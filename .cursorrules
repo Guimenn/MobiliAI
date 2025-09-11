@@ -1,0 +1,95 @@
+# Projeto: Loja de Tintas com Visualização de Cores via IA
+
+description: |
+  Sistema web onde o cliente envia uma foto de uma parede ou ambiente, e o software identifica as cores presentes, permitindo substituí-las virtualmente pela cor de tinta desejada.
+
+  O sistema gerencia toda a operação da empresa, incluindo múltiplas lojas, cadastro de produtos, cores de tinta, estoque manual, vendas e fluxo de caixa.
+
+  O estoque será manual, atualizado pelos funcionários da loja.
+
+value: |
+  Este projeto demonstra engenharia de software completa: frontend moderno, backend modular, banco de dados, integração com IA e APIs externas. 
+  Foca em solução prática para varejo com múltiplas lojas e gestão centralizada.
+  Mantém IA aplicada à experiência do cliente (troca de cores + recomendação), totalmente web, sem hardware extra.
+
+features:
+  - title: Gestão da Empresa e Lojas
+    description: |
+      - Cadastro de produtos, cores de tinta e fornecedores.
+      - Controle de estoque manual por loja.
+      - Registro de vendas e fluxo de caixa por loja e consolidado.
+      - Histórico de clientes, compras e preferências de cores.
+      - Relatórios de desempenho por loja (vendas, cores mais vendidas, receita).
+
+  - title: IA e Visualização de Cores
+    description: |
+      - Detecção de cores na foto enviada pelo cliente (OpenCV/TensorFlow).
+      - Substituição de cores na imagem com a cor escolhida.
+      - Sugestão de paletas complementares e combinações harmoniosas.
+      - Pré-visualização realista antes da compra.
+      - Recomendações de produtos e kits baseadas na cor escolhida.
+
+  - title: Funcionalidades Inovadoras
+    description: |
+      1️⃣ Visualização de Cores Online
+        - Troca de cores em fotos com IA via site.
+        - Paletas inteligentes sugerindo combinações harmoniosas.
+        - Tecnologias: OpenCV, TensorFlow.js, Canvas/WebGL
+
+      2️⃣ Assistente Virtual Inteligente
+        - Chatbot para ajudar na escolha de cores e produtos.
+        - Sugestões de combinações baseadas em estilo, iluminação e preferências do cliente.
+        - Integração com ChatGPT API ou outras APIs de NLP.
+        - Tecnologias: OpenAI GPT API, Rasa, Dialogflow
+
+      3️⃣ Sistema de Autoatendimento Web
+        - Cliente envia foto, escolhe cor, visualiza resultado e adiciona produtos ao carrinho.
+        - Pagamento online via PIX utilizando AbacatePay.
+        - Tecnologias: Next.js + Shadcn/UI, NestJS, AbacatePay API
+
+      4️⃣ Sugestão de Produtos Complementares
+        - IA sugere pincéis, rolos, fitas e kits de pintura completos.
+        - Tecnologias: Sistemas de recomendação (KNN, TensorFlow)
+
+      5️⃣ Experiência Multicanal
+        - Interface web responsiva, mobile-friendly.
+        - Permite salvar projetos e paletas favoritas.
+
+      6️⃣ Marketing Inteligente
+        - Ofertas personalizadas por cliente ou loja.
+        - Sugestões de cores e kits baseadas no histórico de compras.
+        - Tecnologias: Python ou Node.js para Machine Learning, Firebase/Mailchimp API
+
+architecture:
+  frontend:
+    description: |
+      - Next.js com Shadcn/UI para interface moderna e responsiva
+      - Upload de fotos, visualização de cores, carrinho, checkout, integração com chatbot IA
+
+  backend:
+    description: |
+      - NestJS (Node.js) modular e escalável
+      - Módulos: Users, Products, Stores, Sales, AIProcessing
+      - Banco de dados: PostgreSQL (via TypeORM ou Prisma)
+      - Autenticação: JWT + Passport.js
+      - Pagamentos: PIX via AbacatePay API
+
+  ai_and_vision:
+    description: |
+      - OpenCV ou TensorFlow.js para detecção e substituição de cores
+      - API de NLP (ChatGPT ou similar) para assistente virtual
+
+technologies:
+  - Next.js
+  - Shadcn/UI
+  - NestJS
+  - PostgreSQL
+  - TypeORM / Prisma
+  - JWT + Passport.js
+  - AbacatePay API (PIX)
+  - OpenCV
+  - TensorFlow.js
+  - ChatGPT API / NLP APIs
+  - Canvas / WebGL
+  - Python / Node.js (Machine Learning)
+  - Firebase / Mailchimp API
