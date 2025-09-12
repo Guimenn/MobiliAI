@@ -1,0 +1,220 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+        
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  CUSTOMER
+}
+
+enum ProductCategory {
+  TINTA
+  PINCEL
+  ROLO
+  FITA
+  KIT
+  OUTROS
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  CASH
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+  role      UserRole @default(CUSTOMER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  storeId String?
+  store   Store?  @relation(fields: [storeId], references: [id])
+  
+  purchases Sale[] @relation("CustomerSales")
+  sales     Sale[] @relation("EmployeeSales")
+  colorAnalyses ColorAnalysis[]
+  chatSessions ChatSession[]
+
+  @@map("users")
+}
+
+model Store {
+  id      String  @id @default(uuid())
+  name    String
+  address String
+  city    String
+  state   String
+  zipCode String
+  phone   String?
+  email   String?
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  employees User[]    @relation()
+  products  Product[] @relation()
+  sales     Sale[]    @relation()
+
+  @@map("stores")
+}
+
+model Product {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  category    ProductCategory @default(TINTA)
+  price       Decimal         @db.Decimal(10, 2)
+  costPrice   Decimal?        @db.Decimal(10, 2)
+  stock       Int             @default(0)
+  minStock    Int             @default(0)
+  color       String?
+  colorCode   String?
+  brand       String?
+  size        String?
+  unit        String?
+  imageUrl    String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  storeId String
+  store   Store      @relation(fields: [storeId], references: [id])
+  saleItems SaleItem[]
+
+  @@map("products")
+}
+
+model Sale {
+  id              String        @id @default(uuid())
+  saleNumber      String        @unique
+  totalAmount     Decimal       @db.Decimal(10, 2)
+  discount        Decimal       @default(0) @db.Decimal(10, 2)
+  tax             Decimal       @default(0) @db.Decimal(10, 2)
+  status          SaleStatus    @default(PENDING)
+  paymentMethod   PaymentMethod @default(CASH)
+  paymentReference String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  customerId String
+  customer   User      @relation("CustomerSales", fields: [customerId], references: [id])
+  
+  employeeId String
+  employee   User      @relation("EmployeeSales", fields: [employeeId], references: [id])
+  
+  storeId String
+  store   Store     @relation(fields: [storeId], references: [id])
+  
+  items SaleItem[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  saleId String
+  sale   Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("sale_items")
+}
+
+model ColorAnalysis {
+  id                String   @id @default(uuid())
+  imageUrl          String
+  detectedColors    Json
+  suggestedPalettes Json?
+  recommendedProducts Json?
+  processedImageUrl String?
+  isProcessed       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@map("color_analyses")
+}
+
+model ChatSession {
+  id        String   @id @default(uuid())
+  title     String
+  isActive  Boolean  @default(true)
+  context   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  userId String
+  user   User         @relation(fields: [userId], references: [id])
+  messages ChatMessage[]
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  content   String
+  role      MessageRole @default(USER)
+  metadata  Json?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Relations
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
