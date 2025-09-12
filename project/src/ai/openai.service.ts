@@ -564,7 +564,7 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
     try {
       console.log('🎭 DALL-E 3: Executando inpainting com máscara de parede...');
       
-      // Redimensionar imagem se necessário (limite de 16KB)
+      // Redimensionar imagem se necessário (limite de 16KB) e converter para PNG
       const sharp = require('sharp');
       let processedImageBuffer = imageBuffer;
       
@@ -572,11 +572,16 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
         console.log('📏 Imagem muito grande, redimensionando...');
         processedImageBuffer = await sharp(imageBuffer)
           .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-          .jpeg({ quality: 80 })
+          .png({ quality: 80 })
           .toBuffer();
         
         console.log('📊 Tamanho original:', imageBuffer.length, 'bytes');
         console.log('📊 Tamanho redimensionado:', processedImageBuffer.length, 'bytes');
+      } else {
+        // Converter para PNG mesmo se não precisar redimensionar
+        processedImageBuffer = await sharp(imageBuffer)
+          .png()
+          .toBuffer();
       }
       
       // Redimensionar máscara também
@@ -599,7 +604,7 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       const path = require('path');
       const tempDir = path.join(process.cwd(), 'temp');
       
-      const tempImagePath = path.join(tempDir, `dalle_image_${Date.now()}.jpg`);
+      const tempImagePath = path.join(tempDir, `dalle_image_${Date.now()}.png`);
       const tempMaskPath = path.join(tempDir, `dalle_mask_${Date.now()}.png`);
       
       fs.writeFileSync(tempImagePath, processedImageBuffer);
