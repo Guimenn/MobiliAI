@@ -564,6 +564,31 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
     try {
       console.log('🎭 DALL-E 3: Executando inpainting com máscara de parede...');
       
+      // Redimensionar imagem se necessário (limite de 16KB)
+      const sharp = require('sharp');
+      let processedImageBuffer = imageBuffer;
+      
+      if (imageBuffer.length > 16384) {
+        console.log('📏 Imagem muito grande, redimensionando...');
+        processedImageBuffer = await sharp(imageBuffer)
+          .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+        
+        console.log('📊 Tamanho original:', imageBuffer.length, 'bytes');
+        console.log('📊 Tamanho redimensionado:', processedImageBuffer.length, 'bytes');
+      }
+      
+      // Redimensionar máscara também
+      let processedMaskBuffer = maskBuffer;
+      if (maskBuffer.length > 16384) {
+        console.log('📏 Máscara muito grande, redimensionando...');
+        processedMaskBuffer = await sharp(maskBuffer)
+          .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+          .png()
+          .toBuffer();
+      }
+      
       // Criar prompt específico para inpainting de parede
       const prompt = this.createWallInpaintingPrompt(targetColor, newColor);
       
@@ -572,8 +597,8 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       // Chamar DALL-E 3 inpainting
       const response = await this.openai.images.edit({
         model: "gpt-image-1",
-        image: imageBuffer as any,
-        mask: maskBuffer as any,
+        image: processedImageBuffer as any,
+        mask: processedMaskBuffer as any,
         prompt: prompt,
         n: 1,
         size: '1024x1024'
