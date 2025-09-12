@@ -523,7 +523,7 @@ Se não conseguir analisar a imagem, retorne um array vazio: []`;
       
       // Chamar DALL-E 3 inpainting
       const response = await this.openai.images.edit({
-        model: "gpt-4o",
+        model: "dall-e-3",
         image: imageBuffer as any,
         mask: maskBuffer as any,
         prompt: prompt,
