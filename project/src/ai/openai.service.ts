@@ -576,13 +576,23 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
         mask: maskBuffer as any,
         prompt: prompt,
         n: 1,
-        size: '1024x1024',
-        response_format: 'b64_json'
+        size: '1024x1024'
       });
       
-      if (response.data && response.data[0] && response.data[0].b64_json) {
+      if (response.data && response.data[0]) {
         console.log('✅ DALL-E 3 Inpainting: Parede editada com sucesso');
-        return Buffer.from(response.data[0].b64_json, 'base64');
+        
+        // Verificar se tem b64_json ou url
+        if (response.data[0].b64_json) {
+          return Buffer.from(response.data[0].b64_json, 'base64');
+        } else if (response.data[0].url) {
+          // Se retornar URL, fazer download da imagem
+          const imageResponse = await fetch(response.data[0].url);
+          const imageBuffer = await imageResponse.arrayBuffer();
+          return Buffer.from(imageBuffer);
+        } else {
+          throw new Error('Formato de resposta inesperado do DALL-E 3');
+        }
       } else {
         throw new Error('Resposta inesperada do DALL-E 3');
       }
