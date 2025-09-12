@@ -61,7 +61,7 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       console.log('🔑 Chave da API configurada:', this.configService.get<string>('OPENAI_API_KEY') ? 'SIM' : 'NÃO');
 
       const requestData = {
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "user",
@@ -177,7 +177,7 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
             const simplePrompt = `Identifique as cores principais desta imagem. Retorne JSON com hex, rgb, percentage e position para cada cor.`;
             
             const simpleResponse = await this.openai.chat.completions.create({
-              model: "gpt-4o",
+              model: "gpt-4o-mini",
               messages: [
                 {
                   role: "user",
@@ -287,7 +287,7 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       console.log('📤 Enviando requisição para OpenAI para análise...');
       
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "user",
