@@ -571,7 +571,7 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       
       // Chamar DALL-E 3 inpainting
       const response = await this.openai.images.edit({
-        model: "dall-e-3",
+        model: "gpt-image-1",
         image: imageBuffer as any,
         mask: maskBuffer as any,
         prompt: prompt,
