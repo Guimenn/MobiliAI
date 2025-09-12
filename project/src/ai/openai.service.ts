@@ -308,7 +308,7 @@ export class OpenAIService {
       let pixelsChanged = 0;
       
       // Tentar extrair tolerância das instruções da OpenAI
-      let tolerance = 60; // Tolerância padrão
+      let tolerance = 80; // Tolerância maior para capturar variações de iluminação
       let blendMode = 'natural';
       
       if (openaiInstructions) {

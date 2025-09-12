@@ -70,6 +70,7 @@ export class AIService {
     targetColor: string,
     newColor: string,
     userId?: string,
+    tolerance: number = 80,
   ): Promise<{ processedImageUrl: string; analysis: ColorAnalysis }> {
     try {
       // Salvar imagem original
@@ -88,27 +89,45 @@ export class AIService {
         .jpeg({ quality: 80 })
         .toFile(originalImagePath);
 
-      // Usar OpenAI para substituição de cor
-      const processedBuffer = await this.openaiService.replaceColorInImage(
-        imageBuffer,
+      // Primeiro, analisar as cores para obter as variações
+      console.log('🔍 Analisando cores para obter variações...');
+      const tempAnalysis = await this.analyzeImageColors(imageBuffer, userId);
+      
+      // Encontrar a cor selecionada e suas variações
+      const detectedColors = tempAnalysis.detectedColors as any[];
+      const selectedColorData = detectedColors.find(
+        color => color.hex.toLowerCase() === targetColor.toLowerCase()
+      );
+      
+      let colorVariations = null;
+      if (selectedColorData && (selectedColorData as any).variations) {
+        colorVariations = (selectedColorData as any).variations;
+        console.log('📊 Variações encontradas:', colorVariations.length);
+      } else {
+        console.log('⚠️ Variações não encontradas, usando método padrão');
+      }
+
+      // Usar algoritmo inteligente de substituição
+      console.log('🎨 Aplicando substituição inteligente de cores...');
+      console.log('🎯 Tolerância configurada:', tolerance);
+      await this.replaceColor(
+        originalImagePath,
+        processedImagePath,
         targetColor,
-        newColor
+        newColor,
+        colorVariations,
+        tolerance
       );
 
-      // Salvar imagem processada
-      fs.writeFileSync(processedImagePath, processedBuffer);
       console.log('💾 Imagem processada salva em:', processedImagePath);
 
-      // Analisar cores da imagem processada
-      const analysis = await this.analyzeImageColors(imageBuffer, userId);
-      
       // Criar URL HTTP para a imagem processada
       const processedImageUrl = `http://localhost:3001/temp/${imageId}_processed.jpg`;
       console.log('🌐 URL da imagem processada:', processedImageUrl);
       
       // Atualizar análise com URL da imagem processada
       await this.prisma.colorAnalysis.update({
-        where: { id: analysis.id },
+        where: { id: tempAnalysis.id },
         data: {
           processedImageUrl: processedImageUrl,
         },
@@ -116,17 +135,19 @@ export class AIService {
 
       console.log('✅ Troca de cor concluída com sucesso');
       console.log('📊 Resultado final:', {
-        analysisId: analysis.id,
+        analysisId: tempAnalysis.id,
         processedImageUrl: processedImageUrl,
         targetColor: targetColor,
-        newColor: newColor
+        newColor: newColor,
+        variationsUsed: colorVariations?.length || 0
       });
 
       return {
         processedImageUrl: processedImageUrl,
-        analysis,
+        analysis: tempAnalysis,
       };
     } catch (error) {
+      console.error('❌ Erro ao processar imagem:', error);
       throw new Error(`Erro ao processar imagem: ${error.message}`);
     }
   }
@@ -152,17 +173,17 @@ export class AIService {
       const image = sharp(imagePath);
       const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
       
-      const colorMap = new Map<string, { count: number; r: number; g: number; b: number }>();
+      const colorMap = new Map<string, { count: number; r: number; g: number; b: number; pixels: Array<{r: number, g: number, b: number}> }>();
       const totalPixels = info.width * info.height;
       
-      // Amostrar pixels (a cada 10 pixels para performance)
-      for (let i = 0; i < data.length; i += 30) { // 30 = 10 pixels * 3 channels (RGB)
+      // Amostrar pixels (a cada 5 pixels para melhor precisão)
+      for (let i = 0; i < data.length; i += 15) { // 15 = 5 pixels * 3 channels (RGB)
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
         
-        // Agrupar cores similares (tolerância de ±20)
-        const key = `${Math.floor(r / 20) * 20}-${Math.floor(g / 20) * 20}-${Math.floor(b / 20) * 20}`;
+        // Agrupar cores similares com tolerância menor para melhor agrupamento
+        const key = `${Math.floor(r / 15) * 15}-${Math.floor(g / 15) * 15}-${Math.floor(b / 15) * 15}`;
         
         if (colorMap.has(key)) {
           const existing = colorMap.get(key)!;
@@ -170,24 +191,46 @@ export class AIService {
           existing.r = (existing.r + r) / 2;
           existing.g = (existing.g + g) / 2;
           existing.b = (existing.b + b) / 2;
+          existing.pixels.push({ r, g, b });
         } else {
-          colorMap.set(key, { count: 1, r, g, b });
+          colorMap.set(key, { 
+            count: 1, 
+            r, g, b, 
+            pixels: [{ r, g, b }] 
+          });
         }
       }
       
+      // Agrupar cores similares usando clustering
+      const colorGroups = this.groupSimilarColors(Array.from(colorMap.entries()));
+      
       // Converter para array e ordenar por frequência
-      const colors = Array.from(colorMap.entries())
-        .map(([key, value]) => ({
-          hex: this.rgbToHex(Math.round(value.r), Math.round(value.g), Math.round(value.b)),
-          rgb: { r: Math.round(value.r), g: Math.round(value.g), b: Math.round(value.b) },
-          percentage: (value.count / (totalPixels / 10)) * 100,
-          position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
-        }))
+      const colors = colorGroups
+        .map((group) => {
+          const totalCount = group.reduce((sum, [, value]) => sum + value.count, 0);
+          const avgR = Math.round(group.reduce((sum, [, value]) => sum + value.r, 0) / group.length);
+          const avgG = Math.round(group.reduce((sum, [, value]) => sum + value.g, 0) / group.length);
+          const avgB = Math.round(group.reduce((sum, [, value]) => sum + value.b, 0) / group.length);
+          
+          return {
+            hex: this.rgbToHex(avgR, avgG, avgB),
+            rgb: { r: avgR, g: avgG, b: avgB },
+            percentage: (totalCount / (totalPixels / 5)) * 100,
+            position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
+            // Armazenar todas as variações da cor para troca inteligente
+            variations: group.map(([key, value]) => ({
+              key,
+              rgb: { r: Math.round(value.r), g: Math.round(value.g), b: Math.round(value.b) },
+              count: value.count
+            }))
+          };
+        })
         .sort((a, b) => b.percentage - a.percentage)
         .slice(0, 6); // Top 6 cores
       
       return colors;
     } catch (error) {
+      console.error('Erro ao extrair cores:', error);
       // Fallback para cores simuladas se houver erro
       return [
         {
@@ -195,27 +238,105 @@ export class AIService {
           rgb: { r: 255, g: 87, b: 51 },
           percentage: 35.5,
           position: { x: 100, y: 150 },
+          variations: [{ key: '255-87-51', rgb: { r: 255, g: 87, b: 51 }, count: 1000 }]
         },
         {
           hex: '#33FF57',
           rgb: { r: 51, g: 255, b: 87 },
           percentage: 28.2,
           position: { x: 300, y: 200 },
+          variations: [{ key: '51-255-87', rgb: { r: 51, g: 255, b: 87 }, count: 800 }]
         },
         {
           hex: '#3357FF',
           rgb: { r: 51, g: 87, b: 255 },
           percentage: 20.1,
           position: { x: 500, y: 100 },
+          variations: [{ key: '51-87-255', rgb: { r: 51, g: 87, b: 255 }, count: 600 }]
         },
         {
           hex: '#FFFF33',
           rgb: { r: 255, g: 255, b: 51 },
           percentage: 16.2,
           position: { x: 200, y: 300 },
+          variations: [{ key: '255-255-51', rgb: { r: 255, g: 255, b: 51 }, count: 500 }]
         },
       ];
     }
+  }
+
+  private groupSimilarColors(colorEntries: Array<[string, any]>): Array<Array<[string, any]>> {
+    const groups: Array<Array<[string, any]>> = [];
+    const used = new Set<string>();
+    
+    for (const [key, value] of colorEntries) {
+      if (used.has(key)) continue;
+      
+      const group: Array<[string, any]> = [[key, value]];
+      used.add(key);
+      
+      // Encontrar cores similares com múltiplas estratégias
+      for (const [otherKey, otherValue] of colorEntries) {
+        if (used.has(otherKey)) continue;
+        
+        // 1. Distância euclidiana padrão
+        const euclideanDistance = Math.sqrt(
+          Math.pow(value.r - otherValue.r, 2) +
+          Math.pow(value.g - otherValue.g, 2) +
+          Math.pow(value.b - otherValue.b, 2)
+        );
+        
+        // 2. Distância de brilho (para capturar variações de iluminação)
+        const brightnessDistance = Math.abs(
+          (value.r + value.g + value.b) / 3 - (otherValue.r + otherValue.g + otherValue.b) / 3
+        );
+        
+        // 3. Distância de saturação (para capturar variações de intensidade)
+        const saturation1 = Math.max(value.r, value.g, value.b) - Math.min(value.r, value.g, value.b);
+        const saturation2 = Math.max(otherValue.r, otherValue.g, otherValue.b) - Math.min(otherValue.r, otherValue.g, otherValue.b);
+        const saturationDistance = Math.abs(saturation1 - saturation2);
+        
+        // 4. Distância de matiz (para capturar variações de cor)
+        const hue1 = this.rgbToHue(value.r, value.g, value.b);
+        const hue2 = this.rgbToHue(otherValue.r, otherValue.g, otherValue.b);
+        const hueDistance = Math.min(Math.abs(hue1 - hue2), 360 - Math.abs(hue1 - hue2));
+        
+        // Critérios mais flexíveis para agrupar cores similares
+        const isSimilar = 
+          euclideanDistance < 80 || // Tolerância maior para distância euclidiana
+          (euclideanDistance < 120 && brightnessDistance < 40) || // Cores próximas com brilho similar
+          (euclideanDistance < 100 && saturationDistance < 30) || // Cores próximas com saturação similar
+          (euclideanDistance < 90 && hueDistance < 20); // Cores próximas com matiz similar
+        
+        if (isSimilar) {
+          group.push([otherKey, otherValue]);
+          used.add(otherKey);
+        }
+      }
+      
+      groups.push(group);
+    }
+    
+    return groups;
+  }
+
+  private rgbToHue(r: number, g: number, b: number): number {
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const diff = max - min;
+    
+    if (diff === 0) return 0;
+    
+    let hue = 0;
+    if (max === r) {
+      hue = ((g - b) / diff) % 6;
+    } else if (max === g) {
+      hue = (b - r) / diff + 2;
+    } else {
+      hue = (r - g) / diff + 4;
+    }
+    
+    return Math.round(hue * 60);
   }
 
   private rgbToHex(r: number, g: number, b: number): string {
@@ -262,6 +383,8 @@ export class AIService {
     outputPath: string,
     targetColor: string,
     newColor: string,
+    colorVariations?: any[],
+    tolerance: number = 80,
   ): Promise<void> {
     try {
       // Converter cores hex para RGB
@@ -272,31 +395,107 @@ export class AIService {
         throw new Error('Cores inválidas');
       }
 
+      console.log('🎯 Iniciando substituição inteligente de cores...');
+      console.log('🎨 Cor alvo:', targetColor, targetRgb);
+      console.log('🆕 Nova cor:', newColor, newRgb);
+      console.log('📊 Variações disponíveis:', colorVariations?.length || 0);
+
       // Processar imagem com Sharp
       const image = sharp(inputPath);
       const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
       
-      // Aplicar substituição de cor pixel por pixel
+      let pixelsChanged = 0;
+      const totalPixels = data.length / 3;
+      
+      // Aplicar substituição de cor pixel por pixel com algoritmo inteligente
       for (let i = 0; i < data.length; i += 3) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
         
-        // Calcular distância da cor alvo (tolerância de 50)
-        const distance = Math.sqrt(
-          Math.pow(r - targetRgb.r, 2) + 
-          Math.pow(g - targetRgb.g, 2) + 
-          Math.pow(b - targetRgb.b, 2)
-        );
+        let shouldReplace = false;
+        let replacementFactor = 0;
         
-        if (distance < 50) {
-          // Aplicar substituição com transição suave
-          const factor = 1 - (distance / 50);
-          data[i] = Math.round(r + (newRgb.r - r) * factor);
-          data[i + 1] = Math.round(g + (newRgb.g - g) * factor);
-          data[i + 2] = Math.round(b + (newRgb.b - b) * factor);
+        if (colorVariations && colorVariations.length > 0) {
+          // Usar variações agrupadas para substituição mais inteligente
+          for (const variation of colorVariations) {
+            const euclideanDistance = Math.sqrt(
+              Math.pow(r - variation.rgb.r, 2) + 
+              Math.pow(g - variation.rgb.g, 2) + 
+              Math.pow(b - variation.rgb.b, 2)
+            );
+            
+            // Calcular distância de brilho
+            const brightnessDistance = Math.abs(
+              (r + g + b) / 3 - (variation.rgb.r + variation.rgb.g + variation.rgb.b) / 3
+            );
+            
+            // Calcular distância de matiz
+            const hue1 = this.rgbToHue(r, g, b);
+            const hue2 = this.rgbToHue(variation.rgb.r, variation.rgb.g, variation.rgb.b);
+            const hueDistance = Math.min(Math.abs(hue1 - hue2), 360 - Math.abs(hue1 - hue2));
+            
+            // Critérios mais flexíveis para substituição usando tolerância configurável
+            const baseTolerance = tolerance;
+            const isMatch = 
+              euclideanDistance < baseTolerance || // Tolerância configurável para distância euclidiana
+              (euclideanDistance < baseTolerance * 1.5 && brightnessDistance < baseTolerance * 0.5) || // Cores próximas com brilho similar
+              (euclideanDistance < baseTolerance * 1.2 && hueDistance < baseTolerance * 0.3); // Cores próximas com matiz similar
+            
+            if (isMatch) {
+              shouldReplace = true;
+              // Usar o melhor fator de substituição baseado na menor distância
+              const factor = Math.max(
+                1 - (euclideanDistance / baseTolerance),
+                1 - (brightnessDistance / (baseTolerance * 0.5)),
+                1 - (hueDistance / (baseTolerance * 0.3))
+              );
+              replacementFactor = Math.max(replacementFactor, Math.min(1, factor));
+              break;
+            }
+          }
+        } else {
+          // Fallback para método original com tolerância maior
+          const euclideanDistance = Math.sqrt(
+            Math.pow(r - targetRgb.r, 2) + 
+            Math.pow(g - targetRgb.g, 2) + 
+            Math.pow(b - targetRgb.b, 2)
+          );
+          
+          const brightnessDistance = Math.abs(
+            (r + g + b) / 3 - (targetRgb.r + targetRgb.g + targetRgb.b) / 3
+          );
+          
+          if (euclideanDistance < tolerance || (euclideanDistance < tolerance * 1.5 && brightnessDistance < tolerance * 0.5)) {
+            shouldReplace = true;
+            replacementFactor = Math.max(
+              1 - (euclideanDistance / tolerance),
+              1 - (brightnessDistance / (tolerance * 0.5))
+            );
+          }
+        }
+        
+        if (shouldReplace) {
+          // Aplicar substituição com transição suave e preservação de brilho
+          const originalBrightness = (r + g + b) / 3;
+          const newBrightness = (newRgb.r + newRgb.g + newRgb.b) / 3;
+          const brightnessRatio = originalBrightness / newBrightness;
+          
+          // Ajustar a nova cor para manter o brilho original
+          const adjustedNewR = Math.min(255, Math.max(0, newRgb.r * brightnessRatio));
+          const adjustedNewG = Math.min(255, Math.max(0, newRgb.g * brightnessRatio));
+          const adjustedNewB = Math.min(255, Math.max(0, newRgb.b * brightnessRatio));
+          
+          data[i] = Math.round(r + (adjustedNewR - r) * replacementFactor);
+          data[i + 1] = Math.round(g + (adjustedNewG - g) * replacementFactor);
+          data[i + 2] = Math.round(b + (adjustedNewB - b) * replacementFactor);
+          
+          pixelsChanged++;
         }
       }
+      
+      console.log(`✅ Substituição concluída: ${pixelsChanged} pixels alterados de ${totalPixels} total`);
+      console.log(`📊 Taxa de substituição: ${((pixelsChanged / totalPixels) * 100).toFixed(2)}%`);
       
       // Salvar imagem processada
       await sharp(data, {
@@ -310,6 +509,7 @@ export class AIService {
         .toFile(outputPath);
         
     } catch (error) {
+      console.error('❌ Erro na substituição de cores:', error);
       // Fallback: aplicar efeito visual simples
       await sharp(inputPath)
         .modulate({

@@ -16,6 +16,11 @@ interface DetectedColor {
   rgb: { r: number; g: number; b: number };
   percentage: number;
   position: { x: number; y: number };
+  variations?: Array<{
+    key: string;
+    rgb: { r: number; g: number; b: number };
+    count: number;
+  }>;
 }
 
 interface ColorAnalysis {
@@ -45,6 +50,7 @@ export default function ColorVisualizer() {
   const [analysis, setAnalysis] = useState<ColorAnalysis | null>(null);
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const [selectedDetectedColor, setSelectedDetectedColor] = useState<DetectedColor | null>(null);
+  const [tolerance, setTolerance] = useState(80); // Tolerância padrão
   const imageRef = useRef<HTMLImageElement>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -120,7 +126,8 @@ export default function ColorVisualizer() {
       const file = new File([blob], 'image.jpg', { type: 'image/jpeg' });
 
       console.log('📤 Enviando requisição para troca de cor...');
-      const result = await aiAPI.replaceColor(file, targetColor, selectedColor);
+      console.log('🎯 Tolerância selecionada:', tolerance);
+      const result = await aiAPI.replaceColor(file, targetColor, selectedColor, tolerance);
       
       console.log('📥 Resultado recebido:', result);
       console.log('🖼️ URL da imagem processada:', result.processedImageUrl);
@@ -289,14 +296,69 @@ export default function ColorVisualizer() {
               <CardDescription>
                 {selectedDetectedColor 
                   ? `Substituir ${selectedDetectedColor.hex} por uma nova cor`
-                  : 'Selecione uma cor detectada acima para começar'
+                  : analysis 
+                    ? 'Clique em uma cor detectada abaixo para começar'
+                    : 'Analise as cores da imagem primeiro'
                 }
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Cores Detectadas - Integradas */}
+              {analysis && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium flex items-center">
+                      <Eye className="mr-2 h-4 w-4" />
+                      Cores Detectadas na Imagem
+                    </Label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Clique em uma cor para selecioná-la e trocar por uma nova cor
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {analysis.detectedColors.map((color, index) => (
+                      <div
+                        key={index}
+                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
+                          selectedDetectedColor?.hex === color.hex
+                            ? 'border-blue-500 bg-blue-50 shadow-md'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => handleColorClick(color)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="relative">
+                            <div
+                              className="w-10 h-10 rounded-lg border-2 border-white shadow-sm"
+                              style={{ backgroundColor: color.hex }}
+                            />
+                            {selectedDetectedColor?.hex === color.hex && (
+                              <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-1">
+                                <Check className="h-2 w-2" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm truncate">{color.hex}</p>
+                            <p className="text-xs text-gray-600">
+                              RGB({color.rgb.r}, {color.rgb.g}, {color.rgb.b})
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {color.percentage.toFixed(1)}% da imagem
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Seção de Troca de Cores */}
               {selectedDetectedColor ? (
                 <>
-                  <div className="space-y-4">
+                  <div className="border-t pt-6 space-y-4">
                     <div>
                       <Label htmlFor="target-color" className="text-sm font-medium">
                         Cor Original (Selecionada)
@@ -348,6 +410,62 @@ export default function ColorVisualizer() {
                     </div>
                   </div>
 
+                  {/* Controle de Tolerância */}
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <Label htmlFor="tolerance" className="text-sm font-medium">
+                      🎯 Tolerância de Detecção
+                    </Label>
+                    <p className="text-xs text-gray-600 mb-3">
+                      Ajuste a sensibilidade para capturar mais variações da cor (maior = mais agressivo)
+                    </p>
+                    <div className="space-y-2">
+                      <input
+                        id="tolerance"
+                        type="range"
+                        min="40"
+                        max="150"
+                        value={tolerance}
+                        onChange={(e) => setTolerance(Number(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Conservador (40)</span>
+                        <span className="font-medium text-blue-600">{tolerance}</span>
+                        <span>Agressivo (150)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Informações sobre variações de iluminação */}
+                  {selectedDetectedColor.variations && selectedDetectedColor.variations.length > 1 && (
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h5 className="text-sm font-medium text-blue-800 mb-2">
+                        🎨 Variações de Iluminação Detectadas
+                      </h5>
+                      <p className="text-xs text-blue-700 mb-3">
+                        O sistema detectou {selectedDetectedColor.variations.length} variações desta cor devido à iluminação. 
+                        Com tolerância {tolerance}, todas serão substituídas uniformemente.
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedDetectedColor.variations.slice(0, 6).map((variation, index) => (
+                          <div
+                            key={index}
+                            className="w-5 h-5 rounded border border-white shadow-sm"
+                            style={{ 
+                              backgroundColor: `rgb(${variation.rgb.r}, ${variation.rgb.g}, ${variation.rgb.b})` 
+                            }}
+                            title={`Variação ${index + 1}: ${variation.rgb.r}, ${variation.rgb.g}, ${variation.rgb.b}`}
+                          />
+                        ))}
+                        {selectedDetectedColor.variations.length > 6 && (
+                          <div className="w-5 h-5 rounded border border-white shadow-sm bg-gray-300 flex items-center justify-center">
+                            <span className="text-xs text-gray-600">+{selectedDetectedColor.variations.length - 6}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <Button
                     onClick={handleReplaceColor}
                     disabled={isProcessing}
@@ -358,11 +476,18 @@ export default function ColorVisualizer() {
                     {isProcessing ? 'Processando com IA...' : 'Aplicar Nova Cor'}
                   </Button>
                 </>
+              ) : analysis ? (
+                <div className="text-center py-6 border-t">
+                  <Palette className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500">
+                    Selecione uma cor detectada acima para começar a troca
+                  </p>
+                </div>
               ) : (
                 <div className="text-center py-8">
                   <Palette className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                   <p className="text-gray-500">
-                    Selecione uma cor detectada na imagem acima para começar a troca de cores
+                    Analise as cores da imagem primeiro para ver as opções de troca
                   </p>
                 </div>
               )}
@@ -370,77 +495,6 @@ export default function ColorVisualizer() {
           </Card>
         </div>
 
-        {/* Detected Colors Section */}
-        {analysis && (
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Eye className="mr-2 h-5 w-5" />
-                Cores Detectadas na Imagem
-              </CardTitle>
-              <CardDescription>
-                Clique em uma cor para selecioná-la e trocar por uma nova cor
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {analysis.detectedColors.map((color, index) => (
-                  <div
-                    key={index}
-                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
-                      selectedDetectedColor?.hex === color.hex
-                        ? 'border-blue-500 bg-blue-50 shadow-md'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => handleColorClick(color)}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="relative">
-                        <div
-                          className="w-16 h-16 rounded-lg border-2 border-white shadow-sm"
-                          style={{ backgroundColor: color.hex }}
-                        />
-                        {selectedDetectedColor?.hex === color.hex && (
-                          <div className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full p-1">
-                            <Check className="h-3 w-3" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="space-y-1">
-                          <p className="font-semibold text-lg">{color.hex}</p>
-                          <p className="text-sm text-gray-600">
-                            RGB({color.rgb.r}, {color.rgb.g}, {color.rgb.b})
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {color.percentage.toFixed(1)}% da imagem
-                          </p>
-                          {selectedDetectedColor?.hex === color.hex && (
-                            <p className="text-xs text-blue-600 font-medium">
-                              ✓ Cor selecionada para troca
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {selectedDetectedColor && (
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-medium text-blue-900 mb-2">
-                    Cor Selecionada: {selectedDetectedColor.hex}
-                  </h4>
-                  <p className="text-sm text-blue-700">
-                    Esta cor representa {selectedDetectedColor.percentage.toFixed(1)}% da sua imagem. 
-                    Agora escolha a nova cor que deseja aplicar.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Results Section */}
         {analysis && (

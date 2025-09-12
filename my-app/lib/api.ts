@@ -274,11 +274,12 @@ export const aiAPI = {
     return response.data;
   },
 
-  replaceColor: async (imageFile: File, targetColor: string, newColor: string) => {
+  replaceColor: async (imageFile: File, targetColor: string, newColor: string, tolerance: number = 80) => {
     const formData = new FormData();
     formData.append('image', imageFile);
     formData.append('targetColor', targetColor);
     formData.append('newColor', newColor);
+    formData.append('tolerance', tolerance.toString());
     
     const response = await api.post('/ai/replace-color', formData, {
       headers: {

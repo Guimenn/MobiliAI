@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
 export class AIController {
-  constructor(private readonly aiService: AIService) {}
+  constructor(private readonly aiService: AIService) { }
 
   @Post('analyze-colors')
   @UseInterceptors(FileInterceptor('image'))
@@ -55,9 +55,9 @@ export class AIController {
       throw new Error('Imagem é obrigatória');
     }
 
-    const { targetColor, newColor } = req.body;
-    console.log('🎯 Cores recebidas:', { targetColor, newColor });
-    
+    const { targetColor, newColor, tolerance } = req.body;
+    console.log('🎯 Cores recebidas:', { targetColor, newColor, tolerance });
+
     if (!targetColor || !newColor) {
       console.error('❌ AIController: Cores não fornecidas');
       throw new Error('targetColor e newColor são obrigatórios');
@@ -69,14 +69,15 @@ export class AIController {
       targetColor,
       newColor,
       req.user.id,
+      tolerance ? parseInt(tolerance) : 80,
     );
-    
+
     console.log('✅ AIController: Troca de cor concluída');
     console.log('📊 Resultado:', {
       hasProcessedImage: !!result.processedImageUrl,
       processedImageUrl: result.processedImageUrl
     });
-    
+
     return result;
   }
 
