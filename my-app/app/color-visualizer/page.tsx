@@ -54,6 +54,7 @@ export default function ColorVisualizer() {
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const [selectedDetectedColor, setSelectedDetectedColor] = useState<DetectedColor | null>(null);
   const [tolerance, setTolerance] = useState(80); // Tolerância padrão
+  const [useDALLE3, setUseDALLE3] = useState(true); // Usar DALL-E 3 por padrão
   const imageRef = useRef<HTMLImageElement>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -130,7 +131,8 @@ export default function ColorVisualizer() {
 
       console.log('📤 Enviando requisição para troca de cor...');
       console.log('🎯 Tolerância selecionada:', tolerance);
-      const result = await aiAPI.replaceColor(file, targetColor, selectedColor, tolerance);
+      console.log('🎭 Usando DALL-E 3:', useDALLE3);
+      const result = await aiAPI.replaceColor(file, targetColor, selectedColor, tolerance, useDALLE3);
       
       console.log('📥 Resultado recebido:', result);
       console.log('🖼️ URL da imagem processada:', result.processedImageUrl);
@@ -449,6 +451,49 @@ export default function ColorVisualizer() {
                       </div>
                     </div>
                   )}
+
+                  {/* Controle de Método de Processamento */}
+                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <Label className="text-sm font-medium">
+                      🎭 Método de Processamento
+                    </Label>
+                    <p className="text-xs text-gray-600 mb-3">
+                      Escolha entre DALL-E 3 inpainting (mais preciso) ou método tradicional
+                    </p>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="radio"
+                          id="dalle3"
+                          name="method"
+                          checked={useDALLE3}
+                          onChange={() => setUseDALLE3(true)}
+                          className="text-purple-600"
+                        />
+                        <Label htmlFor="dalle3" className="text-sm font-medium">
+                          🎭 DALL-E 3 Inpainting
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="radio"
+                          id="traditional"
+                          name="method"
+                          checked={!useDALLE3}
+                          onChange={() => setUseDALLE3(false)}
+                          className="text-purple-600"
+                        />
+                        <Label htmlFor="traditional" className="text-sm font-medium">
+                          🎨 Método Tradicional
+                        </Label>
+                      </div>
+                    </div>
+                    {useDALLE3 && (
+                      <p className="text-xs text-purple-700 mt-2">
+                        ✅ DALL-E 3 usa IA avançada para editar apenas a parede, preservando reflexos e outros elementos
+                      </p>
+                    )}
+                  </div>
 
                   {/* Controle de Tolerância */}
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">

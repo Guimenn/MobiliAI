@@ -55,8 +55,8 @@ export class AIController {
       throw new Error('Imagem é obrigatória');
     }
 
-    const { targetColor, newColor, tolerance } = req.body;
-    console.log('🎯 Cores recebidas:', { targetColor, newColor, tolerance });
+    const { targetColor, newColor, tolerance, useDALLE3 } = req.body;
+    console.log('🎯 Cores recebidas:', { targetColor, newColor, tolerance, useDALLE3 });
 
     if (!targetColor || !newColor) {
       console.error('❌ AIController: Cores não fornecidas');
@@ -70,6 +70,7 @@ export class AIController {
       newColor,
       req.user.id,
       tolerance ? parseInt(tolerance) : 80,
+      useDALLE3 === 'true' || useDALLE3 === true,
     );
 
     console.log('✅ AIController: Troca de cor concluída');

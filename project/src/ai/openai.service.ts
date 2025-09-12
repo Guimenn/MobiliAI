@@ -56,7 +56,7 @@ export class OpenAIService {
       console.log('🔑 Chave da API configurada:', this.configService.get<string>('OPENAI_API_KEY') ? 'SIM' : 'NÃO');
 
       const requestData = {
-        model: "gpt-4o-mini",
+        model: "gpt-image-1",
         messages: [
           {
             role: "user",
@@ -224,7 +224,7 @@ export class OpenAIService {
       console.log('📤 Enviando requisição para OpenAI para análise...');
       
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-image-1",
         messages: [
           {
             role: "user",
@@ -391,15 +391,6 @@ export class OpenAIService {
     }
   }
 
-  private hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16)
-    } : null;
-  }
-
   private getFallbackColors(): any[] {
     return [
       {
@@ -427,5 +418,160 @@ export class OpenAIService {
         position: { x: 200, y: 300 },
       },
     ];
+  }
+
+  async performDALLE3Inpainting(
+    imageBuffer: Buffer,
+    maskBuffer: Buffer,
+    targetColor: string,
+    newColor: string,
+  ): Promise<Buffer> {
+    try {
+      console.log('🎭 DALL-E 3: Executando inpainting com máscara de parede...');
+      
+      // Criar prompt específico para inpainting de parede
+      const prompt = this.createWallInpaintingPrompt(targetColor, newColor);
+      
+      console.log('📝 Prompt de inpainting:', prompt);
+      
+      // Chamar DALL-E 3 inpainting
+      const response = await this.openai.images.edit({
+        model: "gpt-image-1",
+        image: imageBuffer as any,
+        mask: maskBuffer as any,
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024',
+        response_format: 'b64_json'
+      });
+      
+      if (response.data && response.data[0] && response.data[0].b64_json) {
+        console.log('✅ DALL-E 3 Inpainting: Parede editada com sucesso');
+        return Buffer.from(response.data[0].b64_json, 'base64');
+      } else {
+        throw new Error('Resposta inesperada do DALL-E 3');
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro no DALL-E 3 inpainting:', error);
+      throw error;
+    }
+  }
+
+  private createWallInpaintingPrompt(targetColor: string, newColor: string): string {
+    return `Troque a cor da parede de ${targetColor} para ${newColor}. 
+    Apenas mude a superfície da parede, mantenha todos os outros elementos inalterados incluindo reflexos no chão, móveis e objetos. 
+    Mantenha as mesmas condições de iluminação e sombras. 
+    A nova cor da parede deve ser ${newColor} e parecer natural e realista. 
+    Não altere nenhum reflexo no chão ou outras superfícies. 
+    Foque APENAS na parede, ignore pisos, tetos e objetos.`;
+  }
+
+  async generateWallMask(
+    imageBuffer: Buffer,
+    targetColor: string,
+    tolerance: number = 80,
+  ): Promise<Buffer> {
+    try {
+      console.log('🎭 Gerando máscara inteligente de parede para inpainting...');
+      
+      const sharp = require('sharp');
+      const { data, info } = await sharp(imageBuffer)
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      
+      // Converter cor alvo para RGB
+      const targetRgb = this.hexToRgb(targetColor);
+      if (!targetRgb) {
+        throw new Error('Cor alvo inválida');
+      }
+      
+      // Criar máscara inteligente (imagem em escala de cinza onde branco = área a ser editada)
+      const maskData = Buffer.alloc(data.length);
+      
+      for (let i = 0; i < data.length; i += 3) {
+        const pixelIndex = i / 3;
+        const x = pixelIndex % info.width;
+        const y = Math.floor(pixelIndex / info.width);
+        
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        
+        // Calcular distância da cor alvo
+        const distance = Math.sqrt(
+          Math.pow(r - targetRgb.r, 2) + 
+          Math.pow(g - targetRgb.g, 2) + 
+          Math.pow(b - targetRgb.b, 2)
+        );
+        
+        // Calcular score de parede baseado na posição
+        const wallScore = this.calculateWallScoreForMask(x, y, info.width, info.height);
+        
+        // Se a cor está dentro da tolerância E tem score de parede alto, marcar como área a ser editada
+        const isColorMatch = distance < tolerance;
+        const isWallArea = wallScore > 0.6;
+        
+        const maskValue = (isColorMatch && isWallArea) ? 255 : 0;
+        
+        maskData[i] = maskValue;     // R
+        maskData[i + 1] = maskValue; // G
+        maskData[i + 2] = maskValue; // B
+      }
+      
+      // Converter máscara para PNG
+      const maskBuffer = await sharp(maskData, {
+        raw: {
+          width: info.width,
+          height: info.height,
+          channels: 3,
+        },
+      })
+        .png()
+        .toBuffer();
+      
+      console.log('✅ Máscara inteligente de parede gerada com sucesso');
+      return maskBuffer;
+      
+    } catch (error) {
+      console.error('❌ Erro ao gerar máscara:', error);
+      throw error;
+    }
+  }
+
+  private calculateWallScoreForMask(x: number, y: number, width: number, height: number): number {
+    // Normalizar coordenadas (0-1)
+    const normalizedX = x / width;
+    const normalizedY = y / height;
+    
+    // Score baseado na posição (paredes geralmente estão nas laterais e topo)
+    let positionScore = 0;
+    
+    // Paredes laterais (esquerda e direita)
+    if (normalizedX < 0.2 || normalizedX > 0.8) {
+      positionScore += 0.4;
+    }
+    
+    // Parede superior
+    if (normalizedY < 0.3) {
+      positionScore += 0.3;
+    }
+    
+    // Penalizar área central inferior (geralmente é chão)
+    if (normalizedX > 0.3 && normalizedX < 0.7 && normalizedY > 0.7) {
+      positionScore -= 0.5;
+    }
+    
+    // Score final (0-1)
+    return Math.max(0, Math.min(1, positionScore));
+  }
+
+  private hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
   }
 }

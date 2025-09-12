@@ -274,12 +274,13 @@ export const aiAPI = {
     return response.data;
   },
 
-  replaceColor: async (imageFile: File, targetColor: string, newColor: string, tolerance: number = 80) => {
+  replaceColor: async (imageFile: File, targetColor: string, newColor: string, tolerance: number = 80, useDALLE3: boolean = true) => {
     const formData = new FormData();
     formData.append('image', imageFile);
     formData.append('targetColor', targetColor);
     formData.append('newColor', newColor);
     formData.append('tolerance', tolerance.toString());
+    formData.append('useDALLE3', useDALLE3.toString());
     
     const response = await api.post('/ai/replace-color', formData, {
       headers: {

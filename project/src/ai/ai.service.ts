@@ -71,6 +71,7 @@ export class AIService {
     newColor: string,
     userId?: string,
     tolerance: number = 80,
+    useDALLE3: boolean = true,
   ): Promise<{ processedImageUrl: string; analysis: ColorAnalysis }> {
     try {
       // Salvar imagem original
@@ -107,17 +108,64 @@ export class AIService {
         console.log('⚠️ Variações não encontradas, usando método padrão');
       }
 
-      // Usar algoritmo inteligente de substituição
-      console.log('🎨 Aplicando substituição inteligente de cores...');
-      console.log('🎯 Tolerância configurada:', tolerance);
-      await this.replaceColor(
-        originalImagePath,
-        processedImagePath,
-        targetColor,
-        newColor,
-        colorVariations,
-        tolerance
-      );
+      // Escolher método baseado na preferência do usuário
+      if (useDALLE3) {
+        // Tentar usar DALL-E 3 inpainting primeiro
+        try {
+          console.log('🎭 Tentando usar DALL-E 3 inpainting...');
+          
+          // Gerar máscara de parede
+          const wallMask = await this.openaiService.generateWallMask(
+            imageBuffer,
+            targetColor,
+            tolerance
+          );
+          
+          // Salvar máscara temporariamente para debug
+          const maskPath = path.join(tempDir, `${imageId}_mask.png`);
+          fs.writeFileSync(maskPath, wallMask);
+          console.log('💾 Máscara salva em:', maskPath);
+          
+          // Usar DALL-E 3 inpainting
+          const processedBuffer = await this.openaiService.performDALLE3Inpainting(
+            imageBuffer,
+            wallMask,
+            targetColor,
+            newColor
+          );
+          
+          // Salvar resultado do DALL-E 3
+          fs.writeFileSync(processedImagePath, processedBuffer);
+          console.log('✅ DALL-E 3 inpainting concluído com sucesso');
+          
+        } catch (dalleError) {
+          console.log('⚠️ DALL-E 3 inpainting falhou, usando método tradicional:', dalleError.message);
+          
+          // Fallback para algoritmo tradicional
+          console.log('🎨 Aplicando substituição inteligente de cores...');
+          console.log('🎯 Tolerância configurada:', tolerance);
+          await this.replaceColor(
+            originalImagePath,
+            processedImagePath,
+            targetColor,
+            newColor,
+            colorVariations,
+            tolerance
+          );
+        }
+      } else {
+        // Usar método tradicional diretamente
+        console.log('🎨 Usando método tradicional de substituição de cores...');
+        console.log('🎯 Tolerância configurada:', tolerance);
+        await this.replaceColor(
+          originalImagePath,
+          processedImagePath,
+          targetColor,
+          newColor,
+          colorVariations,
+          tolerance
+        );
+      }
 
       console.log('💾 Imagem processada salva em:', processedImagePath);
 
