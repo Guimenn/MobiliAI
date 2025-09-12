@@ -153,7 +153,7 @@ Se não conseguir analisar a imagem, retorne um array vazio: []`;
         const colors = JSON.parse(jsonContent);
         console.log('✅ JSON parseado com sucesso:', colors);
         console.log('🔍 Verificando se é array:', Array.isArray(colors));
-        if (Array.isArray(colors)) {
+        if (Array.isArray(colors) && colors.length > 0) {
           console.log('✅ Retornando cores da OpenAI:', colors);
           
           // Limpar arquivo temporário
@@ -168,7 +168,7 @@ Se não conseguir analisar a imagem, retorne um array vazio: []`;
           
           return colors;
         } else {
-          console.log('⚠️ Não é array, usando fallback');
+          console.log('⚠️ Array vazio ou inválido, usando fallback');
           return this.getFallbackColors();
         }
       } catch (parseError) {
@@ -409,29 +409,101 @@ Se não conseguir analisar a imagem, retorne um array vazio: []`;
   private getFallbackColors(): any[] {
     return [
       {
-        hex: '#FF5733',
-        rgb: { r: 255, g: 87, b: 51 },
-        percentage: 35.5,
-        position: { x: 100, y: 150 },
+        hex: '#F5F5F5',
+        rgb: { r: 245, g: 245, b: 245 },
+        percentage: 25.0,
+        position: { x: 200, y: 150 },
+        wallScore: 0.8,
+        isWall: true,
+        variations: [
+          {
+            key: '245-245-245',
+            rgb: { r: 245, g: 245, b: 245 },
+            count: 1000,
+            wallScore: 0.8
+          }
+        ]
       },
       {
-        hex: '#33FF57',
-        rgb: { r: 51, g: 255, b: 87 },
-        percentage: 28.2,
+        hex: '#E8E8E8',
+        rgb: { r: 232, g: 232, b: 232 },
+        percentage: 20.0,
         position: { x: 300, y: 200 },
+        wallScore: 0.7,
+        isWall: true,
+        variations: [
+          {
+            key: '232-232-232',
+            rgb: { r: 232, g: 232, b: 232 },
+            count: 800,
+            wallScore: 0.7
+          }
+        ]
       },
       {
-        hex: '#3357FF',
-        rgb: { r: 51, g: 87, b: 255 },
-        percentage: 20.1,
-        position: { x: 500, y: 100 },
+        hex: '#D3D3D3',
+        rgb: { r: 211, g: 211, b: 211 },
+        percentage: 15.0,
+        position: { x: 150, y: 100 },
+        wallScore: 0.6,
+        isWall: true,
+        variations: [
+          {
+            key: '211-211-211',
+            rgb: { r: 211, g: 211, b: 211 },
+            count: 600,
+            wallScore: 0.6
+          }
+        ]
       },
       {
-        hex: '#FFFF33',
-        rgb: { r: 255, g: 255, b: 51 },
-        percentage: 16.2,
-        position: { x: 200, y: 300 },
+        hex: '#BEBEBE',
+        rgb: { r: 190, g: 190, b: 190 },
+        percentage: 12.0,
+        position: { x: 400, y: 250 },
+        wallScore: 0.5,
+        isWall: false,
+        variations: [
+          {
+            key: '190-190-190',
+            rgb: { r: 190, g: 190, b: 190 },
+            count: 480,
+            wallScore: 0.5
+          }
+        ]
       },
+      {
+        hex: '#A9A9A9',
+        rgb: { r: 169, g: 169, b: 169 },
+        percentage: 10.0,
+        position: { x: 350, y: 300 },
+        wallScore: 0.4,
+        isWall: false,
+        variations: [
+          {
+            key: '169-169-169',
+            rgb: { r: 169, g: 169, b: 169 },
+            count: 400,
+            wallScore: 0.4
+          }
+        ]
+      },
+      {
+        hex: '#808080',
+        rgb: { r: 128, g: 128, b: 128 },
+        percentage: 8.0,
+        position: { x: 250, y: 350 },
+        wallScore: 0.3,
+        isWall: false,
+        variations: [
+          {
+            key: '128-128-128',
+            rgb: { r: 128, g: 128, b: 128 },
+            count: 320,
+            wallScore: 0.3
+          }
+        ]
+      }
     ];
   }
 
