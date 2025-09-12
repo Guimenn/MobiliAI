@@ -594,9 +594,8 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       
       console.log('📝 Prompt de inpainting:', prompt);
       
-      // Chamar DALL-E 3 inpainting
+      // Chamar DALL-E 2 inpainting (mais estável)
       const response = await this.openai.images.edit({
-        model: "gpt-image-1",
         image: processedImageBuffer as any,
         mask: processedMaskBuffer as any,
         prompt: prompt,
