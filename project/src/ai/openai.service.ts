@@ -36,27 +36,32 @@ export class OpenAIService {
       const base64Image = fs.readFileSync(imagePath, 'base64');
       console.log('🔄 Imagem convertida para base64, tamanho:', base64Image.length, 'caracteres');
 
-      const prompt = `Analise esta imagem e identifique as 6 cores dominantes. Para cada cor, forneça:
-      1. Código hexadecimal
-      2. Valores RGB
-      3. Porcentagem aproximada da cor na imagem
-      4. Posição aproximada (x, y) onde a cor aparece mais
+      const prompt = `Você é um especialista em análise de cores de imagens. Analise esta imagem e identifique as 6 cores dominantes mais importantes.
 
-      IMPORTANTE: Responda APENAS com JSON válido, sem markdown, sem texto adicional, sem \`\`\`json. Apenas o array JSON:
-      [
-        {
-          "hex": "#FF5733",
-          "rgb": {"r": 255, "g": 87, "b": 51},
-          "percentage": 35.5,
-          "position": {"x": 100, "y": 150}
-        }
-      ]`;
+Para cada cor encontrada, forneça EXATAMENTE no formato JSON abaixo:
+- hex: código hexadecimal da cor
+- rgb: valores RGB numéricos
+- percentage: porcentagem aproximada da cor na imagem
+- position: coordenadas x,y onde a cor aparece mais
+
+IMPORTANTE: Responda APENAS com JSON válido, sem texto adicional, sem explicações, sem markdown. Apenas o array JSON:
+
+[
+  {
+    "hex": "#FF5733",
+    "rgb": {"r": 255, "g": 87, "b": 51},
+    "percentage": 35.5,
+    "position": {"x": 100, "y": 150}
+  }
+]
+
+Se não conseguir analisar a imagem, retorne um array vazio: []`;
 
       console.log('📝 Prompt enviado:', prompt);
       console.log('🔑 Chave da API configurada:', this.configService.get<string>('OPENAI_API_KEY') ? 'SIM' : 'NÃO');
 
       const requestData = {
-        model: "gpt-image-1",
+        model: "gpt-4o",
         messages: [
           {
             role: "user",
@@ -100,6 +105,16 @@ export class OpenAIService {
       if (!content) {
         console.error('❌ Resposta vazia da OpenAI');
         throw new Error('Resposta vazia da OpenAI');
+      }
+
+      console.log('💬 Conteúdo da resposta:', content);
+
+      // Verificar se a IA não conseguiu analisar a imagem
+      if (content.toLowerCase().includes('unable to provide') || 
+          content.toLowerCase().includes('cannot analyze') ||
+          content.toLowerCase().includes('unable to analyze')) {
+        console.log('⚠️ IA não conseguiu analisar a imagem, usando cores padrão');
+        return this.getFallbackColors();
       }
 
       // Tentar parsear JSON da resposta
@@ -224,7 +239,7 @@ export class OpenAIService {
       console.log('📤 Enviando requisição para OpenAI para análise...');
       
       const response = await this.openai.chat.completions.create({
-        model: "gpt-image-1",
+        model: "gpt-4o",
         messages: [
           {
             role: "user",
@@ -436,7 +451,7 @@ export class OpenAIService {
       
       // Chamar DALL-E 3 inpainting
       const response = await this.openai.images.edit({
-        model: "gpt-image-1",
+        model: "gpt-4o",
         image: imageBuffer as any,
         mask: maskBuffer as any,
         prompt: prompt,
