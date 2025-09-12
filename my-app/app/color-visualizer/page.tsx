@@ -16,10 +16,13 @@ interface DetectedColor {
   rgb: { r: number; g: number; b: number };
   percentage: number;
   position: { x: number; y: number };
+  wallScore?: number;
+  isWall?: boolean;
   variations?: Array<{
     key: string;
     rgb: { r: number; g: number; b: number };
     count: number;
+    wallScore?: number;
   }>;
 }
 
@@ -323,6 +326,8 @@ export default function ColorVisualizer() {
                         className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
                           selectedDetectedColor?.hex === color.hex
                             ? 'border-blue-500 bg-blue-50 shadow-md'
+                            : color.isWall
+                            ? 'border-green-200 hover:border-green-300 bg-green-50'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                         onClick={() => handleColorClick(color)}
@@ -338,15 +343,32 @@ export default function ColorVisualizer() {
                                 <Check className="h-2 w-2" />
                               </div>
                             )}
+                            {color.isWall && (
+                              <div className="absolute -bottom-1 -left-1 bg-green-500 text-white rounded-full p-1">
+                                <span className="text-xs font-bold">P</span>
+                              </div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm truncate">{color.hex}</p>
+                            <div className="flex items-center space-x-2">
+                              <p className="font-semibold text-sm truncate">{color.hex}</p>
+                              {color.isWall && (
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                                  Parede
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-600">
                               RGB({color.rgb.r}, {color.rgb.g}, {color.rgb.b})
                             </p>
                             <p className="text-xs text-gray-500">
                               {color.percentage.toFixed(1)}% da imagem
                             </p>
+                            {color.wallScore !== undefined && (
+                              <p className="text-xs text-gray-400">
+                                Score parede: {(color.wallScore * 100).toFixed(0)}%
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -410,6 +432,24 @@ export default function ColorVisualizer() {
                     </div>
                   </div>
 
+                  {/* Aviso para cores não-parede */}
+                  {selectedDetectedColor && !selectedDetectedColor.isWall && (
+                    <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-yellow-600">⚠️</span>
+                        <div>
+                          <h5 className="text-sm font-medium text-yellow-800">
+                            Cor não identificada como parede
+                          </h5>
+                          <p className="text-xs text-yellow-700 mt-1">
+                            Esta cor pode ser de reflexo, chão ou outro objeto. 
+                            O sistema prioriza substituir apenas cores de parede para evitar alterações indesejadas.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Controle de Tolerância */}
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <Label htmlFor="tolerance" className="text-sm font-medium">
@@ -444,17 +484,22 @@ export default function ColorVisualizer() {
                       </h5>
                       <p className="text-xs text-blue-700 mb-3">
                         O sistema detectou {selectedDetectedColor.variations.length} variações desta cor devido à iluminação. 
-                        Com tolerância {tolerance}, todas serão substituídas uniformemente.
+                        {selectedDetectedColor.isWall 
+                          ? ` Com tolerância ${tolerance}, apenas as variações de parede serão substituídas uniformemente.`
+                          : ` ⚠️ Esta cor não é identificada como parede, então pode não ser substituída completamente.`
+                        }
                       </p>
                       <div className="flex flex-wrap gap-1">
                         {selectedDetectedColor.variations.slice(0, 6).map((variation, index) => (
                           <div
                             key={index}
-                            className="w-5 h-5 rounded border border-white shadow-sm"
+                            className={`w-5 h-5 rounded border border-white shadow-sm ${
+                              variation.wallScore && variation.wallScore > 0.5 ? 'ring-2 ring-green-400' : ''
+                            }`}
                             style={{ 
                               backgroundColor: `rgb(${variation.rgb.r}, ${variation.rgb.g}, ${variation.rgb.b})` 
                             }}
-                            title={`Variação ${index + 1}: ${variation.rgb.r}, ${variation.rgb.g}, ${variation.rgb.b}`}
+                            title={`Variação ${index + 1}: ${variation.rgb.r}, ${variation.rgb.g}, ${variation.rgb.b}${variation.wallScore ? ` (Parede: ${(variation.wallScore * 100).toFixed(0)}%)` : ''}`}
                           />
                         ))}
                         {selectedDetectedColor.variations.length > 6 && (
@@ -463,6 +508,11 @@ export default function ColorVisualizer() {
                           </div>
                         )}
                       </div>
+                      {selectedDetectedColor.isWall && (
+                        <p className="text-xs text-green-700 mt-2">
+                          ✅ Cores com anel verde são identificadas como parede e serão substituídas
+                        </p>
+                      )}
                     </div>
                   )}
 

@@ -173,11 +173,15 @@ export class AIService {
       const image = sharp(imagePath);
       const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
       
-      const colorMap = new Map<string, { count: number; r: number; g: number; b: number; pixels: Array<{r: number, g: number, b: number}> }>();
+      const colorMap = new Map<string, { count: number; r: number; g: number; b: number; pixels: Array<{r: number, g: number, b: number, x: number, y: number}> }>();
       const totalPixels = info.width * info.height;
       
       // Amostrar pixels (a cada 5 pixels para melhor precisão)
       for (let i = 0; i < data.length; i += 15) { // 15 = 5 pixels * 3 channels (RGB)
+        const pixelIndex = i / 3;
+        const x = pixelIndex % info.width;
+        const y = Math.floor(pixelIndex / info.width);
+        
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
@@ -191,12 +195,12 @@ export class AIService {
           existing.r = (existing.r + r) / 2;
           existing.g = (existing.g + g) / 2;
           existing.b = (existing.b + b) / 2;
-          existing.pixels.push({ r, g, b });
+          existing.pixels.push({ r, g, b, x, y });
         } else {
           colorMap.set(key, { 
             count: 1, 
             r, g, b, 
-            pixels: [{ r, g, b }] 
+            pixels: [{ r, g, b, x, y }] 
           });
         }
       }
@@ -204,7 +208,7 @@ export class AIService {
       // Agrupar cores similares usando clustering
       const colorGroups = this.groupSimilarColors(Array.from(colorMap.entries()));
       
-      // Converter para array e ordenar por frequência
+      // Converter para array e ordenar por frequência, priorizando cores de parede
       const colors = colorGroups
         .map((group) => {
           const totalCount = group.reduce((sum, [, value]) => sum + value.count, 0);
@@ -212,20 +216,32 @@ export class AIService {
           const avgG = Math.round(group.reduce((sum, [, value]) => sum + value.g, 0) / group.length);
           const avgB = Math.round(group.reduce((sum, [, value]) => sum + value.b, 0) / group.length);
           
+          // Analisar posição dos pixels para determinar se é parede
+          const allPixels = group.flatMap(([, value]) => value.pixels);
+          const wallScore = this.calculateWallScore(allPixels, info.width, info.height);
+          
           return {
             hex: this.rgbToHex(avgR, avgG, avgB),
             rgb: { r: avgR, g: avgG, b: avgB },
             percentage: (totalCount / (totalPixels / 5)) * 100,
             position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
+            wallScore: wallScore, // Score de probabilidade de ser parede (0-1)
+            isWall: wallScore > 0.6, // Considera parede se score > 60%
             // Armazenar todas as variações da cor para troca inteligente
             variations: group.map(([key, value]) => ({
               key,
               rgb: { r: Math.round(value.r), g: Math.round(value.g), b: Math.round(value.b) },
-              count: value.count
+              count: value.count,
+              wallScore: wallScore
             }))
           };
         })
-        .sort((a, b) => b.percentage - a.percentage)
+        .sort((a, b) => {
+          // Priorizar cores de parede primeiro, depois por frequência
+          if (a.isWall && !b.isWall) return -1;
+          if (!a.isWall && b.isWall) return 1;
+          return b.percentage - a.percentage;
+        })
         .slice(0, 6); // Top 6 cores
       
       return colors;
@@ -238,31 +254,82 @@ export class AIService {
           rgb: { r: 255, g: 87, b: 51 },
           percentage: 35.5,
           position: { x: 100, y: 150 },
-          variations: [{ key: '255-87-51', rgb: { r: 255, g: 87, b: 51 }, count: 1000 }]
+          wallScore: 0.8,
+          isWall: true,
+          variations: [{ key: '255-87-51', rgb: { r: 255, g: 87, b: 51 }, count: 1000, wallScore: 0.8 }]
         },
         {
           hex: '#33FF57',
           rgb: { r: 51, g: 255, b: 87 },
           percentage: 28.2,
           position: { x: 300, y: 200 },
-          variations: [{ key: '51-255-87', rgb: { r: 51, g: 255, b: 87 }, count: 800 }]
+          wallScore: 0.3,
+          isWall: false,
+          variations: [{ key: '51-255-87', rgb: { r: 51, g: 255, b: 87 }, count: 800, wallScore: 0.3 }]
         },
         {
           hex: '#3357FF',
           rgb: { r: 51, g: 87, b: 255 },
           percentage: 20.1,
           position: { x: 500, y: 100 },
-          variations: [{ key: '51-87-255', rgb: { r: 51, g: 87, b: 255 }, count: 600 }]
+          wallScore: 0.7,
+          isWall: true,
+          variations: [{ key: '51-87-255', rgb: { r: 51, g: 87, b: 255 }, count: 600, wallScore: 0.7 }]
         },
         {
           hex: '#FFFF33',
           rgb: { r: 255, g: 255, b: 51 },
           percentage: 16.2,
           position: { x: 200, y: 300 },
-          variations: [{ key: '255-255-51', rgb: { r: 255, g: 255, b: 51 }, count: 500 }]
+          wallScore: 0.2,
+          isWall: false,
+          variations: [{ key: '255-255-51', rgb: { r: 255, g: 255, b: 51 }, count: 500, wallScore: 0.2 }]
         },
       ];
     }
+  }
+
+  private calculateWallScore(pixels: Array<{x: number, y: number, r: number, g: number, b: number}>, width: number, height: number): number {
+    if (pixels.length === 0) return 0;
+    
+    let wallScore = 0;
+    const totalPixels = pixels.length;
+    
+    // 1. Análise de posição - paredes geralmente estão nas laterais e topo
+    const topPixels = pixels.filter(p => p.y < height * 0.3).length;
+    const sidePixels = pixels.filter(p => p.x < width * 0.2 || p.x > width * 0.8).length;
+    const centerPixels = pixels.filter(p => p.x > width * 0.3 && p.x < width * 0.7 && p.y > height * 0.4).length;
+    
+    // Paredes tendem a estar no topo e laterais, não no centro inferior
+    wallScore += (topPixels / totalPixels) * 0.4; // 40% do score vem da posição superior
+    wallScore += (sidePixels / totalPixels) * 0.3; // 30% do score vem das laterais
+    wallScore -= (centerPixels / totalPixels) * 0.2; // Penalizar pixels no centro inferior (chão)
+    
+    // 2. Análise de cor - paredes tendem a ter cores mais uniformes
+    const avgR = pixels.reduce((sum, p) => sum + p.r, 0) / totalPixels;
+    const avgG = pixels.reduce((sum, p) => sum + p.g, 0) / totalPixels;
+    const avgB = pixels.reduce((sum, p) => sum + p.b, 0) / totalPixels;
+    
+    // Calcular variância da cor
+    const variance = pixels.reduce((sum, p) => {
+      const distance = Math.sqrt(
+        Math.pow(p.r - avgR, 2) + 
+        Math.pow(p.g - avgG, 2) + 
+        Math.pow(p.b - avgB, 2)
+      );
+      return sum + distance;
+    }, 0) / totalPixels;
+    
+    // Cores mais uniformes (menor variância) são mais prováveis de serem paredes
+    const uniformityScore = Math.max(0, 1 - (variance / 100)); // Normalizar variância
+    wallScore += uniformityScore * 0.3; // 30% do score vem da uniformidade da cor
+    
+    // 3. Análise de brilho - reflexos tendem a ser mais brilhantes
+    const avgBrightness = (avgR + avgG + avgB) / 3;
+    const brightnessScore = avgBrightness < 200 ? 0.1 : 0; // Penalizar cores muito brilhantes (reflexos)
+    wallScore += brightnessScore;
+    
+    return Math.max(0, Math.min(1, wallScore)); // Garantir que o score esteja entre 0 e 1
   }
 
   private groupSimilarColors(colorEntries: Array<[string, any]>): Array<Array<[string, any]>> {
@@ -419,6 +486,11 @@ export class AIService {
         if (colorVariations && colorVariations.length > 0) {
           // Usar variações agrupadas para substituição mais inteligente
           for (const variation of colorVariations) {
+            // VERIFICAÇÃO CRÍTICA: Só substituir se for cor de parede
+            if (variation.wallScore < 0.5) {
+              continue; // Pular cores que não são de parede (reflexos, chão, etc.)
+            }
+            
             const euclideanDistance = Math.sqrt(
               Math.pow(r - variation.rgb.r, 2) + 
               Math.pow(g - variation.rgb.g, 2) + 
