@@ -36,15 +36,15 @@ export class OpenAIService {
       const base64Image = fs.readFileSync(imagePath, 'base64');
       console.log('🔄 Imagem convertida para base64, tamanho:', base64Image.length, 'caracteres');
 
-      const prompt = `Você é um especialista em análise de cores de imagens. Analise esta imagem e identifique as 6 cores dominantes mais importantes.
+      const prompt = `Analise esta imagem e identifique as 6 cores dominantes. Você DEVE analisar a imagem e retornar cores reais.
 
-Para cada cor encontrada, forneça EXATAMENTE no formato JSON abaixo:
-- hex: código hexadecimal da cor
-- rgb: valores RGB numéricos
-- percentage: porcentagem aproximada da cor na imagem
-- position: coordenadas x,y onde a cor aparece mais
+Para cada cor, forneça:
+- hex: código hexadecimal
+- rgb: valores RGB
+- percentage: porcentagem da cor na imagem
+- position: coordenadas x,y
 
-IMPORTANTE: Responda APENAS com JSON válido, sem texto adicional, sem explicações, sem markdown. Apenas o array JSON:
+OBRIGATÓRIO: Retorne APENAS JSON válido, sem texto adicional:
 
 [
   {
@@ -55,7 +55,7 @@ IMPORTANTE: Responda APENAS com JSON válido, sem texto adicional, sem explicaç
   }
 ]
 
-Se não conseguir analisar a imagem, retorne um array vazio: []`;
+NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
 
       console.log('📝 Prompt enviado:', prompt);
       console.log('🔑 Chave da API configurada:', this.configService.get<string>('OPENAI_API_KEY') ? 'SIM' : 'NÃO');
@@ -112,7 +112,9 @@ Se não conseguir analisar a imagem, retorne um array vazio: []`;
       // Verificar se a IA não conseguiu analisar a imagem
       if (content.toLowerCase().includes('unable to provide') || 
           content.toLowerCase().includes('cannot analyze') ||
-          content.toLowerCase().includes('unable to analyze')) {
+          content.toLowerCase().includes('unable to analyze') ||
+          content.toLowerCase().includes('i cannot') ||
+          content.toLowerCase().includes('i\'m unable')) {
         console.log('⚠️ IA não conseguiu analisar a imagem, usando cores padrão');
         return this.getFallbackColors();
       }
@@ -168,7 +170,53 @@ Se não conseguir analisar a imagem, retorne um array vazio: []`;
           
           return colors;
         } else {
-          console.log('⚠️ Array vazio ou inválido, usando fallback');
+          console.log('⚠️ Array vazio ou inválido, tentando análise alternativa...');
+          
+          // Tentar com prompt mais simples
+          try {
+            const simplePrompt = `Identifique as cores principais desta imagem. Retorne JSON com hex, rgb, percentage e position para cada cor.`;
+            
+            const simpleResponse = await this.openai.chat.completions.create({
+              model: "gpt-4o",
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "text",
+                      text: simplePrompt,
+                    },
+                    {
+                      type: "image_url",
+                      image_url: {
+                        url: `data:image/jpeg;base64,${base64Image}`,
+                      },
+                    },
+                  ],
+                },
+              ],
+              max_tokens: 500,
+            });
+            
+            const simpleContent = simpleResponse.choices[0]?.message?.content;
+            if (simpleContent) {
+              console.log('🔄 Tentativa alternativa:', simpleContent);
+              
+              // Tentar extrair JSON da resposta
+              const jsonMatch = simpleContent.match(/\[[\s\S]*\]/);
+              if (jsonMatch) {
+                const alternativeColors = JSON.parse(jsonMatch[0]);
+                if (Array.isArray(alternativeColors) && alternativeColors.length > 0) {
+                  console.log('✅ Análise alternativa bem-sucedida:', alternativeColors);
+                  return alternativeColors;
+                }
+              }
+            }
+          } catch (altError) {
+            console.log('⚠️ Análise alternativa falhou:', altError.message);
+          }
+          
+          console.log('⚠️ Usando cores padrão como fallback final');
           return this.getFallbackColors();
         }
       } catch (parseError) {
