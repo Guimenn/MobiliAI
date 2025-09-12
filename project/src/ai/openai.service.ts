@@ -594,14 +594,36 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       
       console.log('📝 Prompt de inpainting:', prompt);
       
+      // Salvar arquivos temporários para DALL-E
+      const fs = require('fs');
+      const path = require('path');
+      const tempDir = path.join(process.cwd(), 'temp');
+      
+      const tempImagePath = path.join(tempDir, `dalle_image_${Date.now()}.jpg`);
+      const tempMaskPath = path.join(tempDir, `dalle_mask_${Date.now()}.png`);
+      
+      fs.writeFileSync(tempImagePath, processedImageBuffer);
+      fs.writeFileSync(tempMaskPath, processedMaskBuffer);
+      
+      console.log('💾 Arquivos temporários salvos para DALL-E');
+      
       // Chamar DALL-E 2 inpainting (mais estável)
       const response = await this.openai.images.edit({
-        image: processedImageBuffer as any,
-        mask: processedMaskBuffer as any,
+        image: fs.createReadStream(tempImagePath),
+        mask: fs.createReadStream(tempMaskPath),
         prompt: prompt,
         n: 1,
         size: '1024x1024'
       });
+      
+      // Limpar arquivos temporários
+      try {
+        fs.unlinkSync(tempImagePath);
+        fs.unlinkSync(tempMaskPath);
+        console.log('🗑️ Arquivos temporários do DALL-E removidos');
+      } catch (cleanupError) {
+        console.warn('⚠️ Erro ao remover arquivos temporários:', cleanupError);
+      }
       
       if (response.data && response.data[0]) {
         console.log('✅ DALL-E 3 Inpainting: Parede editada com sucesso');
