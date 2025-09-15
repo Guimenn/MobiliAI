@@ -15,7 +15,7 @@ export class AIService {
     private openaiService: OpenAIService,
   ) {}
 
-  async analyzeImageColors(imageBuffer: Buffer, userId?: string): Promise<ColorAnalysis> {
+  async analyzeImageColors(imageBuffer: Buffer, userId?: string, mimeType?: string): Promise<ColorAnalysis> {
     try {
       console.log('🎨 AIService: Iniciando análise de cores...');
       console.log('👤 User ID:', userId);
@@ -38,7 +38,7 @@ export class AIService {
 
       console.log('🔄 AIService: Chamando OpenAI service...');
       // Usar OpenAI para análise de cores
-      const detectedColors = await this.openaiService.analyzeImageColors(imageBuffer);
+      const detectedColors = await this.openaiService.analyzeImageColors(imageBuffer, mimeType);
       console.log('✅ AIService: OpenAI retornou cores:', detectedColors);
       
       // Gerar paletas sugeridas

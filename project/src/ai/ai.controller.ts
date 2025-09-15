@@ -27,8 +27,29 @@ export class AIController {
       throw new Error('Imagem é obrigatória');
     }
 
+    // Validar formato da imagem
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      console.error('❌ AIController: Formato de imagem não suportado:', file.mimetype);
+      throw new Error(`Formato de imagem não suportado. Formatos aceitos: ${allowedMimeTypes.join(', ')}`);
+    }
+
+    // Validar tamanho do arquivo (máximo 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      console.error('❌ AIController: Arquivo muito grande:', file.size, 'bytes');
+      throw new Error('Arquivo muito grande. Tamanho máximo: 10MB');
+    }
+
+    // Validar se o buffer não está vazio
+    if (!file.buffer || file.buffer.length === 0) {
+      console.error('❌ AIController: Buffer da imagem vazio');
+      throw new Error('Imagem inválida ou corrompida');
+    }
+
+    console.log('✅ AIController: Validações passaram - formato:', file.mimetype, 'tamanho:', file.size, 'bytes');
     console.log('🔄 AIController: Chamando AI service...');
-    const result = await this.aiService.analyzeImageColors(file.buffer, req.user.id);
+    const result = await this.aiService.analyzeImageColors(file.buffer, req.user.id, file.mimetype);
     console.log('✅ AIController: Análise concluída, retornando resultado');
     return result;
   }
@@ -53,6 +74,13 @@ export class AIController {
     if (!file) {
       console.error('❌ AIController: Nenhum arquivo enviado');
       throw new Error('Imagem é obrigatória');
+    }
+
+    // Validar formato da imagem
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      console.error('❌ AIController: Formato de imagem não suportado:', file.mimetype);
+      throw new Error(`Formato de imagem não suportado. Formatos aceitos: ${allowedMimeTypes.join(', ')}`);
     }
 
     const { targetColor, newColor } = req.body;
