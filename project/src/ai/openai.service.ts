@@ -14,10 +14,31 @@ export class OpenAIService {
     });
   }
 
-  async analyzeImageColors(imageBuffer: Buffer): Promise<any[]> {
+  async analyzeImageColors(imageBuffer: Buffer, mimeType?: string): Promise<any[]> {
     try {
       console.log('🔍 Iniciando análise de cores com OpenAI...');
       console.log('📊 Tamanho do buffer da imagem:', imageBuffer.length, 'bytes');
+      console.log('📋 MIME type:', mimeType);
+      
+      // Determinar extensão baseada no MIME type
+      let extension = 'jpg'; // padrão
+      if (mimeType) {
+        switch (mimeType) {
+          case 'image/png':
+            extension = 'png';
+            break;
+          case 'image/jpeg':
+          case 'image/jpg':
+            extension = 'jpg';
+            break;
+          case 'image/gif':
+            extension = 'gif';
+            break;
+          case 'image/webp':
+            extension = 'webp';
+            break;
+        }
+      }
       
       // Salvar imagem temporariamente
       const tempDir = path.join(process.cwd(), 'temp');
@@ -26,11 +47,34 @@ export class OpenAIService {
       }
 
       const imageId = Date.now().toString();
-      const imagePath = path.join(tempDir, `${imageId}.jpg`);
+      const imagePath = path.join(tempDir, `${imageId}.${extension}`);
       
-      // Salvar buffer como arquivo
-      fs.writeFileSync(imagePath, imageBuffer);
-      console.log('💾 Imagem salva em:', imagePath);
+      // Converter imagem para JPEG usando Sharp para garantir compatibilidade
+      const sharp = require('sharp');
+      
+      // Validar se a imagem é válida
+      try {
+        const metadata = await sharp(imageBuffer).metadata();
+        console.log('📋 Metadados da imagem:', {
+          format: metadata.format,
+          width: metadata.width,
+          height: metadata.height,
+          channels: metadata.channels
+        });
+      } catch (metadataError) {
+        console.error('❌ Erro ao ler metadados da imagem:', metadataError);
+        throw new Error('Imagem inválida ou corrompida');
+      }
+      
+      const jpegBuffer = await sharp(imageBuffer)
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      
+      // Salvar como JPEG
+      fs.writeFileSync(imagePath, jpegBuffer);
+      console.log('💾 Imagem convertida e salva em:', imagePath);
+      console.log('📊 Tamanho original:', imageBuffer.length, 'bytes');
+      console.log('📊 Tamanho convertido:', jpegBuffer.length, 'bytes');
 
       // Converter para base64
       const base64Image = fs.readFileSync(imagePath, 'base64');
@@ -73,7 +117,7 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
               {
                 type: "image_url",
                 image_url: {
-                  url: `data:image/jpeg;base64,${base64Image}`,
+                  url: `data:${mimeType || 'image/jpeg'};base64,${base64Image}`,
                 },
               },
             ],
@@ -265,23 +309,27 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       const base64Image = fs.readFileSync(inputPath, 'base64');
       console.log('🔄 Imagem convertida para base64');
 
-      const prompt = `Você é um especialista em processamento de imagens. Analise esta imagem e identifique todas as áreas que contêm a cor ${targetColor} ou cores muito similares (tolerância de ±30 em RGB).
+      const prompt = `Você é um especialista em processamento de imagens para pintura de paredes. Analise esta imagem e identifique TODA a área da parede que contém a cor ${targetColor}.
 
-      TAREFA: Substituir a cor ${targetColor} pela cor ${newColor} de forma realista e natural.
+      TAREFA: Substituir a cor da parede INTEIRA pela cor ${newColor}, aplicando uniformemente em toda a superfície da parede, mas mantendo a cor original do resto da imagem.
 
-      REQUISITOS:
-      - Manter a mesma iluminação, sombras e texturas
-      - Preservar a forma e estrutura dos objetos
-      - Aplicar transições suaves entre as cores
-      - Manter a naturalidade da cena
+      REQUISITOS CRÍTICOS:
+      - Identificar TODA a área da parede (incluindo diferentes tons da mesma cor)
+      - Aplicar a nova cor de forma UNIFORME em toda a parede
+      - Manter a iluminação e sombras naturais (preservar luminância)
+      - Preservar contornos de objetos (quadros, molduras, etc.)
+      - Cobrir TODOS os tons da cor da parede, não apenas a cor exata
+      - Usar tolerância alta para cobrir toda a parede
 
       IMPORTANTE: Responda APENAS com JSON válido:
       {
-        "instructions": "Descrição detalhada de como fazer a substituição",
+        "instructions": "Substituir cor da parede inteira uniformemente preservando iluminação",
         "confidence": 0.95,
-        "areas_to_replace": ["descrição das áreas identificadas"],
-        "color_tolerance": 30,
-        "blend_mode": "natural"
+        "areas_to_replace": ["toda a área da parede identificada"],
+        "color_tolerance": 80,
+        "blend_mode": "wall_full_coverage",
+        "preserve_edges": false,
+        "preserve_luminance": 0.7
       }`;
 
       console.log('📤 Enviando requisição para OpenAI para análise...');
@@ -338,13 +386,13 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
     newColor: string,
     openaiInstructions?: string,
   ): Promise<Buffer> {
-    // Implementação local de substituição de cor usando Sharp
-    // Esta é uma versão simplificada - em produção, usar OpenCV ou similar
+    // Implementação melhorada de substituição de cor usando Sharp
+    // Foca em preservar iluminação e contornos naturais
     
     const sharp = require('sharp');
     
     try {
-      console.log('🔧 Processando substituição de cor local...');
+      console.log('🔧 Processando substituição de cor melhorada...');
       if (openaiInstructions) {
         console.log('📋 Instruções da OpenAI:', openaiInstructions);
       }
@@ -360,6 +408,11 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       console.log('🎯 Cor alvo RGB:', targetRgb);
       console.log('🆕 Nova cor RGB:', newRgb);
 
+      // Primeiro, vamos usar uma abordagem mais sofisticada
+      // 1. Detectar bordas para preservar contornos
+      // 2. Usar máscara de luminância para preservar iluminação
+      // 3. Aplicar substituição mais seletiva
+
       // Processar imagem com Sharp
       const { data, info } = await sharp(imageBuffer)
         .raw()
@@ -370,61 +423,138 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       
       let pixelsChanged = 0;
       
-      // Tentar extrair tolerância das instruções da OpenAI
-      let tolerance = 80; // Tolerância maior para capturar variações de iluminação
-      let blendMode = 'natural';
+      // Configurações para trocar cor da parede inteira
+      let tolerance = 80; // Tolerância maior para cobrir toda a parede
+      let edgeThreshold = 40; // Threshold para detectar bordas (mais alto)
+      let luminancePreservation = 0.7; // Preservar 70% da luminância original
+      let preserveEdges = false; // Não preservar bordas para cobrir parede inteira
       
       if (openaiInstructions) {
         try {
           const instructions = JSON.parse(openaiInstructions);
           if (instructions.color_tolerance) {
-            tolerance = instructions.color_tolerance;
+            tolerance = Math.min(instructions.color_tolerance, 30); // Limitar tolerância
           }
-          if (instructions.blend_mode) {
-            blendMode = instructions.blend_mode;
+          if (instructions.preserve_luminance) {
+            luminancePreservation = instructions.preserve_luminance;
           }
-          console.log('📋 Usando configurações da OpenAI:', { tolerance, blendMode });
+          if (instructions.preserve_edges !== undefined) {
+            preserveEdges = instructions.preserve_edges;
+          }
+          console.log('📋 Usando configurações da OpenAI:', { 
+            tolerance, 
+            luminancePreservation, 
+            preserveEdges 
+          });
         } catch (e) {
           console.log('⚠️ Não foi possível parsear instruções da OpenAI, usando padrões');
         }
       }
       
-      // Aplicar substituição de cor pixel por pixel
+      // Criar mapa de bordas simples
+      const edgeMap = new Array(info.width * info.height).fill(false);
+      
+      // Detectar bordas usando gradiente simples
+      for (let y = 1; y < info.height - 1; y++) {
+        for (let x = 1; x < info.width - 1; x++) {
+          const idx = (y * info.width + x) * 3;
+          const idxUp = ((y - 1) * info.width + x) * 3;
+          const idxDown = ((y + 1) * info.width + x) * 3;
+          const idxLeft = (y * info.width + (x - 1)) * 3;
+          const idxRight = (y * info.width + (x + 1)) * 3;
+          
+          // Calcular gradiente
+          const gradX = Math.abs(data[idx] - data[idxRight]) + 
+                       Math.abs(data[idx + 1] - data[idxRight + 1]) + 
+                       Math.abs(data[idx + 2] - data[idxRight + 2]);
+          
+          const gradY = Math.abs(data[idx] - data[idxDown]) + 
+                       Math.abs(data[idx + 1] - data[idxDown + 1]) + 
+                       Math.abs(data[idx + 2] - data[idxDown + 2]);
+          
+          const gradient = Math.sqrt(gradX * gradX + gradY * gradY);
+          
+          if (gradient > edgeThreshold) {
+            edgeMap[y * info.width + x] = true;
+          }
+        }
+      }
+      
+      // Primeiro, identificar a cor dominante da parede
+      const colorMap = new Map<string, number>();
       for (let i = 0; i < data.length; i += 3) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
         
-        // Calcular distância da cor alvo
+        // Agrupar cores similares (tolerância de ±15)
+        const key = `${Math.floor(r / 15) * 15}-${Math.floor(g / 15) * 15}-${Math.floor(b / 15) * 15}`;
+        colorMap.set(key, (colorMap.get(key) || 0) + 1);
+      }
+      
+      // Encontrar a cor mais comum (provavelmente a parede)
+      let dominantColor = targetRgb;
+      let maxCount = 0;
+      for (const [key, count] of colorMap.entries()) {
+        if (count > maxCount) {
+          const [r, g, b] = key.split('-').map(Number);
+          dominantColor = { r, g, b };
+          maxCount = count;
+        }
+      }
+      
+      console.log('🎯 Cor dominante identificada:', dominantColor);
+      console.log('📊 Frequência da cor dominante:', maxCount);
+      
+      // Aplicar substituição de cor pixel por pixel para parede inteira
+      for (let i = 0; i < data.length; i += 3) {
+        const pixelIndex = i / 3;
+        const x = pixelIndex % info.width;
+        const y = Math.floor(pixelIndex / info.width);
+        const isEdge = edgeMap[pixelIndex];
+        
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        
+        // Calcular distância da cor alvo (mais permissivo)
         const distance = Math.sqrt(
           Math.pow(r - targetRgb.r, 2) + 
           Math.pow(g - targetRgb.g, 2) + 
           Math.pow(b - targetRgb.b, 2)
         );
         
-        if (distance < tolerance) {
-          // Aplicar substituição com transição suave
-          const factor = 1 - (distance / tolerance);
-          let smoothFactor;
+        // Calcular distância da cor dominante também
+        const dominantDistance = Math.sqrt(
+          Math.pow(r - dominantColor.r, 2) + 
+          Math.pow(g - dominantColor.g, 2) + 
+          Math.pow(b - dominantColor.b, 2)
+        );
+        
+        // Aplicar se for cor da parede (alvo ou dominante) e não for borda forte
+        const isWallColor = distance < tolerance || dominantDistance < 60;
+        const isStrongEdge = isEdge && edgeMap[pixelIndex];
+        
+        if (isWallColor && !isStrongEdge) {
+          // Calcular luminância original
+          const originalLuminance = 0.299 * r + 0.587 * g + 0.114 * b;
           
-          // Ajustar fator de suavização baseado no modo de blend
-          switch (blendMode) {
-            case 'natural':
-              smoothFactor = Math.pow(factor, 0.7);
-              break;
-            case 'smooth':
-              smoothFactor = Math.pow(factor, 0.5);
-              break;
-            case 'sharp':
-              smoothFactor = factor;
-              break;
-            default:
-              smoothFactor = Math.pow(factor, 0.7);
-          }
+          // Aplicar substituição mais agressiva para parede inteira
+          const factor = Math.max(0.3, 1 - (Math.min(distance, dominantDistance) / tolerance));
+          const smoothFactor = Math.pow(factor, 0.6); // Menos suave para cobertura total
           
-          data[i] = Math.round(r + (newRgb.r - r) * smoothFactor);
-          data[i + 1] = Math.round(g + (newRgb.g - g) * smoothFactor);
-          data[i + 2] = Math.round(b + (newRgb.b - b) * smoothFactor);
+          // Calcular nova cor mantendo luminância
+          const newR = Math.round(r + (newRgb.r - r) * smoothFactor);
+          const newG = Math.round(g + (newRgb.g - g) * smoothFactor);
+          const newB = Math.round(b + (newRgb.b - b) * smoothFactor);
+          
+          // Ajustar para preservar luminância original
+          const newLuminance = 0.299 * newR + 0.587 * newG + 0.114 * newB;
+          const luminanceRatio = originalLuminance / (newLuminance + 0.001);
+          
+          data[i] = Math.min(255, Math.max(0, Math.round(newR * luminanceRatio * luminancePreservation + r * (1 - luminancePreservation))));
+          data[i + 1] = Math.min(255, Math.max(0, Math.round(newG * luminanceRatio * luminancePreservation + g * (1 - luminancePreservation))));
+          data[i + 2] = Math.min(255, Math.max(0, Math.round(newB * luminanceRatio * luminancePreservation + b * (1 - luminancePreservation))));
           
           pixelsChanged++;
         }
@@ -432,6 +562,7 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
       
       console.log('✅ Pixels alterados:', pixelsChanged);
       console.log('📈 Porcentagem alterada:', ((pixelsChanged * 3) / data.length * 100).toFixed(2) + '%');
+      console.log('🎨 Preservação de luminância:', (luminancePreservation * 100) + '%');
       
       // Retornar buffer processado
       const processedBuffer = await sharp(data, {
@@ -444,7 +575,7 @@ NÃO retorne array vazio. Analise a imagem e forneça cores reais.`;
         .jpeg({ quality: 95 })
         .toBuffer();
         
-      console.log('🎨 Processamento concluído com sucesso');
+      console.log('🎨 Processamento melhorado concluído com sucesso');
       return processedBuffer;
         
     } catch (error) {
