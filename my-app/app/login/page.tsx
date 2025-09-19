@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Palette, Eye, EyeOff } from 'lucide-react';
+import { Sparkles, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -62,27 +62,25 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Logo */}
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center">
-            <Palette className="h-8 w-8 text-white" />
-          </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            Loja de Tintas
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <Link href="/" className="flex items-center justify-center space-x-2">
+            <Sparkles className="h-10 w-10 text-blue-600" />
+            <span className="text-3xl font-bold text-gray-900 dark:text-white">MobiliAI</span>
+          </Link>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
             Faça login em sua conta
           </p>
         </div>
 
         {/* Login Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Entrar</CardTitle>
+        <Card className="border-0 shadow-xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Bem-vindo de volta</CardTitle>
             <CardDescription>
-              Digite suas credenciais para acessar sua conta
+              Entre na sua conta para continuar sua jornada de decoração
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -98,6 +96,7 @@ export default function LoginPage() {
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="seu@email.com"
+                  className="h-11"
                 />
               </div>
 
@@ -113,6 +112,7 @@ export default function LoginPage() {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="Sua senha"
+                    className="h-11 pr-10"
                   />
                   <button
                     type="button"
@@ -128,9 +128,25 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <input
+                    id="remember"
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                  />
+                  <Label htmlFor="remember" className="text-sm text-gray-600">
+                    Lembrar de mim
+                  </Label>
+                </div>
+                <Link href="#" className="text-sm text-blue-600 hover:underline">
+                  Esqueceu a senha?
+                </Link>
+              </div>
+
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700"
                 disabled={isLoading}
               >
                 {isLoading ? 'Entrando...' : 'Entrar'}
@@ -140,8 +156,8 @@ export default function LoginPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 Não tem uma conta?{' '}
-                <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
-                  Cadastre-se
+                <Link href="/register" className="font-medium text-blue-600 hover:underline">
+                  Criar conta gratuita
                 </Link>
               </p>
             </div>

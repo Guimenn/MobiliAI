@@ -20,11 +20,13 @@ enum UserRole {
 }
 
 enum ProductCategory {
-  TINTA
-  PINCEL
-  ROLO
-  FITA
-  KIT
+  SOFA
+  MESA
+  CADEIRA
+  ARMARIO
+  CAMA
+  DECORACAO
+  ILUMINACAO
   OUTROS
 }
 
@@ -69,7 +71,7 @@ model User {
   
   purchases Sale[] @relation("CustomerSales")
   sales     Sale[] @relation("EmployeeSales")
-  colorAnalyses ColorAnalysis[]
+  furnitureAnalyses FurnitureAnalysis[]
   chatSessions ChatSession[]
 
   @@map("users")
@@ -100,16 +102,17 @@ model Product {
   id          String          @id @default(uuid())
   name        String
   description String?
-  category    ProductCategory @default(TINTA)
+  category    ProductCategory @default(SOFA)
   price       Decimal         @db.Decimal(10, 2)
   costPrice   Decimal?        @db.Decimal(10, 2)
   stock       Int             @default(0)
   minStock    Int             @default(0)
   color       String?
-  colorCode   String?
+  material    String?
   brand       String?
-  size        String?
-  unit        String?
+  dimensions  String?
+  weight      String?
+  style       String?
   imageUrl    String?
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())
@@ -170,11 +173,11 @@ model SaleItem {
   @@map("sale_items")
 }
 
-model ColorAnalysis {
+model FurnitureAnalysis {
   id                String   @id @default(uuid())
   imageUrl          String
-  detectedColors    Json
-  suggestedPalettes Json?
+  detectedSpaces    Json
+  suggestedFurniture Json?
   recommendedProducts Json?
   processedImageUrl String?
   isProcessed       Boolean  @default(false)
@@ -185,7 +188,7 @@ model ColorAnalysis {
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
 
-  @@map("color_analyses")
+  @@map("furniture_analyses")
 }
 
 model ChatSession {

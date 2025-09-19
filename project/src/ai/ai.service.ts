@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { ColorAnalysis, Product, User } from '@prisma/client';
+import { ColorAnalysis, Product, User, FurnitureAnalysis } from '@prisma/client';
 import { OpenAIService } from './openai.service';
 import sharp from 'sharp';
 import * as fs from 'fs';
@@ -213,6 +213,220 @@ export class AIService {
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  // Novas funcionalidades para análise de móveis
+  async analyzeFurnitureSpaces(imageBuffer: Buffer, userId?: string, mimeType?: string): Promise<FurnitureAnalysis> {
+    try {
+      console.log('🪑 AIService: Iniciando análise de espaços para móveis...');
+      console.log('👤 User ID:', userId);
+      console.log('📊 Tamanho do buffer:', imageBuffer.length, 'bytes');
+      
+      // Salvar imagem temporariamente
+      const tempDir = path.join(process.cwd(), 'temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      const imageId = Date.now().toString();
+      const imagePath = path.join(tempDir, `${imageId}.jpg`);
+      
+      // Processar imagem com Sharp
+      await sharp(imageBuffer)
+        .resize(800, 600, { fit: 'inside' })
+        .jpeg({ quality: 80 })
+        .toFile(imagePath);
+
+      console.log('🔄 AIService: Chamando OpenAI service para análise de espaços...');
+      // Usar OpenAI para análise de espaços
+      const detectedSpaces = await this.openaiService.analyzeFurnitureSpaces(imageBuffer, mimeType);
+      console.log('✅ AIService: OpenAI retornou espaços:', detectedSpaces);
+      
+      // Gerar sugestões de móveis
+      const suggestedFurniture = this.generateFurnitureSuggestions(detectedSpaces);
+      
+      // Recomendar produtos baseados nos espaços
+      const recommendedProducts = await this.recommendFurnitureProducts(detectedSpaces);
+
+      // Salvar análise no banco
+      const savedAnalysis = await this.prisma.furnitureAnalysis.create({
+        data: {
+          imageUrl: imagePath,
+          detectedSpaces: detectedSpaces as any,
+          suggestedFurniture: suggestedFurniture as any,
+          recommendedProducts: recommendedProducts as any,
+          userId,
+          isProcessed: true,
+        },
+      });
+
+      return savedAnalysis;
+    } catch (error) {
+      throw new Error(`Erro ao analisar espaços: ${error.message}`);
+    }
+  }
+
+  async addFurnitureToSpace(
+    imageBuffer: Buffer,
+    space: any,
+    furniture: string,
+    userId?: string,
+  ): Promise<{ processedImageUrl: string; analysis: FurnitureAnalysis }> {
+    try {
+      // Salvar imagem original
+      const tempDir = path.join(process.cwd(), 'temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      const imageId = Date.now().toString();
+      const originalImagePath = path.join(tempDir, `${imageId}_original.jpg`);
+      const processedImagePath = path.join(tempDir, `${imageId}_processed.jpg`);
+
+      // Salvar imagem original
+      await sharp(imageBuffer)
+        .resize(800, 600, { fit: 'inside' })
+        .jpeg({ quality: 80 })
+        .toFile(originalImagePath);
+
+      // Primeiro, analisar os espaços
+      console.log('🔍 Analisando espaços para adicionar móvel...');
+      const tempAnalysis = await this.analyzeFurnitureSpaces(imageBuffer, userId);
+      
+      // Usar OpenAI para adicionar móvel ao espaço
+      const processedBuffer = await this.openaiService.addFurnitureToImage(
+        imageBuffer,
+        space,
+        furniture
+      );
+      
+      // Salvar resultado
+      fs.writeFileSync(processedImagePath, processedBuffer);
+      console.log('✅ Móvel adicionado com sucesso');
+
+      // Criar URL HTTP para a imagem processada
+      const processedImageUrl = `http://localhost:3001/temp/${imageId}_processed.jpg`;
+      console.log('🌐 URL da imagem processada:', processedImageUrl);
+      
+      // Atualizar análise com URL da imagem processada
+      await this.prisma.furnitureAnalysis.update({
+        where: { id: tempAnalysis.id },
+        data: {
+          processedImageUrl: processedImageUrl,
+        },
+      });
+
+      console.log('✅ Adição de móvel concluída com sucesso');
+      console.log('📊 Resultado final:', {
+        analysisId: tempAnalysis.id,
+        processedImageUrl: processedImageUrl,
+        space: space.type,
+        furniture: furniture
+      });
+
+      return {
+        processedImageUrl: processedImageUrl,
+        analysis: tempAnalysis,
+      };
+    } catch (error) {
+      console.error('❌ Erro ao adicionar móvel:', error);
+      throw new Error(`Erro ao adicionar móvel: ${error.message}`);
+    }
+  }
+
+  async getFurnitureAnalysis(id: string): Promise<FurnitureAnalysis> {
+    const analysis = await this.prisma.furnitureAnalysis.findUnique({ where: { id } });
+    if (!analysis) {
+      throw new NotFoundException('Análise de móveis não encontrada');
+    }
+    return analysis;
+  }
+
+  async getUserFurnitureAnalyses(userId: string): Promise<FurnitureAnalysis[]> {
+    return this.prisma.furnitureAnalysis.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  private generateFurnitureSuggestions(detectedSpaces: any[]): any[] {
+    // Gerar sugestões de móveis baseadas nos espaços detectados
+    const suggestions = [];
+    
+    for (const space of detectedSpaces) {
+      switch (space.type.toLowerCase()) {
+        case 'sala':
+          suggestions.push({
+            name: 'Sofá 3 Lugares',
+            category: 'sofa',
+            confidence: 0.9,
+            reason: 'Ideal para sala de estar'
+          });
+          suggestions.push({
+            name: 'Mesa de Centro',
+            category: 'mesa',
+            confidence: 0.8,
+            reason: 'Complementa o sofá'
+          });
+          break;
+        case 'quarto':
+          suggestions.push({
+            name: 'Cama King Size',
+            category: 'cama',
+            confidence: 0.95,
+            reason: 'Cama principal para o quarto'
+          });
+          suggestions.push({
+            name: 'Guarda-roupa',
+            category: 'armario',
+            confidence: 0.9,
+            reason: 'Armazenamento essencial'
+          });
+          break;
+        case 'cozinha':
+          suggestions.push({
+            name: 'Mesa de Jantar',
+            category: 'mesa',
+            confidence: 0.85,
+            reason: 'Mesa para refeições'
+          });
+          suggestions.push({
+            name: 'Cadeiras de Jantar',
+            category: 'cadeira',
+            confidence: 0.8,
+            reason: 'Cadeiras para a mesa'
+          });
+          break;
+        default:
+          suggestions.push({
+            name: 'Poltrona',
+            category: 'cadeira',
+            confidence: 0.7,
+            reason: 'Móvel versátil para qualquer ambiente'
+          });
+      }
+    }
+    
+    return suggestions;
+  }
+
+  private async recommendFurnitureProducts(detectedSpaces: any[]): Promise<any[]> {
+    // Buscar produtos de móveis
+    const products = await this.prisma.product.findMany({
+      where: { 
+        isActive: true,
+        category: {
+          in: ['SOFA', 'MESA', 'CADEIRA', 'ARMARIO', 'CAMA', 'DECORACAO', 'ILUMINACAO']
+        }
+      },
+      take: 5,
+    });
+
+    return products.map(product => ({
+      productId: product.id,
+      confidence: Math.random() * 0.5 + 0.5, // Simulação
+      reason: `Móvel ideal para ${product.category.toLowerCase()}`,
+    }));
   }
 
   private async extractColorsFromImage(imagePath: string): Promise<any[]> {

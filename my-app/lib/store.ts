@@ -17,12 +17,15 @@ export interface Product {
   id: string;
   name: string;
   description?: string;
-  category: 'tinta' | 'pincel' | 'rolo' | 'fita' | 'kit' | 'outros';
+  category: 'sofa' | 'mesa' | 'cadeira' | 'armario' | 'cama' | 'decoracao' | 'iluminacao' | 'outros';
   price: number;
   stock: number;
   color?: string;
-  colorCode?: string;
+  material?: string;
   brand?: string;
+  dimensions?: string;
+  weight?: string;
+  style?: string;
   imageUrl?: string;
   storeId: string;
 }
@@ -32,19 +35,21 @@ export interface CartItem {
   quantity: number;
 }
 
-export interface ColorAnalysis {
+export interface FurnitureAnalysis {
   id: string;
   imageUrl: string;
-  detectedColors: {
-    hex: string;
-    rgb: { r: number; g: number; b: number };
-    percentage: number;
-    position: { x: number; y: number };
+  detectedSpaces: {
+    type: string;
+    area: number;
+    position: { x: number; y: number; width: number; height: number };
+    confidence: number;
+    suggestedFurniture: string[];
   }[];
-  suggestedPalettes: {
+  suggestedFurniture: {
     name: string;
-    colors: string[];
-    harmony: string;
+    category: string;
+    confidence: number;
+    reason: string;
   }[];
   recommendedProducts: {
     productId: string;
@@ -69,9 +74,9 @@ interface AppState {
   products: Product[];
   selectedProduct: Product | null;
   
-  // Color Analysis
-  colorAnalyses: ColorAnalysis[];
-  currentAnalysis: ColorAnalysis | null;
+  // Furniture Analysis
+  furnitureAnalyses: FurnitureAnalysis[];
+  currentAnalysis: FurnitureAnalysis | null;
   
   // UI State
   isLoading: boolean;
@@ -90,9 +95,9 @@ interface AppState {
   setProducts: (products: Product[]) => void;
   setSelectedProduct: (product: Product | null) => void;
   
-  setColorAnalyses: (analyses: ColorAnalysis[]) => void;
-  setCurrentAnalysis: (analysis: ColorAnalysis | null) => void;
-  addColorAnalysis: (analysis: ColorAnalysis) => void;
+  setFurnitureAnalyses: (analyses: FurnitureAnalysis[]) => void;
+  setCurrentAnalysis: (analysis: FurnitureAnalysis | null) => void;
+  addFurnitureAnalysis: (analysis: FurnitureAnalysis) => void;
   
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -111,7 +116,7 @@ export const useAppStore = create<AppState>()(
       cartTotal: 0,
       products: [],
       selectedProduct: null,
-      colorAnalyses: [],
+      furnitureAnalyses: [],
       currentAnalysis: null,
       isLoading: false,
       error: null,
@@ -178,12 +183,12 @@ export const useAppStore = create<AppState>()(
       setProducts: (products) => set({ products }),
       setSelectedProduct: (product) => set({ selectedProduct: product }),
 
-      // Color analysis actions
-      setColorAnalyses: (analyses) => set({ colorAnalyses: analyses }),
+      // Furniture analysis actions
+      setFurnitureAnalyses: (analyses) => set({ furnitureAnalyses: analyses }),
       setCurrentAnalysis: (analysis) => set({ currentAnalysis: analysis }),
-      addColorAnalysis: (analysis) => {
-        const { colorAnalyses } = get();
-        set({ colorAnalyses: [analysis, ...colorAnalyses] });
+      addFurnitureAnalysis: (analysis) => {
+        const { furnitureAnalyses } = get();
+        set({ furnitureAnalyses: [analysis, ...furnitureAnalyses] });
       },
 
       // UI actions
@@ -199,21 +204,21 @@ export const useAppStore = create<AppState>()(
         cartTotal: 0,
         products: [],
         selectedProduct: null,
-        colorAnalyses: [],
+        furnitureAnalyses: [],
         currentAnalysis: null,
         isLoading: false,
         error: null,
       }),
     }),
     {
-      name: 'loja-tintas-storage',
+      name: 'mobili-ai-storage',
       partialize: (state) => ({
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
         cart: state.cart,
         cartTotal: state.cartTotal,
-        colorAnalyses: state.colorAnalyses,
+        furnitureAnalyses: state.furnitureAnalyses,
       }),
     }
   )

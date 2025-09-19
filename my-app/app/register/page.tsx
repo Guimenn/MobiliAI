@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Palette, Eye, EyeOff } from 'lucide-react';
+import { Sparkles, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RegisterPage() {
@@ -83,27 +83,25 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Logo */}
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center">
-            <Palette className="h-8 w-8 text-white" />
-          </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            Loja de Tintas
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Crie sua conta gratuita
+          <Link href="/" className="flex items-center justify-center space-x-2">
+            <Sparkles className="h-10 w-10 text-blue-600" />
+            <span className="text-3xl font-bold text-gray-900 dark:text-white">MobiliAI</span>
+          </Link>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            Crie sua conta gratuita e transforme sua casa
           </p>
         </div>
 
         {/* Register Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Criar Conta</CardTitle>
+        <Card className="border-0 shadow-xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Junte-se ao MobiliAI</CardTitle>
             <CardDescription>
-              Preencha os dados abaixo para criar sua conta
+              Crie sua conta e comece a decorar sua casa com IA
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -260,20 +258,57 @@ export default function RegisterPage() {
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700"
                 disabled={isLoading}
               >
-                {isLoading ? 'Criando conta...' : 'Criar Conta'}
+                {isLoading ? 'Criando conta...' : 'Criar Conta Gratuita'}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 Já tem uma conta?{' '}
-                <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+                <Link href="/login" className="font-medium text-blue-600 hover:underline">
                   Faça login
                 </Link>
               </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Benefits */}
+        <Card className="border-0 shadow-lg bg-green-50 dark:bg-green-900/20">
+          <CardHeader>
+            <CardTitle className="text-lg text-center text-green-800 dark:text-green-200">
+              O que você ganha ao se cadastrar?
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm text-green-700 dark:text-green-300">
+                  Acesso gratuito à IA Decoradora
+                </span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm text-green-700 dark:text-green-300">
+                  Frete grátis para compras acima de R$ 500
+                </span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm text-green-700 dark:text-green-300">
+                  Histórico de projetos salvos
+                </span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm text-green-700 dark:text-green-300">
+                  Suporte prioritário
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>

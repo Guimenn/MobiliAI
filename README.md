@@ -1,30 +1,30 @@
-# 🎨 Loja de Tintas com Visualização de Cores via IA
+# 🪑 MobiliAI - Loja de Móveis com IA
 
-Sistema web inovador onde o cliente envia uma foto de uma parede ou ambiente, e o software identifica as cores presentes, permitindo substituí-las virtualmente pela cor de tinta desejada.
+Sistema web inovador onde o cliente envia uma foto de um ambiente, e o software identifica o espaço e sugere móveis ideais, permitindo visualizar como ficará o ambiente com diferentes móveis e decorações.
 
 ## ✨ Funcionalidades
 
 ### 🎯 Gestão da Empresa e Lojas
-- Cadastro de produtos, cores de tinta e fornecedores
+- Cadastro de produtos, móveis e fornecedores
 - Controle de estoque manual por loja
 - Registro de vendas e fluxo de caixa por loja e consolidado
-- Histórico de clientes, compras e preferências de cores
+- Histórico de clientes, compras e preferências de decoração
 - Relatórios de desempenho por loja
 
-### 🤖 IA e Visualização de Cores
-- Detecção de cores na foto enviada pelo cliente
-- Substituição de cores na imagem com a cor escolhida
-- Sugestão de paletas complementares e combinações harmoniosas
+### 🤖 IA e Visualização de Móveis
+- Detecção de espaços e ambientes na foto enviada pelo cliente
+- Substituição de móveis na imagem com peças escolhidas
+- Sugestão de decorações complementares e combinações harmoniosas
 - Pré-visualização realista antes da compra
-- Recomendações de produtos baseadas na cor escolhida
+- Recomendações de móveis baseadas no estilo e espaço
 
 ### 💬 Assistente Virtual Inteligente
-- Chatbot para ajudar na escolha de cores e produtos
+- Chatbot para ajudar na escolha de móveis e decoração
 - Sugestões de combinações baseadas em estilo e preferências
 - Integração com ChatGPT API
 
 ### 🛒 Sistema de Autoatendimento Web
-- Cliente envia foto, escolhe cor, visualiza resultado
+- Cliente envia foto, escolhe móveis, visualiza resultado
 - Carrinho de compras integrado
 - Sistema de pagamento PIX via AbacatePay
 
@@ -158,20 +158,20 @@ O frontend estará disponível em `http://localhost:3000`
 
 ## 📱 Como Usar
 
-### 1. Visualização de Cores
-1. Acesse a página "Visualizar Cores"
-2. Faça upload de uma foto da parede
-3. Clique em "Analisar Cores" para detectar as cores presentes
-4. Use o seletor de cores para trocar uma cor por outra
+### 1. Visualização de Móveis
+1. Acesse a página "Visualizar Móveis"
+2. Faça upload de uma foto do ambiente
+3. Clique em "Analisar Espaço" para detectar o ambiente
+4. Escolha móveis do catálogo para visualizar no espaço
 5. Veja o resultado em tempo real
 
 ### 2. Assistente Virtual
 1. Acesse o chatbot no canto inferior direito
-2. Faça perguntas sobre cores, produtos ou técnicas de pintura
+2. Faça perguntas sobre móveis, decoração ou estilos
 3. Receba recomendações personalizadas
 
 ### 3. Compras
-1. Navegue pelos produtos
+1. Navegue pelos móveis
 2. Use os filtros para encontrar o que precisa
 3. Adicione produtos ao carrinho
 4. Finalize a compra
@@ -247,4 +247,4 @@ Se você encontrar algum problema ou tiver dúvidas, por favor:
 
 ---
 
-Desenvolvido com ❤️ para revolucionar a experiência de compra de tintas!
+Desenvolvido com ❤️ para revolucionar a experiência de compra de móveis!

@@ -94,9 +94,9 @@ export const productsAPI = {
     return response.data;
   },
 
-  getByColor: async (color: string, storeId?: string) => {
+  getByStyle: async (style: string, storeId?: string) => {
     const params = storeId ? { storeId } : {};
-    const response = await api.get(`/products/color/${color}`, { params });
+    const response = await api.get(`/products/style/${style}`, { params });
     return response.data;
   },
 
@@ -109,10 +109,11 @@ export const productsAPI = {
     stock: number;
     minStock?: number;
     color?: string;
-    colorCode?: string;
+    material?: string;
     brand?: string;
-    size?: string;
-    unit?: string;
+    dimensions?: string;
+    weight?: string;
+    style?: string;
     imageUrl?: string;
     storeId: string;
   }) => {
@@ -129,10 +130,11 @@ export const productsAPI = {
     stock: number;
     minStock: number;
     color: string;
-    colorCode: string;
+    material: string;
     brand: string;
-    size: string;
-    unit: string;
+    dimensions: string;
+    weight: string;
+    style: string;
     imageUrl: string;
     isActive: boolean;
   }>) => {
@@ -262,11 +264,11 @@ export const storesAPI = {
 
 // AI API
 export const aiAPI = {
-  analyzeColors: async (imageFile: File) => {
+  analyzeFurniture: async (imageFile: File) => {
     const formData = new FormData();
     formData.append('image', imageFile);
     
-    const response = await api.post('/ai/analyze-colors', formData, {
+    const response = await api.post('/ai/analyze-furniture', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -274,15 +276,13 @@ export const aiAPI = {
     return response.data;
   },
 
-  replaceColor: async (imageFile: File, targetColor: string, newColor: string, tolerance: number = 80, useDALLE3: boolean = true) => {
+  addFurniture: async (imageFile: File, space: any, furniture: string) => {
     const formData = new FormData();
     formData.append('image', imageFile);
-    formData.append('targetColor', targetColor);
-    formData.append('newColor', newColor);
-    formData.append('tolerance', tolerance.toString());
-    formData.append('useDALLE3', useDALLE3.toString());
+    formData.append('space', JSON.stringify(space));
+    formData.append('furniture', furniture);
     
-    const response = await api.post('/ai/replace-color', formData, {
+    const response = await api.post('/ai/add-furniture', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
