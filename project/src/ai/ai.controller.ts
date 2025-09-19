@@ -1,12 +1,16 @@
-import { Controller, Post, Get, Param, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Get, Param, UseGuards, Request, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AIService } from './ai.service';
+import { ReplicateService } from './replicate.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
 export class AIController {
-  constructor(private readonly aiService: AIService) { }
+  constructor(
+    private readonly aiService: AIService,
+    private readonly replicateService: ReplicateService
+  ) { }
 
   @Post('analyze-colors')
   @UseInterceptors(FileInterceptor('image'))
@@ -83,7 +87,7 @@ export class AIController {
       throw new Error(`Formato de imagem não suportado. Formatos aceitos: ${allowedMimeTypes.join(', ')}`);
     }
 
-    const { targetColor, newColor } = req.body;
+    const { targetColor, newColor, tolerance, useDALLE3 } = req.body;
     console.log('🎯 Cores recebidas:', { targetColor, newColor });
     
     if (!targetColor || !newColor) {
@@ -118,5 +122,93 @@ export class AIController {
   @Get('my-analyses')
   async getUserColorAnalyses(@Request() req) {
     return this.aiService.getUserColorAnalyses(req.user.id);
+  }
+
+  // Novas rotas baseadas na lógica do projeto testando-nanobanana
+  @Post('process-url')
+  async processImageWithUrl(
+    @Body() body: { prompt: string; imageUrl: string; outputFormat?: string },
+    @Request() req
+  ) {
+    console.log('🚀 AIController: Processando imagem com URL');
+    console.log('📝 Prompt:', body.prompt);
+    console.log('🖼️ URL:', body.imageUrl);
+    console.log('👤 Usuário:', req.user.id);
+
+    if (!body.prompt || !body.imageUrl) {
+      throw new Error('Prompt e URL da imagem são obrigatórios');
+    }
+
+    const result = await this.replicateService.processImageWithUrl(
+      body.prompt,
+      body.imageUrl,
+      body.outputFormat || 'jpg'
+    );
+
+    if (result.success) {
+      return {
+        success: true,
+        imageUrl: result.imageUrl,
+        localFile: result.localFile,
+        message: 'Imagem processada com sucesso!'
+      };
+    } else {
+      throw new Error(result.error || 'Erro ao processar imagem');
+    }
+  }
+
+  @Post('process-upload')
+  @UseInterceptors(FileInterceptor('image'))
+  async processImageWithUpload(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { prompt: string; outputFormat?: string },
+    @Request() req
+  ) {
+    console.log('🚀 AIController: Processando upload de imagem');
+    console.log('📁 Arquivo:', file ? {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    } : 'NENHUM');
+    console.log('📝 Prompt:', body.prompt);
+    console.log('👤 Usuário:', req.user.id);
+
+    if (!file) {
+      throw new Error('Nenhuma imagem foi enviada');
+    }
+
+    if (!body.prompt) {
+      throw new Error('Prompt é obrigatório');
+    }
+
+    // Validar formato da imagem
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new Error(`Formato de imagem não suportado. Formatos aceitos: ${allowedMimeTypes.join(', ')}`);
+    }
+
+    // Validar tamanho do arquivo (máximo 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new Error('Arquivo muito grande. Tamanho máximo: 10MB');
+    }
+
+    const result = await this.replicateService.processImageWithPrompt(
+      body.prompt,
+      file.buffer,
+      body.outputFormat || 'jpg',
+      file.originalname
+    );
+
+    if (result.success) {
+      return {
+        success: true,
+        imageUrl: result.imageUrl,
+        localFile: result.localFile,
+        message: 'Imagem processada com sucesso!'
+      };
+    } else {
+      throw new Error(result.error || 'Erro ao processar imagem');
+    }
   }
 }

@@ -1,4 +1,4 @@
-{
+                                                                                                                                                                                                                                                                                {
   "name": "loja-tintas-backend",
   "private": true,
   "version": "1.0.0",
@@ -16,7 +16,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/jest/bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e": "jest --config ./test/jest-e2e.json",                                                        
     "seed": "ts-node seed.ts"
   },
   "engines": {
@@ -38,6 +38,7 @@
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "cors": "^2.8.5",
     "multer": "^1.4.5-lts.1",
     "openai": "^4.28.0",
     "passport": "^0.7.0",
@@ -46,6 +47,7 @@
     "pg": "^8.11.3",
     "prisma": "^6.16.1",
     "reflect-metadata": "^0.2.2",
+    "replicate": "^0.34.1",
     "rxjs": "^7.8.1",
     "sharp": "^0.33.2",
     "typeorm": "^0.3.20"

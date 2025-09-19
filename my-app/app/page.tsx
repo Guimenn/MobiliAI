@@ -49,6 +49,12 @@ export default function Home() {
                 Visualizar Cores
               </Button>
             </Link>
+            <Link href="/ai-processor">
+              <Button size="lg" className="bg-purple-600 hover:bg-purple-700">
+                <Palette className="mr-2 h-5 w-5" />
+                Processar com IA
+              </Button>
+            </Link>
             <Link href="/products">
               <Button size="lg" variant="outline">
                 <ShoppingCart className="mr-2 h-5 w-5" />
@@ -107,6 +113,56 @@ export default function Home() {
                 </CardDescription>
               </CardContent>
             </Card>
+          </div>
+          
+          {/* Nova seção para processamento de IA */}
+          <div className="mt-16">
+            <h3 className="text-2xl font-bold text-center text-gray-900 mb-8">
+              Processamento Avançado com IA
+            </h3>
+            <div className="grid md:grid-cols-2 gap-8">
+              <Card className="text-center p-6 hover:shadow-lg transition-shadow border-purple-200">
+                <CardHeader>
+                  <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                    <Palette className="h-8 w-8 text-purple-600" />
+                  </div>
+                  <CardTitle>Processamento com Prompt</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="mb-4">
+                    Use prompts em linguagem natural para modificar suas imagens. 
+                    Diga exatamente o que você quer e nossa IA fará o resto.
+                  </CardDescription>
+                  <Link href="/ai-processor">
+                    <Button className="w-full bg-purple-600 hover:bg-purple-700">
+                      <Palette className="mr-2 h-4 w-4" />
+                      Experimentar Agora
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+
+              <Card className="text-center p-6 hover:shadow-lg transition-shadow border-blue-200">
+                <CardHeader>
+                  <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <Camera className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <CardTitle>Análise Inteligente de Cores</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="mb-4">
+                    Nossa IA analisa automaticamente as cores da sua imagem e 
+                    sugere as melhores opções de tinta para seu projeto.
+                  </CardDescription>
+                  <Link href="/color-visualizer">
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                      <Camera className="mr-2 h-4 w-4" />
+                      Analisar Cores
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </section>

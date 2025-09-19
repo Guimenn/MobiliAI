@@ -299,6 +299,34 @@ export const aiAPI = {
     const response = await api.get('/ai/my-analyses');
     return response.data;
   },
+
+  // Novas funções baseadas na lógica do projeto testando-nanobanana
+  processImageWithUrl: async (data: {
+    prompt: string;
+    imageUrl: string;
+    outputFormat?: string;
+  }) => {
+    const response = await api.post('/ai/process-url', data);
+    return response.data;
+  },
+
+  processImageWithUpload: async (data: {
+    file: File;
+    prompt: string;
+    outputFormat?: string;
+  }) => {
+    const formData = new FormData();
+    formData.append('image', data.file);
+    formData.append('prompt', data.prompt);
+    formData.append('outputFormat', data.outputFormat || 'jpg');
+    
+    const response = await api.post('/ai/process-upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
 
 // Chatbot API
