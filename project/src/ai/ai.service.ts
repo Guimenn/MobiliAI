@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { ColorAnalysis, Product, User, FurnitureAnalysis } from '@prisma/client';
+import { ColorAnalysis, Product, User, FurnitureAnalysis, ProductCategory } from '@prisma/client';
 import { OpenAIService } from './openai.service';
 import sharp from 'sharp';
 import * as fs from 'fs';
@@ -52,7 +52,7 @@ export class AIService {
         data: {
           imageUrl: imagePath,
           detectedColors: detectedColors as any,
-          suggestedPalettes: suggestedPalettes as any,
+          suggestedColors: suggestedPalettes as any,
           recommendedProducts: recommendedProducts as any,
           userId,
           isProcessed: true,
@@ -416,7 +416,7 @@ export class AIService {
       where: { 
         isActive: true,
         category: {
-          in: ['SOFA', 'MESA', 'CADEIRA', 'ARMARIO', 'CAMA', 'DECORACAO', 'ILUMINACAO']
+          in: ['SOFA', 'MESA', 'CADEIRA', 'ARMARIO', 'CAMA', 'DECORACAO', 'ILUMINACAO'] as ProductCategory[]
         }
       },
       take: 5,
@@ -703,7 +703,7 @@ export class AIService {
     return products.map(product => ({
       productId: product.id,
       confidence: Math.random() * 0.5 + 0.5, // Simulação
-      reason: `Cor similar à ${product.color || 'cor do produto'}`,
+      reason: `Cor similar à ${product.colorName || 'cor do produto'}`,
     }));
   }
 

@@ -38,7 +38,7 @@ export async function seedDatabase() {
       name: 'João Silva',
       email: 'funcionario@loja.com',
       password: 'func123',
-      role: UserRole.EMPLOYEE,
+      role: UserRole.CASHIER,
       storeId: store.id,
     },
     {
@@ -69,7 +69,7 @@ export async function seedDatabase() {
     {
       name: 'Tinta Acrílica Branco Gelo',
       description: 'Tinta acrílica de alta qualidade para interiores',
-      category: ProductCategory.TINTA,
+      category: ProductCategory.OUTROS,
       price: 89.90,
       costPrice: 60.00,
       stock: 50,
@@ -84,7 +84,7 @@ export async function seedDatabase() {
     {
       name: 'Tinta Acrílica Azul Oceano',
       description: 'Tinta acrílica para interiores e exteriores',
-      category: ProductCategory.TINTA,
+      category: ProductCategory.OUTROS,
       price: 95.50,
       costPrice: 65.00,
       stock: 30,
@@ -99,7 +99,7 @@ export async function seedDatabase() {
     {
       name: 'Tinta Acrílica Verde Menta',
       description: 'Tinta acrílica suave para quartos e salas',
-      category: ProductCategory.TINTA,
+      category: ProductCategory.OUTROS,
       price: 92.00,
       costPrice: 62.00,
       stock: 25,
@@ -114,7 +114,7 @@ export async function seedDatabase() {
     {
       name: 'Pincel Chato 2"',
       description: 'Pincel chato profissional para acabamentos',
-      category: ProductCategory.PINCEL,
+      category: ProductCategory.OUTROS,
       price: 15.90,
       costPrice: 8.00,
       stock: 100,
@@ -127,7 +127,7 @@ export async function seedDatabase() {
     {
       name: 'Rolo de Pintura 9"',
       description: 'Rolo de pintura para grandes superfícies',
-      category: ProductCategory.ROLO,
+      category: ProductCategory.OUTROS,
       price: 12.50,
       costPrice: 6.00,
       stock: 80,
@@ -140,7 +140,7 @@ export async function seedDatabase() {
     {
       name: 'Fita Crepe 48mm',
       description: 'Fita crepe para proteção e acabamentos',
-      category: ProductCategory.FITA,
+      category: ProductCategory.OUTROS,
       price: 8.90,
       costPrice: 4.00,
       stock: 200,
@@ -153,7 +153,7 @@ export async function seedDatabase() {
     {
       name: 'Kit Pintura Completo',
       description: 'Kit com tinta, pincel, rolo e fita crepe',
-      category: ProductCategory.KIT,
+      category: ProductCategory.OUTROS,
       price: 199.90,
       costPrice: 120.00,
       stock: 15,

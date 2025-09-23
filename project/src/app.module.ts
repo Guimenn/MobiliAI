@@ -11,6 +11,9 @@ import { StoresModule } from './stores/stores.module';
 import { SalesModule } from './sales/sales.module';
 import { AIModule } from './ai/ai.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
+import { PdvModule } from './pdv/pdv.module';
+import { FinancialModule } from './financial/financial.module';
 
 @Module({
   imports: [
@@ -32,6 +35,9 @@ import { ChatbotModule } from './chatbot/chatbot.module';
     SalesModule,
     AIModule,
     ChatbotModule,
+    SuppliersModule,
+    PdvModule,
+    FinancialModule,
   ],
   controllers: [AppController],
   providers: [AppService],

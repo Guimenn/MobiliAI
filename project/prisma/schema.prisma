@@ -13,20 +13,28 @@ datasource db {
 }
         
 enum UserRole {
-  ADMIN
-  MANAGER
-  EMPLOYEE
-  CUSTOMER
+  ADMIN           // Administrador da Matriz - Acesso total
+  STORE_MANAGER   // Gerente de Loja - Acesso apenas à sua loja
+  CASHIER         // Vendedor/Caixa - Acesso apenas ao PDV da sua loja
+  CUSTOMER        // Cliente
 }
 
 enum ProductCategory {
+  // Móveis Principais
   SOFA
   MESA
   CADEIRA
   ARMARIO
-  CAMA
-  DECORACAO
-  ILUMINACAO
+  ESTANTE
+  POLTRONA
+  
+  
+  // Decoração
+  QUADRO
+  LUMINARIA
+  
+  
+  // Outros
   OUTROS
 }
 
@@ -50,6 +58,20 @@ enum MessageRole {
   SYSTEM
 }
 
+enum ProductStyle {
+  MODERNO
+  MINIMALISTA
+  RUSTICO
+}
+
+enum MaterialType {
+  MADEIRA
+  METAL
+  COURO
+  TECIDO
+}
+
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -71,8 +93,14 @@ model User {
   
   purchases Sale[] @relation("CustomerSales")
   sales     Sale[] @relation("EmployeeSales")
+  colorAnalyses ColorAnalysis[]
   furnitureAnalyses FurnitureAnalysis[]
   chatSessions ChatSession[]
+  reviews ProductReview[]
+  moodboards Moodboard[]
+  dailyCash DailyCash[]
+  cashExpenses CashExpense[]
+  cashFlows CashFlow[]
 
   @@map("users")
 }
@@ -94,6 +122,8 @@ model Store {
   employees User[]    @relation()
   products  Product[] @relation()
   sales     Sale[]    @relation()
+  dailyCash DailyCash[]
+  cashFlows CashFlow[]
 
   @@map("stores")
 }
@@ -102,26 +132,69 @@ model Product {
   id          String          @id @default(uuid())
   name        String
   description String?
+  shortDescription String?
   category    ProductCategory @default(SOFA)
   price       Decimal         @db.Decimal(10, 2)
   costPrice   Decimal?        @db.Decimal(10, 2)
   stock       Int             @default(0)
   minStock    Int             @default(0)
-  color       String?
-  material    String?
+  
+  // Atributos de Design
+  style       ProductStyle?
+  material    MaterialType?
+  colorHex    String?         // Código hexadecimal da cor
+  colorName   String?          // Nome da cor (ex: "Azul Marinho")
+  customColor String?          // Cor personalizada descrita pelo cliente
+  
+  // Dimensões
+  width       Decimal?         @db.Decimal(8, 2)  // Largura em cm
+  height      Decimal?         @db.Decimal(8, 2)  // Altura em cm
+  depth       Decimal?         @db.Decimal(8, 2)  // Profundidade em cm
+  weight      Decimal?         @db.Decimal(8, 2)  // Peso em kg
+  
+  // Informações Comerciais
   brand       String?
-  dimensions  String?
-  weight      String?
-  style       String?
+  model       String?
+  sku         String?          @unique
+  barcode     String?          @unique
+  
+  // Mídia
   imageUrl    String?
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  imageUrls   String[]          // Array de URLs de imagens
+  videoUrl    String?
+  
+  // SEO e Marketing
+  tags        String[]         // Tags para busca
+  keywords    String[]         // Palavras-chave para SEO
+  isFeatured  Boolean          @default(false)
+  isNew       Boolean          @default(false)
+  isBestSeller Boolean         @default(false)
+  
+  // Avaliações
+  rating      Decimal?         @db.Decimal(3, 2)  // Rating de 0.00 a 5.00
+  reviewCount Int              @default(0)
+  
+  // Status
+  isActive    Boolean          @default(true)
+  isAvailable Boolean          @default(true)
+  
+  // Timestamps
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   // Relations
   storeId String
   store   Store      @relation(fields: [storeId], references: [id])
   saleItems SaleItem[]
+  reviews ProductReview[]
+  variants ProductVariant[]
+  compatibility ProductCompatibility[]
+  compatibleProducts ProductCompatibility[] @relation("CompatibleProducts")
+  moodboardItems MoodboardItem[]
+  collectionId String?
+  collection Collection? @relation(fields: [collectionId], references: [id])
+  supplierId String?
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
 
   @@map("products")
 }
@@ -149,6 +222,9 @@ model Sale {
   storeId String
   store   Store     @relation(fields: [storeId], references: [id])
   
+  dailyCashId String?
+  dailyCash   DailyCash? @relation(fields: [dailyCashId], references: [id])
+  
   items SaleItem[]
 
   @@map("sales")
@@ -171,6 +247,24 @@ model SaleItem {
   product   Product @relation(fields: [productId], references: [id])
 
   @@map("sale_items")
+}
+
+model ColorAnalysis {
+  id                String   @id @default(uuid())
+  imageUrl          String
+  detectedColors    Json
+  suggestedColors   Json?
+  recommendedProducts Json?
+  processedImageUrl String?
+  isProcessed       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@map("color_analyses")
 }
 
 model FurnitureAnalysis {
@@ -220,4 +314,203 @@ model ChatMessage {
   session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("chat_messages")
+}
+
+// Tabela de Avaliações de Produtos
+model ProductReview {
+  id        String   @id @default(uuid())
+  rating    Int      // 1 a 5 estrelas
+  title     String?
+  comment   String?
+  isVerified Boolean @default(false)
+  helpful   Int      @default(0)  // Quantas pessoas acharam útil
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("product_reviews")
+}
+
+// Tabela de Variantes de Produtos (cores, tamanhos, etc.)
+model ProductVariant {
+  id        String   @id @default(uuid())
+  name      String   // Ex: "Azul Marinho", "Pequeno", "Grande"
+  sku       String?  @unique
+  price     Decimal? @db.Decimal(10, 2)  // Preço específico da variante
+  stock     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_variants")
+}
+
+// Tabela de Compatibilidade entre Produtos
+model ProductCompatibility {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Relations
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  compatibleProductId String
+  compatibleProduct   Product @relation("CompatibleProducts", fields: [compatibleProductId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, compatibleProductId])
+  @@map("product_compatibility")
+}
+
+// Tabela de Coleções/Tendências
+model Collection {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  isTrending  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  products Product[]
+
+  @@map("collections")
+}
+
+// Tabela de Moodboards (salvos pelos usuários)
+model Moodboard {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  items  MoodboardItem[]
+
+  @@map("moodboards")
+}
+
+// Itens de Moodboard
+model MoodboardItem {
+  id        String   @id @default(uuid())
+  positionX Decimal @db.Decimal(8, 2)
+  positionY Decimal @db.Decimal(8, 2)
+  scale     Decimal  @db.Decimal(3, 2) @default(1.00)
+  rotation  Decimal  @db.Decimal(5, 2) @default(0.00)
+  createdAt DateTime @default(now())
+
+  // Relations
+  moodboardId String
+  moodboard   Moodboard @relation(fields: [moodboardId], references: [id], onDelete: Cascade)
+  
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  @@map("moodboard_items")
+}
+
+// Tabela de Fornecedores
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String
+  cnpj        String?  @unique
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  contactName String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  products Product[]
+
+  @@map("suppliers")
+}
+
+// Tabela de Controle de Caixa Diário
+model DailyCash {
+  id              String   @id @default(uuid())
+  date            DateTime @default(now())
+  openingAmount  Decimal  @db.Decimal(10, 2)  // Valor de abertura
+  closingAmount   Decimal? @db.Decimal(10, 2)  // Valor de fechamento
+  totalSales      Decimal  @default(0) @db.Decimal(10, 2)
+  totalExpenses   Decimal  @default(0) @db.Decimal(10, 2)
+  isOpen          Boolean  @default(true)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  storeId String
+  store   Store   @relation(fields: [storeId], references: [id])
+  
+  userId String
+  user   User     @relation(fields: [userId], references: [id])
+  
+  sales Sale[]
+  expenses CashExpense[]
+
+  @@map("daily_cash")
+}
+
+// Tabela de Despesas de Caixa
+model CashExpense {
+  id          String   @id @default(uuid())
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  category    String   // Ex: "Aluguel", "Luz", "Água", "Salários"
+  date        DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  dailyCashId String
+  dailyCash   DailyCash @relation(fields: [dailyCashId], references: [id], onDelete: Cascade)
+  
+  userId String
+  user   User     @relation(fields: [userId], references: [id])
+
+  @@map("cash_expenses")
+}
+
+// Tabela de Fluxo de Caixa
+model CashFlow {
+  id          String   @id @default(uuid())
+  type        String   // "INCOME" ou "EXPENSE"
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  category    String
+  date        DateTime @default(now())
+  isRecurring Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  storeId String
+  store   Store   @relation(fields: [storeId], references: [id])
+  
+  userId String
+  user   User     @relation(fields: [userId], references: [id])
+
+  @@map("cash_flows")
 }

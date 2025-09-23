@@ -125,7 +125,7 @@ export class ChatbotService {
       - Sugestões de paletas harmoniosas
       - Informações sobre técnicas de pintura
 
-      Produtos disponíveis: ${relevantProducts.map(p => `${p.name} - ${p.color} - R$ ${p.price}`).join(', ')}
+      Produtos disponíveis: ${relevantProducts.map(p => `${p.name} - ${p.colorName || 'Cor personalizada'} - R$ ${p.price}`).join(', ')}
 
       Seja amigável, profissional e útil. Sempre que possível, sugira produtos específicos da loja.`;
 
@@ -189,7 +189,7 @@ export class ChatbotService {
     
     products.forEach(product => {
       if (response.toLowerCase().includes(product.name.toLowerCase()) ||
-          response.toLowerCase().includes(product.color?.toLowerCase() || '')) {
+          response.toLowerCase().includes(product.colorName?.toLowerCase() || '')) {
         recommendations.push(product.id);
       }
     });
