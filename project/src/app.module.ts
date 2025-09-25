@@ -14,6 +14,10 @@ import { ChatbotModule } from './chatbot/chatbot.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { PdvModule } from './pdv/pdv.module';
 import { FinancialModule } from './financial/financial.module';
+import { AdminModule } from './admin/admin.module';
+import { ManagerModule } from './manager/manager.module';
+import { EmployeeModule } from './employee/employee.module';
+import { CustomerModule } from './customer/customer.module';
 
 @Module({
   imports: [
@@ -38,6 +42,10 @@ import { FinancialModule } from './financial/financial.module';
     SuppliersModule,
     PdvModule,
     FinancialModule,
+    AdminModule,
+    ManagerModule,
+    EmployeeModule,
+    CustomerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
