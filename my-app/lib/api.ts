@@ -31,7 +31,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Não fazer logout automático em rotas de auth
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/')) {
       useAppStore.getState().logout();
       window.location.href = '/login';
     }

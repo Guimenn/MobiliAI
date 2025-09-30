@@ -1,57 +1,79 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
-import Loading from './Loading';
 
 interface AuthGuardProps {
   children: React.ReactNode;
   requiredRole?: string;
+  redirectTo?: string;
 }
 
-export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
-  const { user, isAuthenticated, token } = useAppStore();
+export default function AuthGuard({ children, requiredRole, redirectTo }: AuthGuardProps) {
+  const { user, isAuthenticated, token, logout } = useAppStore();
   const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Se não está autenticado, redirecionar para login
-    if (!isAuthenticated || !user || !token) {
-      router.push('/login');
-      return;
-    }
-
-    // Se tem role específico requerido, verificar
-    if (requiredRole && user.role !== requiredRole) {
-      // Redirecionar para o dashboard apropriado do usuário
-      switch (user.role) {
-        case 'admin':
-          router.push('/admin/dashboard');
-          break;
-        case 'store_manager':
-          router.push('/manager');
-          break;
-        case 'cashier':
-          router.push('/employee');
-          break;
-        case 'customer':
-          router.push('/customer');
-          break;
-        default:
-          router.push('/login');
+    const checkAuth = () => {
+      // Se não está autenticado ou não tem token, redirecionar para login
+      if (!isAuthenticated || !user || !token) {
+        router.replace('/login');
+        return;
       }
-      return;
-    }
-  }, [isAuthenticated, user, token, requiredRole, router]);
 
-  // Se não está autenticado, não renderizar nada
-  if (!isAuthenticated || !user || !token) {
-    return <Loading />;
+      // Se tem role específico requerido e não é o role correto
+      if (requiredRole && user.role !== requiredRole) {
+        // Redirecionar para o dashboard apropriado
+        switch (user.role) {
+          case 'admin':
+            router.replace('/admin/dashboard');
+            break;
+          case 'store_manager':
+            router.replace('/manager');
+            break;
+          case 'cashier':
+            window.location.replace('http://localhost:3002');
+            break;
+          case 'customer':
+            window.location.replace('http://localhost:3002');
+            break;
+          default:
+            router.replace('/login');
+            break;
+        }
+        return;
+      }
+
+      // Se tem redirectTo específico
+      if (redirectTo) {
+        router.replace(redirectTo);
+        return;
+      }
+
+      // Se chegou até aqui, está tudo ok
+      setIsChecking(false);
+    };
+
+    // Verificar autenticação
+    checkAuth();
+  }, [isAuthenticated, user, token, requiredRole, redirectTo, router]);
+
+  if (isChecking) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
-  // Se tem role específico e não é o correto, não renderizar
+  if (!isAuthenticated || !user || !token) {
+    return null;
+  }
+
   if (requiredRole && user.role !== requiredRole) {
-    return <Loading />;
+    return null;
   }
 
   return <>{children}</>;

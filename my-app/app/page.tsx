@@ -1,347 +1,654 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
-import { productsAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { 
-  Palette, 
-  Camera, 
-  MessageCircle, 
-  ShoppingCart, 
-  Star, 
-  Sparkles,
-  ArrowRight,
-  Users,
-  Zap,
+  Store, 
+  Users, 
+  Package, 
+  TrendingUp, 
+  DollarSign, 
+  BarChart3,
+  Settings,
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
+  LogOut,
   Shield,
+  UserCheck,
+  Building2,
+  ShoppingCart,
+  FileText,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  ArrowRight,
+  Sparkles,
+  CreditCard,
   Truck,
-  CheckCircle
+  Star,
+  Activity,
+  Database,
+  Lock,
+  Unlock,
+  Zap
 } from 'lucide-react';
 import Link from 'next/link';
+import ClientOnly from '@/components/ClientOnly';
 
-export default function Home() {
-  const { products, setProducts, isLoading, setLoading } = useAppStore();
+export default function AdminHome() {
+  const { user, isAuthenticated, logout, isUserAuthenticated } = useAppStore();
+  const router = useRouter();
+  const [stats, setStats] = useState({
+    totalStores: 0,
+    totalUsers: 0,
+    totalProducts: 0,
+    totalSales: 0,
+    monthlyRevenue: 0,
+    activeStores: 0
+  });
 
   useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setLoading(true);
-        const data = await productsAPI.getAll();
-        setProducts(data);
-      } catch (error) {
-        console.error('Erro ao carregar produtos:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Debug: mostrar estado atual
+    console.log('Estado atual:', { isAuthenticated, user, role: user?.role });
+    
+    // Verificar se o estado está sendo carregado do localStorage
+    const storedState = localStorage.getItem('mobili-ai-storage');
+    console.log('Estado armazenado:', storedState ? JSON.parse(storedState) : 'Nenhum estado armazenado');
+    
+    // Carregar estatísticas se estiver autenticado
+    if (isUserAuthenticated()) {
+      loadStats();
+    }
+  }, [isAuthenticated, user, isUserAuthenticated]);
 
-    loadProducts();
-  }, [setProducts, setLoading]);
+  const loadStats = async () => {
+    // Simular carregamento de estatísticas
+    setStats({
+      totalStores: 3,
+      totalUsers: 24,
+      totalProducts: 156,
+      totalSales: 89,
+      monthlyRevenue: 125000,
+      activeStores: 3
+    });
+  };
 
-  const featuredProducts = products.slice(0, 6);
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
+
+
+  // Debug: mostrar informações do usuário
+  console.log('Usuário logado:', { 
+    name: user?.name, 
+    role: user?.role, 
+    email: user?.email,
+    isAuthenticated 
+  });
+
+  // Verificar se é admin ou gerente - com debug
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const isManager = user?.role?.toLowerCase() === 'store_manager';
+  
+  console.log('Verificação de acesso:', { 
+    isAdmin, 
+    isManager, 
+    canAccess: isAdmin || isManager,
+    roleValue: user?.role,
+    roleType: typeof user?.role
+  });
+
+  // Debug adicional para verificar se as funcionalidades estão sendo renderizadas
+  console.log('Renderizando funcionalidades para:', user?.role);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Header */}
-      <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Sparkles className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900 dark:text-white">MobiliAI</span>
-          </div>
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link href="#features" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">
-              Funcionalidades
-            </Link>
-            <Link href="/products" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">
-              Produtos
-            </Link>
-            <Link href="/ai-processor" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">
-              IA Decoradora
-            </Link>
-            <Link href="/furniture-visualizer" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">
-              Visualizador
-            </Link>
-          </nav>
-          <div className="flex items-center space-x-4">
+    <ClientOnly fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <Sparkles className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">MobiliAI</h1>
+          <p className="text-gray-600 mb-8">Sistema Administrativo</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        </div>
+      </div>
+    }>
+      {!isUserAuthenticated() ? (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+          <div className="text-center">
+            <Sparkles className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">MobiliAI</h1>
+            <p className="text-gray-600 mb-8">Sistema Administrativo</p>
             <Link href="/login">
-              <Button variant="ghost">Entrar</Button>
-            </Link>
-            <Link href="/register">
-              <Button>Começar</Button>
+              <Button size="lg" className="text-lg px-8 py-6">
+                Fazer Login
+              </Button>
             </Link>
           </div>
         </div>
-      </header>
+      ) : (
+        <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-3">
+                <Sparkles className="h-8 w-8 text-blue-600" />
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    {isAdmin ? 'Sistema Administrativo' : 'Gestão da Loja'}
+                  </h1>
+                  <p className="text-sm text-gray-600">
+                    {isAdmin ? 'Controle total da empresa' : 'Gerencie sua loja'}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {isAdmin ? 'Administrador' : 'Gerente'}
+                  </p>
+                </div>
+                
+                <Button variant="outline" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
 
-      {/* Hero Section */}
-      <section className="relative py-20 px-4 text-center">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold text-gray-900 dark:text-white mb-6">
-            Decore sua casa com
-            <span className="text-blue-600 block">Inteligência Artificial</span>
-          </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-            Teste móveis no seu ambiente real antes de comprar. Nossa IA Decoradora 
-            transforma qualquer foto em um showroom virtual personalizado.
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Bem-vindo, {user?.name}!
+          </h2>
+          <p className="text-gray-600">
+            {isAdmin 
+              ? 'Controle total da empresa - Gerencie lojas, funcionários, produtos e finanças.'
+              : 'Gerencie sua loja e acompanhe o desempenho da sua equipe.'
+            }
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/furniture-visualizer">
-              <Button size="lg" className="text-lg px-8 py-6 bg-blue-600 hover:bg-blue-700">
-                <Camera className="mr-2 h-5 w-5" />
-                Testar IA Decoradora
-              </Button>
-            </Link>
-            <Link href="/products">
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6">
-                Ver Produtos
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="py-20 px-4">
-        <div className="container mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Por que escolher o MobiliAI?
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              Combinamos tecnologia de ponta com uma experiência de compra única
+          
+          {/* Debug Info */}
+          <div className="mt-4 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              <strong>Debug:</strong> Role = "{user?.role}" | isAdmin = {isAdmin.toString()} | isManager = {isManager.toString()}
             </p>
           </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mb-4">
-                  <Sparkles className="h-6 w-6 text-blue-600" />
-                </div>
-                <CardTitle>IA Decoradora</CardTitle>
-                <CardDescription>
-                  Visualize móveis no seu ambiente real usando inteligência artificial avançada
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mb-4">
-                  <Camera className="h-6 w-6 text-green-600" />
-                </div>
-                <CardTitle>Visualização Realista</CardTitle>
-                <CardDescription>
-                  Veja como os móveis ficam na sua casa antes de comprar
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center mb-4">
-                  <MessageCircle className="h-6 w-6 text-purple-600" />
-                </div>
-                <CardTitle>Assistente Virtual</CardTitle>
-                <CardDescription>
-                  Chatbot inteligente para te ajudar na escolha dos móveis perfeitos
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center mb-4">
-                  <Truck className="h-6 w-6 text-orange-600" />
-                </div>
-                <CardTitle>Frete Grátis</CardTitle>
-                <CardDescription>
-                  Entrega gratuita para compras acima de R$ 500
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center mb-4">
-                  <Shield className="h-6 w-6 text-red-600" />
-                </div>
-                <CardTitle>Garantia Total</CardTitle>
-                <CardDescription>
-                  Garantia estendida para produtos recomendados pela IA
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardHeader>
-                <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center mb-4">
-                  <Users className="h-6 w-6 text-indigo-600" />
-                </div>
-                <CardTitle>Comunidade Ativa</CardTitle>
-                <CardDescription>
-                  Participe da nossa comunidade de entusiastas de decoração
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
         </div>
-      </section>
 
-      {/* Stats Section */}
-      <section className="bg-blue-600 text-white py-20">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold mb-2">70%</div>
-              <div className="text-blue-100">Usuários usam a IA</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">30%</div>
-              <div className="text-blue-100">Aumento em conversões</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">1.000+</div>
-              <div className="text-blue-100">Produtos disponíveis</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">99.9%</div>
-              <div className="text-blue-100">Uptime garantido</div>
-            </div>
-          </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Lojas</CardTitle>
+              <Store className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalStores}</div>
+              <p className="text-xs text-muted-foreground">
+                {isAdmin ? 'Total de lojas' : 'Sua loja'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Usuários</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalUsers}</div>
+              <p className="text-xs text-muted-foreground">
+                {isAdmin ? 'Total de usuários' : 'Funcionários da loja'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Produtos</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalProducts}</div>
+              <p className="text-xs text-muted-foreground">
+                {isAdmin ? 'Total de produtos' : 'Produtos da loja'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Vendas do Mês</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">R$ {stats.monthlyRevenue.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">
+                {isAdmin ? 'Receita consolidada' : 'Receita da loja'}
+              </p>
+            </CardContent>
+          </Card>
         </div>
-      </section>
 
-      {/* Featured Products */}
-      <section className="py-20 px-4 bg-white dark:bg-gray-900">
-        <div className="container mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Produtos em Destaque
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
-              Descubra nossa seleção especial de móveis
-            </p>
-          </div>
-          {isLoading ? (
-            <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="mt-2 text-gray-600 dark:text-gray-300">Carregando produtos...</p>
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-6">
-              {featuredProducts.map((product) => (
-                <Card key={product.id} className="hover:shadow-lg transition-shadow border-0">
-                  <CardHeader className="p-4">
-                    <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg mb-3 flex items-center justify-center">
-                      {product.imageUrl ? (
-                        <img
-                          src={product.imageUrl}
-                          alt={product.name}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                          <Palette className="h-8 w-8 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    <CardTitle className="text-sm">{product.name}</CardTitle>
-                    <CardDescription className="text-xs">
-                      {product.brand} • {product.color}
-                    </CardDescription>
+        {/* Admin Functions */}
+        {isAdmin && (
+          <div className="mb-8">
+            <h3 className="text-2xl font-bold text-gray-900 mb-6">Funcionalidades Administrativas</h3>
+            
+            {/* Cadastro de Lojas */}
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">🏢 Gestão de Lojas</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/stores')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Lojas</CardTitle>
+                    <Store className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
-                  <CardContent className="p-4 pt-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-blue-600">
-                        R$ {Number(product.price).toFixed(2)}
-                      </span>
-                      <div className="flex items-center">
-                        <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                        <span className="text-xs text-gray-500 ml-1">4.8</span>
-                      </div>
-                    </div>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Gestão</div>
+                    <p className="text-xs text-muted-foreground">
+                      Cadastrar, editar e desativar lojas filiais
+                    </p>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          )}
-          <div className="text-center mt-8">
-            <Link href="/products">
-              <Button variant="outline" size="lg">
-                Ver Todos os Produtos
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
 
-      {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-        <div className="container mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-6">
-            Pronto para transformar sua casa?
-          </h2>
-          <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Junte-se a milhares de pessoas que já descobriram o futuro da decoração
-          </p>
-          <Link href="/register">
-            <Button size="lg" variant="secondary" className="text-lg px-8 py-6">
-              <Zap className="mr-2 h-5 w-5" />
-              Começar Agora - É Grátis
-            </Button>
-          </Link>
-        </div>
-      </section>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/stores/new')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Nova Loja</CardTitle>
+                    <Plus className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Cadastrar</div>
+                    <p className="text-xs text-muted-foreground">
+                      Criar nova loja filial
+                    </p>
+                  </CardContent>
+                </Card>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <Sparkles className="h-6 w-6 text-blue-400" />
-                <span className="text-xl font-bold">MobiliAI</span>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/stores/status')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Status</CardTitle>
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Monitorar</div>
+                    <p className="text-xs text-muted-foreground">
+                      Status das lojas
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
-              <p className="text-gray-400">
-                Revolucionando a experiência de compra de móveis com Inteligência Artificial.
-              </p>
             </div>
-            <div>
-              <h3 className="font-semibold mb-4">Produtos</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/products" className="hover:text-white transition-colors">Catálogo</Link></li>
-                <li><Link href="/ai-processor" className="hover:text-white transition-colors">IA Decoradora</Link></li>
-                <li><Link href="/furniture-visualizer" className="hover:text-white transition-colors">Visualizador</Link></li>
-              </ul>
+
+            {/* Cadastro de Funcionários */}
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">👥 Gestão de Funcionários</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/users')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Funcionários</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Pessoal</div>
+                    <p className="text-xs text-muted-foreground">
+                      Gerenciar funcionários de todas as lojas
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/users/new')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Novo Funcionário</CardTitle>
+                    <UserCheck className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Cadastrar</div>
+                    <p className="text-xs text-muted-foreground">
+                      Cadastrar funcionário com vínculo à loja
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/users/roles')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Perfis</CardTitle>
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Acessos</div>
+                    <p className="text-xs text-muted-foreground">
+                      Definir perfis de acesso
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold mb-4">Suporte</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="#" className="hover:text-white transition-colors">Central de Ajuda</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">Contato</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">FAQ</Link></li>
-              </ul>
+
+            {/* Cadastro de Fornecedores */}
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">🏭 Gestão de Fornecedores</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/suppliers')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Fornecedores</CardTitle>
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Cadastros</div>
+                    <p className="text-xs text-muted-foreground">
+                      Gerenciar fornecedores
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/suppliers/new')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Novo Fornecedor</CardTitle>
+                    <Plus className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Cadastrar</div>
+                    <p className="text-xs text-muted-foreground">
+                      Cadastrar novo fornecedor
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/suppliers/contacts')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Contatos</CardTitle>
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Informações</div>
+                    <p className="text-xs text-muted-foreground">
+                      Dados de contato e empresa
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold mb-4">Empresa</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="#" className="hover:text-white transition-colors">Sobre</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">Carreiras</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">Imprensa</Link></li>
-              </ul>
+
+            {/* Cadastro de Produtos */}
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">📦 Gestão de Produtos</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/products')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Produtos</CardTitle>
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Catálogo</div>
+                    <p className="text-xs text-muted-foreground">
+                      Gerenciar produtos com SKU e preços
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/products/new')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Novo Produto</CardTitle>
+                    <Plus className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Cadastrar</div>
+                    <p className="text-xs text-muted-foreground">
+                      Cadastrar produto com código de barras
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/products/categories')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Categorias</CardTitle>
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Organizar</div>
+                    <p className="text-xs text-muted-foreground">
+                      Gerenciar categorias de produtos
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Gestão Financeira */}
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">💰 Gestão Financeira</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/financial')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Fluxo de Caixa</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Financeiro</div>
+                    <p className="text-xs text-muted-foreground">
+                      Controle de entradas e saídas
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/financial/expenses')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Despesas</CardTitle>
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Contas a Pagar</div>
+                    <p className="text-xs text-muted-foreground">
+                      Aluguel, água, luz, salários
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/financial/suppliers')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Fornecedores</CardTitle>
+                    <Truck className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Pagamentos</div>
+                    <p className="text-xs text-muted-foreground">
+                      Controle de pagamentos a fornecedores
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Relatórios Consolidados */}
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">📊 Relatórios Consolidados</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/reports')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Relatórios</CardTitle>
+                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Consolidados</div>
+                    <p className="text-xs text-muted-foreground">
+                      Relatórios de todas as lojas
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/reports/sales')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Vendas</CardTitle>
+                    <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Vendas</div>
+                    <p className="text-xs text-muted-foreground">
+                      Acompanhar vendas de todas as lojas
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/reports/financial')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Financeiro</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Fluxo</div>
+                    <p className="text-xs text-muted-foreground">
+                      Relatórios financeiros consolidados
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Controle e Monitoramento */}
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">⚙️ Controle e Monitoramento</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/system')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Sistema</CardTitle>
+                    <Settings className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Configurações</div>
+                    <p className="text-xs text-muted-foreground">
+                      Configurações do sistema
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/logs')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Logs</CardTitle>
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Auditoria</div>
+                    <p className="text-xs text-muted-foreground">
+                      Logs de atividades do sistema
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/backup')}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Backup</CardTitle>
+                    <Database className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Segurança</div>
+                    <p className="text-xs text-muted-foreground">
+                      Backup e segurança dos dados
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 MobiliAI. Todos os direitos reservados.</p>
+        )}
+
+        {/* Manager Functions */}
+        {isManager && (
+          <div className="mb-8">
+            <h3 className="text-2xl font-bold text-gray-900 mb-6">Funcionalidades do Gerente</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/manager')}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Dashboard</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">Visão Geral</div>
+                  <p className="text-xs text-muted-foreground">
+                    Estatísticas da sua loja
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/manager/users')}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Funcionários</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">Pessoal</div>
+                  <p className="text-xs text-muted-foreground">
+                    Gerenciar funcionários da sua loja
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/manager/products')}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Produtos</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">Estoque</div>
+                  <p className="text-xs text-muted-foreground">
+                    Gerenciar produtos da sua loja
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
+        )}
+
+        {/* Recent Activity */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>Atividade Recente</CardTitle>
+            <CardDescription>Últimas ações realizadas no sistema</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Sistema iniciado</p>
+                  <p className="text-xs text-gray-500">Há alguns minutos</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Login realizado</p>
+                  <p className="text-xs text-gray-500">Há alguns minutos</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Configurações carregadas</p>
+                  <p className="text-xs text-gray-500">Há alguns minutos</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
         </div>
-      </footer>
-    </div>
+      )}
+    </ClientOnly>
   );
 }

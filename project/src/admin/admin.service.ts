@@ -166,10 +166,13 @@ export class AdminService {
       throw new BadRequestException('Email já está em uso');
     }
 
+    // Limpar storeId se for string vazia
+    const cleanStoreId = userData.storeId && userData.storeId.trim() !== '' ? userData.storeId : undefined;
+
     // Verificar se loja existe (se fornecida)
-    if (userData.storeId) {
+    if (cleanStoreId) {
       const store = await this.prisma.store.findUnique({
-        where: { id: userData.storeId }
+        where: { id: cleanStoreId }
       });
       if (!store) {
         throw new NotFoundException('Loja não encontrada');
@@ -185,7 +188,7 @@ export class AdminService {
         email: userData.email,
         password: hashedPassword,
         role: userData.role,
-        storeId: userData.storeId,
+        storeId: cleanStoreId,
         phone: userData.phone,
         address: userData.address
       },

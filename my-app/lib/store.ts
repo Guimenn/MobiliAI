@@ -5,7 +5,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'manager' | 'employee' | 'customer';
+  role: 'admin' | 'ADMIN' | 'store_manager' | 'STORE_MANAGER' | 'cashier' | 'CASHIER' | 'customer' | 'CUSTOMER';
   storeId?: string;
   store?: {
     id: string;
@@ -102,6 +102,8 @@ interface AppState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   
+  // Auth helpers
+  isUserAuthenticated: () => boolean;
   logout: () => void;
 }
 
@@ -122,7 +124,7 @@ export const useAppStore = create<AppState>()(
       error: null,
 
       // Auth actions
-      setUser: (user) => set({ user }),
+      setUser: (user) => set({ user, isAuthenticated: !!user }),
       setToken: (token) => set({ token }),
       setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
 
@@ -195,20 +197,49 @@ export const useAppStore = create<AppState>()(
       setLoading: (loading) => set({ isLoading: loading }),
       setError: (error) => set({ error }),
 
+      // Auth helpers
+      isUserAuthenticated: () => {
+        const state = get();
+        // Verificar se temos user e token válidos
+        const hasValidAuth = state.user && state.token && state.isAuthenticated;
+        
+        // Verificar também no localStorage como fallback
+        if (!hasValidAuth && typeof window !== 'undefined') {
+          try {
+            const stored = localStorage.getItem('mobili-ai-storage');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              return !!(parsed.state?.user && parsed.state?.token);
+            }
+          } catch (e) {
+            console.error('Erro ao verificar localStorage:', e);
+          }
+        }
+        
+        return hasValidAuth;
+      },
+
       // Logout
-      logout: () => set({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        cart: [],
-        cartTotal: 0,
-        products: [],
-        selectedProduct: null,
-        furnitureAnalyses: [],
-        currentAnalysis: null,
-        isLoading: false,
-        error: null,
-      }),
+      logout: () => {
+        // Limpar localStorage completamente
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('mobili-ai-storage');
+        }
+        
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          cart: [],
+          cartTotal: 0,
+          products: [],
+          selectedProduct: null,
+          furnitureAnalyses: [],
+          currentAnalysis: null,
+          isLoading: false,
+          error: null,
+        });
+      },
     }),
     {
       name: 'mobili-ai-storage',

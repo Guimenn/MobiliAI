@@ -38,13 +38,16 @@ export default function LoginPage() {
       setAuthenticated(true);
       
       // Redirect based on user role
-      if (response.user.role === 'admin') {
-        router.push('/admin');
-      } else if (response.user.role === 'manager' || response.user.role === 'employee') {
-        router.push('/dashboard');
-      } else {
-        router.push('/');
-      }
+      setTimeout(() => {
+        if (response.user.role === 'admin') {
+          window.location.replace('/admin/dashboard');
+        } else if (response.user.role === 'store_manager') {
+          window.location.replace('/manager');
+        } else {
+          // Apenas admin e gerente podem acessar o sistema administrativo
+          window.location.replace('/');
+        }
+      }, 100);
     } catch (error: unknown) {
       console.error('Erro no login:', error);
       setError((error as any)?.response?.data?.message || 'Erro ao fazer login');

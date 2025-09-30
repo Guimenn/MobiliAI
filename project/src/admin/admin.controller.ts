@@ -54,7 +54,18 @@ export class AdminController {
 
   @Post('users')
   async createUser(@Body() userData: CreateUserDto) {
-    return this.adminService.createUser(userData);
+    try {
+      // Limpar dados antes de processar
+      const cleanUserData = {
+        ...userData,
+        storeId: userData.storeId && userData.storeId.trim() !== '' ? userData.storeId : undefined
+      };
+      
+      return await this.adminService.createUser(cleanUserData);
+    } catch (error) {
+      console.error('Erro ao criar usuário:', error);
+      throw error;
+    }
   }
 
   @Put('users/:id')

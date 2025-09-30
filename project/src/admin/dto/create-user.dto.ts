@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsEnum, IsOptional, IsUUID, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsEmail, IsEnum, IsOptional, IsUUID, MinLength, MaxLength, IsBoolean } from 'class-validator';
 import { UserRole } from '@prisma/client';
 
 export class CreateUserDto {
@@ -19,7 +19,7 @@ export class CreateUserDto {
   role: UserRole;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   storeId?: string;
 
   @IsOptional()
@@ -31,4 +31,8 @@ export class CreateUserDto {
   @IsString()
   @MaxLength(500)
   address?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
