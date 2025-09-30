@@ -16,6 +16,23 @@ export interface Product {
   category: string;
   description?: string;
   image?: string;
+  brand?: string;
+  color?: string;
+  finish?: string;
+  coverage?: string;
+  rating?: number;
+}
+
+export interface ColorPalette {
+  id: string;
+  name: string;
+  hex: string;
+  rgb: string;
+  price: number;
+  brand: string;
+  finish: string;
+  coverage: string;
+  category: string;
 }
 
 export interface CartItem extends Product {
@@ -230,6 +247,216 @@ class ApiService {
 
     if (!response.ok) {
       throw new Error('Erro ao atualizar estoque');
+    }
+  }
+
+  // AI Color Processing
+  async processImageForColors(imageFile: File): Promise<{
+    detectedColors: ColorPalette[];
+    processedImage: string;
+  }> {
+    const formData = new FormData();
+    formData.append('image', imageFile);
+
+    const response = await fetch(`${API_BASE_URL}/ai/process-image`, {
+      method: 'POST',
+      headers: {
+        ...this.getAuthHeaders(),
+        'Content-Type': undefined, // Let browser set it for FormData
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao processar imagem');
+    }
+
+    return response.json();
+  }
+
+  async applyColorToImage(imageData: string, colorHex: string): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/ai/apply-color`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ imageData, colorHex }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao aplicar cor');
+    }
+
+    const data = await response.json();
+    return data.processedImage;
+  }
+
+  // Color Palette
+  async getColorPalette(): Promise<ColorPalette[]> {
+    const response = await fetch(`${API_BASE_URL}/customer/colors`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao carregar paleta de cores');
+    }
+
+    return response.json();
+  }
+
+  async searchColors(query: string): Promise<ColorPalette[]> {
+    const response = await fetch(`${API_BASE_URL}/customer/colors/search?q=${encodeURIComponent(query)}`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao buscar cores');
+    }
+
+    return response.json();
+  }
+
+  // Chatbot
+  async sendMessage(message: string): Promise<{
+    response: string;
+    suggestions?: string[];
+    products?: Product[];
+  }> {
+    const response = await fetch(`${API_BASE_URL}/chatbot/message`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao enviar mensagem');
+    }
+
+    return response.json();
+  }
+
+  // Reports (for cashier)
+  async getSalesReport(period: 'today' | 'week' | 'month' | 'quarter'): Promise<{
+    totalSales: number;
+    totalOrders: number;
+    averageTicket: number;
+    topProducts: Array<{
+      id: string;
+      name: string;
+      quantity: number;
+      revenue: number;
+    }>;
+    dailySales: Array<{
+      date: string;
+      sales: number;
+      orders: number;
+    }>;
+    paymentMethods: Array<{
+      method: string;
+      count: number;
+      amount: number;
+    }>;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/employee/reports/sales?period=${period}`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao carregar relatório');
+    }
+
+    return response.json();
+  }
+
+  async exportReport(period: string, format: 'pdf' | 'excel'): Promise<Blob> {
+    const response = await fetch(`${API_BASE_URL}/employee/reports/export?period=${period}&format=${format}`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao exportar relatório');
+    }
+
+    return response.blob();
+  }
+
+  // Customer Orders
+  async createOrder(orderData: {
+    items: CartItem[];
+    paymentMethod: string;
+    shippingAddress?: {
+      street: string;
+      number: string;
+      complement: string;
+      neighborhood: string;
+      city: string;
+      state: string;
+      zipCode: string;
+    };
+  }): Promise<{
+    orderId: string;
+    status: string;
+    total: number;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/customer/orders`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(orderData),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao criar pedido');
+    }
+
+    return response.json();
+  }
+
+  async getOrders(): Promise<Array<{
+    id: string;
+    status: string;
+    total: number;
+    createdAt: string;
+    items: CartItem[];
+  }>> {
+    const response = await fetch(`${API_BASE_URL}/customer/orders`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao carregar pedidos');
+    }
+
+    return response.json();
+  }
+
+  // Store Settings (for cashier)
+  async getStoreSettings(): Promise<{
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+    workingHours: string;
+    deliveryRadius: number;
+    minOrderValue: number;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/employee/store/settings`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao carregar configurações');
+    }
+
+    return response.json();
+  }
+
+  async updateStoreSettings(settings: any): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/employee/store/settings`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(settings),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao atualizar configurações');
     }
   }
 }

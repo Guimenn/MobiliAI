@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import Layout from '@/components/Layout';
+import LoginScreen from '@/components/LoginScreen';
 import { 
   Search, 
   ShoppingCart, 
@@ -14,14 +16,16 @@ import {
   QrCode, 
   Plus, 
   Minus, 
-  User, 
-  LogOut, 
-  Store, 
   Package, 
-  BarChart3,
   ShoppingBag,
-  Heart,
-  Star
+  Star,
+  TrendingUp,
+  Eye,
+  MessageCircle,
+  Palette,
+  Scan,
+  Calculator,
+  Receipt
 } from 'lucide-react';
 
 interface Product {
@@ -32,6 +36,10 @@ interface Product {
   category: string;
   description?: string;
   image?: string;
+  brand?: string;
+  color?: string;
+  finish?: string;
+  coverage?: string;
 }
 
 interface CartItem extends Product {
@@ -57,43 +65,102 @@ export default function LojaHome() {
   const [cashOpen, setCashOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mock products data
+  // Mock products data - Tintas e produtos relacionados
   const mockProducts: Product[] = [
     { 
       id: 'prod1', 
-      name: 'Sofá 3 Lugares Cinza', 
-      price: 2500.00, 
-      stock: 5, 
-      category: 'SOFA',
-      description: 'Sofá moderno e confortável para sala de estar',
-      image: '/api/placeholder/300/200'
+      name: 'Tinta Acrílica Premium Branco Gelo', 
+      price: 89.90, 
+      stock: 25, 
+      category: 'TINTAS',
+      description: 'Tinta acrílica de alta qualidade para interiores e exteriores',
+      image: '/api/placeholder/300/200',
+      brand: 'ColorMax',
+      color: 'Branco Gelo',
+      finish: 'Fosco',
+      coverage: '16m²/L'
     },
     { 
       id: 'prod2', 
-      name: 'Mesa de Centro Moderna', 
-      price: 350.00, 
-      stock: 10, 
-      category: 'MESA',
-      description: 'Mesa de centro com design contemporâneo',
-      image: '/api/placeholder/300/200'
+      name: 'Esmalte Sintético Azul Royal', 
+      price: 125.50, 
+      stock: 15, 
+      category: 'TINTAS',
+      description: 'Esmalte sintético para madeiras e metais',
+      image: '/api/placeholder/300/200',
+      brand: 'Premium Paint',
+      color: 'Azul Royal',
+      finish: 'Brilhante',
+      coverage: '12m²/L'
     },
     { 
       id: 'prod3', 
-      name: 'Cadeira Ergonômica', 
-      price: 250.00, 
-      stock: 20, 
-      category: 'CADEIRA',
-      description: 'Cadeira ergonômica para escritório',
-      image: '/api/placeholder/300/200'
+      name: 'Primer Universal Branco', 
+      price: 45.00, 
+      stock: 30, 
+      category: 'PRIMERS',
+      description: 'Primer universal para qualquer tipo de superfície',
+      image: '/api/placeholder/300/200',
+      brand: 'BaseTech',
+      color: 'Branco',
+      finish: 'Fosco',
+      coverage: '20m²/L'
     },
     { 
       id: 'prod4', 
-      name: 'Estante Modular', 
-      price: 800.00, 
-      stock: 3, 
-      category: 'ESTANTE',
-      description: 'Estante modular versátil',
-      image: '/api/placeholder/300/200'
+      name: 'Kit Pintura Completo Verde Menta', 
+      price: 299.90, 
+      stock: 8, 
+      category: 'KITS',
+      description: 'Kit completo com tinta, primer, pincéis e rolos',
+      image: '/api/placeholder/300/200',
+      brand: 'Complete Paint',
+      color: 'Verde Menta',
+      finish: 'Fosco',
+      coverage: '45m²'
+    },
+    { 
+      id: 'prod5', 
+      name: 'Pincel Chato 2" Profissional', 
+      price: 15.90, 
+      stock: 50, 
+      category: 'FERRAMENTAS',
+      description: 'Pincel de cerdas naturais para acabamento perfeito',
+      image: '/api/placeholder/300/200',
+      brand: 'ProTools'
+    },
+    { 
+      id: 'prod6', 
+      name: 'Rolo de Pintura 7"', 
+      price: 12.50, 
+      stock: 40, 
+      category: 'FERRAMENTAS',
+      description: 'Rolo de lã para pintura de grandes áreas',
+      image: '/api/placeholder/300/200',
+      brand: 'RollMax'
+    },
+    { 
+      id: 'prod7', 
+      name: 'Fita Crepe 48mm x 50m', 
+      price: 8.90, 
+      stock: 60, 
+      category: 'FERRAMENTAS',
+      description: 'Fita crepe para proteção e acabamento',
+      image: '/api/placeholder/300/200',
+      brand: 'TapePro'
+    },
+    { 
+      id: 'prod8', 
+      name: 'Tinta Látex PVA Rosa Pink', 
+      price: 67.80, 
+      stock: 20, 
+      category: 'TINTAS',
+      description: 'Tinta látex PVA para quartos infantis',
+      image: '/api/placeholder/300/200',
+      brand: 'Kids Color',
+      color: 'Rosa Pink',
+      finish: 'Fosco',
+      coverage: '18m²/L'
     },
   ];
 
@@ -210,164 +277,126 @@ export default function LojaHome() {
 
   // Se não estiver autenticado, mostrar tela de login
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-8">
-            <Store className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900">Sistema de Loja</h1>
-            <p className="text-gray-600">Escolha seu tipo de acesso</p>
-          </div>
-          
-          <div className="space-y-4">
-            <Button 
-              onClick={() => handleLogin('cashier')}
-              className="w-full py-3 text-lg bg-blue-600 hover:bg-blue-700"
-            >
-              <User className="mr-2 h-5 w-5" />
-              Acesso Funcionário
-            </Button>
-            
-            <Button 
-              onClick={() => handleLogin('customer')}
-              className="w-full py-3 text-lg bg-green-600 hover:bg-green-700"
-            >
-              <ShoppingBag className="mr-2 h-5 w-5" />
-              Acesso Cliente
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
+  // PÁGINA PRINCIPAL DE COMPRAS - ÚNICA PARA TODOS
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-3">
-              <Store className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {user?.role === 'cashier' ? 'Ponto de Venda' : 'Loja Online'}
-                </h1>
-                <p className="text-sm text-gray-600">
-                  {user?.role === 'cashier' ? 'Sistema de vendas' : 'Compre seus móveis'}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {user?.role === 'cashier' && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">Status do Caixa:</span>
-                  <Badge variant={cashOpen ? "default" : "secondary"}>
-                    {cashOpen ? 'Aberto' : 'Fechado'}
-                  </Badge>
+    <Layout 
+      user={user}
+      cashOpen={cashOpen}
+      cartCount={cart.length}
+      onLogout={handleLogout}
+      onToggleCash={() => setCashOpen(!cashOpen)}
+    >
+      <div className="space-y-6">
+        {/* Dashboard de Vendas/Compras */}
+        {user?.role === 'cashier' && !cashOpen && (
+          <div className="flex justify-center">
+            <Card className="border-red-200 bg-red-50 max-w-md">
+              <CardContent className="p-6 text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <X className="h-8 w-8 text-red-600" />
                 </div>
-              )}
-              
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-500">
-                  {user?.role === 'cashier' ? 'Funcionário' : 'Cliente'}
-                </p>
-              </div>
-              
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sair
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {user?.role === 'cashier' && (
-          <div className="mb-6 flex justify-center">
-            {!cashOpen ? (
-              <Button 
-                onClick={() => setCashOpen(true)}
-                className="px-8 py-3 text-lg bg-green-600 hover:bg-green-700"
-              >
-                Abrir Caixa
-              </Button>
-            ) : (
-              <Button 
-                onClick={() => setCashOpen(false)}
-                className="px-8 py-3 text-lg bg-red-600 hover:bg-red-700"
-              >
-                Fechar Caixa
-              </Button>
-            )}
+                <h2 className="text-xl font-bold text-red-800 mb-2">Caixa Fechado</h2>
+                <p className="text-red-600 mb-4">Abra o caixa para iniciar as vendas</p>
+                <Button 
+                  onClick={() => setCashOpen(true)}
+                  className="px-8 py-3 text-lg bg-green-600 hover:bg-green-700"
+                >
+                  Abrir Caixa
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         )}
 
+        {/* Interface de Compras/Vendas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Product Search & List */}
+          {/* Busca e Lista de Produtos */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex space-x-2 mb-6">
-                <Input
-                  type="text"
-                  placeholder="Buscar produto por nome ou categoria..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="flex-grow"
-                />
-                <Button onClick={handleSearch}>
-                  <Search className="mr-2 h-4 w-4" />
-                  Buscar
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {products.length > 0 ? (
-                  products.map(product => (
-                    <Card key={product.id} className="cursor-pointer hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <CardTitle className="text-lg">{product.name}</CardTitle>
-                        <Badge variant="secondary" className="w-fit">{product.category}</Badge>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-2xl font-bold text-blue-600">R$ {product.price.toFixed(2)}</p>
-                        <p className="text-sm text-gray-500">Estoque: {product.stock}</p>
-                        <Button 
-                          onClick={() => addToCart(product)}
-                          disabled={user?.role === 'cashier' && !cashOpen}
-                          className="mt-2 w-full"
-                        >
-                          Adicionar ao Carrinho
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))
-                ) : (
-                  <p className="col-span-2 text-center text-gray-500">
-                    Nenhum produto encontrado. Tente buscar!
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Cart & Checkout */}
-          <div className="lg:col-span-1">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <ShoppingCart className="mr-2 h-5 w-5" />
-                  Carrinho ({cart.length})
+                  <Search className="mr-2 h-5 w-5" />
+                  {user?.role === 'cashier' ? 'Buscar Produtos para Venda' : 'Nossos Produtos'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
+                <div className="flex space-x-2 mb-6">
+                  <Input
+                    type="text"
+                    placeholder={user?.role === 'cashier' ? "Digite o nome ou código do produto..." : "Buscar produtos..."}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="flex-grow text-lg"
+                  />
+                  <Button onClick={handleSearch} size="lg">
+                    <Search className="mr-2 h-5 w-5" />
+                    Buscar
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {products.map(product => (
+                    <Card key={product.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <Package className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg">{product.name}</h3>
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Badge variant="secondary">{product.category}</Badge>
+                              {product.brand && <Badge variant="outline">{product.brand}</Badge>}
+                            </div>
+                            <p className="text-2xl font-bold text-blue-600">R$ {product.price.toFixed(2)}</p>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500">
+                              <span>Estoque: {product.stock}</span>
+                              {product.coverage && <span>{product.coverage}</span>}
+                            </div>
+                          </div>
+                          <Button 
+                            onClick={() => addToCart(product)}
+                            disabled={user?.role === 'cashier' && !cashOpen}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Adicionar
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Carrinho de Compras/Vendas */}
+          <div className="lg:col-span-1">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    {user?.role === 'cashier' ? (
+                      <Receipt className="mr-2 h-5 w-5" />
+                    ) : (
+                      <ShoppingCart className="mr-2 h-5 w-5" />
+                    )}
+                    {user?.role === 'cashier' ? 'Venda Atual' : 'Seu Carrinho'}
+                  </div>
+                  <Badge variant="secondary">{cart.length} itens</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
                   {cart.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">Carrinho vazio</p>
+                    <div className="text-center py-8 text-gray-500">
+                      <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>{user?.role === 'cashier' ? 'Carrinho vazio' : 'Seu carrinho está vazio'}</p>
+                    </div>
                   ) : (
                     cart.map(item => (
                       <div key={item.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -380,25 +409,25 @@ export default function LojaHome() {
                         <div className="flex items-center space-x-2">
                           <Button 
                             variant="outline" 
-                            size="icon" 
+                            size="sm"
                             onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
                           >
-                            <Minus className="h-4 w-4" />
+                            <Minus className="h-3 w-3" />
                           </Button>
-                          <span className="font-medium text-sm">{item.quantity}</span>
+                          <span className="font-medium text-sm w-6 text-center">{item.quantity}</span>
                           <Button 
                             variant="outline" 
-                            size="icon" 
+                            size="sm"
                             onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
                           >
-                            <Plus className="h-4 w-4" />
+                            <Plus className="h-3 w-3" />
                           </Button>
                           <Button 
                             variant="ghost" 
-                            size="icon" 
+                            size="sm"
                             onClick={() => removeFromCart(item.id)}
                           >
-                            <X className="h-4 w-4 text-red-500" />
+                            <X className="h-3 w-3 text-red-500" />
                           </Button>
                         </div>
                       </div>
@@ -407,54 +436,55 @@ export default function LojaHome() {
                 </div>
 
                 {cart.length > 0 && (
-                  <div className="mt-6 border-t pt-4">
-                    <div className="flex justify-between items-center mb-4">
+                  <div className="mt-6 border-t pt-4 space-y-4">
+                    <div className="flex justify-between items-center">
                       <span className="text-lg font-semibold">Total:</span>
-                      <span className="text-2xl font-bold text-blue-600">
+                      <span className="text-2xl font-bold text-green-600">
                         R$ {total.toFixed(2)}
                       </span>
                     </div>
 
-                    <div className="mb-4">
-                      <h3 className="font-semibold mb-2">Método de Pagamento:</h3>
-                      <div className="flex space-x-2">
+                    <div>
+                      <h3 className="font-semibold mb-2">Forma de Pagamento:</h3>
+                      <div className="grid grid-cols-3 gap-2">
                         <Button
                           variant={paymentMethod === 'cash' ? 'default' : 'outline'}
                           onClick={() => setPaymentMethod('cash')}
-                          className="flex-1"
+                          size="sm"
                         >
-                          <DollarSign className="mr-2 h-4 w-4" />
+                          <DollarSign className="mr-1 h-3 w-3" />
                           Dinheiro
                         </Button>
                         <Button
                           variant={paymentMethod === 'card' ? 'default' : 'outline'}
                           onClick={() => setPaymentMethod('card')}
-                          className="flex-1"
+                          size="sm"
                         >
-                          <CreditCard className="mr-2 h-4 w-4" />
+                          <CreditCard className="mr-1 h-3 w-3" />
                           Cartão
                         </Button>
                         <Button
                           variant={paymentMethod === 'pix' ? 'default' : 'outline'}
                           onClick={() => setPaymentMethod('pix')}
-                          className="flex-1"
+                          size="sm"
                         >
-                          <QrCode className="mr-2 h-4 w-4" />
-                          Pix
+                          <QrCode className="mr-1 h-3 w-3" />
+                          PIX
                         </Button>
                       </div>
                     </div>
 
-                    {paymentMethod === 'cash' && (
-                      <div className="mb-4">
+                    {paymentMethod === 'cash' && user?.role === 'cashier' && (
+                      <div>
                         <label className="block text-sm font-medium mb-2">
-                          Valor Recebido (Dinheiro):
+                          Valor Recebido:
                         </label>
                         <Input
                           type="number"
                           value={cashAmount}
                           onChange={(e) => setCashAmount(Number(e.target.value))}
                           placeholder="0.00"
+                          className="text-lg"
                         />
                         {typeof cashAmount === 'number' && cashAmount > 0 && (
                           <p className="mt-2 text-lg font-semibold">
@@ -469,11 +499,22 @@ export default function LojaHome() {
                       className="w-full py-3 text-lg bg-green-600 hover:bg-green-700" 
                       disabled={
                         cart.length === 0 || 
+                        (user?.role === 'cashier' && !cashOpen) ||
                         (paymentMethod === 'cash' && (typeof cashAmount !== 'number' || cashAmount < total)) ||
                         isLoading
                       }
                     >
-                      {isLoading ? 'Processando...' : 'Finalizar Venda'}
+                      {isLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <Calculator className="mr-2 h-5 w-5" />
+                          {user?.role === 'cashier' ? 'Finalizar Venda' : 'Finalizar Compra'}
+                        </>
+                      )}
                     </Button>
                   </div>
                 )}
@@ -481,7 +522,7 @@ export default function LojaHome() {
             </Card>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 }
