@@ -27,17 +27,17 @@ export default function Dashboard() {
     if (isAuthenticated && user) {
       // Redirecionar baseado no papel do usuário
       switch (user.role) {
-        case 'admin':
+        case 'ADMIN':
           router.push('/admin/dashboard');
           break;
-        case 'store_manager':
+        case 'STORE_MANAGER':
           router.push('/manager');
           break;
-        case 'cashier':
-          router.push('/employee');
+        case 'CASHIER':
+          router.push('/');
           break;
-        case 'customer':
-          router.push('/customer');
+        case 'CUSTOMER':
+          router.push('/');
           break;
         default:
           router.push('/login');

@@ -68,14 +68,18 @@ export class AuthService {
       },
     });
 
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('Credenciais inválidas');
+    if (!user) {
+      throw new UnauthorizedException('Email não encontrado');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Usuário inativo');
     }
 
     // Verificar senha
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Credenciais inválidas');
+      throw new UnauthorizedException('Senha incorreta');
     }
 
     // Gerar token
@@ -130,6 +134,11 @@ export class AuthService {
         store: true,
       },
     });
+  }
+
+  async checkEmailExists(email: string): Promise<{ exists: boolean }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    return { exists: !!user };
   }
 
   private generateToken(user: User): string {

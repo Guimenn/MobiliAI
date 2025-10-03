@@ -1,12 +1,17 @@
 import { Controller, Post, Body, Get, UseGuards, Request, Patch } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, ChangePasswordDto } from '../dto/auth.dto';
+import { RegisterDto, LoginDto, ChangePasswordDto, CheckEmailDto } from '../dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('check-email')
+  async checkEmail(@Body() checkEmailDto: CheckEmailDto) {
+    return this.authService.checkEmailExists(checkEmailDto.email);
+  }
 
   @Post('register')
   async register(@Body() registerDto: RegisterDto) {

@@ -31,12 +31,15 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Não fazer logout automático em rotas de auth ou manager
+    // Não fazer logout automático em rotas de auth
     if (error.response?.status === 401 && 
-        !error.config?.url?.includes('/auth/') &&
-        !window.location.pathname.includes('/manager')) {
-      useAppStore.getState().logout();
-      window.location.href = '/login';
+        !error.config?.url?.includes('/auth/')) {
+      // Só fazer logout se não estiver em uma rota de autenticação
+      if (!window.location.pathname.includes('/login') && 
+          !window.location.pathname.includes('/register')) {
+        useAppStore.getState().logout();
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -74,6 +77,11 @@ export const authAPI = {
       currentPassword,
       newPassword,
     });
+    return response.data;
+  },
+
+  checkEmail: async (email: string) => {
+    const response = await api.post('/auth/check-email', { email });
     return response.data;
   },
 };

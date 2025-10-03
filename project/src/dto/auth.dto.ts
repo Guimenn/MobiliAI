@@ -18,6 +18,10 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
+  cpf?: string;
+
+  @IsOptional()
+  @IsString()
   address?: string;
 
   @IsOptional()
@@ -56,4 +60,9 @@ export class ChangePasswordDto {
   @IsString()
   @MinLength(6)
   newPassword: string;
+}
+
+export class CheckEmailDto {
+  @IsEmail()
+  email: string;
 }

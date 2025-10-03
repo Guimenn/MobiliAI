@@ -124,9 +124,18 @@ export const useAppStore = create<AppState>()(
       error: null,
 
       // Auth actions
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
-      setToken: (token) => set({ token }),
-      setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
+      setUser: (user) => {
+        console.log('Store setUser called with:', user);
+        set({ user, isAuthenticated: !!user });
+      },
+      setToken: (token) => {
+        console.log('Store setToken called with:', token ? 'Token received' : 'No token');
+        set({ token });
+      },
+      setAuthenticated: (isAuthenticated) => {
+        console.log('Store setAuthenticated called with:', isAuthenticated);
+        set({ isAuthenticated });
+      },
 
       // Cart actions
       addToCart: (product, quantity = 1) => {
@@ -200,23 +209,7 @@ export const useAppStore = create<AppState>()(
       // Auth helpers
       isUserAuthenticated: () => {
         const state = get();
-        // Verificar se temos user e token válidos
-        const hasValidAuth = state.user && state.token && state.isAuthenticated;
-        
-        // Verificar também no localStorage como fallback
-        if (!hasValidAuth && typeof window !== 'undefined') {
-          try {
-            const stored = localStorage.getItem('mobili-ai-storage');
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              return !!(parsed.state?.user && parsed.state?.token);
-            }
-          } catch (e) {
-            console.error('Erro ao verificar localStorage:', e);
-          }
-        }
-        
-        return hasValidAuth;
+        return !!(state.user && state.token && state.isAuthenticated);
       },
 
       // Logout

@@ -27,17 +27,17 @@ export default function AuthGuard({ children, requiredRole, redirectTo }: AuthGu
       if (requiredRole && user.role !== requiredRole) {
         // Redirecionar para o dashboard apropriado
         switch (user.role) {
-          case 'admin':
+          case 'ADMIN':
             router.replace('/admin/dashboard');
             break;
-          case 'store_manager':
+          case 'STORE_MANAGER':
             router.replace('/manager');
             break;
-          case 'cashier':
-            window.location.replace('http://localhost:3002');
+          case 'CASHIER':
+            router.replace('/');
             break;
-          case 'customer':
-            window.location.replace('http://localhost:3002');
+          case 'CUSTOMER':
+            router.replace('/');
             break;
           default:
             router.replace('/login');

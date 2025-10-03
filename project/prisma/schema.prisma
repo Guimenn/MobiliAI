@@ -80,6 +80,7 @@ model User {
   password  String
   name      String
   phone     String?
+  cpf       String?  @unique
   address   String?
   city      String?
   state     String?
