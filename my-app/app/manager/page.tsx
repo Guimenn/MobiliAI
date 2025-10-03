@@ -3,11 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
+import { managerAPI } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { 
   Users, 
   Package, 
@@ -40,14 +44,113 @@ export default function ManagerDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [storeStats, setStoreStats] = useState({
+    totalEmployees: 0,
+    totalProducts: 0,
+    totalSales: 0,
+    monthlyRevenue: 0
+  });
+  const [recentSales, setRecentSales] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [error, setError] = useState('');
 
-  // REMOVER TODA VERIFICAÇÃO DE AUTENTICAÇÃO TEMPORARIAMENTE
-  // Para resolver o problema de redirecionamento
-  
+  // Função para buscar dados específicos da loja do gerente
+  const fetchStoreData = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      
+      const [dashboardData, storeSales, storeProducts, storeEmployees] = await Promise.all([
+        managerAPI.getDashboard(),
+        managerAPI.getStoreSalesReport(),
+        managerAPI.getStoreProducts(1, 10, ''),
+        managerAPI.getStoreUsers(1, 50, '')
+      ]);
+
+      // Atualizar estatísticas da loja
+      if (dashboardData.overview) {
+        setStoreStats(dashboardData.overview);
+      }
+
+      // Atualizar vendas recentes (apenas da loja)
+      if (dashboardData.recentSales) {
+        setRecentSales(dashboardData.recentSales);
+      }
+
+      // Atualizar produtos (apenas da loja)
+      if (storeProducts.products) {
+        setProducts(storeProducts.products);
+        
+        // Top produtos da loja
+        if (dashboardData.topProducts) {
+          setTopProducts(dashboardData.topProducts);
+        } else {
+          setTopProducts(storeProducts.products.slice(0, 5));
+        }
+      }
+
+      // Atualizar funcionários (apenas da loja)
+      if (storeEmployees.users) {
+        setEmployees(storeEmployees.users);
+      }
+
+    } catch (err: any) {
+      console.error('Erro ao buscar dados da loja:', err);
+      setError(err.response?.data?.message || 'Erro ao carregar dados da loja');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const checkAuth = () => {
+      if (!isAuthenticated || !user) {
+        router.push('/login');
+        return;
+      }
+      
+      if (user.role !== 'STORE_MANAGER') {
+        router.push('/');
+        return;
+      }
+    };
+
+    checkAuth();
+    
+    // Buscar dados da loja se autenticado como gerente
+    if (isAuthenticated && user && user.role === 'STORE_MANAGER') {
+      fetchStoreData();
+    }
+  }, [isAuthenticated, user, router]);
+
   const handleLogout = () => {
     logout();
     router.push('/login');
   };
+
+  if (!isAuthenticated || !user || user.role !== 'STORE_MANAGER') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#3e2626]"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-500 text-xl mb-4">❌ Erro ao carregar dashboard</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={fetchStoreData} className="bg-[#3e2626] hover:bg-[#8B4513]">
+            Tentar novamente
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -55,15 +158,29 @@ export default function ManagerDashboard() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Dashboard da Loja</h1>
-                  <p className="text-sm text-gray-600">Gerencie sua loja</p>
+            <div className="flex items-center space-x-4">
+              <div className="w-10 h-10 bg-[#3e2626] rounded-lg flex items-center justify-center">
+                <Store className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-[#3e2626]">Dashboard da Loja</h1>
+                <p className="text-sm text-gray-600">Gerencie sua loja</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <Separator orientation="vertical" className="h-6" />
+              <div className="flex items-center space-x-3">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-[#3e2626]">{user?.name || 'Gerente'}</p>
+                  <p className="text-xs text-gray-500">Gerente</p>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{user?.name || 'Gerente'}</p>
-                    <p className="text-xs text-gray-500">Gerente</p>
-                  </div>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-[#3e2626] text-white text-sm">
+                    {user?.name?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sair
@@ -91,88 +208,100 @@ export default function ManagerDashboard() {
           <TabsContent value="overview" className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Funcionários</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-gray-600">Funcionários</CardTitle>
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Users className="h-4 w-4 text-blue-600" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">8</div>
-                  <p className="text-xs text-muted-foreground">
-                    +1 desde o mês passado
-                  </p>
+                  <div className="text-3xl font-bold text-[#3e2626]">{storeStats.totalEmployees}</div>
+                  <div className="flex items-center mt-2">
+                    <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
+                    <p className="text-sm text-green-600">Funcionários da loja</p>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Produtos</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-gray-600">Produtos</CardTitle>
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <Package className="h-4 w-4 text-purple-600" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">52</div>
-                  <p className="text-xs text-muted-foreground">
-                    +3 desde o mês passado
-                  </p>
+                  <div className="text-3xl font-bold text-[#3e2626]">{storeStats.totalProducts}</div>
+                  <div className="flex items-center mt-2">
+                    <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
+                    <p className="text-sm text-green-600">Produtos em estoque</p>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Vendas do Mês</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-gray-600">Vendas do Mês</CardTitle>
+                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <DollarSign className="h-4 w-4 text-orange-600" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">R$ 15.230</div>
-                  <p className="text-xs text-muted-foreground">
-                    +8% desde o mês passado
-                  </p>
+                  <div className="text-3xl font-bold text-[#3e2626]">R$ {storeStats.monthlyRevenue.toLocaleString()}</div>
+                  <div className="flex items-center mt-2">
+                    <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
+                    <p className="text-sm text-green-600">Receita mensal</p>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Estoque Baixo</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-gray-600">Total de Vendas</CardTitle>
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <ShoppingCart className="h-4 w-4 text-green-600" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">3</div>
-                  <p className="text-xs text-muted-foreground">
-                    Produtos precisam de reposição
-                  </p>
+                  <div className="text-3xl font-bold text-[#3e2626]">{storeStats.totalSales}</div>
+                  <div className="flex items-center mt-2">
+                    <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
+                    <p className="text-sm text-green-600">Vendas realizadas</p>
+                  </div>
                 </CardContent>
               </Card>
             </div>
 
             {/* Recent Activity */}
-            <Card>
+            <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle>Atividade Recente da Loja</CardTitle>
-                <CardDescription>Últimas ações realizadas na sua loja</CardDescription>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="h-5 w-5 mr-2 text-[#3e2626]" />
+                  Vendas Recentes da Loja
+                </CardTitle>
+                <CardDescription>Últimas vendas realizadas na sua loja</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Nova venda realizada</p>
-                      <p className="text-xs text-gray-500">R$ 1.200,00 - há 1 hora</p>
+                  {isLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626]"></div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Produto adicionado</p>
-                      <p className="text-xs text-gray-500">Sofá Moderno - há 3 horas</p>
+                  ) : recentSales.length > 0 ? recentSales.map((sale: any) => (
+                    <div key={sale.id} className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Nova venda - R$ {sale.items?.reduce((sum: number, item: any) => sum + (item.unitPrice * item.quantity), 0).toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">{sale.customer?.name} - {new Date(sale.createdAt).toLocaleDateString()}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Estoque baixo</p>
-                      <p className="text-xs text-gray-500">Mesa de Centro - há 5 horas</p>
+                  )) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>Nenhuma venda recente na loja</p>
                     </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -187,44 +316,59 @@ export default function ManagerDashboard() {
               </Button>
             </div>
 
-            <Card>
+            <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle>Funcionários da Loja</CardTitle>
                 <CardDescription>Gerencie os funcionários da sua loja</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">Maria Santos</h3>
-                      <p className="text-sm text-gray-600">maria@loja.com - Funcionária</p>
+                  {isLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626]"></div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">Ativo</Badge>
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                  ) : employees.length > 0 ? employees.map((employee: any) => (
+                    <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center space-x-4">
+                        <Avatar className="w-10 h-10">
+                          <AvatarFallback className="bg-[#3e2626] text-white text-sm">
+                            {employee.name?.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-semibold text-[#3e2626]">{employee.name}</h3>
+                          <p className="text-sm text-gray-600">{employee.email}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Badge className={
+                              employee.role === 'STORE_MANAGER' ? 'bg-blue-100 text-blue-800' :
+                              employee.role === 'CASHIER' ? 'bg-orange-100 text-orange-800' :
+                              'bg-gray-100 text-gray-800'
+                            }>
+                              {employee.role === 'STORE_MANAGER' ? 'Gerente' :
+                               employee.role === 'CASHIER' ? 'Funcionário' :
+                               employee.role}
+                            </Badge>
+                            <Badge className={employee.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                              {employee.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">João Silva</h3>
-                      <p className="text-sm text-gray-600">joao@loja.com - Funcionário</p>
+                  )) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum funcionário cadastrado na loja</p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">Ativo</Badge>
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

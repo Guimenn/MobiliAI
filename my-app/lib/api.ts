@@ -370,4 +370,279 @@ export const chatbotAPI = {
   },
 };
 
+// Admin API
+export const adminAPI = {
+  // Dashboard
+  getDashboard: async () => {
+    const response = await api.get('/admin/dashboard');
+    return response.data;
+  },
+
+  getOverviewStats: async () => {
+    const response = await api.get('/admin/stats/overview');
+    return response.data;
+  },
+
+  getRecentSales: async () => {
+    const response = await api.get('/admin/stats/recent-sales');
+    return response.data;
+  },
+
+  getTopProducts: async () => {
+    const response = await api.get('/admin/stats/top-products');
+    return response.data;
+  },
+
+  // Users
+  getAllUsers: async (page = 1, limit = 10, search = '') => {
+    const response = await api.get('/admin/users', {
+      params: { page, limit, search }
+    });
+    return response.data;
+  },
+
+  getUserById: async (id: string) => {
+    const response = await api.get(`/admin/users/${id}`);
+    return response.data;
+  },
+
+  createUser: async (userData: any) => {
+    const response = await api.post('/admin/users', userData);
+    return response.data;
+  },
+
+  updateUser: async (id: string, userData: any) => {
+    const response = await api.put(`/admin/users/${id}`, userData);
+    return response.data;
+  },
+
+  deleteUser: async (id: string) => {
+    const response = await api.delete(`/admin/users/${id}`);
+    return response.data;
+  },
+
+  changeUserPassword: async (id: string, password: string) => {
+    const response = await api.put(`/admin/users/${id}/password`, { password });
+    return response.data;
+  },
+
+  // Stores
+  getAllStores: async () => {
+    const response = await api.get('/admin/stores');
+    return response.data;
+  },
+
+  getStoreById: async (id: string) => {
+    const response = await api.get(`/admin/stores/${id}`);
+    return response.data;
+  },
+
+  createStore: async (storeData: any) => {
+    const response = await api.post('/admin/stores', storeData);
+    return response.data;
+  },
+
+  updateStore: async (id: string, storeData: any) => {
+    const response = await api.put(`/admin/stores/${id}`, storeData);
+    return response.data;
+  },
+
+  deleteStore: async (id: string) => {
+    const response = await api.delete(`/admin/stores/${id}`);
+    return response.data;
+  },
+
+  // Products
+  getAllProducts: async (page = 1, limit = 10, search = '', category?: string) => {
+    const response = await api.get('/admin/products', {
+      params: { page, limit, search, category }
+    });
+    return response.data;
+  },
+
+  createProduct: async (productData: any) => {
+    const response = await api.post('/admin/products', productData);
+    return response.data;
+  },
+
+  updateProduct: async (id: string, productData: any) => {
+    const response = await api.put(`/admin/products/${id}`, productData);
+    return response.data;
+  },
+
+  deleteProduct: async (id: string) => {
+    const response = await api.delete(`/admin/products/${id}`);
+    return response.data;
+  },
+
+  // Reports
+  getSalesReport: async (startDate?: string, endDate?: string, storeId?: string) => {
+    const response = await api.get('/admin/reports/sales', {
+      params: { startDate, endDate, storeId }
+    });
+    return response.data;
+  },
+
+  getInventoryReport: async (storeId?: string) => {
+    const response = await api.get('/admin/reports/inventory', {
+      params: { storeId }
+    });
+    return response.data;
+  },
+
+  getUserActivityReport: async (userId?: string, startDate?: string, endDate?: string) => {
+    const response = await api.get('/admin/reports/user-activity', {
+      params: { userId, startDate, endDate }
+    });
+    return response.data;
+  },
+};
+
+// Manager API
+export const managerAPI = {
+  // Dashboard
+  getDashboard: async () => {
+    const response = await api.get('/manager/dashboard');
+    return response.data;
+  },
+
+  getOverviewStats: async () => {
+    const response = await api.get('/manager/stats/overview');
+    return response.data;
+  },
+
+  getRecentSales: async () => {
+    const response = await api.get('/manager/stats/recent-sales');
+    return response.data;
+  },
+
+  getTopProducts: async () => {
+    const response = await api.get('/manager/stats/top-products');
+    return response.data;
+  },
+
+  getStoreInfo: async () => {
+    const response = await api.get('/manager/store');
+    return response.data;
+  },
+
+  // Users (apenas da loja do gerente)
+  getStoreUsers: async (page = 1, limit = 10, search = '') => {
+    const response = await api.get('/manager/users', {
+      params: { page, limit, search }
+    });
+    return response.data;
+  },
+
+  getUserById: async (id: string) => {
+    const response = await api.get(`/manager/users/${id}`);
+    return response.data;
+  },
+
+  createStoreUser: async (userData: any) => {
+    const response = await api.post('/manager/users', userData);
+    return response.data;
+  },
+
+  updateStoreUser: async (id: string, userData: any) => {
+    const response = await api.put(`/manager/users/${id}`, userData);
+    return response.data;
+  },
+
+  deleteStoreUser: async (id: string) => {
+    const response = await api.delete(`/manager/users/${id}`);
+    return response.data;
+  },
+
+  changeUserPassword: async (id: string, password: string) => {
+    const response = await api.put(`/manager/users/${id}/password`, { password });
+    return response.data;
+  },
+
+  // Products (apenas da loja do gerente)
+  getStoreProducts: async (page = 1, limit = 10, search = '', category?: string) => {
+    const response = await api.get('/manager/products', {
+      params: { page, limit, search, category }
+    });
+    return response.data;
+  },
+
+  getProductById: async (id: string) => {
+    const response = await api.get(`/manager/products/${id}`);
+    return response.data;
+  },
+
+  createStoreProduct: async (productData: any) => {
+    const response = await api.post('/manager/products', productData);
+    return response.data;
+  },
+
+  updateStoreProduct: async (id: string, productData: any) => {
+    const response = await api.put(`/manager/products/${id}`, productData);
+    return response.data;
+  },
+
+  deleteStoreProduct: async (id: string) => {
+    const response = await api.delete(`/manager/products/${id}`);
+    return response.data;
+  },
+
+  // Reports (apenas da loja do gerente)
+  getStoreSalesReport: async (startDate?: string, endDate?: string) => {
+    const response = await api.get('/manager/reports/sales', {
+      params: { startDate, endDate }
+    });
+    return response.data;
+  },
+
+  getStoreInventoryReport: async () => {
+    const response = await api.get('/manager/reports/inventory');
+    return response.data;
+  },
+
+  getStoreUserActivityReport: async (userId?: string, startDate?: string, endDate?: string) => {
+    const response = await api.get('/manager/reports/user-activity', {
+      params: { userId, startDate, endDate }
+    });
+    return response.data;
+  },
+
+  // Inventory
+  getInventoryStatus: async () => {
+    const response = await api.get('/manager/inventory/status');
+    return response.data;
+  },
+
+  getInventoryAlerts: async () => {
+    const response = await api.get('/manager/inventory/alerts');
+    return response.data;
+  },
+
+  updateProductStock: async (productId: string, stock: number) => {
+    const response = await api.put(`/manager/inventory/products/${productId}/stock`, { stock });
+    return response.data;
+  },
+
+  adjustInventory: async (productId: string, adjustment: number, reason: string) => {
+    const response = await api.post(`/manager/inventory/products/${productId}/adjust`, { 
+      adjustment, reason 
+    });
+    return response.data;
+  },
+
+  getInventoryReport: async (category?: string) => {
+    const response = await api.get('/manager/inventory/report', {
+      params: { category }
+    });
+    return response.data;
+  },
+
+  getStockMovement: async (productId?: string, days = 30) => {
+    const response = await api.get('/manager/inventory/movement', {
+      params: { productId, days }
+    });
+    return response.data;
+  },
+};
+
 export default api;

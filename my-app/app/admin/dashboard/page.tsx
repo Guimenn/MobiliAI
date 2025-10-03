@@ -3,11 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
+import { adminAPI } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { 
   Users, 
   Store, 
@@ -63,6 +67,67 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalStores: 0,
+    totalProducts: 0,
+    totalRevenue: 0,
+    monthlyRevenue: 0,
+    activeStores: 0
+  });
+  const [recentSales, setRecentSales] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [stores, setStores] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [error, setError] = useState('');
+
+  // Função para buscar dados do dashboard
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      
+      const [dashboardData, storesData, usersData] = await Promise.all([
+        adminAPI.getDashboard(),
+        adminAPI.getAllStores(),
+        adminAPI.getAllUsers(1, 10, '')
+      ]);
+
+      // Atualizar estatísticas
+      if (dashboardData.overview) {
+        setStats(dashboardData.overview);
+      }
+
+      // Atualizar vendas recentes
+      if (dashboardData.recentSales) {
+        setRecentSales(dashboardData.recentSales);
+      }
+
+      // Atualizar produtos em destaque
+      if (dashboardData.topProducts) {
+        setTopProducts(dashboardData.topProducts);
+      }
+
+      // Atualizar lojas
+      if (storesData) {
+        setStores(storesData);
+      }
+
+      // Atualizar usuários (apenas funcionários e gerentes)
+      if (usersData && usersData.users) {
+        const filteredUsers = usersData.users.filter((user: any) => 
+          user.role === 'STORE_MANAGER' || user.role === 'CASHIER'
+        );
+        setUsers(filteredUsers);
+      }
+
+    } catch (err: any) {
+      console.error('Erro ao buscar dados do dashboard:', err);
+      setError(err.response?.data?.message || 'Erro ao carregar dados do dashboard');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const checkAuth = () => {
@@ -89,8 +154,12 @@ export default function AdminDashboard() {
       }
     };
 
-    const timer = setTimeout(checkAuth, 500);
-    return () => clearTimeout(timer);
+    checkAuth();
+    
+    // Buscar dados do dashboard se autenticado como admin
+    if (isAuthenticated && user && user.role === 'ADMIN') {
+      fetchDashboardData();
+    }
   }, [isAuthenticated, user, router]);
 
   const handleLogout = () => {
@@ -102,6 +171,20 @@ export default function AdminDashboard() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#3e2626]"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-500 text-xl mb-4">❌ Erro ao carregar dashboard</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={fetchDashboardData} className="bg-[#3e2626] hover:bg-[#8B4513]">
+            Tentar novamente
+          </Button>
+        </div>
       </div>
     );
   }
@@ -127,14 +210,17 @@ export default function AdminDashboard() {
                 <Bell className="h-4 w-4 mr-2" />
                 Notificações
               </Button>
+              <Separator orientation="vertical" className="h-6" />
               <div className="flex items-center space-x-3">
                 <div className="text-right">
                   <p className="text-sm font-medium text-[#3e2626]">{user.name}</p>
                   <p className="text-xs text-gray-500">Administrador</p>
                 </div>
-                <div className="w-8 h-8 bg-[#3e2626] rounded-full flex items-center justify-center">
-                  <UserCheck className="h-4 w-4 text-white" />
-                </div>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-[#3e2626] text-white text-sm">
+                    {user.name?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
               </div>
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
@@ -160,66 +246,66 @@ export default function AdminDashboard() {
           <TabsContent value="overview" className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Total de Lojas</CardTitle>
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Store className="h-4 w-4 text-blue-600" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-[#3e2626]">8</div>
-                  <div className="flex items-center mt-2">
-                    <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
-                    <p className="text-sm text-green-600">+2 este mês</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg">
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600">Total de Usuários</CardTitle>
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Users className="h-4 w-4 text-blue-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-[#3e2626]">{stats.totalUsers.toLocaleString()}</div>
+                  <div className="flex items-center mt-2">
+                    <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
+                    <p className="text-sm text-green-600">Usuários cadastrados</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Total de Lojas</CardTitle>
                   <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <Users className="h-4 w-4 text-green-600" />
+                    <Store className="h-4 w-4 text-green-600" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-[#3e2626]">1,247</div>
+                  <div className="text-3xl font-bold text-[#3e2626]">{stats.totalStores}</div>
                   <div className="flex items-center mt-2">
                     <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
-                    <p className="text-sm text-green-600">+12% este mês</p>
+                    <p className="text-sm text-green-600">{stats.activeStores} ativas</p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-lg">
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Produtos Ativos</CardTitle>
-                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Package className="h-4 w-4 text-orange-600" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-[#3e2626]">2,847</div>
-                  <div className="flex items-center mt-2">
-                    <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
-                    <p className="text-sm text-green-600">+8% este mês</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Receita Mensal</CardTitle>
+                  <CardTitle className="text-sm font-medium text-gray-600">Total de Produtos</CardTitle>
                   <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <DollarSign className="h-4 w-4 text-purple-600" />
+                    <Package className="h-4 w-4 text-purple-600" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-[#3e2626]">R$ 847K</div>
+                  <div className="text-3xl font-bold text-[#3e2626]">{stats.totalProducts.toLocaleString()}</div>
                   <div className="flex items-center mt-2">
                     <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
-                    <p className="text-sm text-green-600">+15% este mês</p>
+                    <p className="text-sm text-green-600">Produtos cadastrados</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Receita Total</CardTitle>
+                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <DollarSign className="h-4 w-4 text-orange-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-[#3e2626]">R$ {stats.monthlyRevenue.toLocaleString()}</div>
+                  <div className="flex items-center mt-2">
+                    <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
+                    <p className="text-sm text-green-600">Receita mensal</p>
                   </div>
                 </CardContent>
               </Card>
@@ -256,34 +342,20 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Nova loja cadastrada</p>
-                        <p className="text-xs text-gray-500">Loja Shopping Center - há 2 horas</p>
+                    {recentSales.length > 0 ? recentSales.slice(0, 5).map((sale: any) => (
+                      <div key={sale.id} className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">Nova venda - R$ {sale.items?.reduce((sum: number, item: any) => sum + (item.unitPrice * item.quantity), 0).toFixed(2)}</p>
+                          <p className="text-xs text-gray-500">{sale.customer?.name} - {sale.store?.name} - {new Date(sale.createdAt).toLocaleDateString()}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Usuário criado</p>
-                        <p className="text-xs text-gray-500">Maria Silva - há 4 horas</p>
+                    )) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>Nenhuma venda recente</p>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-3 p-3 bg-yellow-50 rounded-lg">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Produto atualizado</p>
-                        <p className="text-xs text-gray-500">Sofá Moderno - há 6 horas</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Relatório gerado</p>
-                        <p className="text-xs text-gray-500">Vendas mensais - há 8 horas</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -319,6 +391,45 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Top Products */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="h-5 w-5 mr-2 text-[#3e2626]" />
+                  Produtos em Destaque
+                </CardTitle>
+                <CardDescription>Produtos com melhor desempenho de vendas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {topProducts.length > 0 ? topProducts.slice(0, 5).map((product: any, index: number) => (
+                    <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-8 h-8 bg-[#3e2626] rounded-full flex items-center justify-center text-white font-bold text-sm">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{product.name}</p>
+                          <p className="text-sm text-gray-500">Avaliação: {product.rating || 0}/5</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-[#3e2626]">R$ {product.price.toLocaleString()}</p>
+                        <div className="w-24 mt-1">
+                          <Progress value={product.rating ? (product.rating / 5) * 100 : 0} className="h-2" />
+                        </div>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum produto em destaque</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="stores" className="space-y-6">
@@ -341,124 +452,66 @@ export default function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Loja Matriz</CardTitle>
-                    <Badge className="bg-green-100 text-green-800">Ativa</Badge>
-                  </div>
-                  <CardDescription>Rua Principal, 123 - Centro</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Users className="h-4 w-4 mr-2" />
-                      15 funcionários
+              {isLoading ? (
+                <div className="col-span-full flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626]"></div>
+                </div>
+              ) : stores.length > 0 ? stores.map((store: any) => (
+                <Card key={store.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{store.name}</CardTitle>
+                      <Badge className={store.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                        {store.isActive ? 'Ativa' : 'Inativa'}
+                      </Badge>
                     </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Package className="h-4 w-4 mr-2" />
-                      1,247 produtos
+                    <CardDescription>{store.address} - {store.city}/{store.state}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Store className="h-4 w-4 mr-2" />
+                        {store._count?.products || 0} produtos
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        {store._count?.sales || 0} vendas
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Mail className="h-4 w-4 mr-2" />
+                        {store.email}
+                      </div>
                     </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      R$ 45K este mês
+                    <div className="flex space-x-2">
+                      <Button size="sm" variant="outline" className="flex-1">
+                        <Eye className="h-4 w-4 mr-2" />
+                        Ver
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Ver
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )) : (
+                <div className="col-span-full text-center py-8 text-gray-500">
+                  <Store className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>Nenhuma loja cadastrada</p>
+                </div>
+              )}
 
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Loja Shopping</CardTitle>
-                    <Badge className="bg-green-100 text-green-800">Ativa</Badge>
-                  </div>
-                  <CardDescription>Shopping Center, 2º andar</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Users className="h-4 w-4 mr-2" />
-                      8 funcionários
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Package className="h-4 w-4 mr-2" />
-                      892 produtos
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      R$ 32K este mês
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Ver
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Loja Norte</CardTitle>
-                    <Badge className="bg-yellow-100 text-yellow-800">Manutenção</Badge>
-                  </div>
-                  <CardDescription>Av. Norte, 456 - Zona Norte</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Users className="h-4 w-4 mr-2" />
-                      12 funcionários
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Package className="h-4 w-4 mr-2" />
-                      1,156 produtos
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      R$ 28K este mês
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Ver
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1">
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
 
           <TabsContent value="users" className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold text-[#3e2626]">Gerenciar Usuários</h2>
-                <p className="text-gray-600">Gerencie todos os usuários do sistema</p>
+                <h2 className="text-2xl font-bold text-[#3e2626]">Gerenciar Funcionários</h2>
+                <p className="text-gray-600">Gerencie funcionários e gerentes do sistema</p>
               </div>
               <div className="flex space-x-2">
-                <Input placeholder="Buscar usuários..." className="w-64" />
+                <Input placeholder="Buscar funcionários..." className="w-64" />
                 <Button variant="outline">
                   <Filter className="h-4 w-4 mr-2" />
                   Filtrar
@@ -472,91 +525,61 @@ export default function AdminDashboard() {
 
             <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle>Lista de Usuários</CardTitle>
-                <CardDescription>Usuários cadastrados no sistema</CardDescription>
+                <CardTitle>Lista de Funcionários</CardTitle>
+                <CardDescription>Funcionários e gerentes cadastrados no sistema</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-[#3e2626] rounded-full flex items-center justify-center">
-                        <UserCheck className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-[#3e2626]">João Silva</h3>
-                        <p className="text-sm text-gray-600">joao@loja.com</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge className="bg-blue-100 text-blue-800">Gerente</Badge>
-                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
+                  {isLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626]"></div>
+                    </div>
+                  ) : users.length > 0 ? users.map((user: any) => (
+                    <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center space-x-4">
+                        <Avatar className="w-10 h-10">
+                          <AvatarFallback className="bg-[#3e2626] text-white text-sm">
+                            {user.name?.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-semibold text-[#3e2626]">{user.name}</h3>
+                          <p className="text-sm text-gray-600">{user.email}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Badge className={
+                              user.role === 'STORE_MANAGER' ? 'bg-blue-100 text-blue-800' :
+                              user.role === 'CASHIER' ? 'bg-orange-100 text-orange-800' :
+                              'bg-gray-100 text-gray-800'
+                            }>
+                              {user.role === 'STORE_MANAGER' ? 'Gerente' :
+                               user.role === 'CASHIER' ? 'Funcionário' :
+                               user.role}
+                            </Badge>
+                            <Badge className={user.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                              {user.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  )) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum funcionário ou gerente cadastrado</p>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-[#8B4513] rounded-full flex items-center justify-center">
-                        <UserCheck className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-[#3e2626]">Maria Santos</h3>
-                        <p className="text-sm text-gray-600">maria@loja.com</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge className="bg-orange-100 text-orange-800">Funcionária</Badge>
-                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-[#D2B48C] rounded-full flex items-center justify-center">
-                        <UserCheck className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-[#3e2626]">Pedro Costa</h3>
-                        <p className="text-sm text-gray-600">pedro@loja.com</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge className="bg-purple-100 text-purple-800">Cliente</Badge>
-                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>

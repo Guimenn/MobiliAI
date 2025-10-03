@@ -6,7 +6,7 @@ import { useAppStore } from '@/lib/store';
 import { authAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Send, Loader2, Eye, EyeOff, Home } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -412,52 +412,36 @@ export default function LoginPage() {
 
   return (
     <div className="h-screen bg-white flex">
-         {/* Left Side - Logo and Branding */}
-         <div className="w-1/2 relative flex flex-col items-center justify-center p-16 overflow-hidden">
+         {/* Left Side - Background Image with MobiliAI Text */}
+         <div className="w-1/2 relative overflow-hidden">
            {/* Background Image */}
            <div className="absolute inset-0">
              <Image
-               src="/image.png"
+               src="/fudno.jpeg"
                alt="Background"
                fill
                className="object-cover"
                priority
              />
-             {/* Overlay for better text readability */}
-             <div className="absolute inset-0 bg-[#3e2626]/40" />
            </div>
 
-           <div className="text-center max-w-2xl relative z-10 px-8">
-             {/* Logo */}
-             <div className="mb-10">
-               <Image
-                 src="/logo.png"
-                 alt="MobiliAI Logo"
-                 width={300}
-                 height={300}
-                 className="mx-auto drop-shadow-2xl"
-                 priority
-               />
-             </div>
+           
              
-             {/* Subtitle */}
-             <h2 className="text-3xl font-bold text-white mb-6 tracking-wide">
-               Sistema Inteligente de Decoração
-             </h2>
-             
-             {/* Description */}
-             <div className="space-y-4">
-               <p className="text-gray-200 text-lg leading-relaxed font-light">
-               Transforme sua casa com móveis e decorações usando nossa IA Decoradora. 
-               </p>
-               <p className="text-gray-300 text-base leading-relaxed">
-               Visualize móveis no seu ambiente real antes de comprar.
-             </p>
-             </div>
-             
-             {/* Decorative line */}
-             <div className="mt-8 flex justify-center">
-               <div className="w-20 h-1 bg-gradient-to-r from-transparent via-white/30 to-transparent rounded-full"></div>
+            {/* MobiliAI Text Overlay - Centralizado e Proporcional */}
+            <div className="absolute inset-0 flex items-center justify-center pt-90 pr-10">
+              <div className="text-center px-8">
+               <h1 className="text-7xl font-black drop-shadow-2xl leading-tight mb-8">
+                 <span className="text-[#3E2626]">Mobili</span>
+                 <span className="text-white">AI</span>
+             </h1>
+               <div className="space-y-3">
+                 <p className="text-3xl font-bold text-white drop-shadow-lg">
+                   Transforme seus espaços
+                 </p>
+                 <p className="text-xl text-[#3e2626] font-semibold drop-shadow-md">
+                   com inteligência artificial
+                 </p>
+               </div>
              </div>
            </div>
          </div>
