@@ -393,7 +393,71 @@ export const adminAPI = {
     return response.data;
   },
 
+  // Reports
+  getReports: async () => {
+    const response = await api.get('/admin/reports');
+    return response.data;
+  },
+
+
+  // Stores
+  getStores: async () => {
+    const response = await api.get('/admin/stores');
+    return response.data;
+  },
+
+  getStoreById: async (id: string) => {
+    const response = await api.get(`/admin/stores/${id}`);
+    return response.data;
+  },
+
+  createStore: async (storeData: any) => {
+    const response = await api.post('/admin/stores', storeData);
+    return response.data;
+  },
+
+  updateStore: async (id: string, storeData: any) => {
+    const response = await api.put(`/admin/stores/${id}`, storeData);
+    return response.data;
+  },
+
+  deleteStore: async (id: string) => {
+    const response = await api.delete(`/admin/stores/${id}`);
+    return response.data;
+  },
+
+  // Products
+  getProducts: async () => {
+    const response = await api.get('/admin/products');
+    return response.data;
+  },
+
+  getProductById: async (id: string) => {
+    const response = await api.get(`/admin/products/${id}`);
+    return response.data;
+  },
+
+  createProduct: async (productData: any) => {
+    const response = await api.post('/admin/products', productData);
+    return response.data;
+  },
+
+  updateProduct: async (id: string, productData: any) => {
+    const response = await api.put(`/admin/products/${id}`, productData);
+    return response.data;
+  },
+
+  deleteProduct: async (id: string) => {
+    const response = await api.delete(`/admin/products/${id}`);
+    return response.data;
+  },
+
   // Users
+  getUsers: async () => {
+    const response = await api.get('/admin/users');
+    return response.data;
+  },
+
   getAllUsers: async (page = 1, limit = 10, search = '') => {
     const response = await api.get('/admin/users', {
       params: { page, limit, search }
@@ -426,54 +490,6 @@ export const adminAPI = {
     return response.data;
   },
 
-  // Stores
-  getAllStores: async () => {
-    const response = await api.get('/admin/stores');
-    return response.data;
-  },
-
-  getStoreById: async (id: string) => {
-    const response = await api.get(`/admin/stores/${id}`);
-    return response.data;
-  },
-
-  createStore: async (storeData: any) => {
-    const response = await api.post('/admin/stores', storeData);
-    return response.data;
-  },
-
-  updateStore: async (id: string, storeData: any) => {
-    const response = await api.put(`/admin/stores/${id}`, storeData);
-    return response.data;
-  },
-
-  deleteStore: async (id: string) => {
-    const response = await api.delete(`/admin/stores/${id}`);
-    return response.data;
-  },
-
-  // Products
-  getAllProducts: async (page = 1, limit = 10, search = '', category?: string) => {
-    const response = await api.get('/admin/products', {
-      params: { page, limit, search, category }
-    });
-    return response.data;
-  },
-
-  createProduct: async (productData: any) => {
-    const response = await api.post('/admin/products', productData);
-    return response.data;
-  },
-
-  updateProduct: async (id: string, productData: any) => {
-    const response = await api.put(`/admin/products/${id}`, productData);
-    return response.data;
-  },
-
-  deleteProduct: async (id: string) => {
-    const response = await api.delete(`/admin/products/${id}`);
-    return response.data;
-  },
 
   // Reports
   getSalesReport: async (startDate?: string, endDate?: string, storeId?: string) => {

@@ -85,10 +85,15 @@ export default function LoginPage() {
   };
 
   const addMessage = (type: 'assistant' | 'user', message: string, hasSkipButton = false) => {
+    // Mascarar senha se for mensagem do usuário e estiver no step de password
+    const displayMessage = (type === 'user' && loginStep === 'password') 
+      ? '*'.repeat(message.length) 
+      : message;
+    
     const newMessage: ChatMessage = {
       id: generateUniqueId(),
       type,
-      message,
+      message: displayMessage,
       timestamp: new Date(),
       hasSkipButton
     };
@@ -159,7 +164,9 @@ export default function LoginPage() {
         setEmailExists(emailCheck.exists);
         
         if (emailCheck.exists) {
-      setLoginStep('password');
+          // Resetar estado de mostrar senha
+          setShowPassword(false);
+          setLoginStep('password');
           simulateTyping('Agora digite sua senha:', 1000);
         } else {
           setLoginStep('userInfo');
@@ -334,6 +341,8 @@ export default function LoginPage() {
         }
       }
     } else if (loginStep === 'password') {
+      // Resetar estado de mostrar senha
+      setShowPassword(false);
       setCredentials(prev => ({ ...prev, password: userInput }));
       setLoginStep('processing');
       
@@ -411,7 +420,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-screen bg-white flex">
+    <div className="h-screen bg-[#fafafa] flex">
          {/* Left Side - Background Image with MobiliAI Text */}
          <div className="w-1/2 relative overflow-hidden">
            {/* Background Image */}
@@ -447,9 +456,9 @@ export default function LoginPage() {
          </div>
 
         {/* Right Side - Chat Interface */}
-        <div className="w-1/2 flex flex-col">
+        <div className="w-1/2 flex flex-col translate-x-[-50px] bg-[#fafafa]">
           {/* Chat Header */}
-          <div className="bg-white border-b border-gray-200 p-8 flex items-center space-x-4">
+          <div className="bg-[#fafafa] p-8 flex items-center space-x-4">
             <div className="w-16 h-16 rounded-lg overflow-hidden flex items-center justify-center bg-gray-50">
               <Image
                 src="/bot.jpeg"
@@ -466,12 +475,12 @@ export default function LoginPage() {
           </div>
 
           {/* Chat Messages */}
-          <div className="flex-1 p-8 overflow-y-auto bg-white">
-            <div className="space-y-4">
+          <div className="flex-1 p-8 overflow-y-auto bg-[#fafafa]">
+            <div className="space-y-6">
               {messages.map((message) => (
                 <div key={message.id}>
                   {message.hasSkipButton ? (
-                    <div className="flex justify-start">
+                    <div className="flex justify-start mb-2">
                       <button
                         onClick={() => {
                           setCurrentInput('pular');
@@ -484,7 +493,7 @@ export default function LoginPage() {
                       </button>
                     </div>
                   ) : message.hasCepButton ? (
-                    <div className="flex justify-start">
+                    <div className="flex justify-start mb-2">
                       <button
                         onClick={() => {
                           setCurrentInput('não sei o CEP');
@@ -498,16 +507,16 @@ export default function LoginPage() {
                     </div>
                   ) : (
                     <div
-                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
                 >
                   <div
-                    className={`max-w-sm lg:max-w-lg px-6 py-4 rounded-2xl ${
+                    className={`max-w-sm lg:max-w-lg px-6 py-4 rounded-2xl shadow-sm ${
                       message.type === 'user'
                         ? 'bg-[#3e2626] text-white'
-                        : 'bg-white text-gray-800 shadow-sm border'
+                        : 'bg-white text-gray-800 border border-gray-200'
                     }`}
                   >
-                    <p className="text-base">{message.message}</p>
+                    <p className="text-base leading-relaxed">{message.message}</p>
                   </div>
                     </div>
                   )}
@@ -516,7 +525,7 @@ export default function LoginPage() {
               
               {isTyping && (
                 <div className="flex justify-start">
-                  <div className="bg-white text-gray-800 shadow-sm border px-6 py-4 rounded-2xl">
+                  <div className="bg-white text-gray-800 px-6 py-4 rounded-2xl border border-gray-200 shadow-sm">
                     <div className="flex items-center space-x-2">
                       <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce" />
                       <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce delay-100" />
@@ -530,13 +539,13 @@ export default function LoginPage() {
           </div>
 
           {/* Chat Input */}
-          <div className="p-8 bg-white">
+          <div className="p-8 bg-[#fafafa]">
             <form onSubmit={handleSubmit} className="flex space-x-3">
               <div className="flex-1 relative">
                 {loginStep === 'password' ? (
                   <div className="relative">
                     <Input
-                      type={showPassword ? 'text' : 'password'}
+                      type="password"
                       value={currentInput}
                       onChange={(e) => setCurrentInput(e.target.value)}
                       placeholder="Digite sua senha"
@@ -546,13 +555,18 @@ export default function LoginPage() {
                     <button
                       type="button"
                       className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      onClick={() => setShowPassword(!showPassword)}
+                      onClick={() => {
+                        const input = document.querySelector('input[type="password"]') as HTMLInputElement;
+                        if (input) {
+                          if (input.type === 'password') {
+                            input.type = 'text';
+                          } else {
+                            input.type = 'password';
+                          }
+                        }
+                      }}
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      )}
+                      <Eye className="h-4 w-4 text-gray-400" />
                     </button>
                   </div>
                 ) : (
