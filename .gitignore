@@ -86,7 +86,7 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public - removido para permitir pasta public do Next.js
 
 # Vuepress build output
 .vuepress/dist
@@ -214,7 +214,7 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public - removido para permitir pasta public do Next.js
 
 # Storybook build outputs
 .out
@@ -313,7 +313,7 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public - removido para permitir pasta public do Next.js
 
 # Storybook build outputs
 .out
