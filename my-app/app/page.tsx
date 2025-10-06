@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -34,8 +34,8 @@ import {
   Palette,
   Camera,
   Home,
-  Sofa,
-  Lamp,
+  Paintbrush,
+  Wand2,
   Users,
   Table,
   Plus,
@@ -44,7 +44,24 @@ import {
   Grid,
   List,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Upload,
+  Eye,
+  Download,
+  Award,
+  Zap,
+  Target,
+  Lightbulb,
+  Brush,
+  Droplets,
+  Layers,
+  Scissors,
+  Sofa,
+  Lamp,
+  BookOpen,
+  Package,
+  Archive,
+  Frame
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -54,15 +71,56 @@ export default function HomePage() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('all');
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
-  const [activeInspiration, setActiveInspiration] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchClosing, setSearchClosing] = useState(false);
+  const [searchOpening, setSearchOpening] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('Sala de Estar');
+  const [favorites, setFavorites] = useState<number[]>([]);
+  const [cartItems, setCartItems] = useState<number[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Função auxiliar para renderizar ícones
+  const renderIcon = (IconComponent: any, className: string) => {
+    return <IconComponent className={className} />;
+  };
+
+  // Função para alternar favorito
+  const toggleFavorite = (productId: number) => {
+    setFavorites(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  // Função para adicionar ao carrinho
+  const addToCart = (productId: number) => {
+    setCartItems(prev => [...prev, productId]);
+  };
 
   // Função para logout
   const handleLogout = () => {
     logout();
     setUserDropdownOpen(false);
     router.push('/');
+  };
+
+  // Função para abrir search com animação
+  const handleOpenSearch = () => {
+    setSearchOpening(true);
+    setSearchOpen(true);
+    setTimeout(() => {
+      setSearchOpening(false);
+    }, 300);
+  };
+
+  // Função para fechar search com animação
+  const handleCloseSearch = () => {
+    setSearchClosing(true);
+    setTimeout(() => {
+      setSearchOpen(false);
+      setSearchClosing(false);
+    }, 200);
   };
 
   // Fechar dropdown quando clicar fora
@@ -74,558 +132,1288 @@ export default function HomePage() {
           setUserDropdownOpen(false);
         }
       }
+      if (searchOpen) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.search-icon-container')) {
+          handleCloseSearch();
+        }
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [userDropdownOpen]);
+  }, [userDropdownOpen, searchOpen]);
 
-  // Dados mockados para demonstração
+  // Categorias baseadas no banco de dados
   const categories = [
-    { id: 'sofa', name: 'Sofás', icon: Sofa, count: 24 },
-    { id: 'chair', name: 'Cadeiras', icon: Users, count: 18 },
-    { id: 'table', name: 'Mesas', icon: Table, count: 15 },
-    { id: 'lamp', name: 'Luminárias', icon: Lamp, count: 12 },
+    { 
+      id: 'SOFA', 
+      name: 'Sofás', 
+      icon: Sofa, 
+      count: 45,
+      description: 'Sofás confortáveis para sua sala',
+      gradient: 'from-[#8B4513] to-[#D2691E]'
+    },
+    { 
+      id: 'MESA', 
+      name: 'Mesas', 
+      icon: Table, 
+      count: 32,
+      description: 'Mesas elegantes para qualquer ambiente',
+      gradient: 'from-[#3e2626] to-[#8B4513]'
+    },
+    { 
+      id: 'CADEIRA', 
+      name: 'Cadeiras', 
+      icon: Users, 
+      count: 28,
+      description: 'Cadeiras ergonômicas e estilosas',
+      gradient: 'from-[#A0522D] to-[#CD853F]'
+    },
+    { 
+      id: 'ARMARIO', 
+      name: 'Armários', 
+      icon: Archive, 
+      count: 18,
+      description: 'Armários organizadores modernos',
+      gradient: 'from-[#654321] to-[#8B4513]'
+    },
+    { 
+      id: 'ESTANTE', 
+      name: 'Estantes', 
+      icon: BookOpen, 
+      count: 22,
+      description: 'Estantes funcionais e decorativas',
+      gradient: 'from-[#2F4F4F] to-[#708090]'
+    },
+    { 
+      id: 'POLTRONA', 
+      name: 'Poltronas', 
+      icon: Sofa, 
+      count: 15,
+      description: 'Poltronas de luxo para relaxar',
+      gradient: 'from-[#8B0000] to-[#DC143C]'
+    },
+    { 
+      id: 'QUADRO', 
+      name: 'Quadros', 
+      icon: Frame, 
+      count: 35,
+      description: 'Quadros decorativos únicos',
+      gradient: 'from-[#4B0082] to-[#9370DB]'
+    },
+    { 
+      id: 'LUMINARIA', 
+      name: 'Luminárias', 
+      icon: Lamp, 
+      count: 25,
+      description: 'Iluminação perfeita para seu espaço',
+      gradient: 'from-[#FFD700] to-[#FFA500]'
+    },
+    { 
+      id: 'OUTROS', 
+      name: 'Outros', 
+      icon: Package, 
+      count: 12,
+      description: 'Produtos especiais e exclusivos',
+      gradient: 'from-[#696969] to-[#A9A9A9]'
+    },
   ];
 
-  const featuredProducts = [
+  const allProducts = [
     {
       id: 1,
       name: 'Sofá 3 Lugares Moderno',
       price: 2499.99,
       originalPrice: 2999.99,
-      image: '/placeholder-sofa.jpg',
-      rating: 4.8,
-      reviews: 124,
-      badge: 'Novo'
+      color: '#3e2626',
+      rating: 4.9,
+      reviews: 156,
+      badge: 'Mais Vendido',
+      category: 'Sala de Estar'
     },
     {
       id: 2,
       name: 'Cadeira Executiva Premium',
       price: 899.99,
-      image: '/placeholder-chair.jpg',
-      rating: 4.9,
+      color: '#8B4513',
+      rating: 4.8,
       reviews: 89,
-      badge: 'Mais Vendido'
+      badge: 'Novo',
+      category: 'Quarto'
     },
     {
       id: 3,
       name: 'Mesa de Centro Elegante',
       price: 1299.99,
       originalPrice: 1599.99,
-      image: '/placeholder-table.jpg',
+      color: '#D2B48C',
       rating: 4.7,
-      reviews: 67,
-      badge: 'Oferta'
+      reviews: 124,
+      badge: 'Oferta',
+      category: 'Sala de Estar'
     },
     {
       id: 4,
       name: 'Luminária Pendant Moderna',
       price: 599.99,
-      image: '/placeholder-lamp.jpg',
+      color: '#A0522D',
       rating: 4.6,
-      reviews: 45,
-      badge: null
+      reviews: 67,
+      badge: null,
+      category: 'Sala de Estar'
     },
     {
       id: 5,
       name: 'Poltrona Relax Premium',
       price: 1899.99,
-      image: '/placeholder-armchair.jpg',
-      rating: 4.8,
+      color: '#CD853F',
+      rating: 4.9,
       reviews: 92,
-      badge: null
+      badge: null,
+      category: 'Sala de Estar'
     },
     {
       id: 6,
       name: 'Mesa de Jantar 6 Lugares',
       price: 2199.99,
-      image: '/placeholder-dining.jpg',
+      color: '#DEB887',
+      rating: 4.8,
+      reviews: 78,
+      badge: 'Novo',
+      category: 'Sala de Jantar'
+    },
+    {
+      id: 7,
+      name: 'Cama King Size Premium',
+      price: 3299.99,
+      color: '#8B4513',
       rating: 4.9,
-      reviews: 156,
-      badge: 'Novo'
+      reviews: 134,
+      badge: 'Mais Vendido',
+      category: 'Quarto'
+    },
+    {
+      id: 8,
+      name: 'Armário de Cozinha Moderno',
+      price: 1899.99,
+      color: '#D2B48C',
+      rating: 4.7,
+      reviews: 89,
+      badge: null,
+      category: 'Cozinha'
+    },
+    {
+      id: 9,
+      name: 'Mesa de Jantar 4 Lugares',
+      price: 1599.99,
+      color: '#A0522D',
+      rating: 4.8,
+      reviews: 67,
+      badge: 'Oferta',
+      category: 'Sala de Jantar'
+    },
+    {
+      id: 10,
+      name: 'Cadeira de Jardim Resistente',
+      price: 399.99,
+      color: '#3e2626',
+      rating: 4.6,
+      reviews: 45,
+      badge: null,
+      category: 'Exterior'
+    },
+    {
+      id: 11,
+      name: 'Guarda-roupa 6 Portas',
+      price: 2499.99,
+      color: '#8B4513',
+      rating: 4.8,
+      reviews: 98,
+      badge: 'Novo',
+      category: 'Quarto'
+    },
+    {
+      id: 12,
+      name: 'Conjunto de Mesa e Cadeiras',
+      price: 2199.99,
+      color: '#D2B48C',
+      rating: 4.7,
+      reviews: 76,
+      badge: null,
+      category: 'Sala de Jantar'
     }
   ];
+
+  // Filtrar produtos baseado na categoria selecionada
+  const filteredProducts = selectedCategory === 'Todos' 
+    ? allProducts 
+    : allProducts.filter(product => product.category === selectedCategory);
+
+  // Configurações de paginação
+  const productsPerPage = 6;
+  const maxPages = 3;
+  const totalFilteredProducts = filteredProducts.length;
+  const totalPages = Math.min(Math.ceil(totalFilteredProducts / productsPerPage), maxPages);
+  
+  // Produtos da página atual
+  const startIndex = (currentPage - 1) * productsPerPage;
+  const endIndex = startIndex + productsPerPage;
+  const featuredProducts = filteredProducts.slice(startIndex, endIndex);
+
+  // Reset página quando categoria muda
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    setCurrentPage(1);
+  };
 
   const testimonials = [
     {
       id: 1,
       name: 'Maria Silva',
       rating: 5,
-      text: 'Excelente qualidade e atendimento! Os móveis chegaram exatamente como esperado.',
+      text: 'A IA de visualização de móveis é incrível! Consegui ver exatamente como ficaria na minha sala antes de comprar.',
       avatar: '/placeholder-avatar1.jpg'
     },
     {
       id: 2,
       name: 'João Santos',
       rating: 5,
-      text: 'A IA para visualizar móveis é incrível! Consegui ver como ficaria antes de comprar.',
+      text: 'Qualidade excelente e atendimento perfeito. A visualização com IA me ajudou muito na escolha dos móveis.',
       avatar: '/placeholder-avatar2.jpg'
     },
     {
       id: 3,
       name: 'Ana Costa',
       rating: 5,
-      text: 'Produtos de alta qualidade e entrega super rápida. Recomendo!',
+      text: 'Produtos de alta qualidade e a tecnologia de IA é revolucionária. Recomendo!',
       avatar: '/placeholder-avatar3.jpg'
     }
   ];
 
-  const inspirations = [
-    { id: 1, title: 'Sala Moderna', image: '/placeholder-inspiration1.jpg' },
-    { id: 2, title: 'Quarto Minimalista', image: '/placeholder-inspiration2.jpg' },
-    { id: 3, title: 'Cozinha Elegante', image: '/placeholder-inspiration3.jpg' }
+  const features = [
+    {
+      icon: Camera,
+      title: 'Visualização com IA',
+      description: 'Tire uma foto e veja como os móveis ficam no seu ambiente'
+    },
+    {
+      icon: Palette,
+      title: 'Decoração Inteligente',
+      description: 'Sugestões de móveis harmoniosos baseadas em IA'
+    },
+    {
+      icon: Zap,
+      title: 'Resultado Instantâneo',
+      description: 'Visualização em tempo real em segundos'
+    },
+    {
+      icon: Award,
+      title: 'Qualidade Garantida',
+      description: 'Móveis premium com garantia de satisfação'
+    }
   ];
 
-  return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-[#3e2626] rounded-lg flex items-center justify-center">
-                <Home className="h-6 w-6 text-white" />
+  // Carousel (Right Side - AI Section)
+  const slides = [
+    {
+      id: 1,
+      number: '01',
+      title: 'Living Room',
+      subtitle: 'Dream Design',
+      largeGradient: 'from-teal-600 to-teal-700',
+      smallGradient: 'from-rose-100 to-rose-200',
+      accentColor: '#2dd4bf', // teal-400
+    },
+    {
+      id: 2,
+      number: '02',
+      title: 'Bedroom',
+      subtitle: 'Cozy Space',
+      largeGradient: 'from-rose-400 to-rose-500',
+      smallGradient: 'from-blue-200 to-blue-300',
+      accentColor: '#f472b6', // pink-400
+    },
+    {
+      id: 3,
+      number: '03',
+      title: 'Modern Office',
+      subtitle: 'Futuristic',
+      largeGradient: 'from-blue-500 to-blue-600',
+      smallGradient: 'from-amber-200 to-amber-300',
+      accentColor: '#3b82f6', // blue-500
+    },
+    {
+      id: 4,
+      number: '04',
+      title: 'Dining',
+      subtitle: 'Family Time',
+      largeGradient: 'from-amber-600 to-amber-700',
+      smallGradient: 'from-lime-100 to-lime-200',
+      accentColor: '#f59e0b', // amber-400
+    },
+  ];
+
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animationDirection, setAnimationDirection] = useState<'left' | 'right'>('right');
+
+  const goNext = () => {
+    if (isAnimating) return;
+    setIsAnimating(true);
+    setAnimationDirection('right');
+    setTimeout(() => {
+      setCarouselIndex((i) => (i + 1) % slides.length);
+      setTimeout(() => setIsAnimating(false), 100);
+    }, 250);
+  };
+  const goPrev = () => {
+    if (isAnimating) return;
+    setIsAnimating(true);
+    setAnimationDirection('left');
+    setTimeout(() => {
+      setCarouselIndex((i) => (i - 1 + slides.length) % slides.length);
+      setTimeout(() => setIsAnimating(false), 100);
+    }, 250);
+  };
+
+
+  const getVisibleIndex = (offset: number) => (carouselIndex + offset) % slides.length;
+
+  const renderSlide = (slide: any, position: number) => {
+    const isLarge = position === 0; // mantém o layout: primeiro card maior, demais quadrados
+    if (isLarge) {
+      return (
+        <div className="w-full md:w-[400px] flex-shrink-0 relative">
+          <div className={`aspect-[6/9] bg-gradient-to-br ${slide.largeGradient} rounded-2xl shadow-xl relative overflow-hidden`}>
+            {/* base do sofá */}
+            <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-white to-gray-100 rounded-t-full transform translate-y-1/4"></div>
+            {/* detalhe lateral */}
+            <div className="absolute bottom-8 right-8 w-12 h-16 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg"></div>
+            {/* luminária */}
+            <div className="absolute bottom-16 right-6 w-8 h-8 bg-white rounded-full"></div>
+            {/* almofadas */}
+            <div className="absolute bottom-6 left-8 w-8 h-6 rounded-lg" style={{ backgroundColor: slide.accentColor }}></div>
+            <div className="absolute bottom-8 left-12 w-6 h-6 bg-yellow-400 rounded-lg"></div>
+            {/* overlay */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-6">
+              <div className="text-white">
+                <div className="text-sm text-white/70 mb-1">{slide.number}</div>
+                <div className="text-lg font-bold mb-1">{slide.title}</div>
+                <div className="text-sm text-white/80">{slide.subtitle}</div>
               </div>
-              <span className="text-2xl font-bold text-[#3e2626]">MobiliAI</span>
-            </Link>
+            </div>
+            {/* botão */}
+            <button 
+              onClick={goNext} 
+              className="absolute bottom-6 right-6 w-10 h-10 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group"
+            >
+              <ArrowRight className="h-4 w-4 text-white rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform duration-300" />
+            </button>
+          </div>
+        </div>
+      );
+    }
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-8">
-              <Link href="/" className="text-[#3e2626] font-medium hover:text-[#8B4513] transition-colors">
-                Início
-              </Link>
-              <Link href="/products" className="text-gray-600 hover:text-[#3e2626] transition-colors">
-                Produtos
-              </Link>
-              <Link href="/ai-tools" className="text-gray-600 hover:text-[#3e2626] transition-colors">
-                IA Decoradora
-              </Link>
-              <Link href="/about" className="text-gray-600 hover:text-[#3e2626] transition-colors">
-                Sobre
-              </Link>
-              <Link href="/contact" className="text-gray-600 hover:text-[#3e2626] transition-colors">
-                Contato
-              </Link>
-            </nav>
-
-            {/* Search Bar */}
-            <div className="hidden md:flex items-center space-x-4 flex-1 max-w-md mx-8">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar móveis..."
-                  className="pl-10 bg-gray-50 border-0 focus:bg-white focus:ring-2 focus:ring-[#8B4513]/20"
-                />
+  // small card (quadrado)
+  const smallGrad = slide.smallGradient;
+  return (
+    <div className="w-full md:w-[350px] flex-shrink-0 relative">
+      <div className={`aspect-[4/5] bg-gradient-to-br ${smallGrad} rounded-2xl shadow-xl relative overflow-hidden`}>
+        {/* base do assento */}
+        <div className="absolute bottom-0 left-0 w-full h-2/3 bg-gradient-to-t from-white/70 to-white/40 rounded-t-full transform translate-y-1/3"></div>
+        {/* detalhe circular */}
+        <div className="absolute bottom-6 right-1/4 w-12 h-12 bg-gradient-to-br from-green-300 to-green-400 rounded-full"></div>
+        {/* vaso */}
+        <div className="absolute bottom-8 right-1/3 w-3 h-6 bg-purple-400 rounded-full"></div>
+        {/* overlay */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-6">
+          <div className="text-white">
+            <div className="text-sm text-white/70 mb-1">{slide.number}</div>
+            <div className="text-lg font-bold mb-1">{slide.title}</div>
+            <div className="text-sm text-white/80">{slide.subtitle}</div>
+          </div>
         </div>
       </div>
-
-            {/* User Actions */}
-            <div className="flex items-center space-x-4">
-              {isAuthenticated && user ? (
-                <>
-                  <Link href="/customer" className="p-2 text-gray-600 hover:text-[#3e2626] transition-colors">
-                    <Heart className="h-5 w-5" />
-                  </Link>
-                  <Link href="/customer" className="p-2 text-gray-600 hover:text-[#3e2626] transition-colors relative">
-                    <ShoppingCart className="h-5 w-5" />
-                    <span className="absolute -top-1 -right-1 bg-[#8B4513] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      3
-                    </span>
-                  </Link>
-                  
-                  {/* User Dropdown */}
-                  <div className="relative user-dropdown">
-                    <button
-                      onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                      className="flex items-center space-x-2 p-2 text-gray-600 hover:text-[#3e2626] transition-colors"
-                    >
-                      <User className="h-5 w-5" />
-                      <span className="hidden md:block text-sm font-medium">{user.name}</span>
-                      <ChevronDown className={`h-4 w-4 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    
-                    {userDropdownOpen && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                        <div className="px-4 py-2 border-b border-gray-100">
-                          <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                          <p className="text-xs text-gray-500">{user.email}</p>
-                        </div>
-                        <Link 
-                          href="/customer" 
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                          onClick={() => setUserDropdownOpen(false)}
-                        >
-                          <User className="h-4 w-4 mr-3" />
-                          Meu Perfil
-                        </Link>
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          <LogOut className="h-4 w-4 mr-3" />
-                          Sair
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-            <Link href="/login">
-                  <Button className="bg-[#3e2626] hover:bg-[#8B4513] text-white">
-                    Entrar
-              </Button>
-            </Link>
-              )}
-
-              {/* Mobile Menu Button */}
+      
+      {/* Navigation Below Card 2 */}
+      {position === 1 && (
+        <div className="flex items-center justify-between mt-4">
+          {/* Dots */}
+          <div className="flex space-x-2">
+            {slides.map((_, idx) => (
               <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 text-gray-600 hover:text-[#3e2626]"
-              >
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                key={idx}
+                aria-label={`Ir para slide ${idx + 1}`}
+                onClick={() => setCarouselIndex(idx)}
+                className={`${idx === carouselIndex ? 'w-3 h-3 bg-[#3e2626]' : 'w-2 h-2 bg-gray-300'} rounded-full transition-all`}
+              />
+            ))}
+          </div>
+
+          {/* Arrows */}
+          <div className="flex space-x-2">
+            <button 
+              onClick={goPrev} 
+              disabled={isAnimating}
+              className="w-8 h-8 bg-gray-200 hover:bg-[#3e2626] hover:text-white rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform duration-300" />
+            </button>
+            <button 
+              onClick={goNext} 
+              disabled={isAnimating}
+              className="w-8 h-8 bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform duration-300" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+  };
+
+  return (
+    <div className="min-h-screen">
+      {/* Hero Background Container */}
+      <div className="relative min-h-screen">
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: 'url(/hero-bg.png)' }}
+        ></div>
+        
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-[#3e2626]/60"></div>
+        
+        {/* Header */}
+        <header className="relative z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            {/* Logo */}
+              <Link href="/" className="flex items-center">
+                <Image 
+                  src="/logoCompleta.svg" 
+                  alt="MobiliAI" 
+                  width={100} 
+                  height={40} 
+                  className="h-16 md:h-24 w-auto max-w-none"
+                />
+              </Link>
+
+          
+
+            {/* Right Side Icons */}
+            <div className="flex items-center space-x-6">
+              {/* Search Icon with Animation */}
+              <div className="relative search-icon-container">
+                {!searchOpen ? (
+                  <button 
+                    onClick={handleOpenSearch}
+                    className="p-2 text-white/80 hover:text-white transition-colors"
+                  >
+                    <Search className="h-6 w-6" />
+                  </button>
+                ) : (
+                  <div className="flex items-center">
+                    <div className={`bg-white/10 backdrop-blur-sm border-2 border-white/30 rounded-xl px-4 py-2 flex items-center space-x-3 transition-all duration-300 ${searchClosing ? 'opacity-0 scale-95 translate-x-4' : searchOpening ? 'opacity-100 scale-100 translate-x-0 animate-in slide-in-from-right' : 'opacity-100 scale-100 translate-x-0'}`}>
+                      <Search className="h-5 w-5 text-white/60" />
+                      <input
+                        type="text"
+                        placeholder="Buscar móveis..."
+                        className="bg-transparent text-white placeholder:text-white/60 focus:outline-none w-64"
+                        autoFocus
+                      />
+                      <button 
+                        onClick={handleCloseSearch}
+                        className="text-white/60 hover:text-white transition-colors"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Favorites Icon */}
+              <button className="p-2 text-white/80 hover:text-white transition-colors">
+                <Heart className="h-6 w-6" />
+              </button>
+              
+              {/* Account Icon */}
+              <button className="p-2 text-white/80 hover:text-white transition-colors">
+                <User className="h-6 w-6" />
+              </button>
+              
+              {/* Cart Icon */}
+              <button className="p-2 text-white/80 hover:text-white transition-colors relative">
+                <ShoppingCart className="h-6 w-6" />
+                {cartItems.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-white text-[#3e2626] text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {cartItems.length}
+                  </span>
+                )}
               </button>
             </div>
           </div>
 
+
           {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <div className="md:hidden border-t border-gray-200 py-4">
+            <div className="md:hidden border-t border-white/20 py-4 bg-black/20 backdrop-blur-sm rounded-lg mt-2">
               <nav className="flex flex-col space-y-4">
-                <Link href="/" className="text-[#3e2626] font-medium">Início</Link>
-                <Link href="/products" className="text-gray-600 hover:text-[#3e2626]">Produtos</Link>
-                <Link href="/ai-tools" className="text-gray-600 hover:text-[#3e2626]">IA Decoradora</Link>
-                <Link href="/about" className="text-gray-600 hover:text-[#3e2626]">Sobre</Link>
-                <Link href="/contact" className="text-gray-600 hover:text-[#3e2626]">Contato</Link>
+                <Link href="/" className="text-white font-medium">Início</Link>
+                <Link href="/products" className="text-white/80 hover:text-white">Produtos</Link>
+                <Link href="/furniture-visualizer" className="text-white/80 hover:text-white">Visualizador IA</Link>
+                <Link href="/about" className="text-white/80 hover:text-white">Sobre</Link>
+                <Link href="/contact" className="text-white/80 hover:text-white">Contato</Link>
               </nav>
-              <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="mt-4 pt-4 border-t border-white/20">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 h-4 w-4" />
                   <Input
                     placeholder="Buscar móveis..."
-                    className="pl-10 bg-gray-50 border-0"
+                    className="pl-10 bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/60"
                   />
                 </div>
               </div>
             </div>
           )}
-        </div>
-      </header>
+          </div>
+        </header>
 
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                <div>
-              <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-                Decore seu Espaço com 
-                <span className="text-[#D2B48C]"> Móveis Estilosos</span>
-                  </h1>
-              <p className="text-xl text-gray-200 mb-8 leading-relaxed">
-                Transforme sua casa com nossa IA Decoradora. Visualize móveis no seu ambiente real antes de comprar.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/products">
-                  <Button size="lg" className="bg-white text-[#3e2626] hover:bg-gray-100 font-semibold">
-                    Explorar Produtos
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-                <Link href="/ai-tools">
-                  <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-[#3e2626] font-semibold">
-                    <Camera className="mr-2 h-5 w-5" />
-                    IA Decoradora
-                  </Button>
-                </Link>
-              </div>
+        {/* Hero Section */}
+        <section className="relative flex items-center justify-center overflow-hidden h-full">
+          {/* Content */}
+          <div className="relative z-50 w-full max-w-5xl px-4 sm:px-6 lg:px-8 text-center mt-30">
+            <div className="max-w-5xl mx-auto">
+              {/* Main Heading */}
+              <h1 className="text-3xl md:text-5xl lg:text-7xl font-thin leading-tight tracking-wider">
+                <span className="block font-thin" style={{ 
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%, #ffffff 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>
+                  Decore seu espaço com
+                </span>
+                <span className="block font-thin mt-3 text-3xl md:text-5xl lg:text-7xl" style={{ 
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%, #ffffff 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>
+                  móveis estilosos
+                </span>
+              </h1>
             </div>
-            <div className="relative">
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8">
-                <div className="bg-white rounded-xl p-6 shadow-2xl">
-                  <div className="aspect-square bg-gradient-to-br from-[#D2B48C] to-[#8B4513] rounded-lg mb-4 flex items-center justify-center">
-                    <Sofa className="h-24 w-24 text-white" />
+          </div>
+        </section>
+      </div>
+
+     
+
+      {/* Categories Section */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
+        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+         
+
+          {/* Grid Layout Customizado - 6 colunas x 5 linhas */}
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-6 h-[800px]">
+            
+            {/* Sofá - 3x2 (colunas 1-3, linhas 1-2) */}
+            <Link href={`/products?category=${categories[0].id}`} className="md:col-span-3 md:row-span-2">
+              <div className="group relative h-full bg-gradient-to-br from-[#3e2626] via-[#8B4513] to-[#A0522D] rounded-3xl overflow-hidden cursor-pointer shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.02]">
+                {/* Background Pattern */}
+                <div className="absolute inset-0 opacity-20">
+                  <div className="absolute inset-0" style={{
+                    backgroundImage: `radial-gradient(circle at 30px 30px, rgba(255,255,255,0.05) 2px, transparent 2px)`,
+                    backgroundSize: '60px 60px'
+                  }}></div>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+                
+                {/* Conteúdo Principal */}
+                <div className="relative z-10 p-8 h-full flex flex-col justify-between">
+                  <div>
+                    <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center mb-8 shadow-lg">
+                      <Sofa className="h-10 w-10 text-white" />
+                    </div>
+                    <h3 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+                      {categories[0].name}
+                    </h3>
+                    <p className="text-white/90 text-xl leading-relaxed max-w-md">
+                      {categories[0].description}
+                    </p>
                   </div>
-                  <h3 className="text-lg font-semibold text-[#3e2626] mb-2">Visualização com IA</h3>
-                  <p className="text-gray-600 text-sm">Veja como os móveis ficam no seu ambiente</p>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-4 h-4 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                      <span className="text-white font-bold text-xl">
+                        {categories[0].count} produtos
+                      </span>
+                    </div>
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
+                      <ArrowRight className="h-6 w-6 text-white group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Efeito de brilho animado */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                
+                {/* Decoração flutuante */}
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
+              </div>
+            </Link>
+
+            {/* Poltrona - 2x2 (colunas 4-5, linhas 1-2) */}
+            <Link href={`/products?category=${categories[5].id}`} className="md:col-span-2 md:row-span-2">
+              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[5].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
+                
+                <div className="relative z-10 p-6 h-full flex flex-col justify-between">
+                  <div className="flex items-start justify-between">
+                    <div className={`w-16 h-16 bg-gradient-to-br ${categories[5].gradient} rounded-2xl flex items-center justify-center shadow-lg`}>
+                      {renderIcon(categories[5].icon, "h-8 w-8 text-white")}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-bold text-[#3e2626]">
+                        {categories[5].count}
+                      </span>
+                      <p className="text-sm text-gray-500 font-medium">produtos</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-2xl font-bold text-[#3e2626] mb-2">
+                      {categories[5].name}
+                    </h4>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {categories[5].description}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/20 rounded-2xl transition-all duration-300"></div>
+              </div>
+            </Link>
+
+            {/* Armário - 1x2 (coluna 6, linhas 1-2) */}
+            <Link href={`/products?category=${categories[3].id}`} className="md:col-span-1 md:row-span-2">
+              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[3].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                
+                <div className="relative z-10 p-4 h-full flex flex-col justify-between">
+                  <div className="flex flex-col items-center">
+                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[3].gradient} rounded-xl flex items-center justify-center shadow-md mb-4`}>
+                      {renderIcon(categories[3].icon, "h-6 w-6 text-white")}
+                    </div>
+                    <div className="text-center">
+                      <span className="text-2xl font-bold text-[#3e2626]">
+                        {categories[3].count}
+                      </span>
+                      <p className="text-xs text-gray-500">produtos</p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <h4 className="text-lg font-bold text-[#3e2626] mb-1">
+                      {categories[3].name}
+                    </h4>
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      {categories[3].description}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
+              </div>
+            </Link>
+
+            {/* Mesa - 2x2 (colunas 1-2, linhas 3-4) */}
+            <Link href={`/products?category=${categories[1].id}`} className="md:col-span-2 md:row-span-2">
+              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[1].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
+                
+                <div className="relative z-10 p-6 h-full flex flex-col justify-between">
+                  <div className="flex items-start justify-between">
+                    <div className={`w-16 h-16 bg-gradient-to-br ${categories[1].gradient} rounded-2xl flex items-center justify-center shadow-lg`}>
+                      {renderIcon(categories[1].icon, "h-8 w-8 text-white")}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-bold text-[#3e2626]">
+                        {categories[1].count}
+                      </span>
+                      <p className="text-sm text-gray-500 font-medium">produtos</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-2xl font-bold text-[#3e2626] mb-2">
+                      {categories[1].name}
+                    </h4>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {categories[1].description}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/20 rounded-2xl transition-all duration-300"></div>
+              </div>
+            </Link>
+
+            {/* Estante - 2x1 (colunas 3-4, linha 3) */}
+            <Link href={`/products?category=${categories[4].id}`} className="md:col-span-2 md:row-span-1">
+              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[4].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                
+                <div className="relative z-10 p-4 h-full flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[4].gradient} rounded-xl flex items-center justify-center shadow-md`}>
+                      {renderIcon(categories[4].icon, "h-6 w-6 text-white")}
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-[#3e2626] mb-1">
+                        {categories[4].name}
+                      </h4>
+                      <p className="text-sm text-gray-600">{categories[4].description}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold text-[#3e2626]">
+                      {categories[4].count}
+                    </span>
+                    <p className="text-xs text-gray-500">produtos</p>
+                  </div>
+                </div>
+                
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
+              </div>
+            </Link>
+
+            {/* Quadro - 1x1 (coluna 6, linha 3) */}
+            <Link href={`/products?category=${categories[6].id}`} className="md:col-span-1 md:row-span-1">
+              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
+                
+                <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${categories[6].gradient} rounded-lg flex items-center justify-center shadow-sm mb-2`}>
+                    {renderIcon(categories[6].icon, "h-5 w-5 text-white")}
+                  </div>
+                  <div className="text-center">
+                    <h4 className="text-sm font-bold text-[#3e2626] mb-1">
+                      {categories[6].name}
+                    </h4>
+                    <p className="text-xs text-gray-500">{categories[6].count} produtos</p>
+                  </div>
+                </div>
+                
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/10 rounded-xl transition-all duration-300"></div>
+              </div>
+            </Link>
+
+            {/* Cadeira - 1x1 (coluna 5, linha 4) */}
+            <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-1">
+              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
+                
+                <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${categories[2].gradient} rounded-lg flex items-center justify-center shadow-sm mb-2`}>
+                    {renderIcon(categories[2].icon, "h-5 w-5 text-white")}
+                  </div>
+                  <div className="text-center">
+                    <h4 className="text-sm font-bold text-[#3e2626] mb-1">
+                      {categories[2].name}
+                    </h4>
+                    <p className="text-xs text-gray-500">{categories[2].count} produtos</p>
+                  </div>
+                </div>
+                
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/10 rounded-xl transition-all duration-300"></div>
+              </div>
+            </Link>
+
+            {/* Luminária - 2x1 (colunas 3-4, linha 4) */}
+            <Link href={`/products?category=${categories[7].id}`} className="md:col-span-2 md:row-span-1">
+              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[7].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                
+                <div className="relative z-10 p-4 h-full flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[7].gradient} rounded-xl flex items-center justify-center shadow-md`}>
+                      {renderIcon(categories[7].icon, "h-6 w-6 text-white")}
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-[#3e2626] mb-1">
+                        {categories[7].name}
+                      </h4>
+                      <p className="text-sm text-gray-600">{categories[7].description}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold text-[#3e2626]">
+                      {categories[7].count}
+                    </span>
+                    <p className="text-xs text-gray-500">produtos</p>
+                  </div>
+                </div>
+                
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
+              </div>
+            </Link>
+
+            {/* Outros - 1x1 (coluna 6, linha 4) */}
+            <Link href={`/products?category=${categories[8].id}`} className="md:col-span-1 md:row-span-1">
+              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[8].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
+                
+                <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${categories[8].gradient} rounded-lg flex items-center justify-center shadow-sm mb-2`}>
+                    {renderIcon(categories[8].icon, "h-5 w-5 text-white")}
+                  </div>
+                  <div className="text-center">
+                    <h4 className="text-sm font-bold text-[#3e2626] mb-1">
+                      {categories[8].name}
+                    </h4>
+                    <p className="text-xs text-gray-500">{categories[8].count} produtos</p>
+                  </div>
+                </div>
+                
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/10 rounded-xl transition-all duration-300"></div>
+              </div>
+            </Link>
+
+            {/* Card "Ver Todos os Produtos" - 1x1 (coluna 6, linha 5) */}
+            <Link href="/products" className="md:col-span-1 md:row-span-1">
+              <div className="group relative h-full bg-gradient-to-br from-[#3e2626] to-[#2a1f1f] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-[#3e2626]/20">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50 group-hover:opacity-80 transition-opacity duration-300"></div>
+                
+                <div className="relative z-10 h-full flex items-center justify-center">
+                  <ArrowRight className="h-8 w-8 text-white group-hover:translate-x-2 transition-all duration-300 group-hover:scale-110" />
+                </div>
+                
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/20 rounded-xl transition-all duration-300"></div>
+              </div>
+            </Link>
+
+          </div>
+        </div>
+      </section>
+
+      {/* AI Section */}
+      <section className="py-20 bg-gradient-to-br from-white to-gray-50">
+        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
+            {/* Left Side - Text Content */}
+            <div className="lg:col-span-1 space-y-8">
+              <div>
+                <h2 className="text-4xl md:text-5xl font-bold text-[#3e2626] mb-6 leading-tight">
+                  <span className="block">Nossa IA</span>
+                  <span className="block ml-4">Revolucionária</span>
+                </h2>
+                <p className="text-xl text-gray-600 leading-relaxed">
+                  Transforme qualquer ambiente com nossa inteligência artificial que visualiza cores e móveis em tempo real
+                </p>
+              </div>
+              
+              <button className="group bg-[#3e2626] text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-[#2a1f1f] transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-3">
+                <span>Experimentar IA</span>
+                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+              </button>
+            </div>
+
+            {/* Right Side - Carousel */}
+            <div className="lg:col-span-2">
+              <div className="relative">
+                <div className="relative overflow-hidden">
+                  <div 
+                    className="flex space-x-4 items-start transition-transform duration-500 ease-out"
+                    style={{
+                      transform: `translateX(${isAnimating ? (animationDirection === 'right' ? '-20px' : '20px') : '0px'})`
+                    }}
+                  >
+                    {([0,1,2] as const).map((offset) => {
+                      const isActive = offset === 0;
+                      const slideData = slides[getVisibleIndex(offset)];
+                      
+                      return (
+                        <div
+                          key={`${carouselIndex}-${offset}`}
+                          className={`flex-shrink-0 transition-all duration-300 ease-out ${
+                            isActive 
+                              ? 'opacity-100 scale-100 transform translate-y-0' 
+                              : 'opacity-80 scale-95 transform translate-y-1'
+                          }`}
+                        >
+                          {renderSlide(slideData, offset)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                        
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-[#3e2626] rounded-full flex items-center justify-center mx-auto mb-4">
-                <Truck className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-[#3e2626] mb-2">Frete Grátis</h3>
-              <p className="text-gray-600 text-sm">Para compras acima de R$ 500</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-[#8B4513] rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-[#3e2626] mb-2">Pagamento Seguro</h3>
-              <p className="text-gray-600 text-sm">Suas informações protegidas</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-[#D2B48C] rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-[#3e2626] mb-2">Entrega Rápida</h3>
-              <p className="text-gray-600 text-sm">Receba em até 7 dias úteis</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-[#3e2626] rounded-full flex items-center justify-center mx-auto mb-4">
-                <Tag className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-[#3e2626] mb-2">Melhores Preços</h3>
-              <p className="text-gray-600 text-sm">Garantia de preço competitivo</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Categories Section */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-[#3e2626] mb-4">
-              Nossas Categorias
-            </h2>
-            <p className="text-xl text-gray-600">
-              Encontre o móvel perfeito para cada ambiente
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {categories.map((category) => (
-              <Link key={category.id} href={`/products?category=${category.id}`}>
-                <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gray-50 hover:bg-white cursor-pointer">
-                  <CardContent className="p-8 text-center">
-                    <div className="w-20 h-20 bg-[#3e2626] rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-[#8B4513] transition-colors">
-                      <category.icon className="h-10 w-10 text-white" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-[#3e2626] mb-2">
-                      {category.name}
-                    </h3>
-                    <p className="text-gray-600">{category.count} produtos</p>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
           </div>
         </div>
       </section>
 
       {/* Featured Products Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-[#3e2626] mb-4">
-              Móveis em Destaque
-            </h2>
-            <p className="text-xl text-gray-600">
-              Produtos selecionados especialmente para você
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredProducts.map((product) => (
-              <Card key={product.id} className="group hover:shadow-xl transition-all duration-300 border-0 bg-white overflow-hidden">
-                <div className="relative">
-                  <div className="aspect-square bg-gradient-to-br from-[#D2B48C] to-[#8B4513] flex items-center justify-center">
-                    <Sofa className="h-24 w-24 text-white" />
-                  </div>
-                  {product.badge && (
-                    <Badge className="absolute top-4 left-4 bg-[#8B4513] text-white">
-                      {product.badge}
-                    </Badge>
+      <section className="py-20 bg-white">
+        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header with Navigation */}
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-16">
+            {/* Left Side - Title and Categories */}
+            <div className="flex-1">
+              {/* Title Section */}
+              <div className="mb-6">
+                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#3e2626] leading-tight">
+                  <span className="block">Móveis em Destaque</span>
+                  <span className="block">Para Sua Casa</span>
+                </h2>
+              </div>
+              
+              {/* Category Navigation - Below Title */}
+              <div className="flex flex-wrap gap-4 items-center">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleCategoryChange('Sala de Jantar')}
+                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
+                    selectedCategory === 'Sala de Jantar' 
+                      ? 'text-[#3e2626]' 
+                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
+                  }`}
+                >
+                  Sala de Jantar
+                  {selectedCategory === 'Sala de Jantar' && (
+                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
                   )}
-                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="sm" className="bg-white/90 hover:bg-white text-[#3e2626]">
-                      <Heart className="h-4 w-4" />
-                    </Button>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleCategoryChange('Sala de Estar')}
+                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
+                    selectedCategory === 'Sala de Estar' 
+                      ? 'text-[#3e2626]' 
+                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
+                  }`}
+                >
+                  Sala de Estar
+                  {selectedCategory === 'Sala de Estar' && (
+                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
+                  )}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleCategoryChange('Quarto')}
+                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
+                    selectedCategory === 'Quarto' 
+                      ? 'text-[#3e2626]' 
+                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
+                  }`}
+                >
+                  Quarto
+                  {selectedCategory === 'Quarto' && (
+                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
+                  )}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleCategoryChange('Cozinha')}
+                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
+                    selectedCategory === 'Cozinha' 
+                      ? 'text-[#3e2626]' 
+                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
+                  }`}
+                >
+                  Cozinha
+                  {selectedCategory === 'Cozinha' && (
+                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
+                  )}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleCategoryChange('Exterior')}
+                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
+                    selectedCategory === 'Exterior' 
+                      ? 'text-[#3e2626]' 
+                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
+                  }`}
+                >
+                  Exterior
+                  {selectedCategory === 'Exterior' && (
+                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
+                  )}
+                </Button>
+
+                {/* Clear Filter Button */}
+                {selectedCategory !== 'Todos' && selectedCategory !== 'Sala de Estar' && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleCategoryChange('Todos')}
+                    className="border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-700 px-3 py-1 text-sm font-medium transition-all duration-300 ml-2"
+                  >
+                    Limpar Filtro
+                  </Button>
+                )}
               </div>
             </div>
-                <CardContent className="p-6">
-                  <div className="flex items-center mb-2">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-4 w-4 ${
-                          i < Math.floor(product.rating)
-                            ? 'text-yellow-400 fill-current'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    ))}
-                    <span className="text-sm text-gray-600 ml-2">
-                      ({product.reviews})
+
+            {/* Right Side - View All Button */}
+            <div className="flex justify-center lg:justify-end mt-8 lg:mt-0">
+              <div className="flex items-center space-x-3">
+                {/* Filter Indicator */}
+                {selectedCategory !== 'Todos' && (
+                  <div className="flex items-center space-x-2 bg-gray-100 px-3 py-2 rounded-full">
+                    <span className="text-sm text-gray-600">
+                      Filtro: <span className="font-medium text-[#3e2626]">{selectedCategory}</span>
                     </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCategoryChange('Todos')}
+                      className="h-6 w-6 p-0 hover:bg-gray-200 rounded-full"
+                    >
+                      <X className="h-4 w-4 text-gray-500" />
+                    </Button>
                   </div>
-                  <h3 className="text-lg font-semibold text-[#3e2626] mb-2">
-                    {product.name}
-                  </h3>
+                )}
+                
+                <Button 
+                  size="lg" 
+                  onClick={() => router.push('/products')}
+                  className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-8 py-3 rounded-full font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-2"
+                >
+                  <span>Ver Todos os Produtos</span>
+                  <ArrowRight className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Products Grid - 2x3 Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {featuredProducts.map((product, index) => (
+              <div key={product.id} className="group relative bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
+                {/* Product Image Container */}
+                <div className="relative">
+                  <div 
+                    className="aspect-square flex items-center justify-center relative overflow-hidden"
+                    style={{ backgroundColor: product.color }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
+                    
+                    {/* Product Icon/Visual */}
+                    <div className="relative z-10 text-center">
+                      <Sofa className="h-20 w-20 text-white/90 mx-auto mb-3 drop-shadow-lg" />
+                      <p className="text-white font-semibold text-base">Móvel Premium</p>
+                    </div>
+
+                    {/* Decorative Elements */}
+                    <div className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full blur-sm"></div>
+                    <div className="absolute bottom-4 left-4 w-6 h-6 bg-white/10 rounded-full blur-sm"></div>
+                  </div>
+
+                  {/* Discount Badge */}
+                  <div className="absolute top-4 left-4">
+                    <div className="w-12 h-12 bg-[#3e2626] rounded-full flex items-center justify-center shadow-lg">
+                      <span className="text-white font-bold text-sm">-10%</span>
+                    </div>
+                  </div>
+
+                  {/* Favorite Button */}
+                  <div className="absolute top-4 right-4">
+                    <Button 
+                      size="sm" 
+                      onClick={() => toggleFavorite(product.id)}
+                      className={`w-10 h-10 shadow-lg rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 ${
+                        favorites.includes(product.id)
+                          ? 'bg-red-500 text-white hover:bg-red-600'
+                          : 'bg-white/90 hover:bg-white text-[#3e2626]'
+                      }`}
+                    >
+                      <Heart className={`h-5 w-5 ${favorites.includes(product.id) ? 'fill-current' : ''}`} />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Product Info Footer - Dark Background */}
+                <div className="bg-[#3e2626] p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xl font-bold text-white">
+                      {product.name}
+                    </h3>
+                  </div>
+                  
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="text-2xl font-bold text-[#3e2626]">
+                      <span className="text-2xl font-bold text-white">
                         R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                       {product.originalPrice && (
-                        <span className="text-lg text-gray-500 line-through">
+                        <span className="text-lg text-white/70 line-through">
                           R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       )}
                     </div>
-                    <Button className="bg-[#3e2626] hover:bg-[#8B4513] text-white">
-                      <ShoppingCart className="h-4 w-4" />
+                    
+                    <Button 
+                      onClick={() => addToCart(product.id)}
+                      className="bg-white text-[#3e2626] hover:bg-gray-100 shadow-lg rounded-full w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
+                    >
+                      <ShoppingCart className="h-5 w-5" />
                     </Button>
                   </div>
-                  </CardContent>
-                </Card>
-            ))}
-          </div>
-
-          <div className="text-center mt-12">
-            <Link href="/products">
-              <Button size="lg" variant="outline" className="border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white">
-                Ver Todos os Produtos
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* AI Tools Section */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-[#3e2626] mb-6">
-                Nova Coleção com IA Decoradora
-              </h2>
-              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                Use nossa tecnologia de inteligência artificial para visualizar móveis no seu ambiente real. 
-                Tire uma foto do seu espaço e veja como os móveis ficam antes de comprar.
-              </p>
-              <div className="space-y-4 mb-8">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-[#8B4513]" />
-                  <span className="text-gray-700">Visualização em tempo real</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-[#8B4513]" />
-                  <span className="text-gray-700">Múltiplas opções de móveis</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-[#8B4513]" />
-                  <span className="text-gray-700">Resultados em segundos</span>
                 </div>
               </div>
-              <Link href="/ai-tools">
-                <Button size="lg" className="bg-[#3e2626] hover:bg-[#8B4513] text-white">
-                  <Camera className="mr-2 h-5 w-5" />
-                  Experimentar IA Decoradora
-                </Button>
-              </Link>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="border-0 bg-gray-50">
-                  <div className="aspect-square bg-gradient-to-br from-[#D2B48C] to-[#8B4513] rounded-lg flex items-center justify-center">
-                    <Users className="h-12 w-12 text-white" />
-                  </div>
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold text-[#3e2626] mb-2">
-                      Cadeira {i}
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold text-[#3e2626]">
-                        R$ {[899, 1299, 799][i-1]}
-                      </span>
-                      <Button size="sm" className="bg-[#3e2626] hover:bg-[#8B4513] text-white">
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-[#3e2626] mb-4">
-              Depoimentos dos Nossos Clientes
-            </h2>
-            <p className="text-xl text-gray-600">
-              Veja o que nossos clientes falam sobre nós
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial) => (
-              <Card key={testimonial.id} className="border-0 bg-white shadow-lg">
-                <CardContent className="p-8">
-                  <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 bg-[#3e2626] rounded-full flex items-center justify-center mr-4">
-                      <User className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-[#3e2626]">{testimonial.name}</h4>
-                      <div className="flex">
-                        {[...Array(testimonial.rating)].map((_, i) => (
-                          <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 italic">"{testimonial.text}"</p>
-                </CardContent>
-              </Card>
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col items-center justify-center mt-12 space-y-4">
+              {/* Pagination Info */}
+              <div className="text-center text-gray-600">
+                <p className="text-sm">
+                  Mostrando {startIndex + 1}-{Math.min(endIndex, totalFilteredProducts)} de {totalFilteredProducts} produtos
+                  {selectedCategory !== 'Todos' && (
+                    <span className="block text-xs mt-1">
+                      na categoria <span className="font-medium text-[#3e2626]">{selectedCategory}</span>
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex items-center space-x-2">
+                {/* Previous Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </Button>
+
+                {/* Page Numbers */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-2 ${
+                      currentPage === page
+                        ? 'bg-[#3e2626] text-white hover:bg-[#2a1f1f]'
+                        : 'border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white'
+                    }`}
+                  >
+                    {page}
+                  </Button>
+                ))}
+
+                {/* Next Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Próxima
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+
+              {/* View All Products Link */}
+              {currentPage === totalPages && (
+                <div className="text-center pt-4">
+                  <p className="text-sm text-gray-500 mb-3">
+                    Quer ver todos os produtos disponíveis?
+                  </p>
+                  <Button
+                    onClick={() => router.push('/products')}
+                    className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-6 py-2 rounded-full font-medium transition-all duration-300"
+                  >
+                    Ver Todos os Produtos
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
+     
+
+     
+
       {/* Newsletter Section */}
-      <section className="py-20 bg-[#3e2626]">
+      <section className="py-20 bg-gradient-to-br from-[#3e2626] to-[#8B4513] text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-                Mantenha-se Atualizado
-              </h2>
-              <p className="text-xl text-gray-200 mb-8">
-                Receba ofertas exclusivas e novidades sobre nossos produtos
-              </p>
-              <div className="flex space-x-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div className="space-y-8">
+              <div className="space-y-6">
+                <h2 className="text-4xl md:text-5xl font-bold leading-tight">
+                  Mantenha-se Atualizado
+                </h2>
+                <p className="text-xl text-gray-200 leading-relaxed">
+                  Receba ofertas exclusivas, novidades sobre móveis e dicas de decoração com IA
+                </p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
                 <Input
                   placeholder="Seu melhor e-mail"
-                  className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-gray-300"
+                  className="flex-1 bg-white/10 border-2 border-white/20 text-white placeholder:text-gray-300 text-lg py-4 px-6 rounded-xl"
                 />
-                <Button className="bg-white text-[#3e2626] hover:bg-gray-100 font-semibold">
+                <Button className="bg-white text-[#3e2626] hover:bg-gray-100 font-semibold text-lg px-8 py-4 rounded-xl">
+                  <Mail className="mr-3 h-6 w-6" />
                   Inscrever
                 </Button>
               </div>
+              
+              <div className="flex items-center space-x-8 text-sm text-gray-300">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-5 w-5 text-[#D2B48C]" />
+                  <span>Ofertas exclusivas</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-5 w-5 text-[#D2B48C]" />
+                  <span>Dicas de decoração</span>
+                </div>
+              </div>
             </div>
+            
             <div className="relative">
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8">
-                <div className="bg-white rounded-xl p-6 shadow-2xl">
-                  <div className="aspect-square bg-gradient-to-br from-[#D2B48C] to-[#8B4513] rounded-lg flex items-center justify-center">
-                    <Mail className="h-24 w-24 text-white" />
-          </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 border border-white/20">
+                <div className="bg-white rounded-2xl p-8 shadow-2xl">
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <div className="w-20 h-20 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Mail className="h-10 w-10 text-white" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#3e2626] mb-2">Newsletter</h3>
+                      <p className="text-gray-600">Receba novidades em primeira mão</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="aspect-square bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-xl flex items-center justify-center">
+                        <Palette className="h-8 w-8 text-white" />
+                      </div>
+                      <div className="aspect-square bg-gradient-to-br from-[#D2B48C] to-[#A0522D] rounded-xl flex items-center justify-center">
+                        <Sparkles className="h-8 w-8 text-white" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -634,70 +1422,73 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-16">
+      <footer className="bg-gray-900 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-[#3e2626] rounded-lg flex items-center justify-center">
-                  <Home className="h-5 w-5 text-white" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+            <div className="space-y-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-[#3e2626] rounded-lg flex items-center justify-center">
+                  <Palette className="h-6 w-6 text-white" />
                 </div>
-                <span className="text-xl font-bold">MobiliAI</span>
+                <span className="text-2xl font-bold">MobiliAI</span>
               </div>
-              <p className="text-gray-400 mb-4">
-                Transforme sua casa com móveis inteligentes e tecnologia de IA.
+              <p className="text-gray-400 text-lg leading-relaxed">
+                Transforme sua casa com móveis inteligentes e tecnologia de IA. 
+                Visualize móveis reais antes de comprar.
               </p>
               <div className="flex space-x-4">
-                <Button size="sm" variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800">
-                  <Facebook className="h-4 w-4" />
+                <Button size="sm" variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white">
+                  <Facebook className="h-5 w-5" />
                 </Button>
-                <Button size="sm" variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800">
-                  <Instagram className="h-4 w-4" />
+                <Button size="sm" variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white">
+                  <Instagram className="h-5 w-5" />
                 </Button>
-                <Button size="sm" variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800">
-                  <Twitter className="h-4 w-4" />
+                <Button size="sm" variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white">
+                  <Twitter className="h-5 w-5" />
                 </Button>
               </div>
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold mb-4">Empresa</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/about" className="hover:text-white transition-colors">Sobre Nós</Link></li>
-                <li><Link href="/contact" className="hover:text-white transition-colors">Contato</Link></li>
-                <li><Link href="/careers" className="hover:text-white transition-colors">Carreiras</Link></li>
-                <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+              <h3 className="text-xl font-bold mb-6">Empresa</h3>
+              <ul className="space-y-4 text-gray-400">
+                <li><Link href="/about" className="hover:text-white transition-colors text-lg">Sobre Nós</Link></li>
+                <li><Link href="/contact" className="hover:text-white transition-colors text-lg">Contato</Link></li>
+                <li><Link href="/careers" className="hover:text-white transition-colors text-lg">Carreiras</Link></li>
+                <li><Link href="/blog" className="hover:text-white transition-colors text-lg">Blog</Link></li>
               </ul>
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold mb-4">Suporte</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/help" className="hover:text-white transition-colors">Central de Ajuda</Link></li>
-                <li><Link href="/shipping" className="hover:text-white transition-colors">Informações de Envio</Link></li>
-                <li><Link href="/returns" className="hover:text-white transition-colors">Devoluções</Link></li>
-                <li><Link href="/faq" className="hover:text-white transition-colors">FAQ</Link></li>
+              <h3 className="text-xl font-bold mb-6">Suporte</h3>
+              <ul className="space-y-4 text-gray-400">
+                <li><Link href="/help" className="hover:text-white transition-colors text-lg">Central de Ajuda</Link></li>
+                <li><Link href="/shipping" className="hover:text-white transition-colors text-lg">Informações de Envio</Link></li>
+                <li><Link href="/returns" className="hover:text-white transition-colors text-lg">Devoluções</Link></li>
+                <li><Link href="/faq" className="hover:text-white transition-colors text-lg">FAQ</Link></li>
               </ul>
-                </div>
+            </div>
 
             <div>
-              <h3 className="text-lg font-semibold mb-4">Baixe Nossa App</h3>
-              <p className="text-gray-400 mb-4">
+              <h3 className="text-xl font-bold mb-6">Baixe Nossa App</h3>
+              <p className="text-gray-400 mb-6 text-lg">
                 Disponível para iOS e Android
               </p>
-              <div className="space-y-2">
-                <Button variant="outline" className="w-full border-gray-600 text-gray-400 hover:bg-gray-800">
+              <div className="space-y-3">
+                <Button variant="outline" className="w-full border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white text-lg py-3">
+                  <Download className="mr-3 h-5 w-5" />
                   App Store
                 </Button>
-                <Button variant="outline" className="w-full border-gray-600 text-gray-400 hover:bg-gray-800">
+                <Button variant="outline" className="w-full border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white text-lg py-3">
+                  <Download className="mr-3 h-5 w-5" />
                   Google Play
                 </Button>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 MobiliAI. Todos os direitos reservados.</p>
+          <div className="border-t border-gray-800 mt-16 pt-8 text-center text-gray-400">
+            <p className="text-lg">&copy; 2024 MobiliAI. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>
