@@ -389,8 +389,19 @@ export const adminAPI = {
   },
 
   getTopProducts: async () => {
-    const response = await api.get('/admin/stats/top-products');
-    return response.data;
+    try {
+      const response = await api.get('/admin/stats/top-products');
+      return response.data;
+    } catch (error) {
+      console.warn('⚠️ Backend indisponível, usando dados mock para topProducts');
+      // Dados mock quando backend não está disponível
+      return [
+        { id: 1, name: 'Tinta Acrílica Branco', sales: 45, revenue: 2250 },
+        { id: 2, name: 'Pincel Chato 2"', sales: 32, revenue: 640 },
+        { id: 3, name: 'Rolo de Pintura', sales: 28, revenue: 420 },
+        { id: 4, name: 'Massa Corrida', sales: 22, revenue: 550 }
+      ];
+    }
   },
 
   // Reports

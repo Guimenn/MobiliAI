@@ -19,6 +19,12 @@ const nextConfig: NextConfig = {
     unoptimized: true,
     domains: ['localhost'],
   },
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
+  // Configurações para reduzir problemas de hidratação
+  reactStrictMode: true,
+  swcMinify: true,
 };
 
 export default nextConfig;
