@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import PromotionalSection from '@/components/PromotionalSection';
 import { 
   Search,
   ShoppingCart,
@@ -1003,6 +1004,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Promotional Section */}
+      <PromotionalSection />
 
       {/* AI Section */}
       <section className="py-20 bg-gradient-to-br from-white to-gray-50">
