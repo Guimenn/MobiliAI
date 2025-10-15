@@ -1,0 +1,156 @@
+# 🍌 Exemplos Rápidos - HTTPie + Google Nano Banana
+
+## 🚀 Comandos Mais Usados
+
+# 1. BÁSICO - Trocar cor da parede
+http POST http://localhost:3005/api/process-url \
+  prompt="troque a cor da parede para vermelho" \
+  imageUrl="https://replicate.delivery/pbxt/NizOTNDRHvLORzA58kYA0GpaXxRdLnj3pxnHPMoZ8y5qO6i8/empty-room-with-plant.webp"
+
+# 2. COM UPLOAD DE ARQUIVO
+http --form POST http://localhost:3005/api/process-upload \
+  prompt="pinte a parede de azul claro" \
+  image@~/Downloads/minha-sala.jpg
+
+# 3. ADICIONAR MÓVEIS
+http POST http://localhost:3005/api/process-url \
+  prompt="adicione um sofá moderno cinza no centro e uma planta no canto" \
+  imageUrl="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800"
+
+# 4. MUDANÇA DE ESTILO
+http POST http://localhost:3005/api/process-url \
+  prompt="transforme em estilo moderno minimalista com cores neutras" \
+  imageUrl="https://example.com/sala.jpg"
+
+# 5. COM FORMATO ESPECÍFICO
+http POST http://localhost:3005/api/process-url \
+  prompt="deixe mais iluminado e moderno" \
+  imageUrl="https://example.com/sala.jpg" \
+  outputFormat="png"
+
+## 📝 Prompts Úteis para Loja de Tintas
+
+# Cores específicas
+"pinte a parede de azul royal elegante"
+"aplique um tom de cinza neutro moderno" 
+"transforme em verde musgo suave"
+"use um bege aconchegante"
+"aplique terracota vibrante"
+
+# Com detalhes
+"pinte a parede de azul claro fosco mantendo a iluminação natural"
+"aplique cinza escuro mate com acabamento moderno"
+"use verde menta suave com textura lisa"
+
+## 🪑 Prompts para Adicionar Móveis
+
+# Sofás
+"adicione um sofá de 3 lugares cinza moderno no centro"
+"coloque um sofá de couro marrom clássico"
+"insira um sofá-cama bege com almofadas decorativas"
+
+# Mesas
+"adicione uma mesa de centro de vidro redonda"
+"coloque uma mesa de jantar de madeira para 6 pessoas"
+"insira uma mesa lateral minimalista branca"
+
+# Decoração
+"adicione plantas decorativas grandes nos cantos"
+"coloque quadros modernos abstratos na parede"
+"insira uma estante de livros de madeira"
+
+## 🎨 Combinações Complexas
+
+# Exemplo 1: Sala completa
+http POST http://localhost:3005/api/process-url \
+  prompt="sala moderna com parede cinza claro, sofá bege, mesa de centro de vidro, plantas decorativas e iluminação LED quente" \
+  imageUrl="https://example.com/sala-vazia.jpg"
+
+# Exemplo 2: Reforma completa
+http POST http://localhost:3005/api/process-url \
+  prompt="modernize completamente: piso de madeira clara, paredes brancas, móveis minimalistas, iluminação natural" \
+  imageUrl="https://example.com/sala-antiga.jpg"
+
+# Exemplo 3: Estilo específico
+http POST http://localhost:3005/api/process-url \
+  prompt="estilo escandinavo: paredes brancas, madeira clara, plantas, minimalista, aconchegante" \
+  imageUrl="https://example.com/sala.jpg"
+
+## 🔧 Comandos Úteis
+
+# Ver resposta formatada (requer jq)
+http POST http://localhost:3005/api/process-url \
+  prompt="azul" imageUrl="URL" | jq
+
+# Salvar resultado em arquivo
+http POST http://localhost:3005/api/process-url \
+  prompt="vermelho" imageUrl="URL" > resultado.json
+
+# Extrair apenas URL da imagem
+http POST http://localhost:3005/api/process-url \
+  prompt="verde" imageUrl="URL" | jq -r '.imageUrl'
+
+# Baixar imagem processada diretamente
+IMAGE_URL=$(http POST http://localhost:3005/api/process-url \
+  prompt="azul" imageUrl="URL" | jq -r '.imageUrl')
+http GET $IMAGE_URL > sala-processada.jpg
+
+# Modo verbose (ver detalhes)
+http -v POST http://localhost:3005/api/process-url \
+  prompt="azul" imageUrl="URL"
+
+## 🧪 Testes Rápidos
+
+# Teste 1: Verificar servidor
+http GET http://localhost:3005/
+
+# Teste 2: Imagem de exemplo do Unsplash
+http POST http://localhost:3005/api/process-url \
+  prompt="pinte de azul" \
+  imageUrl="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800"
+
+# Teste 3: Trocar 3 cores rapidamente
+for cor in vermelho azul verde; do
+  echo "Testando cor: $cor"
+  http POST http://localhost:3005/api/process-url \
+    prompt="pinte de $cor" \
+    imageUrl="URL_DA_IMAGEM" | jq -r '.localFile'
+done
+
+## 📱 Para uso em scripts
+
+#!/bin/bash
+# Processar múltiplas imagens
+for imagem in /caminho/para/imagens/*.jpg; do
+  echo "Processando: $imagem"
+  http --form POST http://localhost:3005/api/process-upload \
+    prompt="modernizar" \
+    image@"$imagem"
+done
+
+## 💡 Dicas
+
+1. Use URLs públicas ou servidor de arquivos para imagens locais
+2. Prompts em português funcionam bem
+3. Combine múltiplas instruções no prompt
+4. Teste diferentes formatos: jpg, png, webp
+5. Use jq para processar JSON de resposta
+
+## 🆘 Resolução de Problemas
+
+# Servidor não responde
+lsof -ti:3005 | xargs kill -9
+cd testando-nanobanana && npm run dev
+
+# HTTPie não instalado
+pip install httpie
+# ou
+sudo apt install httpie
+
+# Ver logs do servidor
+tail -f testando-nanobanana/nohup.out
+
+# Testar conectividade
+curl http://localhost:3005/
+ping localhost
+

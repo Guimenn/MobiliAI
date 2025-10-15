@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍌 Nano Banana - Replicate API</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b, #feca57);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            color: #ff6b6b;
+            border-bottom: 3px solid #ff6b6b;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #ff6b6b;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-label {
+            display: block;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .file-input-label:hover {
+            border-color: #ff6b6b;
+            background: #fff5f5;
+        }
+
+        .file-input-label.dragover {
+            border-color: #ff6b6b;
+            background: #fff5f5;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #ff6b6b, #feca57);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #ff6b6b;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result-image {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-top: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .example-urls {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .example-urls h4 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .example-urls a {
+            color: #007bff;
+            text-decoration: none;
+            display: block;
+            margin: 5px 0;
+            word-break: break-all;
+        }
+
+        .example-urls a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍌 Nano Banana</h1>
+            <p>Processe suas imagens com IA usando a API do Replicate</p>
+        </div>
+
+        <div class="content">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('url')">📷 URL da Imagem</button>
+                <button class="tab" onclick="switchTab('upload')">📁 Upload de Arquivo</button>
+            </div>
+
+            <!-- Tab URL -->
+            <div id="url-tab" class="tab-content active">
+                <form id="url-form">
+                    <div class="form-group">
+                        <label for="imageUrl">URL da Imagem:</label>
+                        <input type="url" id="imageUrl" placeholder="https://exemplo.com/imagem.jpg" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="urlPrompt">Prompt (o que você quer fazer com a imagem):</label>
+                        <textarea id="urlPrompt" placeholder="Ex: troque a cor para vermelho, adicione um gato, transforme em desenho..." required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="urlFormat">Formato de saída:</label>
+                        <select id="urlFormat">
+                            <option value="jpg">JPG</option>
+                            <option value="png">PNG</option>
+                            <option value="webp">WebP</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn" id="urlBtn">🚀 Processar Imagem</button>
+                </form>
+
+                <div class="example-urls">
+                    <h4>💡 URLs de exemplo para testar:</h4>
+                    <a href="#" onclick="setUrl('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop')">
+                        🏔️ Paisagem de montanha (Unsplash)
+                    </a>
+                    <a href="#" onclick="setUrl('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=600&fit=crop')">
+                        🌲 Floresta (Unsplash)
+                    </a>
+                    <a href="#" onclick="setUrl('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop')">
+                        🏞️ Natureza (Unsplash)
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tab Upload -->
+            <div id="upload-tab" class="tab-content">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label>Selecionar Imagem:</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="imageFile" class="file-input" accept="image/*" required>
+                            <label for="imageFile" class="file-input-label" id="fileLabel">
+                                📁 Clique aqui ou arraste uma imagem
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="uploadPrompt">Prompt (o que você quer fazer com a imagem):</label>
+                        <textarea id="uploadPrompt" placeholder="Ex: troque a cor para vermelho, adicione um gato, transforme em desenho..." required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="uploadFormat">Formato de saída:</label>
+                        <select id="uploadFormat">
+                            <option value="jpg">JPG</option>
+                            <option value="png">PNG</option>
+                            <option value="webp">WebP</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn" id="uploadBtn">🚀 Processar Imagem</button>
+                </form>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processando imagem... Isso pode levar alguns segundos.</p>
+            </div>
+
+            <div class="result" id="result">
+                <div id="resultContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Trocar entre abas
+        function switchTab(tabName) {
+            // Remover active de todas as abas
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // Ativar aba selecionada
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+
+        // Definir URL de exemplo
+        function setUrl(url) {
+            document.getElementById('imageUrl').value = url;
+        }
+
+        // Drag and drop para upload
+        const fileInput = document.getElementById('imageFile');
+        const fileLabel = document.getElementById('fileLabel');
+
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                fileLabel.textContent = `📁 ${e.target.files[0].name}`;
+            }
+        });
+
+        // Drag and drop visual feedback
+        fileLabel.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+
+        fileLabel.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+
+        fileLabel.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileLabel.textContent = `📁 ${files[0].name}`;
+            }
+        });
+
+        // Processar formulário URL
+        document.getElementById('url-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const imageUrl = document.getElementById('imageUrl').value;
+            const prompt = document.getElementById('urlPrompt').value;
+            const format = document.getElementById('urlFormat').value;
+            
+            await processImage('url', { imageUrl, prompt, outputFormat: format });
+        });
+
+        // Processar formulário Upload
+        document.getElementById('upload-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const file = document.getElementById('imageFile').files[0];
+            const prompt = document.getElementById('uploadPrompt').value;
+            const format = document.getElementById('uploadFormat').value;
+            
+            if (!file) {
+                showResult('error', 'Por favor, selecione uma imagem.');
+                return;
+            }
+            
+            await processImage('upload', { file, prompt, outputFormat: format });
+        });
+
+        // Função para processar imagem
+        async function processImage(type, data) {
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            
+            // Mostrar loading
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            
+            // Desabilitar botões
+            document.getElementById('urlBtn').disabled = true;
+            document.getElementById('uploadBtn').disabled = true;
+            
+            try {
+                let response;
+                
+                if (type === 'url') {
+                    response = await fetch('/api/process-url', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    const formData = new FormData();
+                    formData.append('image', data.file);
+                    formData.append('prompt', data.prompt);
+                    formData.append('outputFormat', data.outputFormat);
+                    
+                    response = await fetch('/api/process-upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
+                
+                const resultData = await response.json();
+                
+                if (resultData.success) {
+                    showResult('success', `
+                        <h3>✅ Imagem processada com sucesso!</h3>
+                        <p><strong>Prompt usado:</strong> ${data.prompt}</p>
+                        <p><strong>Arquivo salvo:</strong> ${resultData.localFile}</p>
+                        <img src="${resultData.imageUrl}" alt="Imagem processada" class="result-image">
+                        <p><a href="${resultData.imageUrl}" target="_blank" style="color: #007bff;">🔗 Abrir imagem em nova aba</a></p>
+                    `);
+                } else {
+                    let errorMessage = resultData.error;
+                    
+                    // Traduzir erros comuns
+                    if (errorMessage.includes('flagged as sensitive')) {
+                        errorMessage = 'A imagem foi rejeitada por conter conteúdo sensível. Tente com uma imagem diferente.';
+                    } else if (errorMessage.includes('No image content found')) {
+                        errorMessage = 'Não foi possível processar a imagem. Verifique se a URL está correta e acessível.';
+                    } else if (errorMessage.includes('unexpected error')) {
+                        errorMessage = 'Erro interno da API. Tente novamente em alguns minutos.';
+                    }
+                    
+                    showResult('error', `
+                        <h3>❌ Erro ao processar imagem</h3>
+                        <p><strong>Erro:</strong> ${errorMessage}</p>
+                        <p><strong>Dica:</strong> Tente usar uma das imagens de exemplo ou uma imagem diferente.</p>
+                    `);
+                }
+            } catch (error) {
+                showResult('error', `
+                    <h3>❌ Erro de conexão</h3>
+                    <p>Não foi possível conectar ao servidor. Verifique se o servidor está rodando.</p>
+                `);
+            } finally {
+                // Esconder loading e reabilitar botões
+                loading.style.display = 'none';
+                document.getElementById('urlBtn').disabled = false;
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        }
+
+        // Mostrar resultado
+        function showResult(type, content) {
+            const result = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            
+            result.className = `result ${type}`;
+            resultContent.innerHTML = content;
+            result.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
