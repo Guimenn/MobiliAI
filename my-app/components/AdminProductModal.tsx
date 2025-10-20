@@ -8,38 +8,64 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { X, Eye, Edit, Save, DollarSign, Package, Tag, Hash, Palette, Building, Ruler, Weight, Brush, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import ImageUpload from './ImageUpload';
+import ImageCarousel from './ImageCarousel';
+import { uploadMultipleProductImages, supabase } from '@/lib/supabase';
 
 interface AdminProductModalProps {
   product: any | null;
   isOpen: boolean;
-  mode: 'view' | 'edit';
+  mode: 'view' | 'edit' | 'create';
   onClose: () => void;
   onProductUpdated: (product: any) => void;
   onProductDeleted: (productId: string) => void;
 }
 
 export default function AdminProductModal({ product, isOpen, mode, onClose, onProductUpdated, onProductDeleted }: AdminProductModalProps) {
-  const [isEditing, setIsEditing] = useState(mode === 'edit');
+  const [isEditing, setIsEditing] = useState(mode === 'edit' || mode === 'create');
   const [editedProduct, setEditedProduct] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [isCarouselOpen, setIsCarouselOpen] = useState(false);
 
   useEffect(() => {
-    if (product) {
+    if (mode === 'create') {
+      // Criar um produto vazio para o modo de criação
+      setEditedProduct({
+        name: '',
+        description: '',
+        price: 0,
+        stock: 0,
+        category: 'OUTROS',
+        sku: '',
+        isActive: true,
+        rating: 0,
+        reviews: 0
+      });
+      setExistingImages([]);
+      setUploadedImages([]);
+    } else if (product) {
       setEditedProduct({ ...product });
+      setExistingImages(product?.imageUrls || []);
+      setUploadedImages([]);
     }
-  }, [product]);
+  }, [product, mode]);
 
   useEffect(() => {
-    setIsEditing(mode === 'edit');
+    setIsEditing(mode === 'edit' || mode === 'create');
   }, [mode]);
 
   const categories = [
-    { value: 'Tintas', label: 'Tintas' },
-    { value: 'Pincéis', label: 'Pincéis' },
-    { value: 'Rolos', label: 'Rolos' },
-    { value: 'Acessórios', label: 'Acessórios' },
-    { value: 'Ferramentas', label: 'Ferramentas' },
-    { value: 'Outros', label: 'Outros' },
+    { value: 'SOFA', label: 'Sofá' },
+    { value: 'MESA', label: 'Mesa' },
+    { value: 'CADEIRA', label: 'Cadeira' },
+    { value: 'ARMARIO', label: 'Armário' },
+    { value: 'ESTANTE', label: 'Estante' },
+    { value: 'POLTRONA', label: 'Poltrona' },
+    { value: 'QUADRO', label: 'Quadro' },
+    { value: 'LUMINARIA', label: 'Luminária' },
+    { value: 'OUTROS', label: 'Outros' },
   ];
 
   const handleSave = async () => {
@@ -48,35 +74,321 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
     try {
       setIsLoading(true);
       
-      const updatedProduct = await adminAPI.updateProduct(editedProduct.id, {
-        name: editedProduct.name,
-        description: editedProduct.description,
-        category: editedProduct.category,
-        price: editedProduct.price,
-        stock: editedProduct.stock,
-        sku: editedProduct.sku,
-        isActive: editedProduct.isActive,
-        colorName: editedProduct.colorName,
-        colorHex: editedProduct.colorHex,
-        brand: editedProduct.brand,
-        supplier: editedProduct.supplier,
-        dimensions: editedProduct.dimensions,
-        weight: editedProduct.weight,
-        style: editedProduct.style,
-        imageUrls: editedProduct.imageUrls || [],
-      });
+      let result;
+      if (mode === 'create') {
+        // Obter storeId - usar o primeiro store disponível
+        const stores = await adminAPI.getStores();
+        const storeId = stores.length > 0 ? stores[0].id : null;
+        
+        if (!storeId) {
+          throw new Error('Nenhuma loja encontrada. Crie uma loja primeiro.');
+        }
 
-      onProductUpdated(updatedProduct);
+        // Validar campos obrigatórios
+        if (!editedProduct.name || !editedProduct.category || editedProduct.price === undefined || editedProduct.stock === undefined) {
+          throw new Error('Nome, categoria, preço e estoque são obrigatórios');
+        }
+
+        // Validar categoria
+        const validCategories = ['SOFA', 'MESA', 'CADEIRA', 'ARMARIO', 'ESTANTE', 'POLTRONA', 'QUADRO', 'LUMINARIA', 'OUTROS'];
+        if (!validCategories.includes(editedProduct.category)) {
+          throw new Error(`Categoria inválida: ${editedProduct.category}. Use uma das seguintes: ${validCategories.join(', ')}`);
+        }
+
+        // Validar preço
+        if (editedProduct.price < 0) {
+          throw new Error('Preço não pode ser negativo');
+        }
+
+        // Validar estoque
+        if (editedProduct.stock < 0) {
+          throw new Error('Estoque não pode ser negativo');
+        }
+
+        // Validar supplierId se fornecido (opcional)
+        if (editedProduct.supplierId && editedProduct.supplierId.trim()) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          if (!uuidRegex.test(editedProduct.supplierId.trim())) {
+            console.warn('⚠️ ID do fornecedor inválido, será ignorado:', editedProduct.supplierId);
+            // Não lançar erro, apenas ignorar o supplierId inválido
+            editedProduct.supplierId = '';
+          }
+        }
+
+        // Incluir todos os campos do produto
+        const productData: any = {
+          name: editedProduct.name.trim(),
+          description: editedProduct.description?.trim() || '',
+          category: editedProduct.category,
+          price: Number(editedProduct.price),
+          stock: Number(editedProduct.stock),
+          sku: editedProduct.sku?.trim() || '',
+          isAvailable: editedProduct.isActive ?? true, // Usar isAvailable conforme DTO
+          colorName: editedProduct.colorName?.trim() || '',
+          brand: editedProduct.brand?.trim() || '',
+          imageUrls: existingImages || [],
+          storeId: storeId
+        };
+
+        // Adicionar campos opcionais apenas se tiverem valor válido
+        if (editedProduct.colorHex?.trim() && editedProduct.colorHex.trim().length <= 7) {
+          productData.colorHex = editedProduct.colorHex.trim();
+        }
+
+        if (editedProduct.weight && !isNaN(Number(editedProduct.weight)) && Number(editedProduct.weight) >= 0) {
+          productData.weight = Number(editedProduct.weight);
+        }
+
+        if (editedProduct.width && !isNaN(Number(editedProduct.width)) && Number(editedProduct.width) >= 0) {
+          productData.width = Number(editedProduct.width);
+        }
+
+        if (editedProduct.height && !isNaN(Number(editedProduct.height)) && Number(editedProduct.height) >= 0) {
+          productData.height = Number(editedProduct.height);
+        }
+
+        if (editedProduct.depth && !isNaN(Number(editedProduct.depth)) && Number(editedProduct.depth) >= 0) {
+          productData.depth = Number(editedProduct.depth);
+        }
+
+        if (editedProduct.style && ['MODERNO', 'MINIMALISTA', 'RUSTICO'].includes(editedProduct.style)) {
+          productData.style = editedProduct.style;
+        }
+
+        // Adicionar supplierId apenas se for um UUID válido
+        if (editedProduct.supplierId && editedProduct.supplierId.trim()) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(editedProduct.supplierId.trim())) {
+            productData.supplierId = editedProduct.supplierId.trim();
+          } else {
+            console.warn('⚠️ SupplierId inválido ignorado:', editedProduct.supplierId);
+          }
+        }
+
+        console.log('📦 Dados do produto sendo enviados:', JSON.stringify(productData, null, 2));
+        console.log('🏪 StoreId:', storeId);
+        console.log('🔍 Verificação de campos obrigatórios:', {
+          name: !!productData.name,
+          category: !!productData.category,
+          price: typeof productData.price === 'number' && productData.price >= 0,
+          stock: typeof productData.stock === 'number' && productData.stock >= 0,
+          storeId: !!productData.storeId
+        });
+        console.log('🔍 Tipos dos campos:', {
+          name: typeof productData.name,
+          description: typeof productData.description,
+          category: typeof productData.category,
+          price: typeof productData.price,
+          stock: typeof productData.stock,
+          sku: typeof productData.sku,
+          colorName: typeof productData.colorName,
+          colorHex: typeof productData.colorHex,
+          brand: typeof productData.brand,
+          weight: typeof productData.weight,
+          width: typeof productData.width,
+          height: typeof productData.height,
+          depth: typeof productData.depth,
+          style: typeof productData.style,
+          supplierId: typeof productData.supplierId,
+          storeId: typeof productData.storeId
+        });
+        console.log('📋 Valores específicos:', {
+          name: productData.name,
+          description: productData.description,
+          category: productData.category,
+          price: productData.price,
+          stock: productData.stock,
+          sku: productData.sku,
+          colorName: productData.colorName,
+          colorHex: productData.colorHex,
+          brand: productData.brand,
+          weight: productData.weight,
+          width: productData.width,
+          height: productData.height,
+          depth: productData.depth,
+          style: productData.style,
+          supplierId: productData.supplierId
+        });
+        console.log('🎯 Categoria sendo enviada:', productData.category);
+        console.log('🎯 Categoria é string?', typeof productData.category === 'string');
+        console.log('🎯 Categoria é válida?', ['SOFA', 'MESA', 'CADEIRA', 'ARMARIO', 'ESTANTE', 'POLTRONA', 'QUADRO', 'LUMINARIA', 'OUTROS'].includes(productData.category));
+        console.log('🎯 StoreId é válido?', productData.storeId && typeof productData.storeId === 'string');
+        console.log('🎯 Campos numéricos:', {
+          price: productData.price,
+          stock: productData.stock,
+          weight: productData.weight,
+          width: productData.width,
+          height: productData.height,
+          depth: productData.depth
+        });
+        
+        // Verificar token de autenticação
+        const token = localStorage.getItem('token');
+        console.log('🔑 Token presente:', !!token);
+        console.log('🔑 Token (primeiros 20 chars):', token?.substring(0, 20));
+        
+        // Verificar se o usuário está logado
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        console.log('👤 Usuário logado:', user);
+        console.log('👤 Role do usuário:', user.role);
+
+      // Fazer upload das imagens primeiro (se houver)
+      let uploadedImageUrls: string[] = [];
+      if (uploadedImages.length > 0) {
+        console.log('📤 Fazendo upload de', uploadedImages.length, 'imagens...');
+        console.log('📤 Arquivos para upload:', uploadedImages.map(f => ({ name: f.name, size: f.size, type: f.type })));
+        
+        try {
+          // Gerar um ID temporário para o produto (será substituído pelo ID real)
+          const tempProductId = `temp-${Date.now()}`;
+          console.log('🆔 ID temporário do produto:', tempProductId);
+          
+          uploadedImageUrls = await uploadMultipleProductImages(uploadedImages, tempProductId);
+          console.log('✅ Upload de imagens concluído:', uploadedImageUrls);
+          
+          // Verificar se todas as URLs foram geradas
+          if (uploadedImageUrls.length !== uploadedImages.length) {
+            console.warn('⚠️ Número de URLs geradas diferente do número de arquivos:', {
+              arquivos: uploadedImages.length,
+              urls: uploadedImageUrls.length
+            });
+          }
+        } catch (uploadError: any) {
+          console.error('❌ Erro no upload de imagens:', uploadError);
+          console.error('❌ Detalhes do erro:', {
+            message: uploadError.message,
+            stack: uploadError.stack,
+            name: uploadError.name
+          });
+          toast.error('Erro no upload de imagens', {
+            description: `Erro: ${uploadError.message || 'Erro desconhecido'}`,
+            duration: 6000,
+          });
+          return;
+        }
+      } else {
+        console.log('ℹ️ Nenhuma imagem nova para upload');
+      }
+
+        // Adicionar URLs das imagens aos dados do produto
+        const finalProductData = {
+          ...productData,
+          imageUrls: [...existingImages, ...uploadedImageUrls]
+        };
+
+        console.log('📦 Dados finais do produto:', finalProductData);
+
+        // Criar novo produto
+        try {
+          result = await adminAPI.createProduct(finalProductData);
+        } catch (error: any) {
+          console.error('🚨 Erro detalhado:', error);
+          console.error('🚨 Resposta do servidor:', error.response?.data);
+          console.error('🚨 Status:', error.response?.status);
+          console.error('🚨 Headers:', error.response?.headers);
+          
+          // Tratar erros de validação específicos
+          if (error.response?.status === 400) {
+            const validationErrors = error.response?.data?.message || error.response?.data;
+            console.error('🚨 Erros de validação:', validationErrors);
+            console.error('🚨 Dados completos da resposta:', error.response?.data);
+            
+            // Se for um array de erros de validação
+            if (Array.isArray(validationErrors)) {
+              console.error('🚨 Array de erros:', validationErrors);
+              const errorMessages = validationErrors.map((err: any, index: number) => {
+                console.error(`🚨 Erro ${index}:`, err);
+                const property = err.property || err.field || 'campo';
+                const constraints = err.constraints || err.messages || err.message || 'erro desconhecido';
+                const constraintValues = typeof constraints === 'object' ? Object.values(constraints) : [constraints];
+                return `${property}: ${constraintValues.join(', ')}`;
+              }).join('\n');
+              throw new Error(`Erro de validação:\n${errorMessages}`);
+            }
+            
+            // Se for uma string de erro
+            if (typeof validationErrors === 'string') {
+              throw new Error(`Erro de validação: ${validationErrors}`);
+            }
+            
+            // Se for um objeto de erro
+            if (typeof validationErrors === 'object' && validationErrors !== null) {
+              const errorMessages = Object.entries(validationErrors).map(([key, value]) => 
+                `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
+              ).join('\n');
+              throw new Error(`Erro de validação:\n${errorMessages}`);
+            }
+          }
+          
+          throw error;
+        }
+        
+        console.log('✅ Produto criado com sucesso:', result);
+        console.log('🖼️ Imagens do produto:', result.imageUrls);
+        console.log('🖼️ Imagem principal:', result.imageUrl);
+        
+        toast.success('Produto criado com sucesso!', {
+          description: `${editedProduct.name} foi criado.`,
+          duration: 4000,
+        });
+      } else {
+        // Fazer upload das novas imagens (se houver)
+        let newUploadedImageUrls: string[] = [];
+        if (uploadedImages.length > 0) {
+          console.log('📤 Fazendo upload de', uploadedImages.length, 'novas imagens...');
+          try {
+            newUploadedImageUrls = await uploadMultipleProductImages(uploadedImages, editedProduct.id);
+            console.log('✅ Upload de novas imagens concluído:', newUploadedImageUrls);
+          } catch (uploadError) {
+            console.error('❌ Erro no upload de novas imagens:', uploadError);
+            toast.error('Erro no upload de imagens', {
+              description: 'As novas imagens não puderam ser enviadas. Tente novamente.',
+              duration: 4000,
+            });
+            return;
+          }
+        }
+
+        // Atualizar produto existente
+        result = await adminAPI.updateProduct(editedProduct.id, {
+          name: editedProduct.name,
+          description: editedProduct.description,
+          category: editedProduct.category,
+          price: editedProduct.price,
+          stock: editedProduct.stock,
+          sku: editedProduct.sku,
+          isActive: editedProduct.isActive,
+          colorName: editedProduct.colorName,
+          colorHex: editedProduct.colorHex,
+          brand: editedProduct.brand,
+          supplierId: editedProduct.supplierId,
+          width: editedProduct.width,
+          height: editedProduct.height,
+          depth: editedProduct.depth,
+          weight: editedProduct.weight,
+          style: editedProduct.style,
+          imageUrls: [...existingImages, ...newUploadedImageUrls],
+        });
+        
+        toast.success('Produto atualizado com sucesso!', {
+          description: `${editedProduct.name} foi atualizado.`,
+          duration: 4000,
+        });
+      }
+
+      onProductUpdated(result);
       setIsEditing(false);
-      toast.success('Produto atualizado com sucesso!', {
-        description: `${editedProduct.name} foi atualizado.`,
-        duration: 4000,
-      });
-    } catch (error) {
-      console.error('Erro ao atualizar produto:', error);
-      toast.error('Erro ao atualizar produto', {
-        description: 'Tente novamente mais tarde.',
-        duration: 4000,
+      onClose();
+    } catch (error: any) {
+      console.error('Erro ao salvar produto:', error);
+      
+      // Exibir erro específico se disponível
+      const errorMessage = error.message || 'Erro desconhecido';
+      const isValidationError = errorMessage.includes('validação') || errorMessage.includes('validation');
+      
+      toast.error('Erro ao salvar produto', {
+        description: isValidationError ? errorMessage : 'Tente novamente mais tarde.',
+        duration: 6000,
       });
     } finally {
       setIsLoading(false);
@@ -86,17 +398,17 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
   const handleDelete = async () => {
     if (!product) return;
 
-    if (!confirm(`Tem certeza que deseja excluir o produto "${product.name}"? Esta ação não pode ser desfeita.`)) {
+    if (!confirm(`Tem certeza que deseja excluir o produto "${product?.name}"? Esta ação não pode ser desfeita.`)) {
       return;
     }
 
     try {
       setIsLoading(true);
-      await adminAPI.deleteProduct(product.id);
-      onProductDeleted(product.id);
+      await adminAPI.deleteProduct(product?.id);
+      onProductDeleted(product?.id);
       onClose();
       toast.success('Produto excluído com sucesso!', {
-        description: `${product.name} foi removido do catálogo.`,
+        description: `${product?.name} foi removido do catálogo.`,
         duration: 4000,
       });
     } catch (error) {
@@ -117,7 +429,82 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
     setIsEditing(false);
   };
 
-  if (!isOpen || !product) return null;
+  const handleImagesChange = (files: File[]) => {
+    setUploadedImages(files);
+  };
+
+  const testSupabaseConnection = async () => {
+    console.log('🧪 Testando conexão com Supabase...');
+    
+    if (!supabase) {
+      console.error('❌ Supabase não está configurado');
+      toast.error('Supabase não configurado', {
+        description: 'Verifique as variáveis de ambiente',
+        duration: 4000,
+      });
+      return;
+    }
+
+    try {
+      // Pular listagem de buckets (pode ter problema de permissão)
+      console.log('🔄 Testando acesso direto ao bucket...');
+      
+      // Testar listagem de arquivos no bucket diretamente
+      const { data: files, error: filesError } = await supabase.storage
+        .from('product-images')
+        .list('products', { limit: 10 });
+
+      if (filesError) {
+        console.error('❌ Erro ao listar arquivos:', filesError);
+        console.error('❌ Detalhes do erro:', {
+          message: filesError.message,
+          name: filesError.name
+        });
+        
+        // Se der erro de permissão, tentar pasta raiz
+        console.log('🔄 Tentando listar pasta raiz...');
+        const { data: rootFiles, error: rootError } = await supabase.storage
+          .from('product-images')
+          .list('', { limit: 10 });
+          
+        if (rootError) {
+          console.error('❌ Erro na pasta raiz:', rootError);
+          toast.error('Erro de permissão', {
+            description: 'Não foi possível acessar o bucket. Verifique as políticas de segurança.',
+            duration: 6000,
+          });
+          return;
+        }
+        
+        console.log('✅ Arquivos na pasta raiz:', rootFiles);
+        toast.success('Conexão com Supabase OK!', {
+          description: `Bucket acessível. ${rootFiles?.length || 0} arquivos na raiz.`,
+          duration: 4000,
+        });
+        return;
+      }
+
+      console.log('✅ Arquivos no bucket:', files);
+      
+      toast.success('Conexão com Supabase OK!', {
+        description: `Bucket encontrado. ${files?.length || 0} arquivos.`,
+        duration: 4000,
+      });
+
+    } catch (error: any) {
+      console.error('❌ Erro geral no teste:', error);
+      toast.error('Erro no teste', {
+        description: error.message,
+        duration: 4000,
+      });
+    }
+  };
+
+  const handleRemoveExistingImage = (url: string) => {
+    setExistingImages(prev => prev.filter(img => img !== url));
+  };
+
+  if (!isOpen) return null;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -138,12 +525,13 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
               <Eye className="h-6 w-6 text-green-600" />
             )}
             <h2 className="text-2xl font-bold text-gray-900">
-              {isEditing ? 'Editar Produto' : 'Visualizar Produto'}
+              {mode === 'create' ? 'Novo Produto' : isEditing ? 'Editar Produto' : 'Visualizar Produto'}
             </h2>
           </div>
-          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2">
             {isEditing && (
               <>
+
                 <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
                   Cancelar
                 </Button>
@@ -181,11 +569,29 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Image Section */}
             <div className="space-y-4">
-              <div className="aspect-square bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
-                {editedProduct?.imageUrls && editedProduct.imageUrls.length > 0 ? (
+              <div 
+                className="aspect-square bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => {
+                  const allImages = [
+                    ...existingImages, 
+                    ...uploadedImages.map(file => URL.createObjectURL(file)),
+                    ...(editedProduct?.imageUrls || [])
+                  ];
+                  if (allImages.length > 0) {
+                    setIsCarouselOpen(true);
+                  }
+                }}
+              >
+                {(existingImages.length > 0 || uploadedImages.length > 0 || (editedProduct?.imageUrls && editedProduct.imageUrls.length > 0)) ? (
                   <img
-                    src={editedProduct.imageUrls[0]}
-                    alt={editedProduct.name}
+                    src={
+                      existingImages.length > 0 
+                        ? existingImages[0] 
+                        : uploadedImages.length > 0 
+                        ? URL.createObjectURL(uploadedImages[0])
+                        : editedProduct?.imageUrls?.[0]
+                    }
+                    alt={editedProduct?.name || 'Produto'}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -193,23 +599,22 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                     <Package className="h-12 w-12 text-gray-400" />
                   </div>
                 )}
+                {/* Indicador de múltiplas imagens */}
+                {((existingImages.length + uploadedImages.length + (editedProduct?.imageUrls?.length || 0)) > 1) && (
+                  <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded-full text-xs font-medium">
+                    {existingImages.length + uploadedImages.length + (editedProduct?.imageUrls?.length || 0)} imagens
+                  </div>
+                )}
               </div>
               
               {isEditing && (
-                <div>
-                  <Label htmlFor="imageUrl" className="text-sm font-medium text-gray-700">
-                    URL da Imagem Principal
-                  </Label>
-                  <Input
-                    id="imageUrl"
-                    type="url"
-                    value={editedProduct?.imageUrls?.[0] || ''}
-                    onChange={(e) => setEditedProduct(prev => prev ? { 
-                      ...prev, 
-                      imageUrls: [e.target.value, ...(prev.imageUrls?.slice(1) || [])]
-                    } : null)}
-                    placeholder="https://exemplo.com/imagem.jpg"
-                    className="mt-1"
+                <div className="mt-4">
+                  <ImageUpload
+                    images={uploadedImages}
+                    onImagesChange={handleImagesChange}
+                    maxImages={5}
+                    existingImages={existingImages}
+                    onRemoveExisting={handleRemoveExistingImage}
                   />
                 </div>
               )}
@@ -234,12 +639,12 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       <Input
                         id="name"
                         value={editedProduct?.name || ''}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, name: e.target.value } : null)}
+                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, name: e.target.value } : null)}
                         placeholder="Nome do produto"
                         className="mt-1"
                       />
                     ) : (
-                      <p className="mt-1 text-lg font-semibold text-gray-900">{product.name}</p>
+                      <p className="mt-1 text-lg font-semibold text-gray-900">{product?.name || 'Novo Produto'}</p>
                     )}
                   </div>
 
@@ -251,13 +656,13 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       <textarea
                         id="description"
                         value={editedProduct?.description || ''}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, description: e.target.value } : null)}
+                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, description: e.target.value } : null)}
                         placeholder="Descrição do produto"
                         className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent resize-none"
                         rows={3}
                       />
                     ) : (
-                      <p className="mt-1 text-gray-600">{product.description || 'Sem descrição'}</p>
+                      <p className="mt-1 text-gray-600">{product?.description || 'Sem descrição'}</p>
                     )}
                   </div>
 
@@ -269,7 +674,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       <select
                         id="category"
                         value={editedProduct?.category || ''}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, category: e.target.value } : null)}
+                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, category: e.target.value } : null)}
                         className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent"
                       >
                         {categories.map(category => (
@@ -279,7 +684,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                         ))}
                       </select>
                     ) : (
-                      <p className="mt-1 text-gray-900">{product.category}</p>
+                      <p className="mt-1 text-gray-900">{product?.category}</p>
                     )}
                   </div>
 
@@ -291,12 +696,12 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       <Input
                         id="sku"
                         value={editedProduct?.sku || ''}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, sku: e.target.value } : null)}
+                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, sku: e.target.value } : null)}
                         placeholder="Código SKU"
                         className="mt-1"
                       />
                     ) : (
-                      <p className="mt-1 text-gray-600">{product.sku || 'Sem SKU'}</p>
+                      <p className="mt-1 text-gray-600">{product?.sku || 'Sem SKU'}</p>
                     )}
                   </div>
 
@@ -308,12 +713,12 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       <Input
                         id="brand"
                         value={editedProduct?.brand || ''}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, brand: e.target.value } : null)}
+                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, brand: e.target.value } : null)}
                         placeholder="Marca do produto"
                         className="mt-1"
                       />
                     ) : (
-                      <p className="mt-1 text-gray-600">{product.brand || 'Sem marca'}</p>
+                      <p className="mt-1 text-gray-600">{product?.brand || 'Sem marca'}</p>
                     )}
                   </div>
                 </CardContent>
@@ -341,14 +746,14 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                           step="0.01"
                           min="0"
                           value={editedProduct?.price || 0}
-                          onChange={(e) => setEditedProduct(prev => prev ? { ...prev, price: parseFloat(e.target.value) || 0 } : null)}
+                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, price: parseFloat(e.target.value) || 0 } : null)}
                           placeholder="0.00"
                           className="pl-10"
                         />
                       </div>
                     ) : (
                       <p className="mt-1 text-2xl font-bold text-[#3e2626]">
-                        {formatPrice(product.price)}
+                        {formatPrice(product?.price)}
                       </p>
                     )}
                   </div>
@@ -363,20 +768,20 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                         type="number"
                         min="0"
                         value={editedProduct?.stock || 0}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, stock: parseInt(e.target.value) || 0 } : null)}
+                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, stock: parseInt(e.target.value) || 0 } : null)}
                         placeholder="0"
                         className="mt-1"
                       />
                     ) : (
                       <div className="mt-1 flex items-center space-x-2">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          product.stock > 10 
+                          product?.stock > 10 
                             ? 'bg-green-100 text-green-800' 
-                            : product.stock > 0 
+                            : product?.stock > 0 
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-red-100 text-red-800'
                         }`}>
-                          {product.stock} unidades
+                          {product?.stock} unidades
                         </span>
                       </div>
                     )}
@@ -392,7 +797,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                           <input
                             type="checkbox"
                             checked={editedProduct?.isActive || false}
-                            onChange={(e) => setEditedProduct(prev => prev ? { ...prev, isActive: e.target.checked } : null)}
+                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, isActive: e.target.checked } : null)}
                             className="mr-2"
                           />
                           <span className="text-sm text-gray-700">Produto Ativo</span>
@@ -401,9 +806,9 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                     ) : (
                       <div className="mt-1">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          product.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          product?.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}>
-                          {product.isActive ? 'Ativo' : 'Inativo'}
+                          {product?.isActive ? 'Ativo' : 'Inativo'}
                         </span>
                       </div>
                     )}
@@ -428,46 +833,73 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       <Input
                         id="colorName"
                         value={editedProduct?.colorName || ''}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, colorName: e.target.value } : null)}
+                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, colorName: e.target.value } : null)}
                         placeholder="Nome da cor"
                         className="mt-1"
                       />
                     ) : (
-                      <p className="mt-1 text-gray-600">{product.colorName || 'Não especificado'}</p>
+                      <p className="mt-1 text-gray-600">{product?.colorName || 'Não especificado'}</p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="supplier" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="supplierId" className="text-sm font-medium text-gray-700">
                       Fornecedor
                     </Label>
                     {isEditing ? (
                       <Input
-                        id="supplier"
-                        value={editedProduct?.supplier || ''}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, supplier: e.target.value } : null)}
-                        placeholder="Nome do fornecedor"
+                        id="supplierId"
+                        value={editedProduct?.supplierId || ''}
+                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, supplierId: e.target.value } : null)}
+                        placeholder="ID do fornecedor"
                         className="mt-1"
                       />
                     ) : (
-                      <p className="mt-1 text-gray-600">{product.supplier || 'Não especificado'}</p>
+                      <p className="mt-1 text-gray-600">{product?.supplier?.name || product?.supplierId || 'Não especificado'}</p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="dimensions" className="text-sm font-medium text-gray-700">
+                    <Label className="text-sm font-medium text-gray-700">
                       Dimensões
                     </Label>
                     {isEditing ? (
-                      <Input
-                        id="dimensions"
-                        value={editedProduct?.dimensions || ''}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, dimensions: e.target.value } : null)}
-                        placeholder="Ex: 200cm x 100cm x 80cm"
-                        className="mt-1"
-                      />
+                      <div className="grid grid-cols-3 gap-2 mt-1">
+                        <div>
+                          <Input
+                            id="width"
+                            value={editedProduct?.width || ''}
+                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, width: e.target.value } : null)}
+                            placeholder="Largura (cm)"
+                            className="text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            id="height"
+                            value={editedProduct?.height || ''}
+                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, height: e.target.value } : null)}
+                            placeholder="Altura (cm)"
+                            className="text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            id="depth"
+                            value={editedProduct?.depth || ''}
+                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, depth: e.target.value } : null)}
+                            placeholder="Profundidade (cm)"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
                     ) : (
-                      <p className="mt-1 text-gray-600">{product.dimensions || 'Não especificado'}</p>
+                      <p className="mt-1 text-gray-600">
+                        {product?.width && product?.height && product?.depth 
+                          ? `${product.width}cm x ${product.height}cm x ${product.depth}cm`
+                          : 'Não especificado'
+                        }
+                      </p>
                     )}
                   </div>
 
@@ -476,15 +908,23 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       Peso
                     </Label>
                     {isEditing ? (
-                      <Input
-                        id="weight"
-                        value={editedProduct?.weight || ''}
-                        onChange={(e) => setEditedProduct(prev => prev ? { ...prev, weight: e.target.value } : null)}
-                        placeholder="Ex: 25kg"
-                        className="mt-1"
-                      />
+                      <div className="relative mt-1">
+                        <Input
+                          id="weight"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editedProduct?.weight || ''}
+                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, weight: parseFloat(e.target.value) || 0 } : null)}
+                          placeholder="Ex: 25.5"
+                          className="pr-8"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">kg</span>
+                      </div>
                     ) : (
-                      <p className="mt-1 text-gray-600">{product.weight || 'Não especificado'}</p>
+                      <p className="mt-1 text-gray-600">
+                        {product?.weight ? `${product.weight}kg` : 'Não especificado'}
+                      </p>
                     )}
                   </div>
                 </CardContent>
@@ -493,6 +933,17 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
           </div>
         </div>
       </div>
+
+      {/* Carrossel de imagens */}
+      <ImageCarousel
+        images={[
+          ...existingImages, 
+          ...uploadedImages.map(file => URL.createObjectURL(file)),
+          ...(editedProduct?.imageUrls || [])
+        ]}
+        isOpen={isCarouselOpen}
+        onClose={() => setIsCarouselOpen(false)}
+      />
     </div>
   );
 }

@@ -50,27 +50,20 @@ export default function ImageUpload({
       return isValid;
     });
 
-    if (validSizeFiles.length === 0) return;
+    if (validSizeFiles.length > 0) {
+      // Criar previews
+      const newPreviews = validSizeFiles.map(file => URL.createObjectURL(file));
+      setPreviews(prev => [...prev, ...newPreviews]);
 
-    // Criar previews
-    const newPreviews: string[] = [];
-    validSizeFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        newPreviews.push(reader.result as string);
-        if (newPreviews.length === validSizeFiles.length) {
-          setPreviews([...previews, ...newPreviews]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-    onImagesChange([...images, ...validSizeFiles]);
+      // Adicionar aos arquivos
+      onImagesChange([...images, ...validSizeFiles]);
+    }
   };
 
   const handleRemoveNew = (index: number) => {
     const newImages = images.filter((_, i) => i !== index);
     const newPreviews = previews.filter((_, i) => i !== index);
+    
     onImagesChange(newImages);
     setPreviews(newPreviews);
   };
@@ -85,32 +78,11 @@ export default function ImageUpload({
     fileInputRef.current?.click();
   };
 
-  const totalImages = images.length + existingImages.length;
+  const totalImages = existingImages.length + images.length;
   const canAddMore = totalImages < maxImages;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-700">
-          Imagens do Produto
-          <span className="text-xs text-gray-500 ml-2">
-            ({totalImages}/{maxImages} imagens)
-          </span>
-        </label>
-        {canAddMore && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleClick}
-            className="flex items-center space-x-2"
-          >
-            <Upload className="h-4 w-4" />
-            <span>Adicionar Imagens</span>
-          </Button>
-        )}
-      </div>
-
       <input
         ref={fileInputRef}
         type="file"
@@ -120,83 +92,128 @@ export default function ImageUpload({
         className="hidden"
       />
 
-      {/* Grid de imagens */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {/* Imagens existentes */}
-        {existingImages.map((url, index) => (
-          <div
-            key={`existing-${index}`}
-            className="relative group aspect-square rounded-lg overflow-hidden border-2 border-gray-200 hover:border-[#3e2626] transition-colors"
-          >
-            <Image
-              src={url}
-              alt={`Imagem ${index + 1}`}
-              fill
-              className="object-cover"
-            />
-            {onRemoveExisting && (
-              <button
-                type="button"
-                onClick={() => handleRemoveExisting(url)}
-                className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-              <p className="text-white text-xs font-medium">Imagem {index + 1}</p>
-            </div>
-          </div>
-        ))}
-
-        {/* Novas imagens (previews) */}
-        {previews.map((preview, index) => (
-          <div
-            key={`new-${index}`}
-            className="relative group aspect-square rounded-lg overflow-hidden border-2 border-green-200 hover:border-green-500 transition-colors"
-          >
-            <Image
-              src={preview}
-              alt={`Nova imagem ${index + 1}`}
-              fill
-              className="object-cover"
-            />
+      {/* Layout de imagens com destaque para a primeira */}
+      <div className="space-y-4">
+         {/* Imagem principal (primeira imagem) */}
+         {(existingImages.length > 0 || previews.length > 0) && (
+           <div className="relative group aspect-video rounded-lg overflow-hidden border-2 border-[#3e2626] bg-gray-100" style={{ minHeight: '200px' }}>
+             {existingImages.length > 0 ? (
+               <img
+                 src={existingImages[0]}
+                 alt="Imagem principal"
+                 className="w-full h-full object-cover"
+               />
+             ) : previews.length > 0 ? (
+               <img
+                 src={previews[0]}
+                 alt="Nova imagem principal"
+                 className="w-full h-full object-cover"
+               />
+             ) : null}
             <button
               type="button"
-              onClick={() => handleRemoveNew(index)}
-              className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+              onClick={() => {
+                if (existingImages.length > 0) {
+                  handleRemoveExisting(existingImages[0]);
+                } else {
+                  handleRemoveNew(0);
+                }
+              }}
+              className="absolute top-3 right-3 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-lg"
             >
               <X className="h-4 w-4" />
             </button>
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-600/60 to-transparent p-2">
-              <p className="text-white text-xs font-medium">Nova - {images[index]?.name}</p>
-            </div>
-            <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
-              NOVA
+          </div>
+        )}
+
+         {/* Imagens adicionais - mostra todas as imagens restantes */}
+         {((existingImages.length + previews.length) > 1) && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-gray-700">Imagens Adicionais</h4>
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {/* Imagens existentes restantes */}
+              {existingImages.slice(1).map((url, index) => (
+                <div
+                  key={`existing-${index + 1}`}
+                  className="relative group aspect-square rounded-lg overflow-hidden border-2 border-gray-200 hover:border-[#3e2626] transition-colors"
+                >
+                  <Image
+                    src={url}
+                    alt={`Imagem ${index + 2}`}
+                    fill
+                    className="object-cover"
+                  />
+                  {onRemoveExisting && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExisting(url)}
+                      className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1">
+                    <p className="text-white text-xs font-medium">{index + 2}</p>
+                  </div>
+                </div>
+              ))}
+
+              {/* Novas imagens restantes - só a partir da segunda */}
+              {previews.slice(1).map((preview, index) => (
+                <div
+                  key={`new-${index + 1}`}
+                  className="relative group aspect-square rounded-lg overflow-hidden border-2 border-green-200 hover:border-green-500 transition-colors"
+                >
+                  <Image
+                    src={preview}
+                    alt={`Nova imagem ${index + 2}`}
+                    fill
+                    className="object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveNew(index + 1)}
+                    className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-600/60 to-transparent p-1">
+                    <p className="text-white text-xs font-medium">{index + 2}</p>
+                  </div>
+                  <div className="absolute top-1 left-1 bg-green-500 text-white px-1 py-0.5 rounded text-xs font-medium">
+                    NOVA
+                  </div>
+                </div>
+              ))}
+
+              {/* Botão para adicionar mais */}
+              {canAddMore && (
+                <button
+                  type="button"
+                  onClick={handleClick}
+                  className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-[#3e2626] transition-colors flex flex-col items-center justify-center space-y-1 bg-gray-50 hover:bg-gray-100"
+                >
+                  <ImageIcon className="h-6 w-6 text-gray-400" />
+                  <p className="text-xs text-gray-500 font-medium">+</p>
+                </button>
+              )}
             </div>
           </div>
-        ))}
-
-        {/* Placeholder para adicionar mais */}
-        {canAddMore && (
-          <button
-            type="button"
-            onClick={handleClick}
-            className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-[#3e2626] transition-colors flex flex-col items-center justify-center space-y-2 bg-gray-50 hover:bg-gray-100"
-          >
-            <ImageIcon className="h-8 w-8 text-gray-400" />
-            <p className="text-xs text-gray-500 font-medium">Adicionar</p>
-            <p className="text-xs text-gray-400">até {maxImages - totalImages} mais</p>
-          </button>
         )}
-      </div>
 
-      {/* Dicas */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <p className="text-xs text-blue-800">
-          <strong>Dicas:</strong> Formatos aceitos: JPG, PNG, GIF, WebP. Tamanho máximo: 5MB por imagem.
-          A primeira imagem será a capa do produto.
-        </p>
+        {/* Botão para adicionar primeira imagem adicional */}
+        {canAddMore && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleClick}
+              className="flex items-center space-x-2 px-4 py-2 border-2 border-dashed border-gray-300 hover:border-[#3e2626] transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
+            >
+              <ImageIcon className="h-5 w-5 text-gray-400" />
+              <span className="text-sm text-gray-600 font-medium">Adicionar Imagem</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

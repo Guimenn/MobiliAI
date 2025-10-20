@@ -16,6 +16,7 @@ import ClientOnly from '@/components/ClientOnly';
 import HydrationBoundary from '@/components/HydrationBoundary';
 import NoSSR from '@/components/NoSSR';
 import ImageUpload from '@/components/ImageUpload';
+import UserAvatarUpload from '@/components/UserAvatarUpload';
 import { uploadMultipleProductImages, simulateImageUpload } from '@/lib/supabase';
 import { 
   Building2, 
@@ -28,6 +29,8 @@ import {
   TrendingUp, 
   Activity, 
   BarChart3,
+  Building,
+  CheckCircle,
   Zap, 
   Plus,
   UserCheck,
@@ -57,7 +60,9 @@ import {
   History,
   MapPin,
   Phone,
-  Mail
+  Mail,
+  Heart,
+  Star
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -429,6 +434,12 @@ export default function AdminDashboard() {
     window.location.href = '/login';
   };
 
+  const handleProductDeleted = (productId: string) => {
+    // Remover produto da lista local
+    setProducts(products.filter(p => p.id !== productId));
+    console.log('Produto removido da lista:', productId);
+  };
+
   // Função para filtrar usuários
   const getFilteredUsers = () => {
     if (!Array.isArray(users)) return [];
@@ -719,6 +730,7 @@ export default function AdminDashboard() {
             <UsersSection 
               users={users}
               isLoading={isLoading}
+              stores={stores}
             />
           )}
           
@@ -733,6 +745,7 @@ export default function AdminDashboard() {
             <AdminProductsSection 
               products={products}
               isLoading={isLoading}
+              onProductDeleted={handleProductDeleted}
             />
           )}
           
@@ -940,7 +953,7 @@ function DashboardContent({ stats, recentSales, topProducts, lastUpdated }: any)
 }
 
 // Componente da Seção de Usuários
-function UsersSection({ users, isLoading }: any) {
+function UsersSection({ users, isLoading, stores }: any) {
   // Estados para filtros
   const [userFilters, setUserFilters] = useState({
     role: 'all',
@@ -955,8 +968,16 @@ function UsersSection({ users, isLoading }: any) {
     email: '',
     password: '',
     role: 'CASHIER',
-    isActive: true
+    isActive: true,
+    cpf: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    storeId: ''
   });
+  const [userAvatar, setUserAvatar] = useState<File | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -974,6 +995,13 @@ function UsersSection({ users, isLoading }: any) {
       
       // Simulação de criação de usuário
       console.log('Criando usuário:', newUser);
+      console.log('Avatar:', userAvatar);
+      
+      // Aqui você pode implementar o upload do avatar se necessário
+      if (userAvatar) {
+        console.log('Avatar será enviado:', userAvatar.name);
+        // TODO: Implementar upload do avatar para o servidor
+      }
       
       // Simular delay da API
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -985,8 +1013,16 @@ function UsersSection({ users, isLoading }: any) {
         email: '',
         password: '',
         role: 'CASHIER',
-        isActive: true
+        isActive: true,
+        cpf: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        storeId: ''
       });
+      setUserAvatar(null);
       
       // Recarregar a página para mostrar o novo usuário
       window.location.reload();
@@ -1006,8 +1042,16 @@ function UsersSection({ users, isLoading }: any) {
       email: '',
       password: '',
       role: 'CASHIER',
-      isActive: true
+      isActive: true,
+      cpf: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      storeId: ''
     });
+    setUserAvatar(null);
   };
 
   // Função para filtrar usuários
@@ -1454,12 +1498,12 @@ function UsersSection({ users, isLoading }: any) {
           onClick={handleCloseModal}
         >
           <div 
-            className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-2xl border border-gray-200"
+            className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
             style={{ position: 'relative', zIndex: 10000 }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Novo Usuário</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">Novo Usuário</h3>
               <Button
                 variant="outline"
                 size="sm"
@@ -1470,106 +1514,260 @@ function UsersSection({ users, isLoading }: any) {
               </Button>
             </div>
 
-            <div className="space-y-4">
-              {/* Nome */}
-              <div>
-                <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                  Nome Completo *
-                </Label>
-                <Input
-                  id="name"
-                  type="text"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Digite o nome completo"
-                  className="mt-1"
-                />
+            <div className="space-y-6">
+              {/* Informações Básicas */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                  <User className="h-5 w-5 mr-2 text-[#3e2626]" />
+                  Informações Básicas
+                </h4>
+                
+                {/* Upload de Avatar */}
+                <div className="mb-6">
+                  <UserAvatarUpload
+                    avatar={userAvatar}
+                    onAvatarChange={setUserAvatar}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Nome */}
+                  <div>
+                    <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                      Nome Completo *
+                    </Label>
+                    <Input
+                      id="name"
+                      type="text"
+                      value={newUser.name}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Digite o nome completo"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                      Email *
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="Digite o email"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Senha */}
+                  <div>
+                    <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                      Senha *
+                    </Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="Digite a senha"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* CPF */}
+                  <div>
+                    <Label htmlFor="cpf" className="text-sm font-medium text-gray-700">
+                      CPF
+                    </Label>
+                    <Input
+                      id="cpf"
+                      type="text"
+                      value={newUser.cpf || ''}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, cpf: e.target.value }))}
+                      placeholder="000.000.000-00"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Telefone */}
+                  <div>
+                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
+                      Telefone
+                    </Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={newUser.phone || ''}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder="(11) 99999-9999"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Cargo */}
+                  <div>
+                    <Label htmlFor="role" className="text-sm font-medium text-gray-700">
+                      Cargo *
+                    </Label>
+                    <select
+                      id="role"
+                      value={newUser.role}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value }))}
+                      className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent"
+                    >
+                      <option value="CUSTOMER">Cliente</option>
+                      <option value="CASHIER">Funcionário</option>
+                      <option value="STORE_MANAGER">Gerente</option>
+                      <option value="ADMIN">Administrador</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              {/* Email */}
-              <div>
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                  Email *
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="Digite o email"
-                  className="mt-1"
-                />
+              {/* Endereço */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                  <MapPin className="h-5 w-5 mr-2 text-[#3e2626]" />
+                  Endereço
+                </h4>
+                <div className="space-y-4">
+                  {/* Endereço */}
+                  <div>
+                    <Label htmlFor="address" className="text-sm font-medium text-gray-700">
+                      Endereço
+                    </Label>
+                    <Input
+                      id="address"
+                      type="text"
+                      value={newUser.address || ''}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, address: e.target.value }))}
+                      placeholder="Rua, número, bairro"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Cidade */}
+                    <div>
+                      <Label htmlFor="city" className="text-sm font-medium text-gray-700">
+                        Cidade
+                      </Label>
+                      <Input
+                        id="city"
+                        type="text"
+                        value={newUser.city || ''}
+                        onChange={(e) => setNewUser(prev => ({ ...prev, city: e.target.value }))}
+                        placeholder="Cidade"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    {/* Estado */}
+                    <div>
+                      <Label htmlFor="state" className="text-sm font-medium text-gray-700">
+                        Estado
+                      </Label>
+                      <Input
+                        id="state"
+                        type="text"
+                        value={newUser.state || ''}
+                        onChange={(e) => setNewUser(prev => ({ ...prev, state: e.target.value }))}
+                        placeholder="Estado"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    {/* CEP */}
+                    <div>
+                      <Label htmlFor="zipCode" className="text-sm font-medium text-gray-700">
+                        CEP
+                      </Label>
+                      <Input
+                        id="zipCode"
+                        type="text"
+                        value={newUser.zipCode || ''}
+                        onChange={(e) => setNewUser(prev => ({ ...prev, zipCode: e.target.value }))}
+                        placeholder="00000-000"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Senha */}
-              <div>
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">
-                  Senha *
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="Digite a senha"
-                  className="mt-1"
-                />
-              </div>
-
-              {/* Cargo */}
-              <div>
-                <Label htmlFor="role" className="text-sm font-medium text-gray-700">
-                  Cargo *
-                </Label>
-                <select
-                  id="role"
-                  value={newUser.role}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent"
-                >
-                  <option value="CASHIER">Funcionário</option>
-                  <option value="STORE_MANAGER">Gerente</option>
-                </select>
-              </div>
+              {/* Atribuição de Loja (para funcionários e gerentes) */}
+              {(newUser.role === 'CASHIER' || newUser.role === 'STORE_MANAGER') && (
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <Building className="h-5 w-5 mr-2 text-[#3e2626]" />
+                    Atribuição de Loja
+                  </h4>
+                  <div>
+                    <Label htmlFor="storeId" className="text-sm font-medium text-gray-700">
+                      Loja de Atuação
+                    </Label>
+                    <select
+                      id="storeId"
+                      value={newUser.storeId || ''}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, storeId: e.target.value }))}
+                      className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent"
+                    >
+                      <option value="">Selecione uma loja</option>
+                      {stores.map((store: any) => (
+                        <option key={store.id} value={store.id}>
+                          {store.name} - {store.city}/{store.state}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               {/* Status */}
-              <div className="flex items-center space-x-2">
-                <input
-                  id="isActive"
-                  type="checkbox"
-                  checked={newUser.isActive}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, isActive: e.target.checked }))}
-                  className="h-4 w-4 text-[#3e2626] focus:ring-[#3e2626] border-gray-300 rounded"
-                />
-                <Label htmlFor="isActive" className="text-sm text-gray-700">
-                  Usuário ativo
-                </Label>
+              <div className="bg-green-50 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                  <CheckCircle className="h-5 w-5 mr-2 text-[#3e2626]" />
+                  Status da Conta
+                </h4>
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={newUser.isActive}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, isActive: e.target.checked }))}
+                      className="mr-2"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Conta Ativa</span>
+                  </label>
+                </div>
               </div>
-            </div>
 
-            {/* Botões */}
-            <div className="flex items-center justify-end space-x-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={handleCloseModal}
-                disabled={isCreating}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleCreateUser}
-                disabled={isCreating}
-                className="bg-[#3e2626] hover:bg-[#2a1a1a] text-white"
-              >
-                {isCreating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Criando...
-                  </>
-                ) : (
-                  'Criar Usuário'
-                )}
-              </Button>
+              {/* Botões */}
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={handleCloseModal}
+                  disabled={isCreating}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCreateUser}
+                  disabled={isCreating}
+                  className="bg-[#3e2626] hover:bg-[#8B4513]"
+                >
+                  {isCreating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Criando...
+                    </>
+                  ) : (
+                    'Criar Usuário'
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -2757,8 +2955,8 @@ function CustomersSection({ customers, isLoading }: any) {
         </CardContent>
       </Card>
 
-      {/* Customer View Modal */}
-      {isModalOpen && selectedCustomer && (
+      {/* Customer View Modal - TODO: Implementar componente */}
+      {/* {isModalOpen && selectedCustomer && (
         <CustomerViewModal
           customer={selectedCustomer}
           isOpen={isModalOpen}
@@ -2767,7 +2965,7 @@ function CustomersSection({ customers, isLoading }: any) {
             setSelectedCustomer(null);
           }}
         />
-      )}
+      )} */}
     </div>
   );
 }

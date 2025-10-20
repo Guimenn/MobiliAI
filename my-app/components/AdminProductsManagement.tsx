@@ -111,6 +111,30 @@ export default function AdminProductsManagement() {
     setSelectedProduct(null);
   };
 
+  const handleDeleteProduct = async (product: any) => {
+    // Mostrar confirmação com botões Sim/Não
+    const confirmDelete = confirm(`Deseja realmente excluir o produto "${product.name}"?`);
+    
+    if (confirmDelete) {
+      try {
+        console.log('🗑️ Excluindo produto:', product.id);
+        
+        // Chamar API para deletar o produto
+        await adminAPI.deleteProduct(product.id);
+        
+        // Remover da lista local
+        setProducts(products.filter(p => p.id !== product.id));
+        
+        // Mostrar mensagem de sucesso
+        alert('Produto excluído com sucesso!');
+        
+      } catch (error: any) {
+        console.error('❌ Erro ao excluir produto:', error);
+        alert('Erro ao excluir produto. Tente novamente.');
+      }
+    }
+  };
+
   const handleProductUpdated = (updatedProduct: any) => {
     setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
   };
@@ -349,7 +373,7 @@ export default function AdminProductsManagement() {
                     variant="outline" 
                     size="sm" 
                     className="text-red-600 hover:text-red-700"
-                    onClick={() => handleEditProduct(product)}
+                    onClick={() => handleDeleteProduct(product)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
