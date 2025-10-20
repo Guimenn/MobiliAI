@@ -22,9 +22,10 @@ import AdminProductModal from './AdminProductModal';
 interface AdminProductsSectionProps {
   products: any[];
   isLoading: boolean;
+  onProductDeleted?: (productId: string) => void;
 }
 
-export default function AdminProductsSection({ products, isLoading }: AdminProductsSectionProps) {
+export default function AdminProductsSection({ products, isLoading, onProductDeleted }: AdminProductsSectionProps) {
   // Estados para filtros
   const [productFilters, setProductFilters] = useState({
     category: 'all',
@@ -35,7 +36,7 @@ export default function AdminProductsSection({ products, isLoading }: AdminProdu
   // Estados para o modal de produto
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
+  const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('view');
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -87,6 +88,32 @@ export default function AdminProductsSection({ products, isLoading }: AdminProdu
     setSelectedProduct(null);
   };
 
+  const handleDeleteProduct = async (product: any) => {
+    // Mostrar confirmação com botões Sim/Não
+    const confirmDelete = confirm(`Deseja realmente excluir o produto "${product.name}"?`);
+    
+    if (confirmDelete) {
+      try {
+        console.log('🗑️ Excluindo produto:', product.id);
+        
+        // Chamar API para deletar o produto
+        await adminAPI.deleteProduct(product.id);
+        
+        // Notificar o componente pai para atualizar a lista
+        if (onProductDeleted) {
+          onProductDeleted(product.id);
+        }
+        
+        // Mostrar mensagem de sucesso
+        alert('Produto excluído com sucesso!');
+        
+      } catch (error: any) {
+        console.error('❌ Erro ao excluir produto:', error);
+        alert('Erro ao excluir produto. Tente novamente.');
+      }
+    }
+  };
+
   const handleProductUpdated = (updatedProduct: any) => {
     // Esta função será chamada pelo modal quando um produto for atualizado
     // O componente pai (dashboard) deve lidar com a atualização da lista
@@ -97,6 +124,17 @@ export default function AdminProductsSection({ products, isLoading }: AdminProdu
     // Esta função será chamada pelo modal quando um produto for excluído
     // O componente pai (dashboard) deve lidar com a atualização da lista
     console.log('Produto excluído:', productId);
+  };
+
+  const handleCreateProduct = () => {
+    setSelectedProduct(null);
+    setModalMode('create');
+    setIsModalOpen(true);
+  };
+
+  const handleRefreshProducts = () => {
+    // Recarregar a página para atualizar os dados
+    window.location.reload();
   };
 
   const formatPrice = (price: number) => {
@@ -143,10 +181,14 @@ export default function AdminProductsSection({ products, isLoading }: AdminProdu
             <Button 
               variant="secondary" 
               className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+              onClick={handleRefreshProducts}
             >
               Atualizar
             </Button>
-            <Button className="bg-white text-[#3e2626] hover:bg-gray-100">
+            <Button 
+              className="bg-white text-[#3e2626] hover:bg-gray-100"
+              onClick={handleCreateProduct}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Novo Produto
             </Button>
@@ -385,7 +427,7 @@ export default function AdminProductsSection({ products, isLoading }: AdminProdu
                     variant="outline" 
                     size="sm" 
                     className="text-red-600 hover:text-red-700"
-                    onClick={() => handleEditProduct(product)}
+                    onClick={() => handleDeleteProduct(product)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

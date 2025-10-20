@@ -24,7 +24,6 @@ const nextConfig: NextConfig = {
   },
   // Configurações para reduzir problemas de hidratação
   reactStrictMode: true,
-  swcMinify: true,
 };
 
 export default nextConfig;
