@@ -501,6 +501,19 @@ export const adminAPI = {
     return response.data;
   },
 
+  // Customers
+  getCustomers: async (page = 1, limit = 10, search = '') => {
+    const response = await api.get('/admin/customers', {
+      params: { page, limit, search }
+    });
+    return response.data;
+  },
+
+  getCustomerById: async (id: string) => {
+    const response = await api.get(`/admin/customers/${id}`);
+    return response.data;
+  },
+
 
   // Reports
   getSalesReport: async (startDate?: string, endDate?: string, storeId?: string) => {

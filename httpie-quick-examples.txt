@@ -154,3 +154,4 @@ tail -f testando-nanobanana/nohup.out
 curl http://localhost:3005/
 ping localhost
 
+

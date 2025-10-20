@@ -2,11 +2,13 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { Product, ProductCategory, User, UserRole } from '@prisma/client';
 import { CreateProductDto, UpdateProductDto } from '../dto/product.dto';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private prisma: PrismaService,
+    private uploadService: UploadService,
   ) {}
 
   async create(createProductDto: CreateProductDto, currentUser: User): Promise<Product> {
@@ -18,6 +20,36 @@ export class ProductsService {
     return this.prisma.product.create({
       data: createProductDto as any,
     });
+  }
+
+  async createWithImages(createProductDto: CreateProductDto, files: Express.Multer.File[], currentUser: User): Promise<Product> {
+    // Apenas funcionários podem criar produtos
+    if (currentUser.role === UserRole.CUSTOMER) {
+      throw new ForbiddenException('Acesso negado');
+    }
+
+    // Criar produto primeiro
+    const product = await this.prisma.product.create({
+      data: createProductDto as any,
+    });
+
+    // Se há imagens, fazer upload
+    if (files && files.length > 0) {
+      const imageUrls = await this.uploadService.uploadMultipleProductImages(files, product.id);
+      
+      // Atualizar produto com as imagens
+      await this.prisma.product.update({
+        where: { id: product.id },
+        data: { 
+          imageUrls,
+          imageUrl: imageUrls[0] // Primeira imagem como principal
+        },
+      });
+
+      return this.findOne(product.id, currentUser);
+    }
+
+    return product;
   }
 
   async findAll(currentUser: User, storeId?: string): Promise<Product[]> {
@@ -191,5 +223,68 @@ export class ProductsService {
 
     // Filtrar produtos com estoque baixo
     return products.filter(product => product.stock <= product.minStock);
+  }
+
+  async uploadProductImage(id: string, file: Express.Multer.File, currentUser: User): Promise<Product> {
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product) {
+      throw new NotFoundException('Produto não encontrado');
+    }
+
+    // Verificar se o usuário tem acesso ao produto
+    if (currentUser.role !== UserRole.ADMIN && product.storeId !== currentUser.storeId) {
+      throw new ForbiddenException('Acesso negado');
+    }
+
+    // Apenas funcionários podem fazer upload de imagens
+    if (currentUser.role === UserRole.CUSTOMER) {
+      throw new ForbiddenException('Acesso negado');
+    }
+
+    // Fazer upload da imagem
+    const imageUrl = await this.uploadService.uploadProductImage(file, id);
+
+    // Atualizar produto com a nova imagem
+    await this.prisma.product.update({
+      where: { id },
+      data: { imageUrl },
+    });
+
+    return this.findOne(id, currentUser);
+  }
+
+  async uploadProductImages(id: string, files: Express.Multer.File[], currentUser: User): Promise<Product> {
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product) {
+      throw new NotFoundException('Produto não encontrado');
+    }
+
+    // Verificar se o usuário tem acesso ao produto
+    if (currentUser.role !== UserRole.ADMIN && product.storeId !== currentUser.storeId) {
+      throw new ForbiddenException('Acesso negado');
+    }
+
+    // Apenas funcionários podem fazer upload de imagens
+    if (currentUser.role === UserRole.CUSTOMER) {
+      throw new ForbiddenException('Acesso negado');
+    }
+
+    // Fazer upload das imagens
+    const imageUrls = await this.uploadService.uploadMultipleProductImages(files, id);
+
+    // Combinar com imagens existentes
+    const existingImages = product.imageUrls || [];
+    const allImageUrls = [...existingImages, ...imageUrls];
+
+    // Atualizar produto com as novas imagens
+    await this.prisma.product.update({
+      where: { id },
+      data: { 
+        imageUrls: allImageUrls,
+        imageUrl: allImageUrls[0] // Primeira imagem como principal
+      },
+    });
+
+    return this.findOne(id, currentUser);
   }
 }

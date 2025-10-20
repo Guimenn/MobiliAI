@@ -18,6 +18,7 @@ import { AdminModule } from './admin/admin.module';
 import { ManagerModule } from './manager/manager.module';
 import { EmployeeModule } from './employee/employee.module';
 import { CustomerModule } from './customer/customer.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { CustomerModule } from './customer/customer.module';
     ManagerModule,
     EmployeeModule,
     CustomerModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

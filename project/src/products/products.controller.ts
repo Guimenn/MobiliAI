@@ -1,4 +1,19 @@
-    import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
+import { 
+  Controller, 
+  Get, 
+  Post, 
+  Body, 
+  Patch, 
+  Param, 
+  Delete, 
+  UseGuards, 
+  Request, 
+  Query,
+  UseInterceptors,
+  UploadedFile,
+  UploadedFiles
+} from '@nestjs/common';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto } from '../dto/product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -12,6 +27,36 @@ export class ProductsController {
   @Post()
   create(@Body() createProductDto: CreateProductDto, @Request() req) {
     return this.productsService.create(createProductDto, req.user);
+  }
+
+  @Post('with-images')
+  @UseInterceptors(FilesInterceptor('images', 10))
+  createWithImages(
+    @Body() createProductDto: CreateProductDto,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Request() req
+  ) {
+    return this.productsService.createWithImages(createProductDto, files, req.user);
+  }
+
+  @Post(':id/upload-image')
+  @UseInterceptors(FileInterceptor('image'))
+  uploadImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req
+  ) {
+    return this.productsService.uploadProductImage(id, file, req.user);
+  }
+
+  @Post(':id/upload-images')
+  @UseInterceptors(FilesInterceptor('images', 10))
+  uploadImages(
+    @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Request() req
+  ) {
+    return this.productsService.uploadProductImages(id, files, req.user);
   }
 
   @Get()

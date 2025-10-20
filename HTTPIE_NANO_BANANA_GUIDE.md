@@ -329,3 +329,4 @@ http -f POST :3005/api/process-upload prompt="adicione móveis" image@imagem.jpg
 # Ver resposta bonita
 http POST :3005/api/process-url prompt="azul" imageUrl="URL" | jq
 ```
+

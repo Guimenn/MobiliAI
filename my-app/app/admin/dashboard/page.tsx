@@ -9,7 +9,9 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { adminAPI } from '@/lib/api';
+import { adminAPI } from '@/lib/api-admin';
+import AdminProductsSection from '@/components/AdminProductsSection';
+import { useAppStore } from '@/lib/store';
 import ClientOnly from '@/components/ClientOnly';
 import HydrationBoundary from '@/components/HydrationBoundary';
 import NoSSR from '@/components/NoSSR';
@@ -20,7 +22,7 @@ import {
   Bell, 
   LogOut, 
   Users, 
-  Store, 
+  Store,      
   Package, 
   DollarSign, 
   TrendingUp, 
@@ -60,6 +62,7 @@ import {
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { user: currentUser, token } = useAppStore();
   const [user, setUser] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -76,6 +79,7 @@ export default function AdminDashboard() {
   const [stores, setStores] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [sales, setSales] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   
   // Filtros para usuários
   const [userFilters, setUserFilters] = useState({
@@ -126,28 +130,28 @@ export default function AdminDashboard() {
       console.log('🔄 Tentando carregar dados do backend...');
       
       // Buscar dados reais do banco
-      const [overviewStats, recentSalesData, topProductsData] = await Promise.all([
-        adminAPI.getOverviewStats(),
-        adminAPI.getRecentSales(),
-        adminAPI.getTopProducts()
-      ]);
+      // const [overviewStats, recentSalesData, topProductsData] = await Promise.all([
+      //   adminAPI.getOverviewStats(),
+      //   adminAPI.getRecentSales(),
+      //   adminAPI.getTopProducts()
+      // ]);
 
       console.log('✅ Dados carregados com sucesso do backend');
 
       // Atualizar estatísticas com dados reais
-      setStats({
-        totalUsers: overviewStats.totalUsers || 0,
-        totalStores: overviewStats.totalStores || 0,
-        totalProducts: overviewStats.totalProducts || 0,
-        monthlyRevenue: overviewStats.monthlyRevenue || 0,
-        activeStores: overviewStats.activeStores || 0
-      });
+      // setStats({
+      //   totalUsers: overviewStats.totalUsers || 0,
+      //   totalStores: overviewStats.totalStores || 0,
+      //   totalProducts: overviewStats.totalProducts || 0,
+      //   monthlyRevenue: overviewStats.monthlyRevenue || 0,
+      //   activeStores: overviewStats.activeStores || 0
+      // });
 
       // Atualizar vendas recentes com dados reais
-      setRecentSales(recentSalesData || []);
+      // setRecentSales(recentSalesData || []);
       
       // Atualizar produtos mais vendidos
-      setTopProducts(topProductsData || []);
+      // setTopProducts(topProductsData || []);
       
       // Atualizar timestamp da última atualização
       setLastUpdated(new Date());
@@ -211,7 +215,8 @@ export default function AdminDashboard() {
         case 'users':
           console.log('Buscando usuários...');
           try {
-            const usersData = await adminAPI.getUsers();
+            const response = await adminAPI.getUsers(token || '');
+            const usersData = response.ok ? await response.json() : null;
             console.log('Dados de usuários recebidos:', usersData);
             
             // Verificar se os dados estão em usersData.users ou se é um array direto
@@ -247,71 +252,40 @@ export default function AdminDashboard() {
           break;
         case 'stores':
           console.log('Buscando lojas...');
-          const storesData = await adminAPI.getStores();
+            const response = await adminAPI.getStores(token || '');
+            const storesData = response.ok ? await response.json() : null;
           console.log('Dados de lojas recebidos:', storesData);
           setStores(Array.isArray(storesData) ? storesData : []);
           break;
         case 'products':
           console.log('Buscando produtos...');
           try {
-            const productsData = await adminAPI.getProducts();
+            const productsData = await adminAPI.getProducts(token || '');
             console.log('Dados de produtos recebidos:', productsData);
             
             // Verificar se os dados estão em productsData.products ou se é um array direto
             const productsArray = productsData?.products || productsData;
             setProducts(Array.isArray(productsArray) ? productsArray : []);
           } catch (error) {
-            console.log('Erro na API de produtos, usando dados mock');
-            // Dados mock para teste
-            setProducts([
-              {
-                id: 1,
-                name: 'Tinta Branca Premium',
-                category: 'Tintas',
-                price: 89.90,
-                stock: 50,
-                isActive: true,
-                sku: 'TIN-001'
-              },
-              {
-                id: 2,
-                name: 'Pincel Chato 2"',
-                category: 'Pincéis',
-                price: 15.50,
-                stock: 25,
-                isActive: true,
-                sku: 'PIN-002'
-              },
-              {
-                id: 3,
-                name: 'Rolo de Pintura',
-                category: 'Rolos',
-                price: 22.90,
-                stock: 30,
-                isActive: true,
-                sku: 'ROL-003'
-              },
-              {
-                id: 4,
-                name: 'Fita Crepe',
-                category: 'Acessórios',
-                price: 8.90,
-                stock: 100,
-                isActive: true,
-                sku: 'FIT-004'
-              }
-            ]);
+            console.error('Erro ao carregar produtos:', error);
+            setProducts([]);
+            // Mostrar erro para o usuário
+            const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+            alert(`Erro ao carregar produtos: ${errorMessage}`);
           }
             break;
         case 'sales':
           console.log('Buscando vendas...');
           try {
-            const salesData = await adminAPI.getRecentSales();
-            console.log('Dados de vendas recebidos:', salesData);
+            // const salesData = await adminAPI.getRecentSales();
+            // console.log('Dados de vendas recebidos:', salesData);
             
             // Verificar se os dados estão em salesData.sales ou se é um array direto
-            const salesArray = salesData?.sales || salesData;
-            setSales(Array.isArray(salesArray) ? salesArray : []);
+            // const salesArray = salesData?.sales || salesData;
+            // setSales(Array.isArray(salesArray) ? salesArray : []);
+            
+            // Usar dados mock por enquanto
+            setSales([]);
           } catch (error) {
             console.log('Erro na API de vendas, usando dados mock');
             // Dados mock para teste
@@ -343,6 +317,71 @@ export default function AdminDashboard() {
             ]);
           }
             break;
+        case 'customers':
+          console.log('Buscando clientes...');
+          try {
+            // Usar dados mock para desenvolvimento
+            setCustomers([
+              {
+                id: '1',
+                name: 'João Silva',
+                email: 'joao@email.com',
+                phone: '(11) 99999-9999',
+                address: 'Rua das Flores, 123',
+                city: 'São Paulo',
+                state: 'SP',
+                zipCode: '01234-567',
+                cpf: '123.456.789-00',
+                isActive: true,
+                createdAt: '2024-01-15T10:00:00Z',
+                updatedAt: '2024-01-15T10:00:00Z',
+                role: 'CUSTOMER',
+                _count: {
+                  purchases: 5,
+                  favorites: 12,
+                  reviews: 3
+                }
+              },
+              {
+                id: '2',
+                name: 'Maria Santos',
+                email: 'maria@email.com',
+                phone: '(11) 88888-8888',
+                address: 'Av. Paulista, 456',
+                city: 'São Paulo',
+                state: 'SP',
+                zipCode: '01310-100',
+                isActive: true,
+                createdAt: '2024-02-10T14:30:00Z',
+                updatedAt: '2024-02-10T14:30:00Z',
+                role: 'CUSTOMER',
+                _count: {
+                  purchases: 8,
+                  favorites: 25,
+                  reviews: 6
+                }
+              },
+              {
+                id: '3',
+                name: 'Pedro Costa',
+                email: 'pedro@email.com',
+                phone: '(11) 77777-7777',
+                isActive: false,
+                createdAt: '2024-03-05T09:15:00Z',
+                updatedAt: '2024-03-05T09:15:00Z',
+                role: 'CUSTOMER',
+                _count: {
+                  purchases: 2,
+                  favorites: 5,
+                  reviews: 1
+                }
+              }
+            ]);
+          } catch (error) {
+            console.error('Erro ao carregar clientes:', error);
+            setCustomers([]);
+          }
+          break;
         case 'reports':
           // Carregar dados de relatórios se necessário
             break;
@@ -560,6 +599,18 @@ export default function AdminDashboard() {
                   <ChevronDown className="h-4 w-4 ml-auto" />
                 </div>
                 <div 
+                  onClick={() => handleSectionChange('customers')}
+                  className={`flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer ${
+                    activeSection === 'customers' 
+                      ? 'bg-[#3e2626] text-white' 
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <User className="h-4 w-4 mr-3" />
+                  Clientes
+                  <ChevronDown className="h-4 w-4 ml-auto" />
+                </div>
+                <div 
                   onClick={() => handleSectionChange('settings')}
                   className={`flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer ${
                     activeSection === 'settings' 
@@ -679,7 +730,7 @@ export default function AdminDashboard() {
           )}
           
           {activeSection === 'products' && (
-            <ProductsSection 
+            <AdminProductsSection 
               products={products}
               isLoading={isLoading}
             />
@@ -688,6 +739,13 @@ export default function AdminDashboard() {
           {activeSection === 'sales' && (
             <SalesSection 
               sales={sales}
+              isLoading={isLoading}
+            />
+          )}
+          
+          {activeSection === 'customers' && (
+            <CustomersSection 
+              customers={customers}
               isLoading={isLoading}
             />
           )}
@@ -2241,180 +2299,97 @@ function StoresSection({ stores, isLoading }: any) {
   );
 }
 
-// Componente da Seção de Produtos
-function ProductsSection({ products, isLoading }: any) {
+// Componente da Seção de Clientes
+function CustomersSection({ customers, isLoading }: any) {
   // Estados para filtros
-  const [productFilters, setProductFilters] = useState({
-    category: 'all',
+  const [customerFilters, setCustomerFilters] = useState({
     status: 'all',
     search: ''
   });
-
-  // Estados para modal de novo produto
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newProduct, setNewProduct] = useState({
-    name: '',
-    description: '',
-    category: 'Tintas',
-    price: 0,
-    stock: 0,
-    sku: '',
-    isActive: true,
-    brand: '',
-    unit: 'un',
-    minStock: 10,
-    maxStock: 100,
-    supplier: '',
-    barcode: '',
-    observations: ''
-  });
-  const [productImages, setProductImages] = useState<File[]>([]);
-  const [isCreating, setIsCreating] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Função para criar novo produto
-  const handleCreateProduct = async () => {
-    console.log('🚀 Iniciando criação de produto...');
-    console.log('📋 Dados do produto:', newProduct);
-    console.log('🖼️ Imagens selecionadas:', productImages.length);
+  // Função para filtrar clientes
+  const getFilteredCustomers = () => {
+    if (!Array.isArray(customers)) return [];
     
-    if (!newProduct.name || !newProduct.category || newProduct.price <= 0) {
-      alert('❌ Por favor, preencha todos os campos obrigatórios:\n- Nome do produto\n- Categoria\n- Preço maior que zero');
-      return;
-    }
-
-    setIsCreating(true);
-    try {
-      // Gerar ID temporário para o produto
-      const tempProductId = `prod_${Date.now()}`;
-      console.log('🆔 ID do produto:', tempProductId);
-      
-      // Upload das imagens para o Supabase
-      let imageUrls: string[] = [];
-      if (productImages.length > 0) {
-        console.log(`📤 Fazendo upload de ${productImages.length} imagens...`);
-        try {
-          // Tentar upload real primeiro
-          imageUrls = await uploadMultipleProductImages(productImages, tempProductId);
-          console.log('✅ Imagens enviadas com sucesso:', imageUrls);
-          
-          // Se não conseguiu fazer upload real, usar simulação
-          if (imageUrls.length === 0 || imageUrls.every(url => url.includes('placeholder'))) {
-            console.log('🔄 Usando simulação de upload...');
-            const simulationPromises = productImages.map(file => simulateImageUpload(file, tempProductId));
-            imageUrls = await Promise.all(simulationPromises);
-            console.log('🎭 Imagens simuladas:', imageUrls);
-          }
-        } catch (uploadError) {
-          console.error('❌ Erro no upload das imagens:', uploadError);
-          console.log('🔄 Tentando simulação de upload...');
-          try {
-            const simulationPromises = productImages.map(file => simulateImageUpload(file, tempProductId));
-            imageUrls = await Promise.all(simulationPromises);
-            console.log('🎭 Upload simulado concluído:', imageUrls);
-          } catch (simError) {
-            console.error('❌ Erro na simulação:', simError);
-            alert('⚠️ Erro ao processar imagens. Produto será criado sem imagens.');
-          }
-        }
-      } else {
-        console.log('ℹ️ Nenhuma imagem selecionada');
-      }
-      
-      // Criar objeto do produto com as URLs das imagens
-      const productData = {
-        ...newProduct,
-        images: imageUrls,
-        id: tempProductId,
-        createdAt: new Date().toISOString()
-      };
-      
-      console.log('📦 Dados finais do produto:', productData);
-      
-      // Aqui você pode integrar com a API real
-      // const response = await adminAPI.createProduct(productData);
-      
-      // Simulação de criação de produto
-      console.log('💾 Salvando produto no banco de dados...');
-      
-      // Simular delay da API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      console.log('🎉 Produto criado com sucesso!');
-      alert(`✅ Produto "${newProduct.name}" criado com sucesso!\n\n📊 Detalhes:\n- Categoria: ${newProduct.category}\n- Preço: R$ ${newProduct.price.toFixed(2)}\n- Imagens: ${imageUrls.length}\n- SKU: ${newProduct.sku || 'Não informado'}`);
-      
-      handleCloseModal();
-      
-      // Recarregar a página para mostrar o novo produto
-      window.location.reload();
-    } catch (error) {
-      console.error('❌ Erro ao criar produto:', error);
-      alert(`❌ Erro ao criar produto: ${error instanceof Error ? error.message : 'Erro desconhecido'}\n\nVerifique o console para mais detalhes.`);
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  // Função para fechar modal
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setNewProduct({
-      name: '',
-      description: '',
-      category: 'Tintas',
-      price: 0,
-      stock: 0,
-      sku: '',
-      isActive: true,
-      brand: '',
-      unit: 'un',
-      minStock: 10,
-      maxStock: 100,
-      supplier: '',
-      barcode: '',
-      observations: ''
-    });
-    setProductImages([]);
-  };
-
-  // Função para filtrar produtos
-  const getFilteredProducts = () => {
-    if (!Array.isArray(products)) return [];
-    
-    return products
-      .filter((product: any) => {
-        // Filtro por categoria
-        if (productFilters.category !== 'all' && product.category !== productFilters.category) {
-          return false;
-        }
-        
+    return customers
+      .filter((customer: any) => {
         // Filtro por status
-        if (productFilters.status !== 'all') {
-          if (productFilters.status === 'active' && !product.isActive) return false;
-          if (productFilters.status === 'inactive' && product.isActive) return false;
+        if (customerFilters.status !== 'all') {
+          if (customerFilters.status === 'active' && !customer.isActive) return false;
+          if (customerFilters.status === 'inactive' && customer.isActive) return false;
         }
         
         // Filtro por busca
-        if (productFilters.search) {
-          const searchTerm = productFilters.search.toLowerCase();
+        if (customerFilters.search) {
+          const searchTerm = customerFilters.search.toLowerCase();
           return (
-            product.name?.toLowerCase().includes(searchTerm) ||
-            product.description?.toLowerCase().includes(searchTerm) ||
-            product.sku?.toLowerCase().includes(searchTerm) ||
-            product.category?.toLowerCase().includes(searchTerm)
+            customer.name?.toLowerCase().includes(searchTerm) ||
+            customer.email?.toLowerCase().includes(searchTerm) ||
+            customer.phone?.toLowerCase().includes(searchTerm)
           );
         }
         
         return true;
       })
-      .sort((a: any, b: any) => a.name.localeCompare(b.name));
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   };
 
-  // Função para obter status do estoque
-  const getStockStatus = (stock: number) => {
-    if (stock === 0) return { label: 'Sem Estoque', color: 'bg-red-100 text-red-800' };
-    if (stock < 10) return { label: 'Estoque Baixo', color: 'bg-yellow-100 text-yellow-800' };
-    return { label: 'Em Estoque', color: 'bg-green-100 text-green-800' };
+  const handleViewCustomer = (customer: any) => {
+    // Simular dados detalhados do cliente
+    const detailedCustomer = {
+      ...customer,
+      purchases: [
+        {
+          id: '1',
+          saleNumber: 'VND-001',
+          totalAmount: 1250.00,
+          status: 'COMPLETED',
+          paymentMethod: 'PIX',
+          createdAt: '2024-01-20T10:00:00Z',
+          items: [
+            {
+              id: '1',
+              quantity: 1,
+              unitPrice: 1250.00,
+              totalPrice: 1250.00,
+              product: {
+                name: 'Sofá 3 Lugares',
+                category: 'SOFA'
+              }
+            }
+          ]
+        }
+      ],
+      favorites: [
+        {
+          id: '1',
+          createdAt: '2024-01-15T10:00:00Z',
+          product: {
+            name: 'Mesa de Jantar',
+            price: 899.90,
+            category: 'MESA'
+          }
+        }
+      ],
+      reviews: [
+        {
+          id: '1',
+          rating: 5,
+          title: 'Excelente produto!',
+          comment: 'Muito satisfeito com a compra, produto de ótima qualidade.',
+          createdAt: '2024-01-25T10:00:00Z',
+          product: {
+            name: 'Sofá 3 Lugares'
+          }
+        }
+      ]
+    };
+    
+    setSelectedCustomer(detailedCustomer);
+    setIsModalOpen(true);
   };
 
   if (isLoading) {
@@ -2422,14 +2397,14 @@ function ProductsSection({ products, isLoading }: any) {
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando produtos...</p>
+          <p className="text-gray-600">Carregando clientes...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100"> 
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
         <div className="w-full">
@@ -2437,11 +2412,11 @@ function ProductsSection({ products, isLoading }: any) {
             <div className="space-y-4">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Package className="h-6 w-6 text-white" />
-              </div>
+                  <User className="h-6 w-6 text-white" />
+                </div>
                 <div className="text-left">
-                  <h1 className="text-3xl font-bold">Gestão de Produtos</h1>
-                  <p className="text-white/80 text-lg">Gerencie o catálogo de produtos da empresa</p>
+                  <h1 className="text-3xl font-bold">Gestão de Clientes</h1>
+                  <p className="text-white/80 text-lg">Visualize e gerencie informações dos clientes</p>
                 </div>
               </div>
             </div>
@@ -2455,66 +2430,23 @@ function ProductsSection({ products, isLoading }: any) {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Atualizar
               </Button>
-              <Button 
-                onClick={() => setIsModalOpen(true)}
-                className="bg-white text-[#3e2626] hover:bg-white/90 font-semibold px-6 py-2 rounded-xl"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-          Novo Produto
-                </Button>
             </div>
           </div>
         </div>
-            </div>
-
-      {/* Stats Cards - Brand Colors */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg hover:shadow-xl hover:border-[#3e2626]/30 transition-all duration-300">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total</p>
-                <p className="text-3xl font-bold text-[#3e2626]">
-                  {products.length}
-                </p>
-                <p className="text-xs text-[#3e2626]/70">Produtos cadastrados</p>
-                  </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                <Package className="h-8 w-8 text-white" />
-              </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-        <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg hover:shadow-xl hover:border-[#3e2626]/30 transition-all duration-300">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Ativos</p>
-                <p className="text-3xl font-bold text-[#3e2626]">
-                  {products.filter((p: any) => p.isActive).length}
-                </p>
-                <p className="text-xs text-[#3e2626]/70">Disponíveis</p>
       </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                <Package className="h-8 w-8 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg hover:shadow-xl hover:border-[#3e2626]/30 transition-all duration-300">
           <CardContent className="p-6">
-              <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Estoque Baixo</p>
-                <p className="text-3xl font-bold text-[#3e2626]">
-                  {products.filter((p: any) => p.stock < 10).length}
-                </p>
-                <p className="text-xs text-[#3e2626]/70">Atenção necessária</p>
-                  </div>
+                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total de Clientes</p>
+                <p className="text-3xl font-bold text-[#3e2626]">{customers.length}</p>
+                <p className="text-xs text-[#3e2626]/70">Cadastrados</p>
+              </div>
               <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                <Package className="h-8 w-8 text-white" />
+                <Users className="h-8 w-8 text-white" />
               </div>
             </div>
           </CardContent>
@@ -2524,59 +2456,73 @@ function ProductsSection({ products, isLoading }: any) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Valor Total</p>
+                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Clientes Ativos</p>
                 <p className="text-3xl font-bold text-[#3e2626]">
-                  R$ {products.reduce((sum: number, p: any) => sum + (p.price * p.stock), 0).toFixed(0)}
+                  {customers.filter((c: any) => c.isActive).length}
                 </p>
-                <p className="text-xs text-[#3e2626]/70">Em estoque</p>
+                <p className="text-xs text-[#3e2626]/70">Ativos</p>
               </div>
               <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                <DollarSign className="h-8 w-8 text-white" />
+                <UserCheck className="h-8 w-8 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg hover:shadow-xl hover:border-[#3e2626]/30 transition-all duration-300">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total de Compras</p>
+                <p className="text-3xl font-bold text-[#3e2626]">
+                  {customers.reduce((sum: number, c: any) => sum + (c._count?.purchases || 0), 0)}
+                </p>
+                <p className="text-xs text-[#3e2626]/70">Realizadas</p>
+              </div>
+              <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
+                <ShoppingCart className="h-8 w-8 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg hover:shadow-xl hover:border-[#3e2626]/30 transition-all duration-300">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total de Favoritos</p>
+                <p className="text-3xl font-bold text-[#3e2626]">
+                  {customers.reduce((sum: number, c: any) => sum + (c._count?.favorites || 0), 0)}
+                </p>
+                <p className="text-xs text-[#3e2626]/70">Produtos</p>
+              </div>
+              <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
+                <Heart className="h-8 w-8 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Advanced Filters Section */}
+      {/* Filters Section */}
       <Card className="bg-white border-2 border-[#3e2626]/10 shadow-lg mb-8">
         <CardContent className="p-8">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Search */}
             <div className="flex-1">
               <Label htmlFor="search" className="text-sm font-semibold text-[#3e2626] mb-3 block">
-                Buscar produtos
+                Buscar clientes
               </Label>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#3e2626]/60 h-5 w-5" />
                 <Input
                   id="search"
-                  placeholder="Digite nome, descrição ou SKU..."
-                  value={productFilters.search}
-                  onChange={(e) => setProductFilters(prev => ({ ...prev, search: e.target.value }))}
+                  placeholder="Digite nome, email ou telefone..."
+                  value={customerFilters.search}
+                  onChange={(e) => setCustomerFilters(prev => ({ ...prev, search: e.target.value }))}
                   className="pl-12 h-12 border-2 border-[#3e2626]/20 rounded-xl focus:border-[#3e2626] focus:ring-0 text-lg bg-white"
                 />
               </div>
-            </div>
-
-            {/* Category Filter */}
-            <div className="lg:w-56">
-              <Label htmlFor="category" className="text-sm font-semibold text-[#3e2626] mb-3 block">
-                Categoria
-              </Label>
-              <select
-                id="category"
-                value={productFilters.category}
-                onChange={(e) => setProductFilters(prev => ({ ...prev, category: e.target.value }))}
-                className="w-full px-4 py-3 border-2 border-[#3e2626]/20 rounded-xl focus:outline-none focus:ring-0 focus:border-[#3e2626] text-lg font-medium bg-white"
-              >
-                <option value="all">Todas as categorias</option>
-                <option value="Tintas">Tintas</option>
-                <option value="Pincéis">Pincéis</option>
-                <option value="Rolos">Rolos</option>
-                <option value="Acessórios">Acessórios</option>
-                <option value="Ferramentas">Ferramentas</option>
-              </select>
             </div>
 
             {/* Status Filter */}
@@ -2586,8 +2532,8 @@ function ProductsSection({ products, isLoading }: any) {
               </Label>
               <select
                 id="status"
-                value={productFilters.status}
-                onChange={(e) => setProductFilters(prev => ({ ...prev, status: e.target.value }))}
+                value={customerFilters.status}
+                onChange={(e) => setCustomerFilters(prev => ({ ...prev, status: e.target.value }))}
                 className="w-full px-4 py-3 border-2 border-[#3e2626]/20 rounded-xl focus:outline-none focus:ring-0 focus:border-[#3e2626] text-lg font-medium bg-white"
               >
                 <option value="all">Todos os status</option>
@@ -2629,7 +2575,7 @@ function ProductsSection({ products, isLoading }: any) {
             <div className="flex items-end">
               <Button
                 variant="outline"
-                onClick={() => setProductFilters({ category: 'all', status: 'all', search: '' })}
+                onClick={() => setCustomerFilters({ status: 'all', search: '' })}
                 className="flex items-center space-x-2 h-12 px-6 border-2 border-[#3e2626]/20 rounded-xl hover:border-[#3e2626] hover:text-[#3e2626] text-[#3e2626]/70"
               >
                 <X className="h-4 w-4" />
@@ -2640,160 +2586,167 @@ function ProductsSection({ products, isLoading }: any) {
         </CardContent>
       </Card>
 
-      {/* Products Display Section */}
+      {/* Customers Display Section */}
       <Card className="bg-white border-2 border-[#3e2626]/10 shadow-lg">
         <CardHeader className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 rounded-t-xl border-b border-[#3e2626]/10">
           <div className="flex items-center justify-between">
-                  <div>
-              <CardTitle className="text-2xl font-bold text-[#3e2626]">Lista de Produtos</CardTitle>
+            <div>
+              <CardTitle className="text-2xl font-bold text-[#3e2626]">Lista de Clientes</CardTitle>
               <CardDescription className="text-lg text-[#3e2626]/70">
-                {getFilteredProducts().length} produto(s) encontrado(s)
+                {getFilteredCustomers().length} cliente(s) encontrado(s)
               </CardDescription>
-                  </div>
-            <div className="flex items-center space-x-3">
-              <Button variant="outline" size="sm" className="border-2 border-[#3e2626]/20 rounded-xl px-4 py-2 text-[#3e2626] hover:bg-[#3e2626] hover:text-white">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-                </div>
-                  </div>
-                </CardHeader>
+            </div>
+          </div>
+        </CardHeader>
         <CardContent className="p-8">
-          {getFilteredProducts().length > 0 ? (
+          {getFilteredCustomers().length > 0 ? (
             viewMode === 'grid' ? (
               // Grid View
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {getFilteredProducts().map((product: any) => {
-                  const stockStatus = getStockStatus(product.stock);
-                  return (
-                    <div key={product.id} className="bg-gradient-to-br from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl p-6 hover:shadow-xl hover:border-[#3e2626] transition-all duration-300 group">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                            <Package className="h-8 w-8 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-[#3e2626] text-lg">{product.name}</h3>
-                            <p className="text-[#3e2626]/70 text-sm">{product.category}</p>
-                          </div>
+                {getFilteredCustomers().map((customer: any) => (
+                  <div key={customer.id} className="bg-gradient-to-br from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl p-6 hover:shadow-xl hover:border-[#3e2626] transition-all duration-300 group">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="relative">
+                          <Avatar className="w-16 h-16 border-4 border-white shadow-lg">
+                            <AvatarFallback className="bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] text-white font-bold text-lg">
+                              {customer.name?.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-4 border-white ${
+                            customer.isActive ? 'bg-green-500' : 'bg-red-500'
+                          }`}></div>
                         </div>
-                      </div>
-                      
-              <div className="space-y-3">
-                        {product.description && (
-                          <p className="text-sm text-[#3e2626]/70 line-clamp-2">{product.description}</p>
-                        )}
-                        
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl font-bold text-[#3e2626]">
-                    R$ {typeof product.price === 'number' ? product.price.toFixed(2) : '0,00'}
-                  </span>
-                          <Badge className={`px-3 py-1 rounded-full text-xs font-semibold ${stockStatus.color}`}>
-                            {stockStatus.label}
-                          </Badge>
-                  </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm text-[#3e2626]/70">
-                            Estoque: {product.stock || 0} unidades
-                </div>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            product.isActive 
-                              ? 'bg-green-100 text-green-800 border border-green-200' 
-                              : 'bg-red-100 text-red-800 border border-red-200'
-                          }`}>
-                            {product.isActive ? 'Ativo' : 'Inativo'}
-                          </span>
-                  </div>
-                        
-                        {product.sku && (
-                          <div className="flex items-center text-sm text-[#3e2626]/70">
-                            <Package className="h-4 w-4 mr-1" />
-                            SKU: {product.sku}
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center justify-between pt-4 border-t border-[#3e2626]/10">
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm" className="rounded-xl hover:bg-[#3e2626]/10 hover:border-[#3e2626] text-[#3e2626] border-[#3e2626]/20">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm" className="rounded-xl hover:bg-[#3e2626]/10 hover:border-[#3e2626] text-[#3e2626] border-[#3e2626]/20">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm" className="rounded-xl hover:bg-[#3e2626]/10 text-[#3e2626] border-[#3e2626]/20">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </div>
+                        <div>
+                          <h3 className="font-bold text-[#3e2626] text-lg">{customer.name}</h3>
+                          <p className="text-[#3e2626]/70 text-sm">{customer.email}</p>
+                          {customer.phone && (
+                            <p className="text-[#3e2626]/70 text-sm">{customer.phone}</p>
+                          )}
                         </div>
                       </div>
                     </div>
-                  );
-                })}
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          customer.isActive 
+                            ? 'bg-green-100 text-green-800 border border-green-200' 
+                            : 'bg-red-100 text-red-800 border border-red-200'
+                        }`}>
+                          {customer.isActive ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-[#3e2626]/5 rounded-lg p-2">
+                          <p className="text-lg font-bold text-[#3e2626]">{customer._count?.purchases || 0}</p>
+                          <p className="text-xs text-[#3e2626]/70">Compras</p>
+                        </div>
+                        <div className="bg-[#3e2626]/5 rounded-lg p-2">
+                          <p className="text-lg font-bold text-[#3e2626]">{customer._count?.favorites || 0}</p>
+                          <p className="text-xs text-[#3e2626]/70">Favoritos</p>
+                        </div>
+                        <div className="bg-[#3e2626]/5 rounded-lg p-2">
+                          <p className="text-lg font-bold text-[#3e2626]">{customer._count?.reviews || 0}</p>
+                          <p className="text-xs text-[#3e2626]/70">Avaliações</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-center pt-4 border-t border-[#3e2626]/10">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleViewCustomer(customer)}
+                          className="rounded-xl hover:bg-[#3e2626] hover:text-white text-[#3e2626] border-[#3e2626]/20 w-full"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver Detalhes
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               // List View
               <div className="space-y-4">
-                {getFilteredProducts().map((product: any) => {
-                  const stockStatus = getStockStatus(product.stock);
-                  return (
-                    <div key={product.id} className="bg-gradient-to-r from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl p-6 hover:shadow-lg hover:border-[#3e2626] transition-all duration-300">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-14 h-14 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                            <Package className="h-7 w-7 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3">
-                              <h3 className="font-bold text-[#3e2626] text-lg">{product.name}</h3>
-                              <Badge className={`px-3 py-1 rounded-full text-xs font-semibold ${stockStatus.color}`}>
-                                {stockStatus.label}
-                              </Badge>
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                product.isActive 
-                                  ? 'bg-green-100 text-green-800 border border-green-200' 
-                                  : 'bg-red-100 text-red-800 border border-red-200'
-                              }`}>
-                                {product.isActive ? 'Ativo' : 'Inativo'}
-                              </span>
-                            </div>
-                            <p className="text-[#3e2626]/70 text-sm mt-1">{product.category} • Estoque: {product.stock || 0} unidades</p>
-                            <p className="text-2xl font-bold text-[#3e2626] mt-1">R$ {typeof product.price === 'number' ? product.price.toFixed(2) : '0,00'}</p>
-                          </div>
+                {getFilteredCustomers().map((customer: any) => (
+                  <div key={customer.id} className="bg-gradient-to-r from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl p-6 hover:shadow-lg hover:border-[#3e2626] transition-all duration-300">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="relative">
+                          <Avatar className="w-14 h-14 border-4 border-white shadow-lg">
+                            <AvatarFallback className="bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] text-white font-bold">
+                              {customer.name?.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white ${
+                            customer.isActive ? 'bg-green-500' : 'bg-red-500'
+                          }`}></div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Button variant="outline" size="sm" className="rounded-xl hover:bg-[#3e2626]/10 hover:border-[#3e2626] text-[#3e2626] border-[#3e2626]/20">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" className="rounded-xl hover:bg-[#3e2626]/10 hover:border-[#3e2626] text-[#3e2626] border-[#3e2626]/20">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" className="rounded-xl hover:bg-[#3e2626]/10 text-[#3e2626] border-[#3e2626]/20">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3">
+                            <h3 className="font-bold text-[#3e2626] text-lg">{customer.name}</h3>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              customer.isActive 
+                                ? 'bg-green-100 text-green-800 border border-green-200' 
+                                : 'bg-red-100 text-red-800 border border-red-200'
+                            }`}>
+                              {customer.isActive ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </div>
+                          <p className="text-[#3e2626]/70 text-sm mt-1">{customer.email}</p>
+                          {customer.phone && (
+                            <p className="text-[#3e2626]/70 text-sm">{customer.phone}</p>
+                          )}
+                          <div className="flex items-center space-x-4 text-xs text-[#3e2626]/70 mt-2">
+                            <div className="flex items-center">
+                              <ShoppingCart className="h-3 w-3 mr-1" />
+                              {customer._count?.purchases || 0} compras
+                            </div>
+                            <div className="flex items-center">
+                              <Heart className="h-3 w-3 mr-1" />
+                              {customer._count?.favorites || 0} favoritos
+                            </div>
+                            <div className="flex items-center">
+                              <Star className="h-3 w-3 mr-1" />
+                              {customer._count?.reviews || 0} avaliações
+                            </div>
+                          </div>
                         </div>
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleViewCustomer(customer)}
+                          className="rounded-xl hover:bg-[#3e2626] hover:text-white text-[#3e2626] border-[#3e2626]/20"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )
           ) : (
             <div className="text-center py-16">
               <div className="w-24 h-24 bg-gradient-to-br from-[#3e2626]/10 to-[#3e2626]/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Package className="h-12 w-12 text-[#3e2626]/60" />
+                <User className="h-12 w-12 text-[#3e2626]/60" />
               </div>
-              <h3 className="text-2xl font-bold text-[#3e2626] mb-3">Nenhum produto encontrado</h3>
+              <h3 className="text-2xl font-bold text-[#3e2626] mb-3">Nenhum cliente encontrado</h3>
               <p className="text-[#3e2626]/70 text-lg mb-6">
-                {productFilters.search || productFilters.category !== 'all' || productFilters.status !== 'all'
-                  ? 'Tente ajustar os filtros para encontrar produtos.'
-                  : 'Não há produtos cadastrados no sistema.'
+                {customerFilters.search || customerFilters.status !== 'all'
+                  ? 'Tente ajustar os filtros para encontrar clientes.'
+                  : 'Não há clientes cadastrados no sistema.'
                 }
               </p>
-              {(productFilters.search || productFilters.category !== 'all' || productFilters.status !== 'all') && (
+              {(customerFilters.search || customerFilters.status !== 'all') && (
                 <Button
                   variant="outline"
-                  onClick={() => setProductFilters({ category: 'all', status: 'all', search: '' })}
+                  onClick={() => setCustomerFilters({ status: 'all', search: '' })}
                   className="px-6 py-3 rounded-xl border-2 border-[#3e2626]/20 hover:border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
                 >
                   Limpar filtros
@@ -2801,337 +2754,19 @@ function ProductsSection({ products, isLoading }: any) {
               )}
             </div>
           )}
-                </CardContent>
-              </Card>
+        </CardContent>
+      </Card>
 
-      {/* Modal de Novo Produto */}
-      {isModalOpen && (
-        <div 
-          className="fixed inset-0 flex items-center justify-center backdrop-blur-sm"
-          style={{ 
-            backgroundColor: 'rgba(0, 0, 0, 0.4)', 
-            zIndex: 9999,
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0
+      {/* Customer View Modal */}
+      {isModalOpen && selectedCustomer && (
+        <CustomerViewModal
+          customer={selectedCustomer}
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedCustomer(null);
           }}
-          onClick={handleCloseModal}
-        >
-          <div 
-            className="bg-white rounded-2xl p-8 w-full max-w-5xl mx-4 shadow-2xl border-2 border-gray-100 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-            style={{ position: 'relative', zIndex: 10000 }}
-          >
-            <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-100">
-              <div>
-                <h3 className="text-2xl font-bold text-[#3e2626]">Novo Produto</h3>
-                <p className="text-sm text-gray-500 mt-1">Preencha os dados do produto e adicione imagens</p>
-          </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 rounded-xl"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="space-y-6">
-              {/* Upload de Imagens */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200">
-                <ImageUpload
-                  images={productImages}
-                  onImagesChange={setProductImages}
-                  maxImages={5}
-                />
-              </div>
-
-              {/* Informações Básicas */}
-              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-                <h4 className="text-lg font-semibold text-[#3e2626] mb-4 flex items-center">
-                  <Package className="h-5 w-5 mr-2" />
-                  Informações Básicas
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Nome */}
-                  <div className="md:col-span-2">
-                    <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                      Nome do Produto *
-                    </Label>
-                    <Input
-                      id="name"
-                      type="text"
-                      value={newProduct.name}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Ex: Tinta Acrílica Premium Branco Neve 3.6L"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* Descrição */}
-                  <div className="md:col-span-2">
-                    <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-                      Descrição
-                    </Label>
-                    <textarea
-                      id="description"
-                      value={newProduct.description}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Descreva as características e benefícios do produto..."
-                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent resize-none"
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Categoria */}
-                  <div>
-                    <Label htmlFor="category" className="text-sm font-medium text-gray-700">
-                      Categoria *
-                    </Label>
-                    <select
-                      id="category"
-                      value={newProduct.category}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, category: e.target.value }))}
-                      className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent"
-                    >
-                      <option value="Tintas">Tintas</option>
-                      <option value="Pincéis">Pincéis</option>
-                      <option value="Rolos">Rolos</option>
-                      <option value="Acessórios">Acessórios</option>
-                      <option value="Ferramentas">Ferramentas</option>
-                      <option value="Vernizes">Vernizes</option>
-                      <option value="Massas">Massas</option>
-                      <option value="Solventes">Solventes</option>
-                    </select>
-                  </div>
-
-                  {/* Marca */}
-                  <div>
-                    <Label htmlFor="brand" className="text-sm font-medium text-gray-700">
-                      Marca
-                    </Label>
-                    <Input
-                      id="brand"
-                      type="text"
-                      value={newProduct.brand}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, brand: e.target.value }))}
-                      placeholder="Ex: Suvinil, Coral, etc."
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* SKU */}
-                  <div>
-                    <Label htmlFor="sku" className="text-sm font-medium text-gray-700">
-                      SKU / Código
-                    </Label>
-                    <Input
-                      id="sku"
-                      type="text"
-                      value={newProduct.sku}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, sku: e.target.value }))}
-                      placeholder="Ex: TIN-ACR-BRA-36L"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* Código de Barras */}
-                  <div>
-                    <Label htmlFor="barcode" className="text-sm font-medium text-gray-700">
-                      Código de Barras / EAN
-                    </Label>
-                    <Input
-                      id="barcode"
-                      type="text"
-                      value={newProduct.barcode}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, barcode: e.target.value }))}
-                      placeholder="Ex: 7898357419876"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Precificação e Estoque */}
-              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-                <h4 className="text-lg font-semibold text-[#3e2626] mb-4 flex items-center">
-                  <DollarSign className="h-5 w-5 mr-2" />
-                  Precificação e Estoque
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Preço */}
-                  <div>
-                    <Label htmlFor="price" className="text-sm font-medium text-gray-700">
-                      Preço de Venda *
-                    </Label>
-                    <div className="relative mt-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                      <Input
-                        id="price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={newProduct.price}
-                        onChange={(e) => setNewProduct(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                        placeholder="0.00"
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Unidade */}
-                  <div>
-                    <Label htmlFor="unit" className="text-sm font-medium text-gray-700">
-                      Unidade
-                    </Label>
-                    <select
-                      id="unit"
-                      value={newProduct.unit}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, unit: e.target.value }))}
-                      className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent"
-                    >
-                      <option value="un">Unidade</option>
-                      <option value="lt">Litro</option>
-                      <option value="ml">Mililitro</option>
-                      <option value="kg">Quilograma</option>
-                      <option value="g">Grama</option>
-                      <option value="m">Metro</option>
-                      <option value="cx">Caixa</option>
-                      <option value="pct">Pacote</option>
-                    </select>
-                  </div>
-
-                  {/* Estoque Atual */}
-                  <div>
-                    <Label htmlFor="stock" className="text-sm font-medium text-gray-700">
-                      Estoque Inicial
-                    </Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      min="0"
-                      value={newProduct.stock}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
-                      placeholder="0"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* Estoque Mínimo */}
-                  <div>
-                    <Label htmlFor="minStock" className="text-sm font-medium text-gray-700">
-                      Estoque Mínimo
-                    </Label>
-                    <Input
-                      id="minStock"
-                      type="number"
-                      min="0"
-                      value={newProduct.minStock}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, minStock: parseInt(e.target.value) || 0 }))}
-                      placeholder="10"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* Estoque Máximo */}
-                  <div>
-                    <Label htmlFor="maxStock" className="text-sm font-medium text-gray-700">
-                      Estoque Máximo
-                    </Label>
-                    <Input
-                      id="maxStock"
-                      type="number"
-                      min="0"
-                      value={newProduct.maxStock}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, maxStock: parseInt(e.target.value) || 0 }))}
-                      placeholder="100"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {/* Fornecedor */}
-                  <div>
-                    <Label htmlFor="supplier" className="text-sm font-medium text-gray-700">
-                      Fornecedor
-                    </Label>
-                    <Input
-                      id="supplier"
-                      type="text"
-                      value={newProduct.supplier}
-                      onChange={(e) => setNewProduct(prev => ({ ...prev, supplier: e.target.value }))}
-                      placeholder="Nome do fornecedor"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Observações */}
-              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-                <h4 className="text-lg font-semibold text-[#3e2626] mb-4">Observações Adicionais</h4>
-                <textarea
-                  id="observations"
-                  value={newProduct.observations}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, observations: e.target.value }))}
-                  placeholder="Informações adicionais, instruções de uso, cuidados especiais, etc."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent resize-none"
-                  rows={3}
-                />
-              </div>
-
-              {/* Status */}
-              <div className="flex items-center justify-between bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
-                <div>
-                  <Label htmlFor="isActive" className="text-sm font-medium text-gray-700">
-                    Status do Produto
-                  </Label>
-                  <p className="text-xs text-gray-500 mt-1">Produto disponível para venda?</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    id="isActive"
-                    type="checkbox"
-                    checked={newProduct.isActive}
-                    onChange={(e) => setNewProduct(prev => ({ ...prev, isActive: e.target.checked }))}
-                    className="sr-only peer"
-                  />
-                  <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#3e2626]/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-[#3e2626]"></div>
-                  <span className="ml-3 text-sm font-medium text-gray-700">
-                    {newProduct.isActive ? 'Ativo' : 'Inativo'}
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* Botões */}
-            <div className="flex items-center justify-end space-x-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={handleCloseModal}
-                disabled={isCreating}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleCreateProduct}
-                disabled={isCreating}
-                className="bg-[#3e2626] hover:bg-[#2a1a1a] text-white"
-              >
-                {isCreating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Criando...
-                  </>
-                ) : (
-                  'Criar Produto'
-                )}
-              </Button>
-      </div>
-          </div>
-        </div>
+        />
       )}
     </div>
   );
@@ -3145,686 +2780,66 @@ function SalesSection({ sales, isLoading }: any) {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
           <p className="text-gray-600">Carregando vendas...</p>
-                  </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestão de Vendas</h1>
-          <p className="text-sm text-gray-600">Acompanhe todas as vendas realizadas</p>
-        </div>
-        <Button className="bg-[#3e2626] hover:bg-[#8B4513]">
-          <ShoppingCart className="h-4 w-4 mr-2" />
-          Nova Venda
-        </Button>
+      <div className="text-center py-12">
+        <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Seção de Vendas</h3>
+        <p className="text-gray-500">Funcionalidade em desenvolvimento.</p>
       </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                <ShoppingCart className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{sales.length}</p>
-                <p className="text-sm text-gray-500">Total de Vendas</p>
-              </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-      {/* Sales List */}
-      <Card>
-              <CardHeader>
-          <CardTitle>Lista de Vendas</CardTitle>
-          <CardDescription>Histórico completo de vendas realizadas</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-            {Array.isArray(sales) && sales.map((sale: any) => (
-              <div key={sale.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                    <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-[#3e2626] rounded-lg flex items-center justify-center">
-                    <ShoppingCart className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                    <h3 className="font-semibold text-gray-900">Venda #{sale.id}</h3>
-                    <p className="text-sm text-gray-600">{sale.customer?.name || 'Cliente não identificado'}</p>
-                    <p className="text-sm text-gray-500">{sale.store?.name || 'Loja não identificada'}</p>
-                      </div>
-                    </div>
-                <div className="text-right">
-                  <p className="font-semibold text-gray-900">R$ {typeof sale.total === 'number' ? sale.total.toFixed(2) : '0,00'}</p>
-                  <p className="text-sm text-gray-500">
-                    {new Date(sale.createdAt).toLocaleDateString('pt-BR')}
-                  </p>
-                  </div>
-                      </div>
-            ))}
-                </div>
-              </CardContent>
-            </Card>
-
-      </div>
-    );
-  }
-
-// Componente da Seção de Relatórios
-function ReportsSection() {
-  const [selectedReport, setSelectedReport] = useState('sales');
-  const [dateRange, setDateRange] = useState('30');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [reportData, setReportData] = useState<any>(null);
-
-  // Função para gerar relatório
-  const generateReport = async () => {
-    setIsGenerating(true);
-    try {
-      // Simular geração de relatório
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Dados mock para demonstração
-      const mockData = {
-        sales: {
-          totalRevenue: 125000,
-          totalSales: 450,
-          averageTicket: 277.78,
-          growthRate: 15.5,
-          topProducts: [
-            { name: 'Tinta Branca Premium', sales: 89, revenue: 8010 },
-            { name: 'Pincel Chato 2"', sales: 156, revenue: 2418 },
-            { name: 'Rolo de Pintura', sales: 134, revenue: 3068.6 },
-            { name: 'Fita Crepe', sales: 203, revenue: 1806.7 }
-          ],
-          salesByStore: [
-            { store: 'Loja Centro', sales: 120, revenue: 45000 },
-            { store: 'Loja Norte', sales: 98, revenue: 38000 },
-            { store: 'Loja Sul', sales: 156, revenue: 42000 }
-          ],
-          salesByDay: [
-            { date: '2024-01-01', sales: 15, revenue: 4500 },
-            { date: '2024-01-02', sales: 23, revenue: 6900 },
-            { date: '2024-01-03', sales: 18, revenue: 5400 },
-            { date: '2024-01-04', sales: 31, revenue: 9300 },
-            { date: '2024-01-05', sales: 27, revenue: 8100 }
-          ]
-        },
-        products: {
-          totalProducts: 124,
-          activeProducts: 118,
-          lowStock: 12,
-          totalValue: 45000,
-          topCategories: [
-            { category: 'Tintas', products: 45, revenue: 65000 },
-            { category: 'Pincéis', products: 32, revenue: 12000 },
-            { category: 'Rolos', products: 28, revenue: 15000 },
-            { category: 'Acessórios', products: 19, revenue: 8000 }
-          ]
-        },
-        stores: {
-          totalStores: 3,
-          activeStores: 3,
-          totalEmployees: 24,
-          averageRevenue: 41666.67,
-          storePerformance: [
-            { store: 'Loja Centro', employees: 8, revenue: 45000, efficiency: 95 },
-            { store: 'Loja Norte', employees: 7, revenue: 38000, efficiency: 88 },
-            { store: 'Loja Sul', employees: 9, revenue: 42000, efficiency: 92 }
-          ]
-        }
-      };
-      
-      setReportData(mockData);
-    } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const formatCurrency = (value: number) => {
-    if (typeof window === 'undefined') {
-      return `R$ ${value.toFixed(2).replace('.', ',')}`;
-    }
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
-
-  const formatPercentage = (value: number) => {
-    return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
-        <div className="w-full">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <BarChart3 className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-left">
-                  <h1 className="text-3xl font-bold">Relatórios e Analytics</h1>
-                  <p className="text-white/80 text-lg">Gere e visualize relatórios detalhados do sistema</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <select
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
-                className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-              >
-                <option value="7">Últimos 7 dias</option>
-                <option value="30">Últimos 30 dias</option>
-                <option value="90">Últimos 90 dias</option>
-                <option value="365">Último ano</option>
-              </select>
-              <Button 
-                onClick={generateReport}
-                disabled={isGenerating}
-                className="bg-white text-[#3e2626] hover:bg-white/90 font-semibold px-6 py-2 rounded-xl"
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#3e2626] mr-2"></div>
-                    Gerando...
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Gerar Relatório
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Report Type Selection */}
-      <Card className="bg-white border-2 border-[#3e2626]/10 shadow-lg mb-8">
-        <CardContent className="p-8">
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="flex-1">
-              <Label htmlFor="reportType" className="text-sm font-semibold text-[#3e2626] mb-3 block">
-                Tipo de Relatório
-              </Label>
-              <select
-                id="reportType"
-                value={selectedReport}
-                onChange={(e) => setSelectedReport(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-[#3e2626]/20 rounded-xl focus:outline-none focus:ring-0 focus:border-[#3e2626] text-lg font-medium bg-white"
-              >
-                <option value="sales">Relatório de Vendas</option>
-                <option value="products">Relatório de Produtos</option>
-                <option value="stores">Relatório de Lojas</option>
-                <option value="financial">Relatório Financeiro</option>
-                <option value="inventory">Relatório de Estoque</option>
-                <option value="customers">Relatório de Clientes</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Report Content */}
-      {reportData && (
-        <div className="space-y-8">
-          {selectedReport === 'sales' && (
-            <>
-              {/* Sales Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Receita Total</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{formatCurrency(reportData.sales.totalRevenue)}</p>
-                        <p className="text-xs text-green-600">{formatPercentage(reportData.sales.growthRate)} vs período anterior</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                        <DollarSign className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total de Vendas</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{reportData.sales.totalSales}</p>
-                        <p className="text-xs text-[#3e2626]/70">transações realizadas</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                        <ShoppingCart className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Ticket Médio</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{formatCurrency(reportData.sales.averageTicket)}</p>
-                        <p className="text-xs text-[#3e2626]/70">por transação</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                        <TrendingUp className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Crescimento</p>
-                        <p className="text-3xl font-bold text-green-600">{formatPercentage(reportData.sales.growthRate)}</p>
-                        <p className="text-xs text-[#3e2626]/70">vs período anterior</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <ArrowUp className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Top Products */}
-              <Card className="bg-white border-2 border-[#3e2626]/10 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 rounded-t-xl border-b border-[#3e2626]/10">
-                  <CardTitle className="text-2xl font-bold text-[#3e2626]">Produtos Mais Vendidos</CardTitle>
-                  <CardDescription className="text-lg text-[#3e2626]/70">Ranking dos produtos com maior volume de vendas</CardDescription>
-                </CardHeader>
-                <CardContent className="p-8">
-                  <div className="space-y-4">
-                    {reportData.sales.topProducts.map((product: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl hover:shadow-lg transition-all duration-300">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                            <span className="text-white font-bold text-lg">{index + 1}</span>
-                          </div>
-                    <div>
-                            <h3 className="font-bold text-[#3e2626] text-lg">{product.name}</h3>
-                            <p className="text-[#3e2626]/70 text-sm">{product.sales} vendas realizadas</p>
-                    </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-[#3e2626]">{formatCurrency(product.revenue)}</p>
-                          <p className="text-sm text-[#3e2626]/70">receita gerada</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Sales by Store */}
-              <Card className="bg-white border-2 border-[#3e2626]/10 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 rounded-t-xl border-b border-[#3e2626]/10">
-                  <CardTitle className="text-2xl font-bold text-[#3e2626]">Vendas por Loja</CardTitle>
-                  <CardDescription className="text-lg text-[#3e2626]/70">Performance comparativa entre as lojas</CardDescription>
-                </CardHeader>
-                <CardContent className="p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {reportData.sales.salesByStore.map((store: any, index: number) => (
-                      <div key={index} className="bg-gradient-to-br from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="flex items-center space-x-3 mb-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                            <Store className="h-6 w-6 text-white" />
-                  </div>
-                    <div>
-                            <h3 className="font-bold text-[#3e2626] text-lg">{store.store}</h3>
-                            <p className="text-[#3e2626]/70 text-sm">{store.sales} vendas</p>
-                    </div>
-                  </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-[#3e2626]/70">Receita:</span>
-                            <span className="font-bold text-[#3e2626]">{formatCurrency(store.revenue)}</span>
-                          </div>
-                          <div className="w-full bg-[#3e2626]/10 rounded-full h-2">
-                            <div 
-                              className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] h-2 rounded-full"
-                              style={{ width: `${(store.revenue / reportData.sales.totalRevenue) * 100}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-
-          {selectedReport === 'products' && (
-            <>
-              {/* Products Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total de Produtos</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{reportData.products.totalProducts}</p>
-                        <p className="text-xs text-[#3e2626]/70">cadastrados</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                        <Package className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Produtos Ativos</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{reportData.products.activeProducts}</p>
-                        <p className="text-xs text-green-600">{((reportData.products.activeProducts / reportData.products.totalProducts) * 100).toFixed(1)}% do total</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <Package className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Estoque Baixo</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{reportData.products.lowStock}</p>
-                        <p className="text-xs text-yellow-600">atenção necessária</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <Package className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Valor Total</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{formatCurrency(reportData.products.totalValue)}</p>
-                        <p className="text-xs text-[#3e2626]/70">em estoque</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                        <DollarSign className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Top Categories */}
-              <Card className="bg-white border-2 border-[#3e2626]/10 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 rounded-t-xl border-b border-[#3e2626]/10">
-                  <CardTitle className="text-2xl font-bold text-[#3e2626]">Categorias Mais Vendidas</CardTitle>
-                  <CardDescription className="text-lg text-[#3e2626]/70">Análise de performance por categoria</CardDescription>
-          </CardHeader>
-                <CardContent className="p-8">
-                  <div className="space-y-4">
-                    {reportData.products.topCategories.map((category: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl hover:shadow-lg transition-all duration-300">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                            <Package className="h-6 w-6 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-[#3e2626] text-lg">{category.category}</h3>
-                            <p className="text-[#3e2626]/70 text-sm">{category.products} produtos • {formatCurrency(category.revenue)} receita</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626]/10 to-[#3e2626]/20 rounded-2xl flex items-center justify-center">
-                            <span className="text-2xl font-bold text-[#3e2626]">{category.products}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-
-          {selectedReport === 'stores' && (
-            <>
-              {/* Stores Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total de Lojas</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{reportData.stores.totalStores}</p>
-                        <p className="text-xs text-[#3e2626]/70">operando</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                        <Store className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Funcionários</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{reportData.stores.totalEmployees}</p>
-                        <p className="text-xs text-[#3e2626]/70">colaboradores</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                        <Users className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Receita Média</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">{formatCurrency(reportData.stores.averageRevenue)}</p>
-                        <p className="text-xs text-[#3e2626]/70">por loja</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                        <DollarSign className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Eficiência Média</p>
-                        <p className="text-3xl font-bold text-[#3e2626]">92%</p>
-                        <p className="text-xs text-green-600">excelente performance</p>
-                      </div>
-                      <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <TrendingUp className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Store Performance */}
-              <Card className="bg-white border-2 border-[#3e2626]/10 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 rounded-t-xl border-b border-[#3e2626]/10">
-                  <CardTitle className="text-2xl font-bold text-[#3e2626]">Performance das Lojas</CardTitle>
-                  <CardDescription className="text-lg text-[#3e2626]/70">Análise detalhada de cada loja</CardDescription>
-                </CardHeader>
-                <CardContent className="p-8">
-                  <div className="space-y-6">
-                    {reportData.stores.storePerformance.map((store: any, index: number) => (
-                      <div key={index} className="bg-gradient-to-r from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
-                              <Store className="h-8 w-8 text-white" />
-                            </div>
-                            <div>
-                              <h3 className="font-bold text-[#3e2626] text-xl">{store.store}</h3>
-                              <p className="text-[#3e2626]/70">{store.employees} funcionários</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-8">
-                            <div className="text-center">
-                              <p className="text-2xl font-bold text-[#3e2626]">{formatCurrency(store.revenue)}</p>
-                              <p className="text-sm text-[#3e2626]/70">Receita</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-2xl font-bold text-[#3e2626]">{store.efficiency}%</p>
-                              <p className="text-sm text-[#3e2626]/70">Eficiência</p>
-                            </div>
-                            <div className="w-20 h-20 relative">
-                              <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
-                                <path
-                                  className="text-[#3e2626]/10"
-                                  stroke="currentColor"
-                                  strokeWidth="3"
-                                  fill="none"
-                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                />
-                                <path
-                                  className="text-[#3e2626]"
-                                  stroke="currentColor"
-                                  strokeWidth="3"
-                                  strokeLinecap="round"
-                                  fill="none"
-                                  strokeDasharray={`${store.efficiency}, 100`}
-                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                />
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Export Options */}
-      {reportData && (
-        <Card className="bg-white border-2 border-[#3e2626]/10 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 rounded-t-xl border-b border-[#3e2626]/10">
-            <CardTitle className="text-2xl font-bold text-[#3e2626]">Exportar Relatório</CardTitle>
-            <CardDescription className="text-lg text-[#3e2626]/70">Baixe o relatório nos formatos disponíveis</CardDescription>
-          </CardHeader>
-          <CardContent className="p-8">
-            <div className="flex flex-wrap gap-4">
-              <Button className="bg-[#3e2626] hover:bg-[#2a1a1a] text-white px-6 py-3 rounded-xl">
-                <Download className="h-4 w-4 mr-2" />
-                PDF
-              </Button>
-              <Button variant="outline" className="border-2 border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626] hover:text-white px-6 py-3 rounded-xl">
-                <Download className="h-4 w-4 mr-2" />
-                Excel
-              </Button>
-              <Button variant="outline" className="border-2 border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626] hover:text-white px-6 py-3 rounded-xl">
-                <Download className="h-4 w-4 mr-2" />
-                CSV
-              </Button>
-              <Button variant="outline" className="border-2 border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626] hover:text-white px-6 py-3 rounded-xl">
-              <BarChart3 className="h-4 w-4 mr-2" />
-                Imagem
-            </Button>
-            </div>
-                </CardContent>
-              </Card>
-      )}
     </div>
   );
 }
 
 // Componente da Seção de Configurações
-function SettingsSection() {
+function SettingsSection({ isLoading }: any) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando configurações...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-              <div>
-        <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-sm text-gray-600">Gerencie as configurações do sistema</p>
-            </div>
+      <div className="text-center py-12">
+        <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Seção de Configurações</h3>
+        <p className="text-gray-500">Funcionalidade em desenvolvimento.</p>
+      </div>
+    </div>
+  );
+}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-                <CardHeader>
-            <CardTitle>Configurações da Empresa</CardTitle>
-            <CardDescription>Configure os dados da sua empresa</CardDescription>
-                </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-                    <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nome da Empresa
-                </label>
-                <Input placeholder="Nome da empresa" />
-                    </div>
-                    <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email
-                </label>
-                <Input placeholder="contato@empresa.com" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+// Componente da Seção de Relatórios
+function ReportsSection({ isLoading }: any) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando relatórios...</p>
+        </div>
+      </div>
+    );
+  }
 
-        <Card>
-                <CardHeader>
-            <CardTitle>Configurações do Sistema</CardTitle>
-            <CardDescription>Configure o comportamento do sistema</CardDescription>
-                </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                  <h3 className="text-sm font-medium text-gray-900">Modo de Manutenção</h3>
-                  <p className="text-sm text-gray-500">Ativar modo de manutenção</p>
-                    </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-                  </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+  return (
+    <div className="space-y-6">
+      <div className="text-center py-12">
+        <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Seção de Relatórios</h3>
+        <p className="text-gray-500">Funcionalidade em desenvolvimento.</p>
+      </div>
     </div>
   );
 }

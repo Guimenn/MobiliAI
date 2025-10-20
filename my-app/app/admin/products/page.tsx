@@ -21,6 +21,7 @@ import {
   Star
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api';
+import AdminProductModal from '@/components/AdminProductModal';
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -30,6 +31,11 @@ export default function ProductsPage() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock'>('name');
+  
+  // Estados para o modal de produto
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
 
   useEffect(() => {
     loadProducts();
@@ -39,15 +45,23 @@ export default function ProductsPage() {
     try {
       setIsLoading(true);
       const data = await adminAPI.getProducts();
-      setProducts(data);
+      console.log('📦 Dados recebidos da API:', data);
+      console.log('📦 Tipo dos dados:', typeof data);
+      console.log('📦 É array?', Array.isArray(data));
+      
+      // Garantir que sempre seja um array
+      const productsArray = Array.isArray(data) ? data : (data?.products || []);
+      console.log('📦 Array final de produtos:', productsArray);
+      setProducts(productsArray);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
+      setProducts([]); // Definir array vazio em caso de erro
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = (Array.isArray(products) ? products : []).filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.sku?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -80,6 +94,31 @@ export default function ProductsPage() {
     if (stock === 0) return { label: 'Sem Estoque', color: 'bg-red-100 text-red-800' };
     if (stock < 10) return { label: 'Estoque Baixo', color: 'bg-yellow-100 text-yellow-800' };
     return { label: 'Em Estoque', color: 'bg-green-100 text-green-800' };
+  };
+
+  const handleViewProduct = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode('view');
+    setIsModalOpen(true);
+  };
+
+  const handleEditProduct = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode('edit');
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+  };
+
+  const handleProductUpdated = (updatedProduct: any) => {
+    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  };
+
+  const handleProductDeleted = (productId: string) => {
+    setProducts(products.filter(p => p.id !== productId));
   };
 
   if (isLoading) {
@@ -307,15 +346,30 @@ export default function ProductsPage() {
                 </CardContent>
                 <div className="px-6 pb-4">
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleViewProduct(product)}
+                    >
                       <Eye className="h-4 w-4 mr-2" />
-                      Ver
+                      Visualizar
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleEditProduct(product)}
+                    >
                       <Edit className="h-4 w-4 mr-2" />
                       Editar
                     </Button>
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => handleEditProduct(product)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -333,6 +387,16 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de Produto */}
+      <AdminProductModal
+        product={selectedProduct}
+        isOpen={isModalOpen}
+        mode={modalMode}
+        onClose={handleCloseModal}
+        onProductUpdated={handleProductUpdated}
+        onProductDeleted={handleProductDeleted}
+      />
     </div>
   );
 }

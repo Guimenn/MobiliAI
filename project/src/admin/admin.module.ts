@@ -10,6 +10,7 @@ import { ProductsModule } from '../products/products.module';
 import { StoresModule } from '../stores/stores.module';
 import { SalesModule } from '../sales/sales.module';
 import { FinancialModule } from '../financial/financial.module';
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { FinancialModule } from '../financial/financial.module';
     StoresModule,
     SalesModule,
     FinancialModule,
+    UploadModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, AdminCategoriesService, AdminSystemService, AdminNotificationsService],

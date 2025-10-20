@@ -164,3 +164,4 @@ echo "- Use 'http -v' para ver mais detalhes da requisição"
 echo "- Combine com 'jq' para processar JSON: http POST ... | jq"
 echo "- Ver documentação completa: cat HTTPIE_NANO_BANANA_GUIDE.md"
 
+

@@ -1,11 +1,15 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole, ProductCategory, ProductStyle, MaterialType } from '@prisma/client';
+import { UploadService } from '../upload/upload.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private uploadService: UploadService
+  ) {}
 
   // ==================== DASHBOARD E ESTATÍSTICAS ====================
   
@@ -541,6 +545,97 @@ export class AdminService {
     return product;
   }
 
+  async createProductWithImages(productData: {
+    name: string;
+    description?: string;
+    category: ProductCategory;
+    price: number;
+    costPrice?: number;
+    stock: number;
+    minStock?: number;
+    colorName?: string;
+    colorHex?: string;
+    brand?: string;
+    style?: ProductStyle;
+    material?: MaterialType;
+    width?: number;
+    height?: number;
+    depth?: number;
+    weight?: number;
+    model?: string;
+    sku?: string;
+    barcode?: string;
+    imageUrls?: string[];
+    videoUrl?: string;
+    tags?: string[];
+    keywords?: string[];
+    isFeatured?: boolean;
+    isNew?: boolean;
+    isBestSeller?: boolean;
+    isAvailable?: boolean;
+    storeId: string;
+    supplierId?: string;
+  }, files?: Express.Multer.File[]) {
+    // Verificar se loja existe
+    const store = await this.prisma.store.findUnique({
+      where: { id: productData.storeId }
+    });
+    if (!store) {
+      throw new NotFoundException('Loja não encontrada');
+    }
+
+    // Verificar se fornecedor existe (se fornecido)
+    if (productData.supplierId) {
+      const supplier = await this.prisma.supplier.findUnique({
+        where: { id: productData.supplierId }
+      });
+      if (!supplier) {
+        throw new NotFoundException('Fornecedor não encontrado');
+      }
+    }
+
+    // Criar produto primeiro
+    const product = await this.prisma.product.create({
+      data: {
+        ...productData,
+        minStock: productData.minStock || 0,
+        isAvailable: productData.isAvailable ?? true
+      },
+      include: {
+        store: { select: { id: true, name: true } },
+        supplier: { select: { id: true, name: true } }
+      }
+    });
+
+    // Se há imagens, fazer upload
+    if (files && files.length > 0) {
+      try {
+        const imageUrls = await this.uploadService.uploadMultipleProductImages(files, product.id);
+        
+        // Atualizar produto com as imagens
+        const updatedProduct = await this.prisma.product.update({
+          where: { id: product.id },
+          data: { 
+            imageUrls,
+            imageUrl: imageUrls[0] // Primeira imagem como principal
+          },
+          include: {
+            store: { select: { id: true, name: true } },
+            supplier: { select: { id: true, name: true } }
+          }
+        });
+
+        return updatedProduct;
+      } catch (error) {
+        // Se falhar o upload, ainda retorna o produto criado
+        console.error('Erro no upload das imagens:', error);
+        return product;
+      }
+    }
+
+    return product;
+  }
+
   async updateProduct(id: string, productData: any) {
     const product = await this.prisma.product.findUnique({
       where: { id }
@@ -687,5 +782,127 @@ export class AdminService {
     });
 
     return sales;
+  }
+
+  // ==================== GESTÃO DE CLIENTES ====================
+
+  async getAllCustomers(page = 1, limit = 10, search = '') {
+    const skip = (page - 1) * limit;
+    
+    const where = {
+      role: UserRole.CUSTOMER,
+      ...(search ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' as any } },
+          { email: { contains: search, mode: 'insensitive' as any } }
+        ]
+      } : {})
+    };
+
+    const [customers, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          _count: {
+            select: {
+              purchases: true,
+              favorites: true,
+              reviews: true,
+              cartItems: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.prisma.user.count({ where })
+    ]);
+
+    return {
+      customers,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  async getCustomerById(id: string) {
+    const customer = await this.prisma.user.findUnique({
+      where: { 
+        id,
+        role: UserRole.CUSTOMER 
+      },
+      include: {
+        purchases: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            items: {
+              include: {
+                product: { 
+                  select: { 
+                    name: true, 
+                    category: true 
+                  } 
+                }
+              }
+            }
+          }
+        },
+        favorites: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            product: {
+              select: {
+                name: true,
+                price: true,
+                category: true
+              }
+            }
+          }
+        },
+        reviews: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            product: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
+        cartItems: {
+          include: {
+            product: {
+              select: {
+                name: true,
+                price: true,
+                category: true
+              }
+            }
+          }
+        },
+        _count: {
+          select: {
+            purchases: true,
+            favorites: true,
+            reviews: true,
+            cartItems: true
+          }
+        }
+      }
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Cliente não encontrado');
+    }
+
+    return customer;
   }
 }

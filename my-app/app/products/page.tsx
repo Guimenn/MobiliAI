@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Search, Filter, ShoppingCart, Star, Sparkles, ArrowLeft, Grid, List } from 'lucide-react';
+import { Search, Filter, ShoppingCart, Star, Sparkles, ArrowLeft, Grid, List, Eye, Edit } from 'lucide-react';
 import Link from 'next/link';
+import ProductModal from '@/components/ProductModal';
 
 type ProductCategory = 'SOFA' | 'MESA' | 'CADEIRA' | 'ARMARIO' | 'CAMA' | 'DECORACAO' | 'ILUMINACAO' | 'OUTROS';
 
@@ -19,6 +20,11 @@ export default function ProductsPage() {
   const [selectedColor, setSelectedColor] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock'>('name');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  // Estados para o modal de produto
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -73,6 +79,27 @@ export default function ProductsPage() {
   const handleAddToCart = (product: Product) => {
     addToCart(product, 1);
     // Aqui você pode adicionar um toast de sucesso
+  };
+
+  const handleViewProduct = (product: Product) => {
+    setSelectedProduct(product);
+    setModalMode('view');
+    setIsModalOpen(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setSelectedProduct(product);
+    setModalMode('edit');
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+  };
+
+  const handleProductUpdated = (updatedProduct: Product) => {
+    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
   };
 
   return (
@@ -307,11 +334,22 @@ export default function ProductsPage() {
                         <ShoppingCart className="mr-2 h-4 w-4" />
                         Adicionar
                       </Button>
-                      <Link href={`/products/${product.id}`}>
-                        <Button variant="outline" size="sm">
-                          Ver
-                        </Button>
-                      </Link>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleViewProduct(product)}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        Visualizar
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleEditProduct(product)}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Editar
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -332,6 +370,15 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de Produto */}
+      <ProductModal
+        product={selectedProduct}
+        isOpen={isModalOpen}
+        mode={modalMode}
+        onClose={handleCloseModal}
+        onProductUpdated={handleProductUpdated}
+      />
     </div>
   );
 }

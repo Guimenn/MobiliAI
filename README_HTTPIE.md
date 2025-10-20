@@ -102,3 +102,4 @@ http POST :3005/api/process-url prompt="azul" imageUrl="URL" | jq
 
 **Pronto para começar?** Execute: `./test-httpie-nano-banana.sh`
 
+
