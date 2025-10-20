@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import PromotionalSection from '@/components/PromotionalSection';
+import Footer from '@/components/Footer';
 import { 
   Search,
   ShoppingCart,
@@ -99,6 +100,30 @@ export default function HomePage() {
     setCartItems(prev => [...prev, productId]);
   };
 
+  // Função para ir para página de favoritos
+  const goToFavorites = () => {
+    router.push('/favorites');
+  };
+
+  // Função para abrir dropdown do usuário
+  const handleUserClick = () => {
+    if (isAuthenticated) {
+      setUserDropdownOpen(!userDropdownOpen);
+    } else {
+      router.push('/login');
+    }
+  };
+
+  // Função para abrir carrinho
+  const handleCartClick = () => {
+    if (cartItems.length > 0) {
+      alert(`Você tem ${cartItems.length} item(s) no carrinho`);
+      // Aqui você pode implementar lógica para mostrar modal do carrinho ou redirecionar
+    } else {
+      alert('Seu carrinho está vazio. Adicione alguns produtos!');
+    }
+  };
+
   // Função para logout
   const handleLogout = () => {
     logout();
@@ -129,7 +154,7 @@ export default function HomePage() {
     const handleClickOutside = (event: MouseEvent) => {
       if (userDropdownOpen) {
         const target = event.target as HTMLElement;
-        if (!target.closest('.user-dropdown')) {
+        if (!target.closest('.user-dropdown-container')) {
           setUserDropdownOpen(false);
         }
       }
@@ -420,8 +445,9 @@ export default function HomePage() {
     {
       id: 1,
       number: '01',
-      title: 'Living Room',
-      subtitle: 'Dream Design',
+      title: 'Sala de Estar',
+      subtitle: 'Design Moderno',
+      image: '/IAsection/ImagemIA1.png',
       largeGradient: 'from-teal-600 to-teal-700',
       smallGradient: 'from-rose-100 to-rose-200',
       accentColor: '#2dd4bf', // teal-400
@@ -429,8 +455,9 @@ export default function HomePage() {
     {
       id: 2,
       number: '02',
-      title: 'Bedroom',
-      subtitle: 'Cozy Space',
+      title: 'Sala de Estar',
+      subtitle: 'Elegância Contemporânea',
+      image: '/IAsection/ImagemIA2.png',
       largeGradient: 'from-rose-400 to-rose-500',
       smallGradient: 'from-blue-200 to-blue-300',
       accentColor: '#f472b6', // pink-400
@@ -438,8 +465,9 @@ export default function HomePage() {
     {
       id: 3,
       number: '03',
-      title: 'Modern Office',
-      subtitle: 'Futuristic',
+      title: 'Escritório Executivo',
+      subtitle: 'Luxo e Sofisticação',
+      image: '/IAsection/ImagemIA3.png',
       largeGradient: 'from-blue-500 to-blue-600',
       smallGradient: 'from-amber-200 to-amber-300',
       accentColor: '#3b82f6', // blue-500
@@ -447,8 +475,9 @@ export default function HomePage() {
     {
       id: 4,
       number: '04',
-      title: 'Dining',
-      subtitle: 'Family Time',
+      title: 'Sala de Jantar',
+      subtitle: 'Momento em Família',
+      image: '/IAsection/ImagemIA4.png',
       largeGradient: 'from-amber-600 to-amber-700',
       smallGradient: 'from-lime-100 to-lime-200',
       accentColor: '#f59e0b', // amber-400
@@ -465,8 +494,8 @@ export default function HomePage() {
     setAnimationDirection('right');
     setTimeout(() => {
       setCarouselIndex((i) => (i + 1) % slides.length);
-      setTimeout(() => setIsAnimating(false), 100);
-    }, 250);
+      setTimeout(() => setIsAnimating(false), 150);
+    }, 400);
   };
   const goPrev = () => {
     if (isAnimating) return;
@@ -474,8 +503,8 @@ export default function HomePage() {
     setAnimationDirection('left');
     setTimeout(() => {
       setCarouselIndex((i) => (i - 1 + slides.length) % slides.length);
-      setTimeout(() => setIsAnimating(false), 100);
-    }, 250);
+      setTimeout(() => setIsAnimating(false), 150);
+    }, 400);
   };
 
 
@@ -486,16 +515,15 @@ export default function HomePage() {
     if (isLarge) {
       return (
         <div className="w-full md:w-[400px] flex-shrink-0 relative">
-          <div className={`aspect-[6/9] bg-gradient-to-br ${slide.largeGradient} rounded-2xl shadow-xl relative overflow-hidden`}>
-            {/* base do sofá */}
-            <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-white to-gray-100 rounded-t-full transform translate-y-1/4"></div>
-            {/* detalhe lateral */}
-            <div className="absolute bottom-8 right-8 w-12 h-16 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg"></div>
-            {/* luminária */}
-            <div className="absolute bottom-16 right-6 w-8 h-8 bg-white rounded-full"></div>
-            {/* almofadas */}
-            <div className="absolute bottom-6 left-8 w-8 h-6 rounded-lg" style={{ backgroundColor: slide.accentColor }}></div>
-            <div className="absolute bottom-8 left-12 w-6 h-6 bg-yellow-400 rounded-lg"></div>
+          <div className={`aspect-[6/9] rounded-2xl shadow-xl relative overflow-hidden`}>
+            {/* Imagem de fundo */}
+            <div 
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{ backgroundImage: `url(${slide.image})` }}
+            ></div>
+            {/* Overlay gradiente para melhor legibilidade */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+            
             {/* overlay */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-6">
               <div className="text-white">
@@ -517,16 +545,17 @@ export default function HomePage() {
     }
 
   // small card (quadrado)
-  const smallGrad = slide.smallGradient;
   return (
     <div className="w-full md:w-[350px] flex-shrink-0 relative">
-      <div className={`aspect-[4/5] bg-gradient-to-br ${smallGrad} rounded-2xl shadow-xl relative overflow-hidden`}>
-        {/* base do assento */}
-        <div className="absolute bottom-0 left-0 w-full h-2/3 bg-gradient-to-t from-white/70 to-white/40 rounded-t-full transform translate-y-1/3"></div>
-        {/* detalhe circular */}
-        <div className="absolute bottom-6 right-1/4 w-12 h-12 bg-gradient-to-br from-green-300 to-green-400 rounded-full"></div>
-        {/* vaso */}
-        <div className="absolute bottom-8 right-1/3 w-3 h-6 bg-purple-400 rounded-full"></div>
+      <div className={`aspect-[4/5] rounded-2xl shadow-xl relative overflow-hidden`}>
+        {/* Imagem de fundo */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${slide.image})` }}
+        ></div>
+        {/* Overlay gradiente para melhor legibilidade */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+        
         {/* overlay */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-6">
           <div className="text-white">
@@ -638,17 +667,102 @@ export default function HomePage() {
               </div>
               
               {/* Favorites Icon */}
-              <button className="p-2 text-white/80 hover:text-white transition-colors">
+              <button 
+                onClick={goToFavorites}
+                className="p-2 text-white/80 hover:text-white transition-colors relative"
+              >
                 <Heart className="h-6 w-6" />
+                {favorites.length > 0 && (
+                  <Badge className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {favorites.length}
+                  </Badge>
+                )}
               </button>
               
               {/* Account Icon */}
-              <button className="p-2 text-white/80 hover:text-white transition-colors">
-                <User className="h-6 w-6" />
-              </button>
+              <div className="relative user-dropdown-container">
+                <button 
+                  onClick={handleUserClick}
+                  className="p-2 text-white/80 hover:text-white transition-colors"
+                >
+                  <User className="h-6 w-6" />
+                </button>
+                
+                {/* User Dropdown */}
+                {userDropdownOpen && isAuthenticated && (
+                  <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-gray-200 py-3 z-[999] animate-in slide-in-from-top-2 duration-200">
+                    {/* Header com informações do usuário */}
+                    <div className="px-4 py-3 bg-gray-50 rounded-t-2xl">
+                      <div className="flex items-center space-x-3">
+                        <div className="relative">
+                          <div className="w-10 h-10 bg-gradient-to-br from-[#3e2626] to-[#5a3a3a] rounded-full flex items-center justify-center shadow-lg">
+                            <User className="h-5 w-5 text-white" />
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-gray-900">{user?.name || 'Usuário'}</p>
+                          <p className="text-xs text-gray-500">{user?.email}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Botões de ação */}
+                    <div className="px-1 py-1">
+                      <Link 
+                        href="/profile"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="flex items-center space-x-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-[#3e2626]/5 hover:to-[#5a3a3a]/5 rounded-lg transition-all duration-200 group"
+                      >
+                        <div className="w-7 h-7 bg-[#3e2626]/10 rounded-lg flex items-center justify-center group-hover:bg-[#3e2626]/20 transition-colors">
+                          <User className="h-4 w-4 text-[#3e2626]" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm">Meu Perfil</p>
+                          <p className="text-xs text-gray-500">Editar informações</p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-[#3e2626] transition-colors" />
+                      </Link>
+                      
+                      <Link 
+                        href="/favorites"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="flex items-center space-x-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-[#3e2626]/5 hover:to-[#5a3a3a]/5 rounded-lg transition-all duration-200 group"
+                      >
+                        <div className="w-7 h-7 bg-[#3e2626]/10 rounded-lg flex items-center justify-center group-hover:bg-[#3e2626]/20 transition-colors">
+                          <Heart className="h-4 w-4 text-[#3e2626]" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm">Meus Favoritos</p>
+                          <p className="text-xs text-gray-500">{favorites.length} produtos salvos</p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-[#3e2626] transition-colors" />
+                      </Link>
+                      
+                      <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
+                      
+                      <button 
+                        onClick={handleLogout}
+                        className="flex items-center space-x-3 px-3 py-2.5 text-sm text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 rounded-lg transition-all duration-200 w-full text-left group"
+                      >
+                        <div className="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
+                          <LogOut className="h-4 w-4 text-red-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm">Sair</p>
+                          <p className="text-xs text-red-500">Fazer logout</p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-red-400 group-hover:text-red-600 transition-colors" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               
               {/* Cart Icon */}
-              <button className="p-2 text-white/80 hover:text-white transition-colors relative">
+              <button 
+                onClick={handleCartClick}
+                className="p-2 text-white/80 hover:text-white transition-colors relative"
+              >
                 <ShoppingCart className="h-6 w-6" />
                 {cartItems.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-white text-[#3e2626] text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -687,7 +801,7 @@ export default function HomePage() {
         {/* Hero Section */}
         <section className="relative flex items-center justify-center overflow-hidden h-full">
           {/* Content */}
-          <div className="relative z-50 w-full max-w-5xl px-4 sm:px-6 lg:px-8 text-center mt-30">
+          <div className="relative z-10 w-full max-w-5xl px-4 sm:px-6 lg:px-8 text-center mt-30">
             <div className="max-w-5xl mx-auto">
               {/* Main Heading */}
               <h1 className="text-3xl md:text-5xl lg:text-7xl font-thin leading-tight tracking-wider">
@@ -717,7 +831,7 @@ export default function HomePage() {
 
       {/* Categories Section */}
       <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
-        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+        <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 mt-10">
          
 
           {/* Grid Layout Customizado - 6 colunas x 5 linhas */}
@@ -1005,19 +1119,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Promotional Section */}
-      <PromotionalSection />
+     
 
       {/* AI Section */}
       <section className="py-20 bg-gradient-to-br from-white to-gray-50">
-        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
+        <div className="max-w-[1000px] mx-auto translate-x-[-130px] gap-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center ">
             {/* Left Side - Text Content */}
-            <div className="lg:col-span-1 space-y-8">
+            <div className="lg:col-span-1 space-y-8 ">
               <div>
-                <h2 className="text-4xl md:text-5xl font-bold text-[#3e2626] mb-6 leading-tight">
+                <h2 className="text-3xl md:text-5xl font-bold text-[#3e2626] mb-6 leading-tight">
                   <span className="block">Nossa IA</span>
-                  <span className="block ml-4">Revolucionária</span>
+                  <span className="block">Inovadora</span>
                 </h2>
                 <p className="text-xl text-gray-600 leading-relaxed">
                   Transforme qualquer ambiente com nossa inteligência artificial que visualiza cores e móveis em tempo real
@@ -1031,13 +1144,13 @@ export default function HomePage() {
             </div>
 
             {/* Right Side - Carousel */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 ">
               <div className="relative">
-                <div className="relative overflow-hidden">
+                <div className="relative overflow-hidden w-[900px]">
                   <div 
-                    className="flex space-x-4 items-start transition-transform duration-500 ease-out"
+                    className="flex space-x-4 items-start transition-all duration-700 ease-in-out"
                     style={{
-                      transform: `translateX(${isAnimating ? (animationDirection === 'right' ? '-20px' : '20px') : '0px'})`
+                      transform: `translateX(${isAnimating ? (animationDirection === 'right' ? '-30px' : '30px') : '0px'})` 
                     }}
                   >
                     {([0,1,2] as const).map((offset) => {
@@ -1052,6 +1165,9 @@ export default function HomePage() {
                               ? 'opacity-100 scale-100 transform translate-y-0' 
                               : 'opacity-80 scale-95 transform translate-y-1'
                           }`}
+                          style={{
+                            transitionDelay: `${offset * 100}ms`
+                          }}
                         >
                           {renderSlide(slideData, offset)}
                         </div>
@@ -1356,146 +1472,12 @@ export default function HomePage() {
         </div>
       </section>
 
-     
+       {/* Promotional Section */}
+       <PromotionalSection />
 
-     
 
-      {/* Newsletter Section */}
-      <section className="py-20 bg-gradient-to-br from-[#3e2626] to-[#8B4513] text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <div className="space-y-8">
-              <div className="space-y-6">
-                <h2 className="text-4xl md:text-5xl font-bold leading-tight">
-                  Mantenha-se Atualizado
-                </h2>
-                <p className="text-xl text-gray-200 leading-relaxed">
-                  Receba ofertas exclusivas, novidades sobre móveis e dicas de decoração com IA
-                </p>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Input
-                  placeholder="Seu melhor e-mail"
-                  className="flex-1 bg-white/10 border-2 border-white/20 text-white placeholder:text-gray-300 text-lg py-4 px-6 rounded-xl"
-                />
-                <Button className="bg-white text-[#3e2626] hover:bg-gray-100 font-semibold text-lg px-8 py-4 rounded-xl">
-                  <Mail className="mr-3 h-6 w-6" />
-                  Inscrever
-                </Button>
-              </div>
-              
-              <div className="flex items-center space-x-8 text-sm text-gray-300">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5 text-[#D2B48C]" />
-                  <span>Ofertas exclusivas</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5 text-[#D2B48C]" />
-                  <span>Dicas de decoração</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="relative">
-              <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 border border-white/20">
-                <div className="bg-white rounded-2xl p-8 shadow-2xl">
-                  <div className="space-y-6">
-                    <div className="text-center">
-                      <div className="w-20 h-20 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Mail className="h-10 w-10 text-white" />
-                      </div>
-                      <h3 className="text-2xl font-bold text-[#3e2626] mb-2">Newsletter</h3>
-                      <p className="text-gray-600">Receba novidades em primeira mão</p>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="aspect-square bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-xl flex items-center justify-center">
-                        <Palette className="h-8 w-8 text-white" />
-                      </div>
-                      <div className="aspect-square bg-gradient-to-br from-[#D2B48C] to-[#A0522D] rounded-xl flex items-center justify-center">
-                        <Sparkles className="h-8 w-8 text-white" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-            <div className="space-y-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-[#3e2626] rounded-lg flex items-center justify-center">
-                  <Palette className="h-6 w-6 text-white" />
-                </div>
-                <span className="text-2xl font-bold">MobiliAI</span>
-              </div>
-              <p className="text-gray-400 text-lg leading-relaxed">
-                Transforme sua casa com móveis inteligentes e tecnologia de IA. 
-                Visualize móveis reais antes de comprar.
-              </p>
-              <div className="flex space-x-4">
-                <Button size="sm" variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white">
-                  <Facebook className="h-5 w-5" />
-                </Button>
-                <Button size="sm" variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white">
-                  <Instagram className="h-5 w-5" />
-                </Button>
-                <Button size="sm" variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white">
-                  <Twitter className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-xl font-bold mb-6">Empresa</h3>
-              <ul className="space-y-4 text-gray-400">
-                <li><Link href="/about" className="hover:text-white transition-colors text-lg">Sobre Nós</Link></li>
-                <li><Link href="/contact" className="hover:text-white transition-colors text-lg">Contato</Link></li>
-                <li><Link href="/careers" className="hover:text-white transition-colors text-lg">Carreiras</Link></li>
-                <li><Link href="/blog" className="hover:text-white transition-colors text-lg">Blog</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-xl font-bold mb-6">Suporte</h3>
-              <ul className="space-y-4 text-gray-400">
-                <li><Link href="/help" className="hover:text-white transition-colors text-lg">Central de Ajuda</Link></li>
-                <li><Link href="/shipping" className="hover:text-white transition-colors text-lg">Informações de Envio</Link></li>
-                <li><Link href="/returns" className="hover:text-white transition-colors text-lg">Devoluções</Link></li>
-                <li><Link href="/faq" className="hover:text-white transition-colors text-lg">FAQ</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-xl font-bold mb-6">Baixe Nossa App</h3>
-              <p className="text-gray-400 mb-6 text-lg">
-                Disponível para iOS e Android
-              </p>
-              <div className="space-y-3">
-                <Button variant="outline" className="w-full border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white text-lg py-3">
-                  <Download className="mr-3 h-5 w-5" />
-                  App Store
-                </Button>
-                <Button variant="outline" className="w-full border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white text-lg py-3">
-                  <Download className="mr-3 h-5 w-5" />
-                  Google Play
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-800 mt-16 pt-8 text-center text-gray-400">
-            <p className="text-lg">&copy; 2024 MobiliAI. Todos os direitos reservados.</p>
-          </div>
-        </div>
-      </footer>
+     {/* Footer */}
+     <Footer />
     </div>
   );
 }

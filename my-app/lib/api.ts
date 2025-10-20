@@ -685,4 +685,123 @@ export const managerAPI = {
   },
 };
 
+// Customer API - Favoritos
+export const customerAPI = {
+  // Favoritos
+  getFavorites: async (page = 1, limit = 12) => {
+    const response = await api.get('/customer/favorites', {
+      params: { page, limit }
+    });
+    return response.data;
+  },
+
+  addToFavorites: async (productId: string) => {
+    const response = await api.post('/customer/favorites/add', { productId });
+    return response.data;
+  },
+
+  removeFromFavorites: async (productId: string) => {
+    const response = await api.delete('/customer/favorites/remove', {
+      data: { productId }
+    });
+    return response.data;
+  },
+
+  checkFavorite: async (productId: string) => {
+    const response = await api.get(`/customer/favorites/check/${productId}`);
+    return response.data;
+  },
+
+  getFavoritesCount: async () => {
+    const response = await api.get('/customer/favorites/count');
+    return response.data;
+  },
+
+  // Carrinho
+  getCart: async () => {
+    const response = await api.get('/customer/cart');
+    return response.data;
+  },
+
+  addToCart: async (productId: string, quantity = 1) => {
+    const response = await api.post('/customer/cart/add', { productId, quantity });
+    return response.data;
+  },
+
+  updateCartItem: async (productId: string, quantity: number) => {
+    const response = await api.put('/customer/cart/update', { productId, quantity });
+    return response.data;
+  },
+
+  removeFromCart: async (productId: string) => {
+    const response = await api.delete('/customer/cart/remove', {
+      data: { productId }
+    });
+    return response.data;
+  },
+
+  clearCart: async () => {
+    const response = await api.delete('/customer/cart/clear');
+    return response.data;
+  },
+
+  // Pedidos
+  getOrders: async (page = 1, limit = 10) => {
+    const response = await api.get('/customer/orders', {
+      params: { page, limit }
+    });
+    return response.data;
+  },
+
+  getOrderById: async (orderId: string) => {
+    const response = await api.get(`/customer/orders/${orderId}`);
+    return response.data;
+  },
+
+  cancelOrder: async (orderId: string) => {
+    const response = await api.put(`/customer/orders/${orderId}/cancel`);
+    return response.data;
+  },
+
+  // Checkout
+  checkout: async (checkoutData: {
+    paymentMethod: string;
+    shippingAddress?: any;
+    notes?: string;
+  }) => {
+    const response = await api.post('/customer/cart/checkout', checkoutData);
+    return response.data;
+  },
+
+  // Avaliações
+  createReview: async (productId: string, rating: number, comment: string) => {
+    const response = await api.post('/customer/reviews', {
+      productId,
+      rating,
+      comment
+    });
+    return response.data;
+  },
+
+  updateReview: async (reviewId: string, rating: number, comment: string) => {
+    const response = await api.put(`/customer/reviews/${reviewId}`, {
+      rating,
+      comment
+    });
+    return response.data;
+  },
+
+  deleteReview: async (reviewId: string) => {
+    const response = await api.delete(`/customer/reviews/${reviewId}`);
+    return response.data;
+  },
+
+  getMyReviews: async (page = 1, limit = 10) => {
+    const response = await api.get('/customer/reviews/my', {
+      params: { page, limit }
+    });
+    return response.data;
+  }
+};
+
 export default api;
