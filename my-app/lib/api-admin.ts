@@ -72,25 +72,13 @@ export const adminAPI = {
 
   // Products
   getProducts: async (token: string) => {
-    if (!token) {
-      throw new Error('Token de autenticação não encontrado. Faça login novamente.');
-    }
-    
     const response = await fetch(`${API_BASE_URL}/admin/products`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     });
-    
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Sessão expirada. Faça login novamente.');
-      }
-      throw new Error(`Erro ao carregar produtos: ${response.statusText}`);
-    }
-    
-    return response.json();
+    return response;
   },
 
   createProduct: async (token: string, data: any) => {
@@ -138,6 +126,29 @@ export const adminAPI = {
     }
     
     return response.json();
+  },
+
+  // Sales
+  getSales: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/admin/sales`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return response;
+  },
+
+  createSale: async (token: string, data: any) => {
+    const response = await fetch(`${API_BASE_URL}/admin/sales`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    return response;
   },
 
   // Financial

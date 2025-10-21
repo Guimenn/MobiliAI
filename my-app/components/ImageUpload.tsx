@@ -25,7 +25,7 @@ export default function ImageUpload({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const totalImages = images.length + existingImages.length + files.length;
+    const totalImages = (images?.length || 0) + existingImages.length + files.length;
 
     if (totalImages > maxImages) {
       alert(`Você pode adicionar no máximo ${maxImages} imagens`);
@@ -56,12 +56,12 @@ export default function ImageUpload({
       setPreviews(prev => [...prev, ...newPreviews]);
 
       // Adicionar aos arquivos
-      onImagesChange([...images, ...validSizeFiles]);
+      onImagesChange([...(images || []), ...validSizeFiles]);
     }
   };
 
   const handleRemoveNew = (index: number) => {
-    const newImages = images.filter((_, i) => i !== index);
+    const newImages = (images || []).filter((_, i) => i !== index);
     const newPreviews = previews.filter((_, i) => i !== index);
     
     onImagesChange(newImages);
@@ -78,7 +78,7 @@ export default function ImageUpload({
     fileInputRef.current?.click();
   };
 
-  const totalImages = existingImages.length + images.length;
+  const totalImages = existingImages.length + (images?.length || 0);
   const canAddMore = totalImages < maxImages;
 
   return (
