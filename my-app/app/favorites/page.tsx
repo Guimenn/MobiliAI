@@ -33,11 +33,20 @@ import {
   DollarSign,
   MapPin,
   Plus,
-  X
+  X,
+  Sparkles,
+  Palette,
+  Paintbrush,
+  Wand2,
+  Eye,
+  Filter,
+  SortAsc,
+  SortDesc
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { toast } from 'sonner';
+import Header from '@/components/Header';
 
 interface FavoriteProduct {
   id: string;
@@ -95,7 +104,7 @@ export default function FavoritesPage() {
           product: {
             id: '1',
             name: 'Sofá 3 Lugares Moderno',
-            description: 'Sofá confortável com design moderno',
+            description: 'Sofá confortável com design moderno e acabamento em tecido premium',
             price: 2500,
             imageUrls: ['/image.png'],
             category: 'SOFA',
@@ -114,7 +123,7 @@ export default function FavoritesPage() {
           product: {
             id: '2',
             name: 'Mesa de Jantar Rústica',
-            description: 'Mesa de jantar em madeira rústica',
+            description: 'Mesa de jantar em madeira rústica com detalhes artesanais únicos',
             price: 1800,
             imageUrls: ['/image.png'],
             category: 'MESA',
@@ -123,6 +132,25 @@ export default function FavoritesPage() {
             reviewCount: 18,
             isFeatured: false,
             isNew: true,
+            isBestSeller: false,
+            store: { name: 'Loja Central' }
+          },
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: '3',
+          product: {
+            id: '3',
+            name: 'Poltrona Elegante Vintage',
+            description: 'Poltrona vintage com estofamento em couro legítimo e pés em madeira',
+            price: 3200,
+            imageUrls: ['/image.png'],
+            category: 'CADEIRA',
+            brand: 'MobiliAI',
+            rating: 4.9,
+            reviewCount: 32,
+            isFeatured: true,
+            isNew: false,
             isBestSeller: false,
             store: { name: 'Loja Central' }
           },
@@ -190,83 +218,55 @@ export default function FavoritesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header Simples */}
-      <header className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-900">MobiliAI</span>
-            </Link>
-
-            <div className="flex items-center space-x-4">
-              <Link href="/favorites" className="relative">
-                <Heart className="w-6 h-6 text-red-500 fill-red-500" />
-                <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                  {favorites.length}
-                </Badge>
-              </Link>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center space-x-2"
-              >
-                <User className="w-5 h-5" />
-                <span>{user?.name}</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Header */}
+      <Header />
 
       {/* Conteúdo Principal */}
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Título */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Favoritos</h1>
+        {/* Título Simples */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-[#3e2626] mb-2">Meus Favoritos</h1>
           <p className="text-gray-600">Produtos que você salvou para depois</p>
         </div>
 
         {/* Busca e Controles */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                placeholder="Buscar nos favoritos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 mb-6">
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  placeholder="Buscar nos favoritos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-            >
-              <Grid className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="w-4 h-4" />
-            </Button>
+            
+            <div className="flex items-center space-x-2">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+              >
+                <Grid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Lista de Favoritos */}
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626]"></div>
           </div>
         ) : filteredFavorites.length === 0 ? (
           <Card>
@@ -309,10 +309,13 @@ export default function FavoritesPage() {
                     {/* Badges */}
                     <div className="absolute top-3 left-3 flex space-x-2">
                       {favorite.product.isFeatured && (
-                        <Badge className="bg-blue-500 text-white">Destaque</Badge>
+                        <Badge className="bg-[#3e2626] text-white">Destaque</Badge>
                       )}
                       {favorite.product.isNew && (
-                        <Badge className="bg-green-500 text-white">Novo</Badge>
+                        <Badge className="bg-[#8B4513] text-white">Novo</Badge>
+                      )}
+                      {favorite.product.isBestSeller && (
+                        <Badge className="bg-[#A0522D] text-white">Mais Vendido</Badge>
                       )}
                     </div>
 
@@ -350,7 +353,7 @@ export default function FavoritesPage() {
 
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xl font-bold text-gray-900">
+                        <p className="text-xl font-bold text-[#3e2626]">
                           R$ {favorite.product.price.toLocaleString('pt-BR')}
                         </p>
                         <p className="text-xs text-gray-500">

@@ -214,11 +214,27 @@ export const useAppStore = create<AppState>()(
 
       // Logout
       logout: () => {
+        console.log('🚪 Executando logout...');
+        
         // Limpar localStorage completamente
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('mobili-ai-storage');
+          try {
+            localStorage.removeItem('mobili-ai-storage');
+            localStorage.removeItem('supabase.auth.token');
+            // Limpar outros possíveis dados de autenticação
+            Object.keys(localStorage).forEach(key => {
+              if (key.includes('supabase') || key.includes('auth')) {
+                localStorage.removeItem(key);
+              }
+            });
+            sessionStorage.clear();
+            console.log('✅ Dados do localStorage limpos');
+          } catch (error) {
+            console.error('❌ Erro ao limpar localStorage:', error);
+          }
         }
         
+        // Resetar estado do store
         set({
           user: null,
           token: null,
@@ -232,6 +248,8 @@ export const useAppStore = create<AppState>()(
           isLoading: false,
           error: null,
         });
+        
+        console.log('✅ Logout concluído - estado resetado');
       },
     }),
     {
