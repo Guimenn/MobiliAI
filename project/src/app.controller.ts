@@ -9,4 +9,11 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
+
+  @Get('test')
+  getTest(): string {
+    return 'Test endpoint funcionando!';
+  }
+
+
 }

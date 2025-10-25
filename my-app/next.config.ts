@@ -7,23 +7,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '3001',
-        pathname: '/**',
-      },
-    ],
-    unoptimized: true,
-    domains: ['localhost'],
-  },
-  experimental: {
-    optimizePackageImports: ['lucide-react'],
-  },
-  // Configurações para reduzir problemas de hidratação
-  reactStrictMode: true,
+  reactStrictMode: false,
 };
 
 export default nextConfig;

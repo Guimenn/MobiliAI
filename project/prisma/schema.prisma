@@ -24,6 +24,7 @@ model User {
   updatedAt         DateTime            @updatedAt
   storeId           String?
   cpf               String?             @unique
+  workingHours      Json?
   cartItems         CartItem[]
   cashExpenses      CashExpense[]
   cashFlows         CashFlow[]
@@ -38,28 +39,38 @@ model User {
   purchases         Sale[]              @relation("CustomerSales")
   sales             Sale[]              @relation("EmployeeSales")
   systemLogs        SystemLog[]
+  timeClockRecords  TimeClock[]
   store             Store?              @relation(fields: [storeId], references: [id])
 
   @@map("users")
 }
 
 model Store {
-  id        String      @id @default(uuid())
-  name      String
-  address   String
-  city      String
-  state     String
-  zipCode   String
-  phone     String?
-  email     String?
-  isActive  Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  cashFlows CashFlow[]
-  dailyCash DailyCash[]
-  products  Product[]
-  sales     Sale[]
-  employees User[]
+  id           String      @id @default(uuid())
+  name         String
+  address      String
+  city         String
+  state        String
+  zipCode      String
+  phone        String?
+  email        String?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  description  String?
+  settings     Json?
+  workingHours Json?
+  // Horário de funcionamento da loja
+  openingTime  String?     // Ex: "08:00"
+  closingTime  String?     // Ex: "18:00"
+  workingDays  String[]    // Ex: ["segunda", "terca", "quarta", "quinta", "sexta", "sabado"]
+  lunchStart   String?     // Ex: "12:00"
+  lunchEnd     String?     // Ex: "13:00"
+  cashFlows    CashFlow[]
+  dailyCash    DailyCash[]
+  products     Product[]
+  sales        Sale[]
+  employees    User[]
 
   @@map("stores")
 }
@@ -432,11 +443,40 @@ model Comparison {
   @@map("comparisons")
 }
 
+model TimeClock {
+  id                String   @id @default(uuid())
+  employeeId        String
+  date              String
+  clockIn           String?
+  clockOut          String?
+  photo             String?
+  clockOutPhoto     String?
+  latitude          Float?
+  longitude         Float?
+  address           String?
+  clockOutLatitude  Float?
+  clockOutLongitude Float?
+  clockOutAddress   String?
+  totalHours        Float?   @default(0)
+  regularHours      Float?   @default(0)
+  overtimeHours     Float?   @default(0)
+  lunchBreakMinutes Int?     @default(60)
+  minutesLate       Int?     @default(0)
+  status            String   @default("PRESENT")
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  employee          User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("time_clock")
+}
+
 enum UserRole {
   ADMIN
   STORE_MANAGER
   CASHIER
   CUSTOMER
+  EMPLOYEE
 }
 
 enum ProductCategory {
@@ -484,4 +524,4 @@ enum MaterialType {
   METAL
   COURO
   TECIDO
-}
+  }

@@ -14,15 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MobiliAI - Decore sua casa com Inteligência Artificial",
-  description: "Transforme sua casa com móveis e decorações usando nossa IA Decoradora. Visualize móveis no seu ambiente real antes de comprar.",
+  title: "MobiliAI",
+  description: "Sistema de Gestão",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="pt-BR">
       <body

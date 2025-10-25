@@ -13,6 +13,8 @@ import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { CreateEmployeeDto } from './dto/create-employee.dto';
+import { UpdateEmployeeDto } from './dto/update-employee.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -89,6 +91,14 @@ export class AdminController {
     return this.adminService.changeUserPassword(id, data.password);
   }
 
+  @Put('users/:id/working-hours')
+  async updateUserWorkingHours(
+    @Param('id') id: string,
+    @Body() data: { workingHours: any }
+  ) {
+    return this.adminService.updateUserWorkingHours(id, data.workingHours);
+  }
+
   // ==================== GESTÃO DE LOJAS ====================
 
   @Get('stores')
@@ -105,8 +115,14 @@ export class AdminController {
   async createStore(@Body() storeData: {
     name: string;
     address: string;
+    city: string;
+    state: string;
+    zipCode: string;
     phone: string;
     email: string;
+    description?: string;
+    workingHours?: any;
+    settings?: any;
     managerId?: string;
   }) {
     return this.adminService.createStore(storeData);
@@ -129,6 +145,158 @@ export class AdminController {
   @Delete('stores/:id')
   async deleteStore(@Param('id') id: string) {
     return this.adminService.deleteStore(id);
+  }
+
+  // ==================== PONTO ELETRÔNICO ====================
+
+  @Post('time-clock')
+  async registerTimeClock(@Body() timeClockData: any) {
+    try {
+      console.log('🕐 Dados de ponto recebidos:', JSON.stringify(timeClockData, null, 2));
+      
+      // Usar o TimeClockService para registrar o ponto
+      const result = await this.adminService.registerTimeClock(timeClockData);
+      
+      console.log('✅ Ponto registrado com sucesso:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Erro ao registrar ponto:', error);
+      throw error;
+    }
+  }
+
+  // Endpoint de teste sem autenticação
+  @Post('test-time-clock')
+  async testTimeClock(@Body() timeClockData: any) {
+    try {
+      console.log('🧪 Teste de time-clock - Dados recebidos:', JSON.stringify(timeClockData, null, 2));
+      
+      return {
+        message: 'Endpoint de teste funcionando',
+        receivedData: timeClockData,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('❌ Erro no teste:', error);
+      throw error;
+    }
+  }
+
+  // Endpoint simples para registro de ponto
+  @Post('simple-time-clock')
+  async simpleTimeClock(@Body() timeClockData: any) {
+    try {
+      console.log('🕐 Simple time-clock - Dados recebidos:', JSON.stringify(timeClockData, null, 2));
+      
+      // Simular registro de ponto (temporário)
+      const result = {
+        id: `time-${Date.now()}`,
+        employeeId: timeClockData.employeeId,
+        date: new Date().toISOString().split('T')[0],
+        clockIn: new Date().toTimeString().split(' ')[0].substring(0, 5),
+        photo: timeClockData.photo ? 'Foto capturada' : null,
+        latitude: timeClockData.latitude,
+        longitude: timeClockData.longitude,
+        address: timeClockData.address,
+        status: 'PRESENT',
+        createdAt: new Date().toISOString()
+      };
+      
+      console.log('✅ Ponto registrado com sucesso:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Erro ao registrar ponto:', error);
+      throw error;
+    }
+  }
+
+  // ==================== FUNCIONÁRIOS ====================
+
+  @Post('employees')
+  async createEmployee(@Body() employeeData: CreateEmployeeDto) {
+    try {
+      console.log('🔍 Dados recebidos no controller:', JSON.stringify(employeeData, null, 2));
+      console.log('🔍 Tipo dos dados:', typeof employeeData);
+      console.log('🔍 Chaves dos dados:', Object.keys(employeeData));
+      return await this.adminService.createEmployee(employeeData);
+    } catch (error) {
+      console.error('❌ Erro ao criar funcionário:', error);
+      throw error;
+    }
+  }
+
+  @Put('employees/:id')
+  async updateEmployee(
+    @Param('id') id: string,
+    @Body() employeeData: UpdateEmployeeDto
+  ) {
+    return this.adminService.updateEmployee(id, employeeData);
+  }
+
+  @Delete('employees/:id')
+  async deleteEmployee(@Param('id') id: string) {
+    return this.adminService.deleteEmployee(id);
+  }
+
+  // ==================== FUNCIONÁRIOS POR LOJA ====================
+
+  @Get('stores/:id/employees')
+  async getStoreEmployees(@Param('id') id: string) {
+    return this.adminService.getStoreEmployees(id);
+  }
+
+  // ==================== VENDAS POR LOJA ====================
+
+  @Get('stores/:id/sales')
+  async getStoreSales(@Param('id') id: string) {
+    return this.adminService.getStoreSales(id);
+  }
+
+  @Get('stores/:id/sales/stats')
+  async getStoreSalesStats(@Param('id') id: string) {
+    return this.adminService.getStoreSalesStats(id);
+  }
+
+  // ==================== ANÁLISES E MÉTRICAS ====================
+
+  @Get('stores/:id/analytics')
+  async getStoreAnalytics(
+    @Param('id') id: string,
+    @Query('period') period: string = '30d'
+  ) {
+    return this.adminService.getStoreAnalytics(id, period);
+  }
+
+  // ==================== RELATÓRIOS POR LOJA ====================
+
+  @Get('stores/:id/reports')
+  async getStoreReport(
+    @Param('id') id: string,
+    @Query('type') type: string = 'sales',
+    @Query('period') period: string = '30d',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    return this.adminService.getStoreReport(id, {
+      type,
+      period,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined
+    });
+  }
+
+  @Post('stores/:id/reports/export')
+  async exportStoreReport(
+    @Param('id') id: string,
+    @Body() options: {
+      type: string;
+      period: string;
+      format: 'pdf' | 'excel' | 'csv';
+      startDate?: string;
+      endDate?: string;
+    }
+  ) {
+    return this.adminService.exportStoreReport(id, options);
   }
 
   // ==================== GESTÃO DE PRODUTOS ====================

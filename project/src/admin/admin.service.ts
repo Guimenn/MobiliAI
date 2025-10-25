@@ -212,6 +212,7 @@ export class AdminService {
     phone?: string;
     address?: string;
     isActive?: boolean;
+    workingHours?: any;
   }) {
     const user = await this.prisma.user.findUnique({
       where: { id }
@@ -250,6 +251,34 @@ export class AdminService {
     });
 
     return updatedUser;
+  }
+
+  async updateUserWorkingHours(id: string, workingHours: any) {
+    const user = await this.prisma.user.findUnique({
+      where: { id }
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    // Validar se o usuário é um funcionário (não cliente)
+    if (user.role === UserRole.CUSTOMER) {
+      throw new BadRequestException('Clientes não podem ter horário de expediente configurado');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: { workingHours },
+      include: {
+        store: { select: { id: true, name: true } }
+      }
+    });
+
+    return {
+      message: 'Horário de expediente atualizado com sucesso',
+      user: updatedUser
+    };
   }
 
   async deleteUser(id: string) {
@@ -363,19 +392,28 @@ export class AdminService {
   async createStore(storeData: {
     name: string;
     address: string;
+    city: string;
+    state: string;
+    zipCode: string;
     phone: string;
     email: string;
+    description?: string;
+    workingHours?: any;
+    settings?: any;
     managerId?: string;
   }) {
     const store = await this.prisma.store.create({
       data: {
         name: storeData.name,
         address: storeData.address,
+        city: storeData.city,
+        state: storeData.state,
+        zipCode: storeData.zipCode,
         phone: storeData.phone,
         email: storeData.email,
-        city: 'São Paulo',
-        state: 'SP',
-        zipCode: '00000-000',
+        description: storeData.description,
+        workingHours: storeData.workingHours,
+        settings: storeData.settings,
         isActive: true
       }
     });
@@ -904,5 +942,437 @@ export class AdminService {
     }
 
     return customer;
+  }
+
+  // ==================== FUNCIONÁRIOS POR LOJA ====================
+
+  async getStoreEmployees(storeId: string) {
+    return this.prisma.user.findMany({
+      where: { storeId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        role: true,
+        isActive: true,
+        createdAt: true
+      }
+    });
+  }
+
+  async createEmployee(employeeData: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    cpf?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    role: any;
+    storeId: string;
+    department?: string;
+    position?: string;
+    hireDate?: string;
+    emergencyContact?: string;
+    emergencyPhone?: string;
+    notes?: string;
+    isActive?: boolean;
+  }) {
+    console.log('🔍 Dados recebidos para criar funcionário:', employeeData);
+    
+    // Verificar se o email já existe
+    console.log('🔍 Verificando se email já existe:', employeeData.email);
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: employeeData.email }
+    });
+
+    if (existingUser) {
+      console.log('❌ Email já existe:', employeeData.email);
+      throw new Error('Já existe um usuário com este email');
+    }
+
+    console.log('✅ Email disponível, prosseguindo com criação...');
+    const { password, ...userData } = employeeData;
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const { storeId, department, position, hireDate, emergencyContact, emergencyPhone, notes, ...restUserData } = userData;
+    
+    console.log('🔍 Dados filtrados para criação:', {
+      ...restUserData,
+      password: '[HASHED]',
+      isActive: userData.isActive ?? true,
+      storeId
+    });
+    
+    return this.prisma.user.create({
+      data: {
+        ...restUserData,
+        password: hashedPassword,
+        isActive: userData.isActive ?? true,
+        store: {
+          connect: { id: storeId }
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        city: true,
+        state: true,
+        zipCode: true,
+        cpf: true,
+        role: true,
+        isActive: true,
+        createdAt: true
+      }
+    });
+  }
+
+  async updateEmployee(employeeId: string, employeeData: any) {
+    return this.prisma.user.update({
+      where: { id: employeeId },
+      data: employeeData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        role: true,
+        isActive: true,
+        createdAt: true
+      }
+    });
+  }
+
+  async deleteEmployee(employeeId: string) {
+    return this.prisma.user.delete({
+      where: { id: employeeId }
+    });
+  }
+
+  // ==================== VENDAS POR LOJA ====================
+
+  async getStoreSales(storeId: string) {
+    return this.prisma.sale.findMany({
+      where: { storeId },
+      include: {
+        customer: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        employee: {
+          select: {
+            name: true
+          }
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                name: true,
+                price: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async getStoreSalesStats(storeId: string) {
+    const [totalRevenue, totalSales, averageTicket] = await Promise.all([
+      this.prisma.sale.aggregate({
+        where: { storeId },
+        _sum: { totalAmount: true }
+      }),
+      this.prisma.sale.count({
+        where: { storeId }
+      }),
+      this.prisma.sale.aggregate({
+        where: { storeId },
+        _avg: { totalAmount: true }
+      })
+    ]);
+
+    return {
+      totalRevenue: totalRevenue._sum.totalAmount || 0,
+      totalSales,
+      averageTicket: averageTicket._avg.totalAmount || 0,
+      growthRate: 0 // Implementar cálculo de crescimento
+    };
+  }
+
+  // ==================== ANÁLISES E MÉTRICAS ====================
+
+  async getStoreAnalytics(storeId: string, period: string) {
+    const now = new Date();
+    let startDate: Date;
+
+    switch (period) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case '1y':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const [revenue, sales, customers, products] = await Promise.all([
+      this.prisma.sale.aggregate({
+        where: {
+          storeId,
+          createdAt: { gte: startDate }
+        },
+        _sum: { totalAmount: true }
+      }),
+      this.prisma.sale.count({
+        where: {
+          storeId,
+          createdAt: { gte: startDate }
+        }
+      }),
+      this.prisma.user.count({
+        where: {
+          storeId,
+          role: 'CUSTOMER',
+          createdAt: { gte: startDate }
+        }
+      }),
+      this.prisma.product.count({
+        where: { storeId }
+      })
+    ]);
+
+    return {
+      revenue: {
+        total: revenue._sum.totalAmount || 0,
+        growth: 0, // Implementar cálculo de crescimento
+        monthly: [] // Implementar dados mensais
+      },
+      sales: {
+        total: sales,
+        growth: 0, // Implementar cálculo de crescimento
+        daily: [] // Implementar dados diários
+      },
+      customers: {
+        total: customers,
+        new: customers,
+        returning: 0 // Implementar cálculo de clientes retornando
+      },
+      products: {
+        total: products,
+        topSelling: [] // Implementar produtos mais vendidos
+      },
+      performance: {
+        averageTicket: revenue._sum.totalAmount ? Number(revenue._sum.totalAmount) / sales : 0,
+        conversionRate: 0, // Implementar taxa de conversão
+        customerSatisfaction: 0 // Implementar satisfação do cliente
+      }
+    };
+  }
+
+  // ==================== RELATÓRIOS POR LOJA ====================
+
+  async getStoreReport(storeId: string, options: any) {
+    const { type, period, startDate, endDate } = options;
+    
+    // Implementar lógica de relatórios baseada no tipo
+    switch (type) {
+      case 'sales':
+        return this.getStoreSalesReport(storeId, startDate, endDate);
+      case 'revenue':
+        return this.getStoreRevenueReport(storeId, startDate, endDate);
+      case 'customers':
+        return this.getStoreCustomersReport(storeId, startDate, endDate);
+      case 'products':
+        return this.getStoreProductsReport(storeId, startDate, endDate);
+      case 'employees':
+        return this.getStoreEmployeesReport(storeId, startDate, endDate);
+      case 'comprehensive':
+        return this.getStoreComprehensiveReport(storeId, startDate, endDate);
+      default:
+        return this.getStoreSalesReport(storeId, startDate, endDate);
+    }
+  }
+
+  async exportStoreReport(storeId: string, options: any) {
+    // Implementar exportação de relatórios
+    const reportData = await this.getStoreReport(storeId, options);
+    
+    // Aqui você implementaria a lógica de exportação para PDF, Excel, CSV
+    // Por enquanto, retornamos os dados para o frontend processar
+    
+    return {
+      data: reportData,
+      format: options.format,
+      filename: `relatorio_loja_${storeId}_${new Date().toISOString().split('T')[0]}.${options.format}`
+    };
+  }
+
+  // Métodos auxiliares para relatórios
+  private async getStoreSalesReport(storeId: string, startDate?: Date, endDate?: Date) {
+    const whereClause: any = { storeId };
+    if (startDate && endDate) {
+      whereClause.createdAt = { gte: startDate, lte: endDate };
+    }
+
+    const sales = await this.prisma.sale.findMany({
+      where: whereClause,
+      include: {
+        customer: { select: { name: true, email: true } },
+        employee: { select: { name: true } },
+        items: {
+          include: {
+            product: { select: { name: true, price: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const totalRevenue = sales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0);
+    const totalSales = sales.length;
+    const averageTicket = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+    return {
+      summary: {
+        totalRevenue,
+        totalSales,
+        averageTicket,
+        growthRate: 0
+      },
+      salesByPeriod: [], // Implementar agrupamento por período
+      topProducts: [], // Implementar produtos mais vendidos
+      topCustomers: [], // Implementar melhores clientes
+      salesByEmployee: [] // Implementar vendas por funcionário
+    };
+  }
+
+  private async getStoreRevenueReport(storeId: string, startDate?: Date, endDate?: Date) {
+    // Implementar relatório de receita
+    return { message: 'Relatório de receita em desenvolvimento' };
+  }
+
+  private async getStoreCustomersReport(storeId: string, startDate?: Date, endDate?: Date) {
+    // Implementar relatório de clientes
+    return { message: 'Relatório de clientes em desenvolvimento' };
+  }
+
+  private async getStoreProductsReport(storeId: string, startDate?: Date, endDate?: Date) {
+    // Implementar relatório de produtos
+    return { message: 'Relatório de produtos em desenvolvimento' };
+  }
+
+  private async getStoreEmployeesReport(storeId: string, startDate?: Date, endDate?: Date) {
+    // Implementar relatório de funcionários
+    return { message: 'Relatório de funcionários em desenvolvimento' };
+  }
+
+  private async getStoreComprehensiveReport(storeId: string, startDate?: Date, endDate?: Date) {
+    // Implementar relatório completo
+    return { message: 'Relatório completo em desenvolvimento' };
+  }
+
+  // ==================== PONTO ELETRÔNICO ====================
+
+  async registerTimeClock(timeClockData: any) {
+    console.log('🔍 AdminService.registerTimeClock - Dados recebidos:', JSON.stringify(timeClockData, null, 2));
+    
+    const { employeeId, photo, latitude, longitude, address, notes } = timeClockData;
+    
+    // Verificar se o funcionário existe
+    const employee = await this.prisma.user.findUnique({
+      where: { id: employeeId }
+    });
+
+    console.log('👤 Funcionário encontrado:', employee ? 'Sim' : 'Não');
+
+    if (!employee) {
+      throw new NotFoundException('Funcionário não encontrado');
+    }
+
+    // Verificar se já existe um ponto de entrada não fechado hoje
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    console.log('📅 Data de hoje:', today);
+    
+    const existingEntry = await this.prisma.timeClock.findFirst({
+      where: {
+        employeeId,
+        date: {
+          gte: today
+        },
+        clockOut: null
+      }
+    });
+
+    console.log('🔍 Entrada existente:', existingEntry ? 'Sim' : 'Não');
+
+    if (existingEntry) {
+      throw new BadRequestException('Já existe um ponto de entrada não fechado para hoje');
+    }
+
+    // Calcular se está atrasado (comparar com horário padrão de entrada - 8:00)
+    const currentTime = new Date();
+    const standardStartTime = new Date();
+    standardStartTime.setHours(8, 0, 0, 0);
+    
+    const isLate = currentTime > standardStartTime;
+    const minutesLate = isLate ? Math.floor((currentTime.getTime() - standardStartTime.getTime()) / (1000 * 60)) : 0;
+
+    // Criar registro de ponto
+    console.log('💾 Criando registro de ponto...');
+    const timeClock = await this.prisma.timeClock.create({
+      data: {
+        employeeId,
+        date: new Date().toISOString().split('T')[0],
+        clockIn: currentTime.toTimeString().split(' ')[0].substring(0, 5),
+        photo,
+        latitude,
+        longitude,
+        address,
+        status: isLate ? 'LATE' : 'PRESENT',
+        minutesLate: minutesLate,
+        totalHours: 0,
+        overtimeHours: 0,
+        notes
+      },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    console.log('✅ Registro de ponto criado com sucesso:', timeClock.id);
+
+    return {
+      message: isLate ? `Ponto registrado com ${minutesLate} minutos de atraso` : 'Ponto de entrada registrado com sucesso',
+      timeClock,
+      isLate,
+      minutesLate
+    };
   }
 }

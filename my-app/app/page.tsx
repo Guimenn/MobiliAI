@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 ﻿'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -546,63 +547,15 @@ export default function HomePage() {
     }
 
   // small card (quadrado)
+=======
+export default function Home() {
+>>>>>>> Stashed changes
   return (
-    <div className="w-full md:w-[350px] flex-shrink-0 relative">
-      <div className={`aspect-[4/5] rounded-2xl shadow-xl relative overflow-hidden`}>
-        {/* Imagem de fundo */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${slide.image})` }}
-        ></div>
-        {/* Overlay gradiente para melhor legibilidade */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-        
-        {/* overlay */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-6">
-          <div className="text-white">
-            <div className="text-sm text-white/70 mb-1">{slide.number}</div>
-            <div className="text-lg font-bold mb-1">{slide.title}</div>
-            <div className="text-sm text-white/80">{slide.subtitle}</div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Navigation Below Card 2 */}
-      {position === 1 && (
-        <div className="flex items-center justify-between mt-4">
-          {/* Dots */}
-          <div className="flex space-x-2">
-            {slides.map((_, idx) => (
-              <button
-                key={idx}
-                aria-label={`Ir para slide ${idx + 1}`}
-                onClick={() => setCarouselIndex(idx)}
-                className={`${idx === carouselIndex ? 'w-3 h-3 bg-[#3e2626]' : 'w-2 h-2 bg-gray-300'} rounded-full transition-all`}
-              />
-            ))}
-          </div>
-
-          {/* Arrows */}
-          <div className="flex space-x-2">
-            <button 
-              onClick={goPrev} 
-              disabled={isAnimating}
-              className="w-8 h-8 bg-gray-200 hover:bg-[#3e2626] hover:text-white rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform duration-300" />
-            </button>
-            <button 
-              onClick={goNext} 
-              disabled={isAnimating}
-              className="w-8 h-8 bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform duration-300" />
-            </button>
-          </div>
-        </div>
-      )}
+    <div className="min-h-screen flex items-center justify-center">
+      <h1 className="text-4xl font-bold">MobiliAI - Sistema Funcionando!</h1>
     </div>
   );
+<<<<<<< Updated upstream
   };
 
   return (
@@ -1304,3 +1257,6 @@ export default function HomePage() {
     </div>
   );
 }
+=======
+}
+>>>>>>> Stashed changes

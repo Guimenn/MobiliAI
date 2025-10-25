@@ -370,6 +370,30 @@ export const chatbotAPI = {
   },
 };
 
+// Dashboard API
+export const dashboardAPI = {
+  getStoreOverview: async (storeId: string) => {
+    const response = await api.get(`/dashboard/store/${storeId}/overview`);
+    return response.data;
+  },
+  getStoreSales: async (storeId: string) => {
+    const response = await api.get(`/dashboard/store/${storeId}/sales`);
+    return response.data;
+  },
+  getStoreAttendance: async (storeId: string) => {
+    const response = await api.get(`/dashboard/store/${storeId}/attendance`);
+    return response.data;
+  },
+  getEmployeePerformance: async (storeId: string) => {
+    const response = await api.get(`/dashboard/store/${storeId}/employee-performance`);
+    return response.data;
+  },
+  getRecentActivity: async (storeId: string) => {
+    const response = await api.get(`/dashboard/store/${storeId}/recent-activity`);
+    return response.data;
+  }
+};
+
 // Admin API
 export const adminAPI = {
   // Dashboard
@@ -534,6 +558,27 @@ export const adminAPI = {
     const response = await api.get('/admin/reports/user-activity', {
       params: { userId, startDate, endDate }
     });
+    return response.data;
+  },
+
+  // Employees
+  createEmployee: async (employeeData: any) => {
+    const response = await api.post('/admin/employees', employeeData);
+    return response.data;
+  },
+
+  updateEmployee: async (employeeId: string, employeeData: any) => {
+    const response = await api.put(`/admin/employees/${employeeId}`, employeeData);
+    return response.data;
+  },
+
+  deleteEmployee: async (employeeId: string) => {
+    const response = await api.delete(`/admin/employees/${employeeId}`);
+    return response.data;
+  },
+
+  getStoreEmployees: async (storeId: string) => {
+    const response = await api.get(`/admin/stores/${storeId}/employees`);
     return response.data;
   },
 };

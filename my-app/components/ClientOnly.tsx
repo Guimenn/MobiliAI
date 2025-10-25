@@ -1,27 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 
 interface ClientOnlyProps {
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
+  children: ReactNode;
+  fallback?: ReactNode;
 }
 
 export default function ClientOnly({ children, fallback = null }: ClientOnlyProps) {
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    // Usar requestAnimationFrame para garantir que o DOM esteja pronto
-    const timer = requestAnimationFrame(() => {
-      setHasMounted(true);
-    });
-    
-    return () => cancelAnimationFrame(timer);
+    setHasMounted(true);
   }, []);
 
   if (!hasMounted) {
-    return <span suppressHydrationWarning={true}>{fallback}</span>;
+    return <>{fallback}</>;
   }
 
-  return <span suppressHydrationWarning={true}>{children}</span>;
+  return <>{children}</>;
 }

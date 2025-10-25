@@ -19,6 +19,10 @@ import { ManagerModule } from './manager/manager.module';
 import { EmployeeModule } from './employee/employee.module';
 import { CustomerModule } from './customer/customer.module';
 import { UploadModule } from './upload/upload.module';
+import { TimeClockModule } from './time-clock/time-clock.module';
+import { TimeClockService } from './time-clock/time-clock.service';
+import { DashboardModule } from './dashboard/dashboard.module';
+
 
 @Module({
   imports: [
@@ -48,8 +52,10 @@ import { UploadModule } from './upload/upload.module';
     EmployeeModule,
     CustomerModule,
     UploadModule,
+    TimeClockModule,
+    DashboardModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, TimeClockService],
 })
 export class AppModule {}

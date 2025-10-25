@@ -61,6 +61,11 @@ import {
   Heart,
   Star
 } from 'lucide-react';
+<<<<<<< Updated upstream
+=======
+import { adminAPI } from '@/lib/api';
+import EditUserModal from '@/components/EditUserModal';
+>>>>>>> Stashed changes
 
 export default function UsersPage() {
   const router = useRouter();
@@ -70,6 +75,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+<<<<<<< Updated upstream
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Filtros para usuários
@@ -78,6 +84,13 @@ export default function UsersPage() {
     status: 'all',
     search: ''
   });
+=======
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState<'all' | 'ADMIN' | 'STORE_MANAGER' | 'CASHIER'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+>>>>>>> Stashed changes
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -115,6 +128,7 @@ export default function UsersPage() {
   const loadUsersData = async () => {
     try {
       setIsLoading(true);
+<<<<<<< Updated upstream
       
       console.log('Carregando dados de usuários do banco...');
       
@@ -164,11 +178,35 @@ export default function UsersPage() {
       console.error('Erro ao carregar dados do banco:', error);
       setUsers([]);
       setStores([]);
+=======
+      const data = await adminAPI.getUsers();
+      console.log('Dados recebidos da API:', data);
+      
+      // Garantir que data é um array
+      let usersArray = [];
+      if (Array.isArray(data)) {
+        usersArray = data;
+      } else if (data && Array.isArray(data.users)) {
+        usersArray = data.users;
+      } else if (data && Array.isArray(data.data)) {
+        usersArray = data.data;
+      } else {
+        console.warn('Formato de dados inesperado:', data);
+        usersArray = [];
+      }
+      
+      console.log('Array de usuários processado:', usersArray);
+      setUsers(usersArray);
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+      setUsers([]); // Definir array vazio em caso de erro
+>>>>>>> Stashed changes
     } finally {
       setIsLoading(false);
     }
   };
 
+<<<<<<< Updated upstream
   const handleLogout = () => {
     router.push('/login');
   };
@@ -417,6 +455,36 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
     role: 'all',
     status: 'all',
     search: ''
+=======
+  const handleEditUser = (user: any) => {
+    setEditingUser(user);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveUser = async (userId: string, userData: any) => {
+    try {
+      await adminAPI.updateUser(userId, userData);
+      await loadUsers(); // Recarregar a lista
+    } catch (error) {
+      console.error('Erro ao salvar usuário:', error);
+      throw error;
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingUser(null);
+  };
+
+  const filteredUsers = (Array.isArray(users) ? users : []).filter(user => {
+    const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = filterRole === 'all' || user.role === filterRole;
+    const matchesStatus = filterStatus === 'all' || 
+                         (filterStatus === 'active' && user.isActive) ||
+                         (filterStatus === 'inactive' && !user.isActive);
+    return matchesSearch && matchesRole && matchesStatus;
+>>>>>>> Stashed changes
   });
 
   // Estados para modal de novo usuário
@@ -885,12 +953,20 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                       <Eye className="h-4 w-4" />
                     </Button>
+<<<<<<< Updated upstream
                         <Button 
                           variant="ghost" 
                           size="sm" 
                           className="h-8 w-8 p-0"
                           onClick={() => handleEditUser(user.id)}
                         >
+=======
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleEditUser(user)}
+                    >
+>>>>>>> Stashed changes
                       <Edit className="h-4 w-4" />
                     </Button>
                         <Button 
@@ -1013,6 +1089,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
         )}
       </div>
 
+<<<<<<< Updated upstream
       {/* Modal de Novo Usuário */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1232,6 +1309,15 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
         </Card>
       </div>
       )}
+=======
+      {/* Modal de Edição */}
+      <EditUserModal
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        user={editingUser}
+        onSave={handleSaveUser}
+      />
+>>>>>>> Stashed changes
     </div>
   );
 }

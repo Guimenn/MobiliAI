@@ -12,18 +12,40 @@ const prisma = new PrismaClient({
 export async function seedDatabase() {
   console.log('🌱 Iniciando seed do banco de dados...');
 
-  // Criar loja principal
-  const store = await prisma.store.create({
-    data: {
-      name: 'Loja Central',
-      address: 'Rua das Flores, 123',
-      city: 'São Paulo',
-      state: 'SP',
-      zipCode: '01234-567',
-      phone: '(11) 99999-9999',
-      email: 'contato@lojacentral.com',
-    },
-  });
+  // Buscar uma loja existente ou criar uma loja padrão se não houver nenhuma
+  let store = await prisma.store.findFirst();
+  
+  if (!store) {
+    store = await prisma.store.create({
+      data: {
+        name: 'Loja Central - Matriz',
+        address: 'Rua das Flores, 123',
+        city: 'São Paulo',
+        state: 'SP',
+        zipCode: '01234-567',
+        phone: '(11) 99999-9999',
+        email: 'contato@lojacentral.com',
+        description: 'Loja matriz do sistema',
+        workingHours: {
+          monday: { open: '08:00', close: '18:00', isOpen: true },
+          tuesday: { open: '08:00', close: '18:00', isOpen: true },
+          wednesday: { open: '08:00', close: '18:00', isOpen: true },
+          thursday: { open: '08:00', close: '18:00', isOpen: true },
+          friday: { open: '08:00', close: '18:00', isOpen: true },
+          saturday: { open: '08:00', close: '17:00', isOpen: true },
+          sunday: { open: '09:00', close: '15:00', isOpen: false }
+        },
+        settings: {
+          allowOnlineOrders: true,
+          requireApprovalForOrders: false,
+          sendNotifications: true,
+          autoAcceptPayments: true,
+          lowStockAlert: true,
+          customerRegistrationRequired: false
+        }
+      },
+    });
+  }
 
   // Criar usuários
   const users = [

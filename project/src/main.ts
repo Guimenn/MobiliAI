@@ -21,6 +21,10 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: (errors) => {
+        console.log('❌ Erro de validação:', JSON.stringify(errors, null, 2));
+        return new Error('Dados inválidos: ' + errors.map(e => e.property + ' - ' + Object.values(e.constraints || {}).join(', ')).join('; '));
+      },
     }),
   );
 

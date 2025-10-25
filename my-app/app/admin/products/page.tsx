@@ -22,9 +22,18 @@ import {
   Users, 
   Store,      
   Package, 
+<<<<<<< Updated upstream
   DollarSign, 
   TrendingUp, 
   Activity, 
+=======
+  Plus,
+  Search, 
+  Edit, 
+  Trash2, 
+  Eye, 
+  DollarSign,
+>>>>>>> Stashed changes
   BarChart3,
   Building,
   CheckCircle,
@@ -44,6 +53,7 @@ import {
   RefreshCw,
   X,
   Filter,
+<<<<<<< Updated upstream
   MoreHorizontal,
   FileText,
   Star,
@@ -67,6 +77,19 @@ import {
   BarChart,
   TrendingDown
 } from 'lucide-react';
+=======
+  Star,
+  Box,
+  Camera,
+  Upload
+} from 'lucide-react';
+import { adminAPI } from '@/lib/api';
+import AdminProductModal from '@/components/AdminProductModal';
+import ProductViewer3D from '@/components/ProductViewer3D';
+import ProductViewer3DAdvanced from '@/components/ProductViewer3DAdvanced';
+import PhotoTo3DConverter from '@/components/PhotoTo3DConverter';
+import Direct3DUploader from '@/components/Direct3DUploader';
+>>>>>>> Stashed changes
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -75,6 +98,7 @@ export default function ProductsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+<<<<<<< Updated upstream
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Filtros para produtos
@@ -83,6 +107,28 @@ export default function ProductsPage() {
     status: 'all',
     search: ''
   });
+=======
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock'>('name');
+  
+  // Estados para o modal de produto
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
+  
+  // Estados para o visualizador 3D
+  const [is3DViewerOpen, setIs3DViewerOpen] = useState(false);
+  const [productFor3D, setProductFor3D] = useState<any | null>(null);
+  const [viewerMode, setViewerMode] = useState<'basic' | 'advanced'>('advanced');
+  
+  // Estados para o conversor de foto para 3D
+  const [isPhotoTo3DOpen, setIsPhotoTo3DOpen] = useState(false);
+  
+  // Estados para o upload direto de 3D
+  const [isDirect3DUploadOpen, setIsDirect3DUploadOpen] = useState(false);
+>>>>>>> Stashed changes
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -197,8 +243,54 @@ export default function ProductsPage() {
         setProducts(mockProducts);
       }
     } catch (error) {
+<<<<<<< Updated upstream
       console.error('Erro ao carregar dados do banco:', error);
       setProducts([]);
+=======
+      console.error('Erro ao carregar produtos:', error);
+      // Dados mock para desenvolvimento incluindo uma cadeira
+      setProducts([
+        {
+          id: '1',
+          name: 'Cadeira de Escritório Premium',
+          category: 'cadeira',
+          price: 599.90,
+          color: 'Marrom',
+          colorCode: '#8B4513',
+          description: 'Cadeira ergonômica com apoio lombar e ajuste de altura',
+          brand: 'OfficePro',
+          stock: 15,
+          isActive: true,
+          imageUrl: '/images/cadeira-premium.jpg'
+        },
+        {
+          id: '2',
+          name: 'Galão de Tinta Branca',
+          category: 'tinta',
+          price: 89.90,
+          color: 'Branco',
+          colorCode: '#FFFFFF',
+          description: 'Tinta látex PVA 18L para uso interno',
+          brand: 'Coral',
+          stock: 50,
+          isActive: true,
+          imageUrl: '/images/tinta-branca.jpg'
+        },
+        {
+          id: '3',
+          name: 'Pincel Premium',
+          category: 'pincel',
+          price: 25.90,
+          color: 'Natural',
+          colorCode: '#D2B48C',
+          description: 'Pincel beiçola 2 polegadas cerdas naturais',
+          brand: 'Suvinil',
+          stock: 100,
+          isActive: true,
+          imageUrl: '/images/pincel-premium.jpg'
+        }
+      ]);
+>>>>>>> Stashed changes
     } finally {
       setIsLoading(false);
     }
@@ -663,6 +755,86 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
     return { label: 'Em Estoque', color: 'bg-green-100 text-green-800' };
   };
 
+<<<<<<< Updated upstream
+=======
+  const handleViewProduct = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode('view');
+    setIsModalOpen(true);
+  };
+
+  const handleEditProduct = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode('edit');
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+  };
+
+  const handleProductUpdated = (updatedProduct: any) => {
+    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  };
+
+  const handleProductDeleted = (productId: string) => {
+    setProducts(products.filter(p => p.id !== productId));
+  };
+
+  const handleView3D = (product: any) => {
+    setProductFor3D(product);
+    setIs3DViewerOpen(true);
+  };
+
+  const handleClose3DViewer = () => {
+    setIs3DViewerOpen(false);
+    setProductFor3D(null);
+  };
+
+  const handlePhotoTo3DConverted = (model3D: any) => {
+    // Adicionar o modelo 3D gerado aos produtos
+    const newProduct = {
+      id: `generated_${Date.now()}`,
+      name: model3D.name,
+      category: model3D.category,
+      price: 0,
+      color: 'Gerado por IA',
+      colorCode: '#FF6B6B',
+      description: 'Modelo 3D gerado automaticamente a partir de foto',
+      brand: 'IA Generated',
+      stock: 1,
+      isActive: true,
+      imageUrl: model3D.originalImage,
+      model3D: model3D
+    };
+    
+    setProducts(prev => [newProduct, ...prev]);
+    setIsPhotoTo3DOpen(false);
+  };
+
+  const handleDirect3DUploaded = (model3D: any) => {
+    // Adicionar o modelo 3D uploadado aos produtos
+    const newProduct = {
+      id: `direct_${Date.now()}`,
+      name: model3D.name,
+      category: model3D.category,
+      price: 0,
+      color: 'Modelo 3D',
+      colorCode: '#3B82F6',
+      description: 'Modelo 3D carregado diretamente',
+      brand: '3D Upload',
+      stock: 1,
+      isActive: true,
+      imageUrl: model3D.previewUrl || '/images/3d-model-placeholder.jpg',
+      model3D: model3D
+    };
+    
+    setProducts(prev => [newProduct, ...prev]);
+    setIsDirect3DUploadOpen(false);
+  };
+
+>>>>>>> Stashed changes
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -691,6 +863,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                 </div>
               </div>
             </div>
+<<<<<<< Updated upstream
             <div className="flex items-center space-x-4">
               <Button 
                 onClick={() => window.location.reload()}
@@ -705,6 +878,26 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                 onClick={() => setIsModalOpen(true)}
                 className="bg-white text-[#3e2626] hover:bg-white/90 font-semibold px-6 py-2 rounded-xl"
               >
+=======
+            <div className="flex space-x-3">
+              <Button 
+                variant="outline"
+                onClick={() => setIsPhotoTo3DOpen(true)}
+                className="border-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Foto para 3D
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setIsDirect3DUploadOpen(true)}
+                className="border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload 3D
+              </Button>
+              <Button className="bg-[#3e2626] hover:bg-[#8B4513]">
+>>>>>>> Stashed changes
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Produto
               </Button>
@@ -948,10 +1141,85 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                         </div>
                       </div>
                     </div>
+<<<<<<< Updated upstream
                   </CardContent>
                 </Card>
               );
             })}
+=======
+
+                    {product.sku && (
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Tag className="h-4 w-4 mr-1" />
+                        SKU: {product.sku}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="flex items-center">
+                        <Star className="h-4 w-4 text-yellow-400 mr-1" />
+                        <span className="text-sm text-gray-600">
+                          {product.rating || 'N/A'} ({product.reviews || 0} avaliações)
+                        </span>
+                      </div>
+                      <Badge className={product.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                        {product.isActive ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+                <div className="px-6 pb-4">
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleViewProduct(product)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Ver
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleView3D(product)}
+                    >
+                      <Box className="h-4 w-4 mr-1" />
+                      3D
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleEditProduct(product)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => handleEditProduct(product)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {filteredProducts.length === 0 && (
+          <div className="text-center py-12">
+            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum produto encontrado</h3>
+            <p className="text-gray-500">Tente ajustar os filtros ou criar um novo produto.</p>
+>>>>>>> Stashed changes
           </div>
         ) : (
           <Card>
@@ -1058,6 +1326,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
         )}
       </div>
 
+<<<<<<< Updated upstream
       {/* Modal de Novo Produto */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1508,6 +1777,51 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
             </div>
           </Card>
         </div>
+=======
+      {/* Modal de Produto */}
+      <AdminProductModal
+        product={selectedProduct}
+        isOpen={isModalOpen}
+        mode={modalMode}
+        onClose={handleCloseModal}
+        onProductUpdated={handleProductUpdated}
+        onProductDeleted={handleProductDeleted}
+      />
+
+      {/* Visualizador 3D */}
+      {productFor3D && (
+        <>
+          {viewerMode === 'basic' ? (
+            <ProductViewer3D
+              product={productFor3D}
+              isOpen={is3DViewerOpen}
+              onClose={handleClose3DViewer}
+            />
+          ) : (
+            <ProductViewer3DAdvanced
+              product={productFor3D}
+              isOpen={is3DViewerOpen}
+              onClose={handleClose3DViewer}
+            />
+          )}
+        </>
+      )}
+
+      {/* Conversor de Foto para 3D */}
+      {isPhotoTo3DOpen && (
+        <PhotoTo3DConverter
+          onConverted={handlePhotoTo3DConverted}
+          onClose={() => setIsPhotoTo3DOpen(false)}
+        />
+      )}
+
+      {/* Upload Direto de 3D */}
+      {isDirect3DUploadOpen && (
+        <Direct3DUploader
+          onUploaded={handleDirect3DUploaded}
+          onClose={() => setIsDirect3DUploadOpen(false)}
+        />
+>>>>>>> Stashed changes
       )}
     </div>
   );

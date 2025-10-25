@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsBoolean, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsBoolean, MinLength, MaxLength, IsArray } from 'class-validator';
 
 export class UpdateStoreDto {
   @IsOptional()
@@ -11,7 +11,7 @@ export class UpdateStoreDto {
   @IsString()
   @MinLength(10)
   @MaxLength(500)
-  address?: string;
+  address?: string; 
 
   @IsOptional()
   @IsString()
@@ -26,4 +26,25 @@ export class UpdateStoreDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  openingTime?: string;
+
+  @IsOptional()
+  @IsString()
+  closingTime?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  workingDays?: string[];
+
+  @IsOptional()
+  @IsString()
+  lunchStart?: string;
+
+  @IsOptional()
+  @IsString()
+  lunchEnd?: string;
 }

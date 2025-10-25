@@ -16,8 +16,10 @@ import {
   Phone,
   Building2,
   Shield,
-  MapPin
+  MapPin,
+  Clock
 } from 'lucide-react';
+import WorkingHoursConfig from '@/components/WorkingHoursConfig';
 
 export default function NewUserPage() {
   const { user, isAuthenticated, token, isUserAuthenticated } = useAppStore();
@@ -35,6 +37,7 @@ export default function NewUserPage() {
     storeId: '',
     address: ''
   });
+  const [workingHours, setWorkingHours] = useState<any>(null);
 
   useEffect(() => {
     if (!isUserAuthenticated()) {
@@ -105,8 +108,14 @@ export default function NewUserPage() {
     e.preventDefault();
     setLoading(true);
 
+    // Preparar dados para envio
+    const userData = {
+      ...formData,
+      ...(workingHours && { workingHours })
+    };
+
     // Debug: mostrar dados que serão enviados
-    console.log('Dados do formulário:', formData);
+    console.log('Dados do formulário:', userData);
     console.log('Token:', token);
 
     try {
@@ -116,7 +125,7 @@ export default function NewUserPage() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(userData)
       });
 
       console.log('Status da resposta:', response.status);
@@ -319,6 +328,19 @@ export default function NewUserPage() {
                 )}
               </div>
 
+              {/* Configuração de Horários de Expediente */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center space-x-2">
+                  <Clock className="h-4 w-4" />
+                  <span>Horários de Expediente</span>
+                </h3>
+                
+                <WorkingHoursConfig
+                  workingHours={workingHours}
+                  onSave={setWorkingHours}
+                  disabled={loading}
+                />
+              </div>
 
               {/* Actions */}
               <div className="flex justify-end space-x-4 pt-6 border-t">

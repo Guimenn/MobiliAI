@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsUUID, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsUUID, MinLength, MaxLength, IsArray } from 'class-validator';
 
 export class CreateStoreDto {
   @IsString()
@@ -22,4 +22,25 @@ export class CreateStoreDto {
   @IsOptional()
   @IsUUID()
   managerId?: string;
+
+  @IsOptional()
+  @IsString()
+  openingTime?: string;
+
+  @IsOptional()
+  @IsString()
+  closingTime?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  workingDays?: string[];
+
+  @IsOptional()
+  @IsString()
+  lunchStart?: string;
+
+  @IsOptional()
+  @IsString()
+  lunchEnd?: string;
 }
