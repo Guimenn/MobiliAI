@@ -6,7 +6,7 @@ import { useAppStore } from '@/lib/store';
 import { authAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Loader2, Eye, EyeOff, Home } from 'lucide-react';
+import { Send, Loader2, Eye, EyeOff, Home, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -434,7 +434,18 @@ export default function LoginPage() {
              />
            </div>
 
-           
+           {/* Botão Voltar para Home */}
+           <div className="absolute top-8 left-8 z-10">
+             <Link href="/">
+               <Button
+                 variant="ghost"
+                 className="bg-white/90 hover:bg-white text-[#3e2626] backdrop-blur-sm shadow-lg"
+               >
+                 <ArrowLeft className="h-4 w-4 mr-2" />
+                 Voltar
+               </Button>
+             </Link>
+           </div>
              
             {/* MobiliAI Text Overlay - Centralizado e Proporcional */}
             <div className="absolute inset-0 flex items-center justify-center pt-90 pr-10">
