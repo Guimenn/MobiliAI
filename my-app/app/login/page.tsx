@@ -56,7 +56,7 @@ export default function LoginPage() {
     if (isAuthenticated && user) {
       // Redirecionamento imediato sem delay
       const redirectPath = user.role === 'ADMIN' 
-        ? '/admin/dashboard' 
+        ? '/admin' 
         : user.role === 'STORE_MANAGER' 
         ? '/manager' 
         : '/';
@@ -366,7 +366,7 @@ export default function LoginPage() {
         setTimeout(() => {
           // Redirecionamento baseado no role do usuário
           const redirectPath = response.user.role === 'ADMIN' 
-            ? '/admin/dashboard' 
+            ? '/admin' 
             : response.user.role === 'STORE_MANAGER' 
             ? '/manager' 
             : '/';

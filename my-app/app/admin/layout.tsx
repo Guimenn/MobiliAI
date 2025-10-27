@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useAppStore } from '@/lib/store';
 import { 
   Building2, 
   Users, 
@@ -26,18 +27,34 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { user, isAuthenticated, token } = useAppStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  
-  // Mock user data temporarily
-  const user = {
-    name: 'Administrador',
-    role: 'ADMIN'
-  };
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Verificar autenticação e role
+  useEffect(() => {
+    if (isMounted) {
+      if (!isAuthenticated || !user || !token) {
+        router.push('/login');
+        return;
+      }
+      
+      // Verificar se o usuário é admin
+      if (user.role !== 'ADMIN') {
+        // Redirecionar para o dashboard apropriado baseado no role
+        if (user.role === 'STORE_MANAGER') {
+          router.push('/manager');
+        } else {
+          router.push('/');
+        }
+        return;
+      }
+    }
+  }, [isMounted, isAuthenticated, user, token, router]);
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: Building2, current: pathname === '/admin' },
@@ -51,13 +68,13 @@ export default function AdminLayout({
   ];
 
   const handleLogout = () => {
-    // Clear local storage
-    localStorage.clear();
-    sessionStorage.clear();
+    // Usar o logout da store
+    const { logout } = useAppStore.getState();
+    logout();
     router.push('/login');
   };
 
-  if (!isMounted) {
+  if (!isMounted || !isAuthenticated || !user || !token || user.role !== 'ADMIN') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
