@@ -22,38 +22,28 @@ import {
   Users, 
   Store,      
   Package, 
-<<<<<<< Updated upstream
   DollarSign, 
   TrendingUp, 
-  Activity, 
-=======
+  Activity,
   Plus,
   Search, 
   Edit, 
   Trash2, 
   Eye, 
-  DollarSign,
->>>>>>> Stashed changes
   BarChart3,
   Building,
   CheckCircle,
   Zap, 
-  Plus,
   UserCheck,
   Download, 
   Settings,
   ArrowUp,
-  Search,
   Menu,
   ChevronDown,
   UserPlus,
-  Edit,
-  Trash2,
-  Eye,
   RefreshCw,
   X,
   Filter,
-<<<<<<< Updated upstream
   MoreHorizontal,
   FileText,
   Star,
@@ -75,21 +65,15 @@ import {
   Mail,
   Heart,
   BarChart,
-  TrendingDown
-} from 'lucide-react';
-=======
-  Star,
+  TrendingDown,
   Box,
-  Camera,
   Upload
 } from 'lucide-react';
-import { adminAPI } from '@/lib/api';
 import AdminProductModal from '@/components/AdminProductModal';
 import ProductViewer3D from '@/components/ProductViewer3D';
 import ProductViewer3DAdvanced from '@/components/ProductViewer3DAdvanced';
 import PhotoTo3DConverter from '@/components/PhotoTo3DConverter';
 import Direct3DUploader from '@/components/Direct3DUploader';
->>>>>>> Stashed changes
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -98,7 +82,6 @@ export default function ProductsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-<<<<<<< Updated upstream
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Filtros para produtos
@@ -107,11 +90,6 @@ export default function ProductsPage() {
     status: 'all',
     search: ''
   });
-=======
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock'>('name');
   
   // Estados para o modal de produto
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
@@ -128,7 +106,6 @@ export default function ProductsPage() {
   
   // Estados para o upload direto de 3D
   const [isDirect3DUploadOpen, setIsDirect3DUploadOpen] = useState(false);
->>>>>>> Stashed changes
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -243,10 +220,6 @@ export default function ProductsPage() {
         setProducts(mockProducts);
       }
     } catch (error) {
-<<<<<<< Updated upstream
-      console.error('Erro ao carregar dados do banco:', error);
-      setProducts([]);
-=======
       console.error('Erro ao carregar produtos:', error);
       // Dados mock para desenvolvimento incluindo uma cadeira
       setProducts([
@@ -290,7 +263,6 @@ export default function ProductsPage() {
           imageUrl: '/images/pincel-premium.jpg'
         }
       ]);
->>>>>>> Stashed changes
     } finally {
       setIsLoading(false);
     }
@@ -298,6 +270,33 @@ export default function ProductsPage() {
 
   const handleLogout = () => {
     router.push('/login');
+  };
+
+  const handleViewProduct = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode('view');
+    setIsModalOpen(true);
+  };
+
+  const handleEditProduct = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode('edit');
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+  };
+
+  const handleProductUpdated = (updatedProduct: any) => {
+    // Atualizar produtos via callback
+    loadProductsData();
+  };
+
+  const handleProductDeleted = (productId: string) => {
+    // Atualizar produtos via callback
+    loadProductsData();
   };
 
   return (
@@ -546,7 +545,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
   });
 
   // Estados para modal de novo produto
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: '',
     description: '',
@@ -598,8 +597,8 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
       const productData = {
         name: newProduct.name,
         description: newProduct.description,
-        price: parseFloat(newProduct.price),
-        stock: parseInt(newProduct.stock),
+        price: newProduct.price,
+        stock: newProduct.stock,
         category: newProduct.category,
         sku: newProduct.sku,
         isActive: newProduct.isActive
@@ -621,15 +620,38 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
         }
         
         alert('Produto criado com sucesso!');
-        setIsModalOpen(false);
+        setIsNewProductModalOpen(false);
         setNewProduct({
           name: '',
           description: '',
-          price: '',
-          stock: '',
-          category: 'Tintas',
+          shortDescription: '',
+          category: 'SOFA',
+          price: 0,
+          costPrice: 0,
+          stock: 0,
+          minStock: 0,
+          style: 'MODERNO',
+          material: 'MADEIRA',
+          colorHex: '',
+          colorName: '',
+          customColor: '',
+          width: 0,
+          height: 0,
+          depth: 0,
+          weight: 0,
+          brand: '',
+          model: '',
           sku: '',
-          isActive: true
+          barcode: '',
+          videoUrl: '',
+          tags: [],
+          keywords: [],
+          isFeatured: false,
+          isNew: false,
+          isBestSeller: false,
+          isActive: true,
+          isAvailable: true,
+          storeId: ''
         });
         setProductImages([]);
         
@@ -648,23 +670,46 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
     }
   };
 
-  // Função para fechar modal
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  // Função para fechar modal de novo produto
+  const handleCloseNewProductModal = () => {
+    setIsNewProductModalOpen(false);
     setNewProduct({
       name: '',
       description: '',
-      price: '',
-      stock: '',
-      category: 'Tintas',
+      shortDescription: '',
+      category: 'SOFA',
+      price: 0,
+      costPrice: 0,
+      stock: 0,
+      minStock: 0,
+      style: 'MODERNO',
+      material: 'MADEIRA',
+      colorHex: '',
+      colorName: '',
+      customColor: '',
+      width: 0,
+      height: 0,
+      depth: 0,
+      weight: 0,
+      brand: '',
+      model: '',
       sku: '',
-      isActive: true
+      barcode: '',
+      videoUrl: '',
+      tags: [],
+      keywords: [],
+      isFeatured: false,
+      isNew: false,
+      isBestSeller: false,
+      isActive: true,
+      isAvailable: true,
+      storeId: ''
     });
     setProductImages([]);
   };
 
-  // Função para editar produto
-  const handleEditProduct = async (productId: string) => {
+  // Função para editar produto (versão simplificada)
+  const handleEditProductById = async (productId: string) => {
     try {
       console.log('Editando produto:', productId);
       // TODO: Implementar modal de edição
@@ -755,32 +800,23 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
     return { label: 'Em Estoque', color: 'bg-green-100 text-green-800' };
   };
 
-<<<<<<< Updated upstream
-=======
-  const handleViewProduct = (product: any) => {
-    setSelectedProduct(product);
-    setModalMode('view');
-    setIsModalOpen(true);
-  };
+  // Estados para o modal de produto
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
+  
+  // Estados para o visualizador 3D
+  const [is3DViewerOpen, setIs3DViewerOpen] = useState(false);
+  const [productFor3D, setProductFor3D] = useState<any | null>(null);
+  const [viewerMode, setViewerMode] = useState<'basic' | 'advanced'>('advanced');
+  
+  // Estados para o conversor de foto para 3D
+  const [isPhotoTo3DOpen, setIsPhotoTo3DOpen] = useState(false);
+  
+  // Estados para o upload direto de 3D
+  const [isDirect3DUploadOpen, setIsDirect3DUploadOpen] = useState(false);
 
-  const handleEditProduct = (product: any) => {
-    setSelectedProduct(product);
-    setModalMode('edit');
-    setIsModalOpen(true);
-  };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedProduct(null);
-  };
 
-  const handleProductUpdated = (updatedProduct: any) => {
-    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-  };
-
-  const handleProductDeleted = (productId: string) => {
-    setProducts(products.filter(p => p.id !== productId));
-  };
 
   const handleView3D = (product: any) => {
     setProductFor3D(product);
@@ -793,48 +829,16 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
   };
 
   const handlePhotoTo3DConverted = (model3D: any) => {
-    // Adicionar o modelo 3D gerado aos produtos
-    const newProduct = {
-      id: `generated_${Date.now()}`,
-      name: model3D.name,
-      category: model3D.category,
-      price: 0,
-      color: 'Gerado por IA',
-      colorCode: '#FF6B6B',
-      description: 'Modelo 3D gerado automaticamente a partir de foto',
-      brand: 'IA Generated',
-      stock: 1,
-      isActive: true,
-      imageUrl: model3D.originalImage,
-      model3D: model3D
-    };
-    
-    setProducts(prev => [newProduct, ...prev]);
+    // Recarregar produtos após conversão
+    onProductsChange();
     setIsPhotoTo3DOpen(false);
   };
 
   const handleDirect3DUploaded = (model3D: any) => {
-    // Adicionar o modelo 3D uploadado aos produtos
-    const newProduct = {
-      id: `direct_${Date.now()}`,
-      name: model3D.name,
-      category: model3D.category,
-      price: 0,
-      color: 'Modelo 3D',
-      colorCode: '#3B82F6',
-      description: 'Modelo 3D carregado diretamente',
-      brand: '3D Upload',
-      stock: 1,
-      isActive: true,
-      imageUrl: model3D.previewUrl || '/images/3d-model-placeholder.jpg',
-      model3D: model3D
-    };
-    
-    setProducts(prev => [newProduct, ...prev]);
+    // Recarregar produtos após upload
+    onProductsChange();
     setIsDirect3DUploadOpen(false);
   };
-
->>>>>>> Stashed changes
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -863,22 +867,6 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                 </div>
               </div>
             </div>
-<<<<<<< Updated upstream
-            <div className="flex items-center space-x-4">
-              <Button 
-                onClick={() => window.location.reload()}
-                variant="outline" 
-                size="sm"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Atualizar
-              </Button>
-              <Button 
-                onClick={() => setIsModalOpen(true)}
-                className="bg-white text-[#3e2626] hover:bg-white/90 font-semibold px-6 py-2 rounded-xl"
-              >
-=======
             <div className="flex space-x-3">
               <Button 
                 variant="outline"
@@ -896,8 +884,10 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                 <Upload className="h-4 w-4 mr-2" />
                 Upload 3D
               </Button>
-              <Button className="bg-[#3e2626] hover:bg-[#8B4513]">
->>>>>>> Stashed changes
+              <Button 
+                onClick={() => setIsNewProductModalOpen(true)}
+                className="bg-[#3e2626] hover:bg-[#8B4513]"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Produto
               </Button>
@@ -1126,7 +1116,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                             variant="ghost" 
                             size="sm" 
                             className="h-8 w-8 p-0"
-                            onClick={() => handleEditProduct(product.id)}
+                            onClick={() => handleEditProductById(product.id)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -1141,85 +1131,10 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                         </div>
                       </div>
                     </div>
-<<<<<<< Updated upstream
                   </CardContent>
                 </Card>
               );
             })}
-=======
-
-                    {product.sku && (
-                      <div className="flex items-center text-sm text-gray-500">
-                        <Tag className="h-4 w-4 mr-1" />
-                        SKU: {product.sku}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between pt-2 border-t">
-                      <div className="flex items-center">
-                        <Star className="h-4 w-4 text-yellow-400 mr-1" />
-                        <span className="text-sm text-gray-600">
-                          {product.rating || 'N/A'} ({product.reviews || 0} avaliações)
-                        </span>
-                      </div>
-                      <Badge className={product.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                        {product.isActive ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-                <div className="px-6 pb-4">
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => handleViewProduct(product)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      Ver
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => handleView3D(product)}
-                    >
-                      <Box className="h-4 w-4 mr-1" />
-                      3D
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => handleEditProduct(product)}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Editar
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => handleEditProduct(product)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-12">
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum produto encontrado</h3>
-            <p className="text-gray-500">Tente ajustar os filtros ou criar um novo produto.</p>
->>>>>>> Stashed changes
           </div>
         ) : (
           <Card>
@@ -1301,7 +1216,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-8 w-8 p-0"
-                                onClick={() => handleEditProduct(product.id)}
+                                onClick={() => handleEditProductById(product.id)}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -1326,458 +1241,6 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
         )}
       </div>
 
-<<<<<<< Updated upstream
-      {/* Modal de Novo Produto */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl">Novo Produto</CardTitle>
-                  <CardDescription className="text-white/80">
-                    Preencha os dados para criar um novo produto
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCloseModal}
-                  className="text-white hover:bg-white/20"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 space-y-8">
-              {/* Informações Básicas */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Package className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Informações Básicas
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome do Produto *</Label>
-                    <Input
-                      id="name"
-                      value={newProduct.name}
-                      onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                      placeholder="Ex: Sofá 3 Lugares Moderno"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Categoria *</Label>
-                    <select
-                      id="category"
-                      value={newProduct.category}
-                      onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3e2626]/20 focus:border-[#3e2626]"
-                    >
-                      <option value="SOFA">Sofá</option>
-                      <option value="MESA">Mesa</option>
-                      <option value="CADEIRA">Cadeira</option>
-                      <option value="ARMARIO">Armário</option>
-                      <option value="ESTANTE">Estante</option>
-                      <option value="POLTRONA">Poltrona</option>
-                      <option value="QUADRO">Quadro</option>
-                      <option value="LUMINARIA">Luminária</option>
-                      <option value="OUTROS">Outros</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Preço *</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      value={newProduct.price}
-                      onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
-                      placeholder="1299.90"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="costPrice">Preço de Custo</Label>
-                    <Input
-                      id="costPrice"
-                      type="number"
-                      step="0.01"
-                      value={newProduct.costPrice}
-                      onChange={(e) => setNewProduct({ ...newProduct, costPrice: Number(e.target.value) })}
-                      placeholder="800.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stock">Estoque *</Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      value={newProduct.stock}
-                      onChange={(e) => setNewProduct({ ...newProduct, stock: Number(e.target.value) })}
-                      placeholder="10"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="minStock">Estoque Mínimo</Label>
-                    <Input
-                      id="minStock"
-                      type="number"
-                      value={newProduct.minStock}
-                      onChange={(e) => setNewProduct({ ...newProduct, minStock: Number(e.target.value) })}
-                      placeholder="2"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sku">SKU</Label>
-                    <Input
-                      id="sku"
-                      value={newProduct.sku}
-                      onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-                      placeholder="SOFA-001"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="barcode">Código de Barras</Label>
-                    <Input
-                      id="barcode"
-                      value={newProduct.barcode}
-                      onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })}
-                      placeholder="7891234567890"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Descrições */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <FileText className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Descrições
-                </h3>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Descrição Completa</Label>
-                    <textarea
-                      id="description"
-                      value={newProduct.description}
-                      onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                      placeholder="Descrição detalhada do produto..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3e2626]/20 focus:border-[#3e2626] resize-none"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="shortDescription">Descrição Curta</Label>
-                    <Input
-                      id="shortDescription"
-                      value={newProduct.shortDescription}
-                      onChange={(e) => setNewProduct({ ...newProduct, shortDescription: e.target.value })}
-                      placeholder="Descrição resumida para listagens"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Características */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Star className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Características
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="style">Estilo</Label>
-                    <select
-                      id="style"
-                      value={newProduct.style}
-                      onChange={(e) => setNewProduct({ ...newProduct, style: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3e2626]/20 focus:border-[#3e2626]"
-                    >
-                      <option value="MODERNO">Moderno</option>
-                      <option value="MINIMALISTA">Minimalista</option>
-                      <option value="RUSTICO">Rústico</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="material">Material</Label>
-                    <select
-                      id="material"
-                      value={newProduct.material}
-                      onChange={(e) => setNewProduct({ ...newProduct, material: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3e2626]/20 focus:border-[#3e2626]"
-                    >
-                      <option value="MADEIRA">Madeira</option>
-                      <option value="METAL">Metal</option>
-                      <option value="COURO">Couro</option>
-                      <option value="TECIDO">Tecido</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="brand">Marca</Label>
-                    <Input
-                      id="brand"
-                      value={newProduct.brand}
-                      onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
-                      placeholder="Ex: Tok&Stok"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="model">Modelo</Label>
-                    <Input
-                      id="model"
-                      value={newProduct.model}
-                      onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
-                      placeholder="Ex: Moderno 2024"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Cores */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Palette className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Cores
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="colorName">Nome da Cor</Label>
-                    <Input
-                      id="colorName"
-                      value={newProduct.colorName}
-                      onChange={(e) => setNewProduct({ ...newProduct, colorName: e.target.value })}
-                      placeholder="Ex: Azul Marinho"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="colorHex">Código da Cor (HEX)</Label>
-                    <Input
-                      id="colorHex"
-                      value={newProduct.colorHex}
-                      onChange={(e) => setNewProduct({ ...newProduct, colorHex: e.target.value })}
-                      placeholder="#1E3A8A"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="customColor">Cor Personalizada</Label>
-                    <Input
-                      id="customColor"
-                      value={newProduct.customColor}
-                      onChange={(e) => setNewProduct({ ...newProduct, customColor: e.target.value })}
-                      placeholder="Descrição da cor customizada"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Dimensões */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Ruler className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Dimensões
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="width">Largura (cm)</Label>
-                    <Input
-                      id="width"
-                      type="number"
-                      step="0.01"
-                      value={newProduct.width}
-                      onChange={(e) => setNewProduct({ ...newProduct, width: Number(e.target.value) })}
-                      placeholder="200.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="height">Altura (cm)</Label>
-                    <Input
-                      id="height"
-                      type="number"
-                      step="0.01"
-                      value={newProduct.height}
-                      onChange={(e) => setNewProduct({ ...newProduct, height: Number(e.target.value) })}
-                      placeholder="80.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="depth">Profundidade (cm)</Label>
-                    <Input
-                      id="depth"
-                      type="number"
-                      step="0.01"
-                      value={newProduct.depth}
-                      onChange={(e) => setNewProduct({ ...newProduct, depth: Number(e.target.value) })}
-                      placeholder="90.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="weight">Peso (kg)</Label>
-                    <Input
-                      id="weight"
-                      type="number"
-                      step="0.01"
-                      value={newProduct.weight}
-                      onChange={(e) => setNewProduct({ ...newProduct, weight: Number(e.target.value) })}
-                      placeholder="45.50"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Mídia */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Camera className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Mídia
-                </h3>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Imagens do Produto</Label>
-                    <ImageUpload
-                      images={productImages}
-                      onImagesChange={setProductImages}
-                      maxImages={5}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="videoUrl">URL do Vídeo</Label>
-                    <Input
-                      id="videoUrl"
-                      value={newProduct.videoUrl}
-                      onChange={(e) => setNewProduct({ ...newProduct, videoUrl: e.target.value })}
-                      placeholder="https://youtube.com/watch?v=..."
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Tags e Palavras-chave */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Tag className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Tags e Palavras-chave
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tags">Tags (separadas por vírgula)</Label>
-                    <Input
-                      id="tags"
-                      value={newProduct.tags.join(', ')}
-                      onChange={(e) => setNewProduct({ ...newProduct, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag) })}
-                      placeholder="moderno, confortável, elegante"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="keywords">Palavras-chave (separadas por vírgula)</Label>
-                    <Input
-                      id="keywords"
-                      value={newProduct.keywords.join(', ')}
-                      onChange={(e) => setNewProduct({ ...newProduct, keywords: e.target.value.split(',').map(keyword => keyword.trim()).filter(keyword => keyword) })}
-                      placeholder="sofá, sala, moderno, conforto"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Status e Configurações */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Settings className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Status e Configurações
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="isActive"
-                        checked={newProduct.isActive}
-                        onChange={(e) => setNewProduct({ ...newProduct, isActive: e.target.checked })}
-                        className="rounded border-gray-300 text-[#3e2626] focus:ring-[#3e2626]"
-                      />
-                      <Label htmlFor="isActive" className="text-sm">
-                        Produto ativo
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="isAvailable"
-                        checked={newProduct.isAvailable}
-                        onChange={(e) => setNewProduct({ ...newProduct, isAvailable: e.target.checked })}
-                        className="rounded border-gray-300 text-[#3e2626] focus:ring-[#3e2626]"
-                      />
-                      <Label htmlFor="isAvailable" className="text-sm">
-                        Disponível para venda
-                      </Label>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="isFeatured"
-                        checked={newProduct.isFeatured}
-                        onChange={(e) => setNewProduct({ ...newProduct, isFeatured: e.target.checked })}
-                        className="rounded border-gray-300 text-[#3e2626] focus:ring-[#3e2626]"
-                      />
-                      <Label htmlFor="isFeatured" className="text-sm">
-                        Produto em destaque
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="isNew"
-                        checked={newProduct.isNew}
-                        onChange={(e) => setNewProduct({ ...newProduct, isNew: e.target.checked })}
-                        className="rounded border-gray-300 text-[#3e2626] focus:ring-[#3e2626]"
-                      />
-                      <Label htmlFor="isNew" className="text-sm">
-                        Produto novo
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="isBestSeller"
-                        checked={newProduct.isBestSeller}
-                        onChange={(e) => setNewProduct({ ...newProduct, isBestSeller: e.target.checked })}
-                        className="rounded border-gray-300 text-[#3e2626] focus:ring-[#3e2626]"
-                      />
-                      <Label htmlFor="isBestSeller" className="text-sm">
-                        Mais vendido
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <div className="flex items-center justify-end space-x-3 p-6 border-t">
-              <Button variant="outline" onClick={handleCloseModal}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleCreateProduct}
-                disabled={isCreating}
-                className="bg-[#3e2626] hover:bg-[#4a2f2f]"
-              >
-                {isCreating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Criando...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Criar Produto
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
-        </div>
-=======
       {/* Modal de Produto */}
       <AdminProductModal
         product={selectedProduct}
@@ -1821,7 +1284,6 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
           onUploaded={handleDirect3DUploaded}
           onClose={() => setIsDirect3DUploadOpen(false)}
         />
->>>>>>> Stashed changes
       )}
     </div>
   );

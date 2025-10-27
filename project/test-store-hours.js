@@ -83,3 +83,4 @@ async function testStoreHours() {
 
 // Executar os testes
 testStoreHours();
+

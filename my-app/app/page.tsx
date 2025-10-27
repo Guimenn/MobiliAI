@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 ﻿'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -547,15 +546,28 @@ export default function HomePage() {
     }
 
   // small card (quadrado)
-=======
-export default function Home() {
->>>>>>> Stashed changes
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <h1 className="text-4xl font-bold">MobiliAI - Sistema Funcionando!</h1>
-    </div>
-  );
-<<<<<<< Updated upstream
+    return (
+      <div className="w-full md:w-[200px] flex-shrink-0 relative">
+        <div className={`aspect-square rounded-2xl shadow-lg relative overflow-hidden`}>
+          {/* Imagem de fundo */}
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: `url(${slide.image})` }}
+          ></div>
+          {/* Overlay gradiente para melhor legibilidade */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+          
+          {/* overlay */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4">
+            <div className="text-white">
+              <div className="text-xs text-white/70 mb-1">{slide.number}</div>
+              <div className="text-sm font-bold mb-1">{slide.title}</div>
+              <div className="text-xs text-white/80">{slide.subtitle}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -1257,6 +1269,3 @@ export default function Home() {
     </div>
   );
 }
-=======
-}
->>>>>>> Stashed changes
