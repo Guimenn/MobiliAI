@@ -36,6 +36,7 @@ import {
   Settings
 } from 'lucide-react';
 import EditUserModal from '@/components/EditUserModal';
+import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 
 export default function UsersPage() {
   const router = useRouter();
@@ -176,6 +177,42 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
   const [userAvatar, setUserAvatar] = useState<File | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Função para lidar com mudanças nos inputs com formatação
+  const handleInputChange = (field: string, value: string) => {
+    // Formatar valor baseado no campo
+    let formattedValue = value;
+    switch (field) {
+      case 'name':
+        formattedValue = formatName(value);
+        break;
+      case 'email':
+        formattedValue = formatEmail(value);
+        break;
+      case 'phone':
+        formattedValue = formatPhone(value);
+        break;
+      case 'address':
+        formattedValue = formatAddress(value);
+        break;
+      case 'city':
+        formattedValue = formatCity(value);
+        break;
+      case 'state':
+        formattedValue = formatState(value);
+        break;
+      case 'zipCode':
+        formattedValue = formatCEP(value);
+        break;
+      case 'cpf':
+        formattedValue = formatCPF(value);
+        break;
+      default:
+        formattedValue = value;
+    }
+    
+    setNewUser({ ...newUser, [field]: formattedValue });
+  };
 
   // Função para criar novo usuário
   const handleCreateUser = async () => {
@@ -777,7 +814,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="name"
                       value={newUser.name}
-                      onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
                       placeholder="Ex: João Silva"
                     />
                   </div>
@@ -787,7 +824,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                       id="email"
                       type="email"
                       value={newUser.email}
-                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
                       placeholder="joao@empresa.com"
                     />
                   </div>
@@ -796,7 +833,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="phone"
                       value={newUser.phone}
-                      onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
                       placeholder="(11) 99999-9999"
                     />
                   </div>
@@ -865,7 +902,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="cpf"
                       value={newUser.cpf}
-                      onChange={(e) => setNewUser({ ...newUser, cpf: e.target.value })}
+                      onChange={(e) => handleInputChange('cpf', e.target.value)}
                       placeholder="000.000.000-00"
                       required
                     />
@@ -875,7 +912,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="address"
                       value={newUser.address}
-                      onChange={(e) => setNewUser({ ...newUser, address: e.target.value })}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
                       placeholder="Rua, número"
                     />
                   </div>
@@ -884,7 +921,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="city"
                       value={newUser.city}
-                      onChange={(e) => setNewUser({ ...newUser, city: e.target.value })}
+                      onChange={(e) => handleInputChange('city', e.target.value)}
                       placeholder="Nome da cidade"
                     />
                   </div>
@@ -893,7 +930,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="state"
                       value={newUser.state}
-                      onChange={(e) => setNewUser({ ...newUser, state: e.target.value })}
+                      onChange={(e) => handleInputChange('state', e.target.value)}
                       placeholder="SP"
                     />
                   </div>
@@ -902,7 +939,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="zipCode"
                       value={newUser.zipCode}
-                      onChange={(e) => setNewUser({ ...newUser, zipCode: e.target.value })}
+                      onChange={(e) => handleInputChange('zipCode', e.target.value)}
                       placeholder="01234-567"
                     />
                   </div>

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Send, Loader2, Eye, EyeOff, Home, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 
 interface ChatMessage {
   id: string;
@@ -586,19 +587,35 @@ export default function LoginPage() {
                     value={currentInput}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Formatação automática do CPF
-                      if (loginStep === 'userInfo' && currentField === 'cpf') {
-                        value = value.replace(/\D/g, '');
-                        if (value.length >= 4) {
-                          value = value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2}).*/, '$1.$2.$3-$4');
+                      // Formatação automática baseada no campo
+                      if (loginStep === 'userInfo') {
+                        switch (currentField) {
+                          case 'cpf':
+                            value = formatCPF(e.target.value);
+                            break;
+                          case 'zipCode':
+                            value = formatCEP(e.target.value);
+                            break;
+                          case 'phone':
+                            value = formatPhone(e.target.value);
+                            break;
+                          case 'state':
+                            value = formatState(e.target.value);
+                            break;
+                          case 'city':
+                            value = formatCity(e.target.value);
+                            break;
+                          case 'address':
+                            value = formatAddress(e.target.value);
+                            break;
+                          case 'name':
+                            value = formatName(e.target.value);
+                            break;
+                          default:
+                            value = e.target.value;
                         }
-                      }
-                      // Formatação automática do CEP
-                      else if (loginStep === 'userInfo' && currentField === 'zipCode') {
-                        value = value.replace(/\D/g, '');
-                        if (value.length >= 5) {
-                          value = value.replace(/^(\d{5})(\d{3}).*/, '$1-$2');
-                        }
+                      } else if (loginStep === 'email') {
+                        value = formatEmail(e.target.value);
                       }
                       setCurrentInput(value);
                     }}

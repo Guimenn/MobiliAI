@@ -18,6 +18,7 @@ import {
   Settings
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api';
+import { formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 
 export default function NewStorePage() {
   const router = useRouter();
@@ -65,9 +66,42 @@ export default function NewStorePage() {
   };
 
   const handleInputChange = (field: string, value: any) => {
+    // Formatar valor baseado no campo
+    let formattedValue = value;
+    switch (field) {
+      case 'name':
+        formattedValue = formatName(value);
+        break;
+      case 'email':
+        formattedValue = formatEmail(value);
+        break;
+      case 'phone':
+        formattedValue = formatPhone(value);
+        break;
+      case 'address':
+        formattedValue = formatAddress(value);
+        break;
+      case 'city':
+        formattedValue = formatCity(value);
+        break;
+      case 'state':
+        formattedValue = formatState(value);
+        break;
+      case 'zipCode':
+        formattedValue = formatCEP(value);
+        break;
+      default:
+        formattedValue = value;
+    }
+    
+    // Evitar atualizações desnecessárias
+    if (formData[field as keyof typeof formData] === formattedValue) {
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: formattedValue
     }));
   };
 
@@ -77,7 +111,7 @@ export default function NewStorePage() {
       workingHours: {
         ...prev.workingHours,
         [day]: {
-          ...prev.workingHours[day],
+          ...(prev.workingHours as any)[day],
           [field]: value
         }
       }
@@ -275,23 +309,23 @@ export default function NewStorePage() {
                   </div>
                   <div className="flex items-center space-x-2">
                     <Switch
-                      checked={formData.workingHours[day.key].isOpen}
+                      checked={(formData.workingHours as any)[day.key].isOpen}
                       onCheckedChange={(checked) => handleWorkingHoursChange(day.key, 'isOpen', checked)}
                     />
                     <Label>Aberto</Label>
                   </div>
-                  {formData.workingHours[day.key].isOpen && (
+                  {(formData.workingHours as any)[day.key].isOpen && (
                     <div className="flex items-center space-x-2">
                       <Input
                         type="time"
-                        value={formData.workingHours[day.key].open}
+                        value={(formData.workingHours as any)[day.key].open}
                         onChange={(e) => handleWorkingHoursChange(day.key, 'open', e.target.value)}
                         className="w-32"
                       />
                       <span>até</span>
                       <Input
                         type="time"
-                        value={formData.workingHours[day.key].close}
+                        value={(formData.workingHours as any)[day.key].close}
                         onChange={(e) => handleWorkingHoursChange(day.key, 'close', e.target.value)}
                         className="w-32"
                       />
