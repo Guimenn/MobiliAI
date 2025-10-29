@@ -334,6 +334,13 @@ export class AdminController {
     return this.adminService.deleteProduct(id);
   }
 
+  // ==================== VENDAS ====================
+
+  @Get('sales')
+  async getAllSales(@Request() req) {
+    return this.adminService.getAllSales(req.user.id);
+  }
+
   // ==================== RELATÓRIOS ====================
 
   @Get('reports/sales')

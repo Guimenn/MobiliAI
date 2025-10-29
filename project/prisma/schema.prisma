@@ -143,12 +143,12 @@ model Sale {
   notes            String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
-  customerId       String
+  customerId       String?
   employeeId       String
   storeId          String
   dailyCashId      String?
   items            SaleItem[]
-  customer         User          @relation("CustomerSales", fields: [customerId], references: [id])
+  customer         User?         @relation("CustomerSales", fields: [customerId], references: [id])
   dailyCash        DailyCash?    @relation(fields: [dailyCashId], references: [id])
   employee         User          @relation("EmployeeSales", fields: [employeeId], references: [id])
   store            Store         @relation(fields: [storeId], references: [id])

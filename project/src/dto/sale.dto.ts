@@ -40,8 +40,9 @@ export class CreateSaleDto {
   @IsString()
   notes?: string;
 
+  @IsOptional()
   @IsUUID()
-  customerId: string;
+  customerId?: string;
 
   @IsUUID()
   storeId: string;

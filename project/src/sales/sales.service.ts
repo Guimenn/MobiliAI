@@ -15,10 +15,12 @@ export class SalesService {
       throw new ForbiddenException('Acesso negado');
     }
 
-    // Verificar se o cliente existe
-    const customer = await this.prisma.user.findUnique({ where: { id: createSaleDto.customerId } });
-    if (!customer) {
-      throw new NotFoundException('Cliente não encontrado');
+    // Verificar se o cliente existe (se fornecido)
+    if (createSaleDto.customerId) {
+      const customer = await this.prisma.user.findUnique({ where: { id: createSaleDto.customerId } });
+      if (!customer) {
+        throw new NotFoundException('Cliente não encontrado');
+      }
     }
 
     // Verificar se todos os produtos existem e têm estoque suficiente

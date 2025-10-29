@@ -184,7 +184,7 @@ export const salesAPI = {
     paymentMethod: string;
     paymentReference?: string;
     notes?: string;
-    customerId: string;
+    customerId?: string;
     storeId: string;
     items: Array<{
       productId: string;

@@ -1059,6 +1059,46 @@ export class AdminService {
 
   // ==================== VENDAS POR LOJA ====================
 
+  async getAllSales(adminId: string) {
+    return this.prisma.sale.findMany({
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        employee: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        store: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+                sku: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
   async getStoreSales(storeId: string) {
     return this.prisma.sale.findMany({
       where: { storeId },

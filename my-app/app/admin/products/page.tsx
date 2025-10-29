@@ -775,11 +775,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
         // Filtro por busca
         if (productFilters.search) {
           const searchTerm = productFilters.search.toLowerCase();
-          return (
-            product.name?.toLowerCase().includes(searchTerm) ||
-            product.description?.toLowerCase().includes(searchTerm) ||
-            product.sku?.toLowerCase().includes(searchTerm)
-          );
+          return product.name?.toLowerCase().includes(searchTerm);
         }
         
         return true;
@@ -802,6 +798,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
 
   // Estados para o modal de produto
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
   
   // Estados para o visualizador 3D
@@ -817,6 +814,23 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
 
 
 
+
+  const handleViewProduct = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode('view');
+    setIsModalOpen(true);
+  };
+
+  const handleEditProduct = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode('edit');
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+  };
 
   const handleView3D = (product: any) => {
     setProductFor3D(product);
@@ -838,6 +852,16 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
     // Recarregar produtos após upload
     onProductsChange();
     setIsDirect3DUploadOpen(false);
+  };
+
+  const handleProductUpdated = (updatedProduct: any) => {
+    // Atualizar produtos via callback
+    onProductsChange();
+  };
+
+  const handleProductDeleted = (productId: string) => {
+    // Atualizar produtos via callback
+    onProductsChange();
   };
   if (isLoading) {
     return (
@@ -1109,7 +1133,12 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                           </Badge>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleViewProduct(product)}
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button 
@@ -1209,14 +1238,19 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex items-center space-x-2">
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 w-8 p-0"
+                                onClick={() => handleViewProduct(product)}
+                              >
                                 <Eye className="h-4 w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-8 w-8 p-0"
-                                onClick={() => handleEditProductById(product.id)}
+                                onClick={() => handleEditProduct(product)}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>

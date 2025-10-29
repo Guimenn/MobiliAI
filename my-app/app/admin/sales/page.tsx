@@ -382,7 +382,11 @@ export default function SalesPage() {
                   <Download className="h-4 w-4 mr-2" />
                   Exportar
                 </Button>
-                <Button size="sm" className="bg-[#3e2626] hover:bg-[#3e2626]/90">
+                <Button 
+                  size="sm" 
+                  className="bg-[#3e2626] hover:bg-[#3e2626]/90"
+                  onClick={() => router.push('/admin/sales/create')}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Nova Venda
                 </Button>
