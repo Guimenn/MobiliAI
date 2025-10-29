@@ -160,6 +160,13 @@ export class AdminService {
     storeId?: string;
     phone?: string;
     address?: string;
+    cpf?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    isActive?: boolean;
+    workingHours?: any;
+    avatarUrl?: string;
   }) {
     // Verificar se email já existe
     const existingUser = await this.prisma.user.findUnique({
@@ -170,36 +177,58 @@ export class AdminService {
       throw new BadRequestException('Email já está em uso');
     }
 
+    // Verificar se CPF já existe (se fornecido)
+    if (userData.cpf) {
+      const existingCpf = await this.prisma.user.findUnique({
+        where: { cpf: userData.cpf }
+      });
+      if (existingCpf) {
+        throw new BadRequestException('CPF já está em uso');
+      }
+    }
+
     // Limpar storeId se for string vazia
     const cleanStoreId = userData.storeId && userData.storeId.trim() !== '' ? userData.storeId : undefined;
 
     // Verificar se loja existe (se fornecida)
     if (cleanStoreId) {
+      console.log('🔍 Verificando loja com ID:', cleanStoreId);
       const store = await this.prisma.store.findUnique({
         where: { id: cleanStoreId }
       });
+      console.log('🏪 Loja encontrada:', store ? 'Sim' : 'Não');
       if (!store) {
+        console.log('❌ Loja não encontrada no banco de dados');
         throw new NotFoundException('Loja não encontrada');
       }
+    } else {
+      console.log('ℹ️ Nenhuma loja especificada (storeId vazio)');
     }
 
     // Hash da senha
     const hashedPassword = await bcrypt.hash(userData.password, 10);
 
-    const user = await this.prisma.user.create({
-      data: {
-        name: userData.name,
-        email: userData.email,
-        password: hashedPassword,
-        role: userData.role,
-        storeId: cleanStoreId,
-        phone: userData.phone,
-        address: userData.address
-      },
-      include: {
-        store: { select: { id: true, name: true } }
-      }
-    });
+      const user = await this.prisma.user.create({
+        data: {
+          name: userData.name,
+          email: userData.email,
+          password: hashedPassword,
+          role: userData.role,
+          storeId: cleanStoreId,
+          phone: userData.phone,
+          address: userData.address,
+          cpf: userData.cpf,
+          city: userData.city,
+          state: userData.state,
+          zipCode: userData.zipCode,
+          isActive: userData.isActive ?? true,
+          workingHours: userData.workingHours,
+          avatarUrl: userData.avatarUrl
+        },
+        include: {
+          store: { select: { id: true, name: true } }
+        }
+      });
 
     return user;
   }
@@ -213,6 +242,7 @@ export class AdminService {
     address?: string;
     isActive?: boolean;
     workingHours?: any;
+    avatarUrl?: string;
   }) {
     const user = await this.prisma.user.findUnique({
       where: { id }
@@ -401,6 +431,7 @@ export class AdminService {
     workingHours?: any;
     settings?: any;
     managerId?: string;
+    imageUrl?: string;
   }) {
     const store = await this.prisma.store.create({
       data: {
@@ -414,7 +445,8 @@ export class AdminService {
         description: storeData.description,
         workingHours: storeData.workingHours,
         settings: storeData.settings,
-        isActive: true
+        isActive: true,
+        imageUrl: storeData.imageUrl
       }
     });
 

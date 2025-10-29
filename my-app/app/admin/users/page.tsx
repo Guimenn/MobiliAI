@@ -36,6 +36,7 @@ import {
   Settings
 } from 'lucide-react';
 import EditUserModal from '@/components/EditUserModal';
+import ViewUserModal from '@/components/ViewUserModal';
 import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 
 export default function UsersPage() {
@@ -46,6 +47,8 @@ export default function UsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [viewingUser, setViewingUser] = useState<any>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   useEffect(() => {
     loadUsersData();
@@ -100,7 +103,7 @@ export default function UsersPage() {
   const handleSaveUser = async (userId: string, userData: any) => {
     try {
       // Usar fetch direto para atualizar usuário
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      const response = await fetch(`http://localhost:3001/api/admin/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token || ''}`,
@@ -113,18 +116,37 @@ export default function UsersPage() {
         await loadUsersData(); // Recarregar a lista
         setIsEditModalOpen(false);
         setEditingUser(null);
+        alert('Usuário atualizado com sucesso!');
       } else {
-        throw new Error('Erro ao atualizar usuário');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao atualizar usuário');
       }
     } catch (error) {
       console.error('Erro ao salvar usuário:', error);
-      alert('Erro ao salvar usuário');
+      alert(`Erro ao salvar usuário: ${error.message}`);
     }
   };
 
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
     setEditingUser(null);
+  };
+
+  const handleViewUser = (user: any) => {
+    setViewingUser(user);
+    setIsViewModalOpen(true);
+  };
+
+  const handleCloseViewModal = () => {
+    setIsViewModalOpen(false);
+    setViewingUser(null);
+  };
+
+  const handleEditFromView = (user: any) => {
+    setViewingUser(null);
+    setIsViewModalOpen(false);
+    setEditingUser(user);
+    setIsEditModalOpen(true);
   };
 
   return (
@@ -135,6 +157,8 @@ export default function UsersPage() {
               stores={stores}
               token={token}
               onUsersChange={loadUsersData}
+              onViewUser={handleViewUser}
+              onEditUser={handleEditUserModal}
           />
 
       {/* Modal de Edição */}
@@ -144,12 +168,21 @@ export default function UsersPage() {
         user={editingUser}
         onSave={handleSaveUser}
       />
+
+      {/* Modal de Visualização */}
+      <ViewUserModal
+        isOpen={isViewModalOpen}
+        onClose={handleCloseViewModal}
+        user={viewingUser}
+        stores={stores}
+        onEdit={handleEditFromView}
+      />
     </div>
   );
 }
 
 // Componente da seção de usuários - código exato do dashboard
-function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
+function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUser, onEditUser }: any) {
   // Estados para filtros
   const [userFilters, setUserFilters] = useState({
     role: 'all',
@@ -172,7 +205,8 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
     city: '',
     state: '',
     zipCode: '',
-    storeId: ''
+    storeId: '',
+    avatarUrl: ''
   });
   const [userAvatar, setUserAvatar] = useState<File | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -225,51 +259,65 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
     try {
       console.log('Criando usuário no banco:', newUser);
       
-      // Preparar dados para envio
-      const userData = {
-        name: newUser.name,
-        email: newUser.email,
-        password: newUser.password,
-        role: newUser.role,
-        isActive: newUser.isActive,
-        cpf: newUser.cpf,
-        phone: newUser.phone,
-        address: newUser.address,
-        city: newUser.city,
-        state: newUser.state,
-        zipCode: newUser.zipCode,
-        storeId: newUser.storeId ? parseInt(newUser.storeId) : null
-      };
+       // Preparar dados para envio
+       const userData = {
+         name: newUser.name,
+         email: newUser.email,
+         password: newUser.password,
+         role: newUser.role,
+         isActive: newUser.isActive,
+         cpf: newUser.cpf,
+         phone: newUser.phone,
+         address: newUser.address,
+         city: newUser.city,
+         state: newUser.state,
+         zipCode: newUser.zipCode,
+         storeId: newUser.storeId || null,
+         avatarUrl: newUser.avatarUrl
+       };
 
       console.log('Dados do usuário a serem enviados:', userData);
 
-      // Chamar API para criar usuário
-      const createdUser = await adminAPI.createUser(userData);
-        console.log('Usuário criado com sucesso:', createdUser);
-        
-        // Upload do avatar se fornecido
-        if (userAvatar) {
-          console.log('Enviando avatar:', userAvatar.name);
-          // TODO: Implementar upload do avatar para o servidor
-          // const avatarResponse = await adminAPI.uploadUserAvatar(token, createdUser.id, userAvatar);
-        }
+       // Chamar API para criar usuário
+       const createdUser = await adminAPI.createUser(userData);
+         console.log('Usuário criado com sucesso:', createdUser);
+         
+         // Upload do avatar se fornecido
+         if (userAvatar) {
+           console.log('Enviando avatar:', userAvatar.name);
+           try {
+             const { uploadUserAvatar } = await import('@/lib/supabase');
+             const avatarUrl = await uploadUserAvatar(userAvatar, createdUser.id);
+             
+             if (avatarUrl) {
+               console.log('Avatar enviado com sucesso:', avatarUrl);
+               // Atualizar o usuário com a URL do avatar
+               await adminAPI.updateUser(createdUser.id, { avatarUrl });
+               console.log('Usuário atualizado com avatar');
+             }
+           } catch (error) {
+             console.error('Erro ao fazer upload do avatar:', error);
+             // Não falhar a criação do usuário por causa do avatar
+           }
+         }
         
         alert('Usuário criado com sucesso!');
         setIsModalOpen(false);
-        setNewUser({
-          name: '',
-          email: '',
-          password: '',
-          role: 'CASHIER',
-          isActive: true,
-          cpf: '',
-          phone: '',
-          address: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          storeId: ''
-        });
+         setNewUser({
+           name: '',
+           email: '',
+           password: '',
+           role: 'CASHIER',
+           isActive: true,
+           cpf: '',
+           phone: '',
+           address: '',
+           city: '',
+           state: '',
+           zipCode: '',
+           storeId: '',
+           avatarUrl: ''
+         });
         setUserAvatar(null);
         
         // Recarregar dados do banco
@@ -285,32 +333,46 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
   // Função para fechar modal
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setNewUser({
-      name: '',
-      email: '',
-      password: '',
-      role: 'CASHIER',
-      isActive: true,
-      cpf: '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      storeId: ''
-    });
+         setNewUser({
+           name: '',
+           email: '',
+           password: '',
+           role: 'CASHIER',
+           isActive: true,
+           cpf: '',
+           phone: '',
+           address: '',
+           city: '',
+           state: '',
+           zipCode: '',
+           storeId: '',
+           avatarUrl: ''
+         });
     setUserAvatar(null);
   };
 
-  // Função para editar usuário (versão simplificada)
+  // Função para editar usuário
   const handleEditUserById = async (userId: string) => {
     try {
       console.log('Editando usuário:', userId);
-      // TODO: Implementar modal de edição
-      alert('Funcionalidade de edição será implementada em breve');
+      
+      // Buscar dados completos do usuário
+      const response = await fetch(`http://localhost:3001/api/admin/users/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token || ''}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        onEditUser(userData);
+      } else {
+        throw new Error('Erro ao buscar dados do usuário');
+      }
     } catch (error) {
       console.error('Erro ao editar usuário:', error);
-      alert('Erro ao editar usuário');
+      alert('Erro ao carregar dados do usuário');
     }
   };
 
@@ -324,7 +386,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
       console.log('Deletando usuário:', userId);
       
       // Usar fetch direto para deletar usuário
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      const response = await fetch(`http://localhost:3001/api/admin/users/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token || ''}`,
@@ -589,12 +651,20 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
               <Card key={user.id} className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 overflow-hidden">
                 <CardContent className="p-0">
                   <div className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 p-6">
-                  <div className="flex items-center space-x-4">
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback className="bg-[#3e2626] text-white text-lg font-semibold">
-                          {user.name?.charAt(0) || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
+                   <div className="flex items-center space-x-4">
+                       <Avatar className="h-12 w-12">
+                         {user.avatarUrl ? (
+                           <img 
+                             src={user.avatarUrl} 
+                             alt={user.name}
+                             className="w-full h-full object-cover rounded-full"
+                           />
+                         ) : (
+                           <AvatarFallback className="bg-[#3e2626] text-white text-lg font-semibold">
+                             {user.name?.charAt(0) || 'U'}
+                           </AvatarFallback>
+                         )}
+                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-semibold text-gray-900 truncate">
                           {user.name}
@@ -648,26 +718,34 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                       <div className="text-xs text-gray-500">
                         Criado em {new Date(user.createdAt).toLocaleDateString('pt-BR')}
                   </div>
-                  <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEditUserById(user.id)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                   <div className="flex items-center space-x-2">
+                         <Button 
+                           variant="ghost" 
+                           size="sm" 
+                           className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                           onClick={() => onViewUser(user)}
+                           title="Visualizar usuário"
+                         >
+                       <Eye className="h-4 w-4" />
+                     </Button>
+                     <Button 
+                       variant="outline" 
+                       size="sm"
+                       onClick={() => handleEditUserById(user.id)}
+                       title="Editar usuário"
+                     >
+                       <Edit className="h-4 w-4" />
+                     </Button>
+                         <Button 
+                           variant="ghost" 
+                           size="sm" 
+                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                           onClick={() => handleDeleteUser(user.id)}
+                           title="Deletar usuário"
+                         >
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                   </div>
                 </div>
                   </div>
                 </CardContent>
@@ -705,12 +783,20 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     {getFilteredUsers().map((user: any) => (
                       <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <Avatar className="h-10 w-10">
-                              <AvatarFallback className="bg-[#3e2626] text-white">
-                                {user.name?.charAt(0) || 'U'}
-                              </AvatarFallback>
-                            </Avatar>
+                           <div className="flex items-center">
+                             <Avatar className="h-10 w-10">
+                               {user.avatarUrl ? (
+                                 <img 
+                                   src={user.avatarUrl} 
+                                   alt={user.name}
+                                   className="w-full h-full object-cover rounded-full"
+                                 />
+                               ) : (
+                                 <AvatarFallback className="bg-[#3e2626] text-white">
+                                   {user.name?.charAt(0) || 'U'}
+                                 </AvatarFallback>
+                               )}
+                             </Avatar>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
                                 {user.name}
@@ -747,27 +833,35 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                           {new Date(user.createdAt).toLocaleDateString('pt-BR')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex items-center space-x-2">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-8 w-8 p-0"
-                              onClick={() => handleEditUserById(user.id)}
-                            >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                              onClick={() => handleDeleteUser(user.id)}
-                            >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                   <div className="flex items-center space-x-2">
+                             <Button 
+                               variant="ghost" 
+                               size="sm" 
+                               className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                               onClick={() => onViewUser(user)}
+                               title="Visualizar usuário"
+                             >
+                       <Eye className="h-4 w-4" />
+                     </Button>
+                             <Button 
+                               variant="ghost" 
+                               size="sm" 
+                               className="h-8 w-8 p-0"
+                               onClick={() => handleEditUserById(user.id)}
+                               title="Editar usuário"
+                             >
+                       <Edit className="h-4 w-4" />
+                     </Button>
+                             <Button 
+                               variant="ghost" 
+                               size="sm" 
+                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                               onClick={() => handleDeleteUser(user.id)}
+                               title="Deletar usuário"
+                             >
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                   </div>
                         </td>
                       </tr>
                     ))}
@@ -953,10 +1047,12 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                   Avatar e Status
                 </h3>
                 <div className="space-y-2">
-                  <Label>Avatar do Usuário</Label>
                   <UserAvatarUpload
                     onAvatarChange={setUserAvatar}
                     avatar={userAvatar}
+                    onAvatarUploaded={(url) => {
+                      setNewUser({ ...newUser, avatarUrl: url });
+                    }}
                   />
                 </div>
                 <div className="flex items-center space-x-2">

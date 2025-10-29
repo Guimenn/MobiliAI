@@ -43,4 +43,8 @@ export class CreateStoreDto {
   @IsOptional()
   @IsString()
   lunchEnd?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }

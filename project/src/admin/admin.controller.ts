@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminCategoriesService } from './admin-categories.service';
 import { AdminSystemService } from './admin-system.service';
@@ -15,6 +15,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
+import { TransformUserDataInterceptor } from './interceptors/transform-user-data.interceptor';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -55,15 +56,10 @@ export class AdminController {
   }
 
   @Post('users')
+  @UseInterceptors(TransformUserDataInterceptor)
   async createUser(@Body() userData: CreateUserDto) {
     try {
-      // Limpar dados antes de processar
-      const cleanUserData = {
-        ...userData,
-        storeId: userData.storeId && userData.storeId.trim() !== '' ? userData.storeId : undefined
-      };
-      
-      return await this.adminService.createUser(cleanUserData);
+      return await this.adminService.createUser(userData);
     } catch (error) {
       console.error('Erro ao criar usuário:', error);
       throw error;

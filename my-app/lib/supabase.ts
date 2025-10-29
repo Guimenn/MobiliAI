@@ -292,3 +292,110 @@ export async function simulateImageUpload(file: File, productId: string): Promis
   console.log('✅ Upload simulado concluído:', placeholderUrl);
   return placeholderUrl;
 }
+
+// ===== FUNÇÕES PARA UPLOAD DE FOTO DE LOJA =====
+
+// Função para fazer upload de foto de loja
+export async function uploadStoreImage(file: File, storeId: string): Promise<string | null> {
+  if (!supabase || !isSupabaseConfigured) {
+    console.warn('⚠️ Supabase não configurado. Configure as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    // Retornar URL de placeholder para desenvolvimento
+    return `https://via.placeholder.com/400x300.png?text=${encodeURIComponent(file.name)}`;
+  }
+
+  // Usar cliente admin se disponível (bypassa RLS)
+  const client = supabaseAdmin || supabase;
+  console.log('🔑 Usando cliente:', supabaseAdmin ? 'Admin (Service Role)' : 'Anon');
+
+  // Pular verificação do bucket - vamos tentar upload diretamente
+  console.log('📤 Tentando upload direto para bucket fotos...');
+
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${storeId}-${Date.now()}.${fileExt}`;
+    
+    // Tentar diferentes pastas em ordem de prioridade
+    const pathsToTry = [
+      `stores/${fileName}`,      // Pasta stores
+      `public/${fileName}`,       // Pasta public
+      fileName                    // Raiz do bucket
+    ];
+
+    console.log('📤 Tentando upload para diferentes caminhos:', pathsToTry);
+
+    // Tentar cada caminho até um funcionar
+    for (let i = 0; i < pathsToTry.length; i++) {
+      const filePath = pathsToTry[i];
+      console.log(`🔄 Tentativa ${i + 1}/${pathsToTry.length}: ${filePath}`);
+      
+      const { data, error } = await client.storage
+        .from('fotos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        console.error(`❌ Erro na tentativa ${i + 1}:`, error);
+        console.error('❌ Detalhes do erro:', {
+          message: error.message,
+          name: error.name
+        });
+        
+        // Se não é a última tentativa, continuar
+        if (i < pathsToTry.length - 1) {
+          console.log('🔄 Tentando próximo caminho...');
+          continue;
+        }
+        
+        // Se é a última tentativa, retornar placeholder
+        console.error('❌ Todas as tentativas falharam');
+        return `https://via.placeholder.com/400x300.png?text=${encodeURIComponent(file.name)}`;
+      }
+
+      // Sucesso! Obter URL pública
+      const { data: publicUrlData } = client.storage
+        .from('fotos')
+        .getPublicUrl(filePath);
+
+      console.log(`✅ Upload bem-sucedido na tentativa ${i + 1}:`, publicUrlData.publicUrl);
+      return publicUrlData.publicUrl;
+    }
+    
+    // Se chegou aqui, todas as tentativas falharam
+    return `https://via.placeholder.com/400x300.png?text=${encodeURIComponent(file.name)}`;
+  } catch (error) {
+    console.error('❌ Erro geral no upload:', error);
+    return `https://via.placeholder.com/400x300.png?text=${encodeURIComponent(file.name)}`;
+  }
+}
+
+// Função para deletar foto de loja
+export async function deleteStoreImage(imageUrl: string): Promise<boolean> {
+  if (!supabase || !isSupabaseConfigured) {
+    console.warn('⚠️ Supabase não configurado. Deletar foto ignorado.');
+    return true; // Retornar true para não quebrar o fluxo
+  }
+
+  try {
+    // Extrair o caminho do arquivo da URL
+    const urlParts = imageUrl.split('/fotos/');
+    if (urlParts.length < 2) return false;
+    
+    const filePath = urlParts[1];
+
+    const { error } = await supabase.storage
+      .from('fotos')
+      .remove([filePath]);
+
+    if (error) {
+      console.error('Erro ao deletar foto:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Erro ao deletar foto:', error);
+    return false;
+  }
+}

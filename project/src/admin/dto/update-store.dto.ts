@@ -47,4 +47,8 @@ export class UpdateStoreDto {
   @IsOptional()
   @IsString()
   lunchEnd?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }

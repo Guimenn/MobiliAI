@@ -23,6 +23,8 @@ import {
   X
 } from 'lucide-react';
 import WorkingHoursConfig from '@/components/WorkingHoursConfig';
+import UserAvatarUpload from '@/components/UserAvatarUpload';
+import { useAppStore } from '@/lib/store';
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -32,6 +34,7 @@ interface EditUserModalProps {
 }
 
 export default function EditUserModal({ isOpen, onClose, user, onSave }: EditUserModalProps) {
+  const { token } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -40,10 +43,12 @@ export default function EditUserModal({ isOpen, onClose, user, onSave }: EditUse
     role: '',
     storeId: '',
     address: '',
-    isActive: true
+    isActive: true,
+    avatarUrl: ''
   });
   const [workingHours, setWorkingHours] = useState<any>(null);
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
+  const [userAvatar, setUserAvatar] = useState<File | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -54,7 +59,8 @@ export default function EditUserModal({ isOpen, onClose, user, onSave }: EditUse
         role: user.role || '',
         storeId: user.storeId || '',
         address: user.address || '',
-        isActive: user.isActive !== false
+        isActive: user.isActive !== false,
+        avatarUrl: user.avatarUrl || ''
       });
       setWorkingHours(user.workingHours || null);
     }
@@ -68,19 +74,30 @@ export default function EditUserModal({ isOpen, onClose, user, onSave }: EditUse
 
   const fetchStores = async () => {
     try {
+      console.log('🔍 Carregando lojas do banco...');
+      console.log('🔑 Token:', token ? 'Token presente' : 'Token ausente');
+      
       const response = await fetch('http://localhost:3001/api/admin/stores', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token || ''}`,
           'Content-Type': 'application/json'
         }
       });
 
+      console.log('📡 Status da resposta:', response.status);
+      console.log('📡 Status OK:', response.ok);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Lojas carregadas do banco:', data);
         setStores(data);
+      } else {
+        console.error('❌ Erro ao carregar lojas:', response.statusText);
+        const errorData = await response.text();
+        console.error('❌ Detalhes do erro:', errorData);
       }
     } catch (error) {
-      console.error('Erro ao carregar lojas:', error);
+      console.error('❌ Erro ao carregar lojas:', error);
     }
   };
 
@@ -89,6 +106,22 @@ export default function EditUserModal({ isOpen, onClose, user, onSave }: EditUse
     setLoading(true);
 
     try {
+      // Upload do avatar se fornecido
+      if (userAvatar && user?.id) {
+        try {
+          const { uploadUserAvatar } = await import('@/lib/supabase');
+          const avatarUrl = await uploadUserAvatar(userAvatar, user.id);
+          
+          if (avatarUrl) {
+            console.log('Avatar enviado com sucesso:', avatarUrl);
+            formData.avatarUrl = avatarUrl;
+          }
+        } catch (error) {
+          console.error('Erro ao fazer upload do avatar:', error);
+          // Continuar mesmo se o upload falhar
+        }
+      }
+
       const userData = {
         ...formData,
         ...(workingHours && { workingHours })
@@ -180,6 +213,18 @@ export default function EditUserModal({ isOpen, onClose, user, onSave }: EditUse
                   value={formData.address}
                   onChange={handleInputChange}
                   placeholder="Rua, número, bairro"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <UserAvatarUpload
+                  avatar={userAvatar}
+                  onAvatarChange={setUserAvatar}
+                  existingAvatar={formData.avatarUrl}
+                  userId={user?.id}
+                  onAvatarUploaded={(url) => {
+                    setFormData({ ...formData, avatarUrl: url });
+                  }}
                 />
               </div>
             </div>

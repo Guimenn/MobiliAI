@@ -37,4 +37,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsObject()
   workingHours?: any;
+
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
 }
