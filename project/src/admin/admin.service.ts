@@ -222,8 +222,7 @@ export class AdminService {
           state: userData.state,
           zipCode: userData.zipCode,
           isActive: userData.isActive ?? true,
-          workingHours: userData.workingHours,
-          avatarUrl: userData.avatarUrl
+          workingHours: userData.workingHours
         },
         include: {
           store: { select: { id: true, name: true } }
@@ -445,8 +444,7 @@ export class AdminService {
         description: storeData.description,
         workingHours: storeData.workingHours,
         settings: storeData.settings,
-        isActive: true,
-        imageUrl: storeData.imageUrl
+        isActive: true
       }
     });
 
