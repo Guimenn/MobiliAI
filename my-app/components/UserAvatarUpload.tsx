@@ -5,6 +5,7 @@ import { Upload, X, User as UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { uploadUserAvatar } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface UserAvatarUploadProps {
   avatar: File | null;
@@ -33,13 +34,19 @@ export default function UserAvatarUpload({
 
     // Validar tipo de arquivo
     if (!file.type.startsWith('image/')) {
-      alert('Por favor, selecione apenas arquivos de imagem.');
+      toast.error('Tipo de arquivo inválido', {
+        description: 'Selecione apenas arquivos de imagem (JPG, PNG, GIF).',
+        duration: 3000,
+      });
       return;
     }
 
     // Validar tamanho (máximo 2MB para avatar)
     if (file.size > 2 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 2MB.');
+      toast.error('Arquivo muito grande', {
+        description: 'A imagem deve ter no máximo 2MB.',
+        duration: 3000,
+      });
       return;
     }
 
@@ -74,16 +81,26 @@ export default function UserAvatarUpload({
       
       if (avatarUrl) {
         console.log('✅ Avatar enviado com sucesso:', avatarUrl);
+        toast.success('Avatar enviado com sucesso!', {
+          description: 'A foto foi salva no sistema.',
+          duration: 3000,
+        });
         if (onAvatarUploaded) {
           onAvatarUploaded(avatarUrl);
         }
       } else {
         console.error('❌ Falha no upload do avatar');
-        alert('Erro ao fazer upload do avatar. Tente novamente.');
+        toast.error('Erro no upload do avatar', {
+          description: 'Tente novamente mais tarde.',
+          duration: 3000,
+        });
       }
     } catch (error) {
       console.error('❌ Erro no upload do avatar:', error);
-      alert('Erro ao fazer upload do avatar. Tente novamente.');
+      toast.error('Erro no upload do avatar', {
+        description: 'Tente novamente mais tarde.',
+        duration: 3000,
+      });
     } finally {
       setIsUploading(false);
     }

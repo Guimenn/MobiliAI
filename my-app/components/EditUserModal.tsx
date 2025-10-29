@@ -25,6 +25,7 @@ import {
 import WorkingHoursConfig from '@/components/WorkingHoursConfig';
 import UserAvatarUpload from '@/components/UserAvatarUpload';
 import { useAppStore } from '@/lib/store';
+import { toast } from 'sonner';
 
 interface EditUserModalProps {
   isOpen: boolean;

@@ -37,7 +37,9 @@ import {
 } from 'lucide-react';
 import EditUserModal from '@/components/EditUserModal';
 import ViewUserModal from '@/components/ViewUserModal';
+import DeleteUserConfirmDialog from '@/components/DeleteUserConfirmDialog';
 import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
+import { toast } from 'sonner';
 
 export default function UsersPage() {
   const router = useRouter();
@@ -49,6 +51,9 @@ export default function UsersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<any>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadUsersData();
@@ -116,14 +121,20 @@ export default function UsersPage() {
         await loadUsersData(); // Recarregar a lista
         setIsEditModalOpen(false);
         setEditingUser(null);
-        alert('Usuário atualizado com sucesso!');
+        toast.success('Usuário atualizado com sucesso!', {
+          description: `${userData.name} foi atualizado.`,
+          duration: 4000,
+        });
       } else {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Erro ao atualizar usuário');
       }
     } catch (error) {
       console.error('Erro ao salvar usuário:', error);
-      alert(`Erro ao salvar usuário: ${error.message}`);
+      toast.error('Erro ao salvar usuário', {
+        description: error.message || 'Tente novamente mais tarde.',
+        duration: 4000,
+      });
     }
   };
 
@@ -149,6 +160,60 @@ export default function UsersPage() {
     setIsEditModalOpen(true);
   };
 
+  // Abrir modal de confirmação de exclusão
+  const handleDeleteUser = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    setUserToDelete(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // Confirmar exclusão
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      console.log('Deletando usuário:', userToDelete.id);
+      const response = await fetch(`http://localhost:3001/api/admin/users/${userToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token || ''}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        toast.success('Usuário deletado com sucesso!', {
+          description: `${userToDelete.name} foi removido do sistema.`,
+          duration: 4000,
+        });
+        loadUsersData();
+        setIsDeleteDialogOpen(false);
+        setUserToDelete(null);
+      } else {
+        const errorData = await response.json();
+        toast.error('Erro ao deletar usuário', {
+          description: errorData.message || 'Erro desconhecido',
+          duration: 4000,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao deletar usuário:', error);
+      toast.error('Erro ao deletar usuário', {
+        description: 'Tente novamente mais tarde.',
+        duration: 4000,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Cancelar exclusão
+  const handleCancelDelete = () => {
+    setIsDeleteDialogOpen(false);
+    setUserToDelete(null);
+  };
+
   return (
     <div className="space-y-6">
             <UsersSection 
@@ -159,6 +224,7 @@ export default function UsersPage() {
               onUsersChange={loadUsersData}
               onViewUser={handleViewUser}
               onEditUser={handleEditUserModal}
+              onDeleteUser={handleDeleteUser}
           />
 
       {/* Modal de Edição */}
@@ -177,12 +243,22 @@ export default function UsersPage() {
         stores={stores}
         onEdit={handleEditFromView}
       />
+
+      {/* Modal de Confirmação de Exclusão */}
+      <DeleteUserConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        userName={userToDelete?.name || ''}
+        userRole={userToDelete?.role}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }
 
 // Componente da seção de usuários - código exato do dashboard
-function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUser, onEditUser }: any) {
+function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUser, onEditUser, onDeleteUser }: any) {
   // Estados para filtros
   const [userFilters, setUserFilters] = useState({
     role: 'all',
@@ -251,7 +327,10 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
   // Função para criar novo usuário
   const handleCreateUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.password) {
-      alert('Por favor, preencha todos os campos obrigatórios.');
+      toast.error('Campos obrigatórios', {
+        description: 'Nome, e-mail e senha são obrigatórios.',
+        duration: 3000,
+      });
       return;
     }
 
@@ -301,7 +380,10 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
            }
          }
         
-        alert('Usuário criado com sucesso!');
+        toast.success('Usuário criado com sucesso!', {
+          description: `${createdUser.name} foi adicionado ao sistema.`,
+          duration: 4000,
+        });
         setIsModalOpen(false);
          setNewUser({
            name: '',
@@ -324,7 +406,10 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
         onUsersChange();
     } catch (error) {
       console.error('Erro ao criar usuário:', error);
-      alert('Erro ao criar usuário. Tente novamente.');
+      toast.error('Erro ao criar usuário', {
+        description: 'Verifique os dados e tente novamente.',
+        duration: 4000,
+      });
     } finally {
       setIsCreating(false);
     }
@@ -372,44 +457,13 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
       }
     } catch (error) {
       console.error('Erro ao editar usuário:', error);
-      alert('Erro ao carregar dados do usuário');
-    }
-  };
-
-  // Função para deletar usuário
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Tem certeza que deseja deletar este usuário?')) {
-      return;
-    }
-
-    try {
-      console.log('Deletando usuário:', userId);
-      
-      // Usar fetch direto para deletar usuário
-      const response = await fetch(`http://localhost:3001/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token || ''}`,
-          'Content-Type': 'application/json'
-        }
+      toast.error('Erro ao carregar dados do usuário', {
+        description: 'Tente novamente mais tarde.',
+        duration: 3000,
       });
-      
-      if (response.ok) {
-        console.log('Usuário deletado com sucesso');
-        alert('Usuário deletado com sucesso!');
-        
-        // Recarregar dados do banco
-        onUsersChange();
-      } else {
-        const errorData = await response.json();
-        console.error('Erro na API:', errorData);
-        alert(`Erro ao deletar usuário: ${errorData.message || 'Erro desconhecido'}`);
-      }
-    } catch (error) {
-      console.error('Erro ao deletar usuário:', error);
-      alert('Erro ao deletar usuário');
     }
   };
+
 
   // Função para filtrar usuários
   const getFilteredUsers = () => {
@@ -740,7 +794,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                            variant="ghost" 
                            size="sm" 
                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                           onClick={() => handleDeleteUser(user.id)}
+                           onClick={() => onDeleteUser(user.id)}
                            title="Deletar usuário"
                          >
                        <Trash2 className="h-4 w-4" />
@@ -856,7 +910,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                                variant="ghost" 
                                size="sm" 
                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                               onClick={() => handleDeleteUser(user.id)}
+                               onClick={() => onDeleteUser(user.id)}
                                title="Deletar usuário"
                              >
                        <Trash2 className="h-4 w-4" />
