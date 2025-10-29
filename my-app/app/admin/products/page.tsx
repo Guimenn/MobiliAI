@@ -91,7 +91,7 @@ export default function ProductsPage() {
   // Estados para o modal de produto
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
+  const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('view');
   
   // Estados para o visualizador 3D
   const [is3DViewerOpen, setIs3DViewerOpen] = useState(false);
@@ -275,13 +275,13 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
-      <ProductsSection 
-        products={products}
-        isLoading={isLoading}
-        token={token}
-        onProductsChange={loadProductsData}
-      />
-    </div>
+            <ProductsSection 
+              products={products}
+              isLoading={isLoading}
+              token={token}
+              onProductsChange={loadProductsData}
+            />
+        </div>
   );
 }
 
@@ -321,22 +321,6 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
     }
   };
 
-  const handleViewProduct = async (productId: string) => {
-    try {
-      console.log('Visualizando produto:', productId);
-      const product = products.find((p: any) => p.id === productId);
-      if (product) {
-        setSelectedProduct(product);
-        setModalMode('view');
-        setIsModalOpen(true);
-      } else {
-        console.error('Produto não encontrado:', productId);
-      }
-    } catch (error) {
-      console.error('Erro ao visualizar produto:', error);
-      alert('Erro ao visualizar produto');
-    }
-  };
 
   // Função para deletar produto
   const handleDeleteProduct = async (productId: string) => {
@@ -417,7 +401,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
   // Estados para o modal de produto
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
+  const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('view');
   
   // Estados para o visualizador 3D
   const [is3DViewerOpen, setIs3DViewerOpen] = useState(false);

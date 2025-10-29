@@ -59,6 +59,7 @@ import EditEmployeeModal from '@/components/EditEmployeeModal';
 import MedicalCertificateModal from '@/components/MedicalCertificateModal';
 import TerminationModal from '@/components/TerminationModal';
 import StoreHoursConfig from '@/components/StoreHoursConfig';
+import StoreSales from './components/StoreSales';
 
 export default function StoreDetailsPage() {
   const router = useRouter();
@@ -1032,10 +1033,21 @@ export default function StoreDetailsPage() {
         )}
 
         {activeTab === 'sales' && (
-          <div className="text-center py-12">
-            <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Vendas</h3>
-            <p className="text-gray-500">Funcionalidade em desenvolvimento</p>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Vendas da Loja</h2>
+                <p className="text-gray-600">Gerencie as vendas desta loja</p>
+              </div>
+              <Button 
+                onClick={() => router.push(`/admin/sales/create?storeId=${storeId}`)}
+                className="bg-[#3e2626] hover:bg-[#4a2f2f] text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Venda
+              </Button>
+            </div>
+            <StoreSales storeId={storeId} />
           </div>
         )}
 

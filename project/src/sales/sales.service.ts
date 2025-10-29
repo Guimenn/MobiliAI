@@ -37,23 +37,40 @@ export class SalesService {
     // Gerar número da venda
     const saleNumber = await this.generateSaleNumber();
 
+    // Mapear paymentMethod (DTO usa minúsculo; Prisma enum usa MAIÚSCULO)
+    const paymentMethodMap: Record<string, any> = {
+      pix: 'PIX',
+      credit_card: 'CREDIT_CARD',
+      debit_card: 'DEBIT_CARD',
+      cash: 'CASH',
+      pending: 'PENDING',
+    };
+    const prismaPaymentMethod = paymentMethodMap[String(createSaleDto.paymentMethod)] || 'CASH';
+
     // Criar a venda com transação
     return this.prisma.$transaction(async (tx) => {
+      // Preparar dados da venda
+      const saleData: any = {
+        saleNumber,
+        totalAmount: createSaleDto.totalAmount,
+        discount: createSaleDto.discount || 0,
+        tax: createSaleDto.tax || 0,
+        status: 'PENDING' as any,
+        paymentMethod: prismaPaymentMethod as any,
+        paymentReference: createSaleDto.paymentReference,
+        notes: createSaleDto.notes,
+        employeeId: currentUser.id,
+        storeId: createSaleDto.storeId,
+      };
+
+      // Adicionar customerId apenas se fornecido e não for null/undefined
+      if (createSaleDto.customerId && createSaleDto.customerId !== null && createSaleDto.customerId !== undefined) {
+        saleData.customerId = createSaleDto.customerId;
+      }
+
       // Criar a venda
       const sale = await tx.sale.create({
-        data: {
-          saleNumber,
-          totalAmount: createSaleDto.totalAmount,
-          discount: createSaleDto.discount || 0,
-          tax: createSaleDto.tax || 0,
-          status: 'PENDING' as any,
-          paymentMethod: (createSaleDto.paymentMethod || 'CASH') as any,
-          paymentReference: createSaleDto.paymentReference,
-          notes: createSaleDto.notes,
-          customerId: createSaleDto.customerId,
-          employeeId: currentUser.id,
-          storeId: createSaleDto.storeId,
-        },
+        data: saleData,
       });
 
       // Criar os itens da venda e atualizar estoque

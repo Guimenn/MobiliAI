@@ -63,7 +63,7 @@ export default function SalesPage() {
             customerEmail: 'joao@email.com',
             totalAmount: 1250.00,
             status: 'COMPLETED',
-            paymentMethod: 'PIX',
+            paymentMethod: 'pix',
             createdAt: new Date('2024-01-15'),
             items: [
               { productName: 'Sofá 3 Lugares', quantity: 1, price: 1250.00 }
@@ -87,7 +87,7 @@ export default function SalesPage() {
             customerEmail: 'pedro@email.com',
             totalAmount: 2100.00,
             status: 'COMPLETED',
-            paymentMethod: 'PIX',
+            paymentMethod: 'pix',
             createdAt: new Date('2024-01-13'),
             items: [
               { productName: 'Conjunto Sala Completo', quantity: 1, price: 2100.00 }
