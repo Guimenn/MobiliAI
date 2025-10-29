@@ -32,11 +32,11 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 enum PaymentMethod {
-  PIX = 'PIX',
-  CREDIT_CARD = 'CREDIT_CARD',
-  DEBIT_CARD = 'DEBIT_CARD',
-  CASH = 'CASH',
-  PENDING = 'PENDING'
+  PIX = 'pix',
+  CREDIT_CARD = 'credit_card',
+  DEBIT_CARD = 'debit_card',
+  CASH = 'cash',
+  PENDING = 'pending'
 }
 
 interface Product {
@@ -56,6 +56,10 @@ interface CartItem extends Product {
 export default function CreateSalePage() {
   const router = useRouter();
   const { user: currentUser, token } = useAppStore();
+  
+  // Obter storeId da URL se fornecido
+  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const storeIdFromUrl = searchParams.get('storeId');
   
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -90,6 +94,16 @@ export default function CreateSalePage() {
     };
     checkAuth();
   }, [currentUser, token, router]);
+
+  // Pré-selecionar loja se storeId for fornecido na URL
+  useEffect(() => {
+    if (storeIdFromUrl && stores.length > 0) {
+      const storeExists = stores.find(store => store.id === storeIdFromUrl);
+      if (storeExists) {
+        setSelectedStore(storeIdFromUrl);
+      }
+    }
+  }, [storeIdFromUrl, stores]);
 
   const loadData = async () => {
     try {
@@ -238,14 +252,13 @@ export default function CreateSalePage() {
     try {
       setIsSubmitting(true);
 
-      const saleData = {
+      const saleData: any = {
         totalAmount: totals.total,
         discount: totals.discountAmount,
         tax: totals.taxAmount,
-        paymentMethod: paymentMethod.toLowerCase(),
+        paymentMethod: paymentMethod,
         paymentReference: paymentReference || undefined,
         notes: notes || undefined,
-        customerId: selectedCustomer || undefined,
         storeId: selectedStore,
         items: cart.map(item => ({
           productId: item.id,
@@ -253,6 +266,11 @@ export default function CreateSalePage() {
           unitPrice: item.price
         }))
       };
+
+      // Adicionar customerId apenas se houver cliente selecionado
+      if (selectedCustomer) {
+        saleData.customerId = selectedCustomer;
+      }
 
       await salesAPI.create(saleData);
 

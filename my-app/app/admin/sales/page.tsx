@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { salesAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
+import SaleDetailsModal from '@/components/SaleDetailsModal';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -23,6 +24,8 @@ export default function SalesPage() {
   const { user: currentUser, token } = useAppStore();
   const [sales, setSales] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [stats, setStats] = useState({
     totalSales: 0,
     totalRevenue: 0,
@@ -44,14 +47,19 @@ export default function SalesPage() {
         setSales(Array.isArray(salesData) ? salesData : []);
         
         // Calcular estatísticas
-        const totalRevenue = salesData.reduce((sum: number, sale: any) => sum + (sale.totalAmount || 0), 0);
+        const totalRevenue = salesData.reduce((sum: number, sale: any) => {
+          const amount = typeof sale.totalAmount === 'string' ? parseFloat(sale.totalAmount) : (sale.totalAmount || 0);
+          return sum + amount;
+        }, 0);
         const averageOrderValue = salesData.length > 0 ? totalRevenue / salesData.length : 0;
+        const completedSales = salesData.filter((sale: any) => sale.status === 'COMPLETED').length;
+        const conversionRate = salesData.length > 0 ? (completedSales / salesData.length) * 100 : 0;
         
         setStats({
           totalSales: salesData.length,
           totalRevenue,
           averageOrderValue,
-          conversionRate: 0 // Seria calculado com dados de visitantes
+          conversionRate
         });
       } catch (apiError) {
         console.log('API de vendas não disponível, usando dados mock');
@@ -63,7 +71,7 @@ export default function SalesPage() {
             customerEmail: 'joao@email.com',
             totalAmount: 1250.00,
             status: 'COMPLETED',
-            paymentMethod: 'PIX',
+            paymentMethod: 'pix',
             createdAt: new Date('2024-01-15'),
             items: [
               { productName: 'Sofá 3 Lugares', quantity: 1, price: 1250.00 }
@@ -87,7 +95,7 @@ export default function SalesPage() {
             customerEmail: 'pedro@email.com',
             totalAmount: 2100.00,
             status: 'COMPLETED',
-            paymentMethod: 'PIX',
+            paymentMethod: 'pix',
             createdAt: new Date('2024-01-13'),
             items: [
               { productName: 'Conjunto Sala Completo', quantity: 1, price: 2100.00 }
@@ -101,13 +109,14 @@ export default function SalesPage() {
         const totalRevenue = mockSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
         const averageOrderValue = mockSales.length > 0 ? totalRevenue / mockSales.length : 0;
         const totalSales = mockSales.length;
-        const pendingSales = mockSales.filter(sale => sale.status === 'PENDING').length;
+        const completedSales = mockSales.filter(sale => sale.status === 'COMPLETED').length;
+        const conversionRate = mockSales.length > 0 ? (completedSales / mockSales.length) * 100 : 0;
         
         setStats({
           totalSales,
           totalRevenue,
           averageOrderValue,
-          conversionRate: 0 // Seria calculado com dados de visitantes
+          conversionRate
         });
       }
     } catch (error) {
@@ -116,6 +125,16 @@ export default function SalesPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleViewSale = (saleId: string) => {
+    setSelectedSaleId(saleId);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedSaleId(null);
   };
 
   return (
@@ -140,7 +159,7 @@ export default function SalesPage() {
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">R$ {stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  <div className="text-2xl font-bold">R$ {Number(stats.totalRevenue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                   <p className="text-xs text-muted-foreground">
                     +8% em relação ao mês anterior
                   </p>
@@ -152,7 +171,7 @@ export default function SalesPage() {
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">R$ {stats.averageOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  <div className="text-2xl font-bold">R$ {Number(stats.averageOrderValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                   <p className="text-xs text-muted-foreground">
                     +5% em relação ao mês anterior
                   </p>
@@ -194,7 +213,7 @@ export default function SalesPage() {
                 ) : (
             <div className="space-y-4">
                     {sales.map((sale: any) => (
-                <div key={sale.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                <div key={sale.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => handleViewSale(sale.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleViewSale(sale.id); }}>
                   <div className="flex items-center space-x-4">
                           <div className="w-10 h-10 bg-[#3e2626]/10 rounded-lg flex items-center justify-center">
                             <Receipt className="h-5 w-5 text-[#3e2626]" />
@@ -215,9 +234,7 @@ export default function SalesPage() {
                               {sale.status === 'COMPLETED' ? 'Concluída' : sale.status || 'Pendente'}
                             </Badge>
                         </div>
-                          <Button variant="ghost" size="sm">
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                          {/* O item inteiro é clicável agora */}
                   </div>
                 </div>
               ))}
@@ -225,6 +242,13 @@ export default function SalesPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Modal de Detalhes da Venda */}
+        <SaleDetailsModal
+          saleId={selectedSaleId}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+        />
     </div>
   );
 }

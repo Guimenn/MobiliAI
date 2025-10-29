@@ -1,0 +1,527 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                String              @id @default(uuid())
+  email             String              @unique
+  password          String
+  name              String
+  phone             String?
+  address           String?
+  city              String?
+  state             String?
+  zipCode           String?
+  role              UserRole            @default(CUSTOMER)
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  storeId           String?
+  cpf               String?             @unique
+  workingHours      Json?
+  cartItems         CartItem[]
+  cashExpenses      CashExpense[]
+  cashFlows         CashFlow[]
+  chatSessions      ChatSession[]
+  colorAnalyses     ColorAnalysis[]
+  comparisons       Comparison[]
+  dailyCash         DailyCash[]
+  favorites         Favorite[]
+  furnitureAnalyses FurnitureAnalysis[]
+  moodboards        Moodboard[]
+  reviews           ProductReview[]
+  purchases         Sale[]              @relation("CustomerSales")
+  sales             Sale[]              @relation("EmployeeSales")
+  systemLogs        SystemLog[]
+  timeClockRecords  TimeClock[]
+  store             Store?              @relation(fields: [storeId], references: [id])
+
+  @@map("users")
+}
+
+model Store {
+  id           String      @id @default(uuid())
+  name         String
+  address      String
+  city         String
+  state        String
+  zipCode      String
+  phone        String?
+  email        String?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  description  String?
+  settings     Json?
+  workingHours Json?
+  // Horário de funcionamento da loja
+  openingTime  String?     // Ex: "08:00"
+  closingTime  String?     // Ex: "18:00"
+  workingDays  String[]    // Ex: ["segunda", "terca", "quarta", "quinta", "sexta", "sabado"]
+  lunchStart   String?     // Ex: "12:00"
+  lunchEnd     String?     // Ex: "13:00"
+  cashFlows    CashFlow[]
+  dailyCash    DailyCash[]
+  products     Product[]
+  sales        Sale[]
+  employees    User[]
+
+  @@map("stores")
+}
+
+model Product {
+  id                 String                 @id @default(uuid())
+  name               String
+  description        String?
+  shortDescription   String?
+  category           ProductCategory        @default(SOFA)
+  price              Decimal                @db.Decimal(10, 2)
+  costPrice          Decimal?               @db.Decimal(10, 2)
+  stock              Int                    @default(0)
+  minStock           Int                    @default(0)
+  style              ProductStyle?
+  material           MaterialType?
+  colorHex           String?
+  colorName          String?
+  customColor        String?
+  width              Decimal?               @db.Decimal(8, 2)
+  height             Decimal?               @db.Decimal(8, 2)
+  depth              Decimal?               @db.Decimal(8, 2)
+  weight             Decimal?               @db.Decimal(8, 2)
+  brand              String?
+  model              String?
+  sku                String?                @unique
+  barcode            String?                @unique
+  imageUrl           String?
+  imageUrls          String[]
+  videoUrl           String?
+  tags               String[]
+  keywords           String[]
+  isFeatured         Boolean                @default(false)
+  isNew              Boolean                @default(false)
+  isBestSeller       Boolean                @default(false)
+  rating             Decimal?               @db.Decimal(3, 2)
+  reviewCount        Int                    @default(0)
+  isActive           Boolean                @default(true)
+  isAvailable        Boolean                @default(true)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  storeId            String
+  collectionId       String?
+  supplierId         String?
+  cartItems          CartItem[]
+  comparisons        Comparison[]
+  favorites          Favorite[]
+  moodboardItems     MoodboardItem[]
+  compatibleProducts ProductCompatibility[] @relation("CompatibleProducts")
+  compatibility      ProductCompatibility[]
+  reviews            ProductReview[]
+  variants           ProductVariant[]
+  collection         Collection?            @relation(fields: [collectionId], references: [id])
+  store              Store                  @relation(fields: [storeId], references: [id])
+  supplier           Supplier?              @relation(fields: [supplierId], references: [id])
+  saleItems          SaleItem[]
+
+  @@map("products")
+}
+
+model Sale {
+  id               String        @id @default(uuid())
+  saleNumber       String        @unique
+  totalAmount      Decimal       @db.Decimal(10, 2)
+  discount         Decimal       @default(0) @db.Decimal(10, 2)
+  tax              Decimal       @default(0) @db.Decimal(10, 2)
+  status           SaleStatus    @default(PENDING)
+  paymentMethod    PaymentMethod @default(CASH)
+  paymentReference String?
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  customerId       String?
+  employeeId       String
+  storeId          String
+  dailyCashId      String?
+  items            SaleItem[]
+  customer         User?         @relation("CustomerSales", fields: [customerId], references: [id])
+  dailyCash        DailyCash?    @relation(fields: [dailyCashId], references: [id])
+  employee         User          @relation("EmployeeSales", fields: [employeeId], references: [id])
+  store            Store         @relation(fields: [storeId], references: [id])
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id         String   @id @default(uuid())
+  quantity   Int
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  totalPrice Decimal  @db.Decimal(10, 2)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  saleId     String
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  sale       Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("sale_items")
+}
+
+model ColorAnalysis {
+  id                  String   @id @default(uuid())
+  imageUrl            String
+  detectedColors      Json
+  suggestedColors     Json?
+  recommendedProducts Json?
+  processedImageUrl   String?
+  isProcessed         Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  userId              String?
+  user                User?    @relation(fields: [userId], references: [id])
+
+  @@map("color_analyses")
+}
+
+model FurnitureAnalysis {
+  id                  String   @id @default(uuid())
+  imageUrl            String
+  detectedSpaces      Json
+  suggestedFurniture  Json?
+  recommendedProducts Json?
+  processedImageUrl   String?
+  isProcessed         Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  userId              String?
+  user                User?    @relation(fields: [userId], references: [id])
+
+  @@map("furniture_analyses")
+}
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  title     String
+  isActive  Boolean       @default(true)
+  context   String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  userId    String
+  messages  ChatMessage[]
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  content   String
+  role      MessageRole @default(USER)
+  metadata  Json?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model ProductReview {
+  id         String   @id @default(uuid())
+  rating     Int
+  title      String?
+  comment    String?
+  isVerified Boolean  @default(false)
+  helpful    Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  productId  String
+  userId     String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@map("product_reviews")
+}
+
+model ProductVariant {
+  id        String   @id @default(uuid())
+  name      String
+  sku       String?  @unique
+  price     Decimal? @db.Decimal(10, 2)
+  stock     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_variants")
+}
+
+model ProductCompatibility {
+  id                  String   @id @default(uuid())
+  createdAt           DateTime @default(now())
+  productId           String
+  compatibleProductId String
+  compatibleProduct   Product  @relation("CompatibleProducts", fields: [compatibleProductId], references: [id], onDelete: Cascade)
+  product             Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, compatibleProductId])
+  @@map("product_compatibility")
+}
+
+model Collection {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  isTrending  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@map("collections")
+}
+
+model Moodboard {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  isPublic    Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  userId      String
+  items       MoodboardItem[]
+  user        User            @relation(fields: [userId], references: [id])
+
+  @@map("moodboards")
+}
+
+model MoodboardItem {
+  id          String    @id @default(uuid())
+  positionX   Decimal   @db.Decimal(8, 2)
+  positionY   Decimal   @db.Decimal(8, 2)
+  scale       Decimal   @default(1.00) @db.Decimal(3, 2)
+  rotation    Decimal   @default(0.00) @db.Decimal(5, 2)
+  createdAt   DateTime  @default(now())
+  moodboardId String
+  productId   String?
+  moodboard   Moodboard @relation(fields: [moodboardId], references: [id], onDelete: Cascade)
+  product     Product?  @relation(fields: [productId], references: [id])
+
+  @@map("moodboard_items")
+}
+
+model Supplier {
+  id          String    @id @default(uuid())
+  name        String
+  cnpj        String?   @unique
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  contactName String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@map("suppliers")
+}
+
+model DailyCash {
+  id            String        @id @default(uuid())
+  date          DateTime      @default(now())
+  openingAmount Decimal       @db.Decimal(10, 2)
+  closingAmount Decimal?      @db.Decimal(10, 2)
+  totalSales    Decimal       @default(0) @db.Decimal(10, 2)
+  totalExpenses Decimal       @default(0) @db.Decimal(10, 2)
+  isOpen        Boolean       @default(true)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  storeId       String
+  userId        String
+  expenses      CashExpense[]
+  store         Store         @relation(fields: [storeId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  sales         Sale[]
+
+  @@map("daily_cash")
+}
+
+model CashExpense {
+  id          String    @id @default(uuid())
+  description String
+  amount      Decimal   @db.Decimal(10, 2)
+  category    String
+  date        DateTime  @default(now())
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  dailyCashId String
+  userId      String
+  dailyCash   DailyCash @relation(fields: [dailyCashId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@map("cash_expenses")
+}
+
+model CashFlow {
+  id          String   @id @default(uuid())
+  type        String
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  category    String
+  date        DateTime @default(now())
+  isRecurring Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  storeId     String
+  userId      String
+  store       Store    @relation(fields: [storeId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("cash_flows")
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String
+  message   String
+  action    String
+  userId    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@map("system_logs")
+}
+
+model CartItem {
+  id         String   @id @default(cuid())
+  customerId String
+  productId  String
+  quantity   Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  customer   User     @relation(fields: [customerId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@map("cart_items")
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  customerId String
+  productId  String
+  createdAt  DateTime @default(now())
+  customer   User     @relation(fields: [customerId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@unique([customerId, productId])
+  @@map("favorites")
+}
+
+model Comparison {
+  id         String   @id @default(cuid())
+  customerId String
+  productId  String
+  createdAt  DateTime @default(now())
+  customer   User     @relation(fields: [customerId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@unique([customerId, productId])
+  @@map("comparisons")
+}
+
+model TimeClock {
+  id                String   @id @default(uuid())
+  employeeId        String
+  date              String
+  clockIn           String?
+  clockOut          String?
+  photo             String?
+  clockOutPhoto     String?
+  latitude          Float?
+  longitude         Float?
+  address           String?
+  clockOutLatitude  Float?
+  clockOutLongitude Float?
+  clockOutAddress   String?
+  totalHours        Float?   @default(0)
+  regularHours      Float?   @default(0)
+  overtimeHours     Float?   @default(0)
+  lunchBreakMinutes Int?     @default(60)
+  minutesLate       Int?     @default(0)
+  status            String   @default("PRESENT")
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  employee          User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("time_clock")
+}
+
+enum UserRole {
+  ADMIN
+  STORE_MANAGER
+  CASHIER
+  CUSTOMER
+  EMPLOYEE
+}
+
+enum ProductCategory {
+  SOFA
+  MESA
+  CADEIRA
+  ARMARIO
+  ESTANTE
+  POLTRONA
+  QUADRO
+  LUMINARIA
+  OUTROS
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+  DELIVERED
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  CASH
+  PENDING
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ProductStyle {
+  MODERNO
+  MINIMALISTA
+  RUSTICO
+}
+
+enum MaterialType {
+  MADEIRA
+  METAL
+  COURO
+  TECIDO
+  }

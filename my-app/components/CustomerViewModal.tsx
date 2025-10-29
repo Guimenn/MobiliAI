@@ -144,10 +144,10 @@ export default function CustomerViewModal({ customer, isOpen, onClose }: Custome
 
   const getPaymentMethodLabel = (method: string) => {
     switch (method) {
-      case 'PIX': return 'PIX';
-      case 'CREDIT_CARD': return 'Cartão de Crédito';
-      case 'DEBIT_CARD': return 'Cartão de Débito';
-      case 'CASH': return 'Dinheiro';
+      case 'pix': return 'PIX';
+      case 'credit_card': return 'Cartão de Crédito';
+      case 'debit_card': return 'Cartão de Débito';
+      case 'cash': return 'Dinheiro';
       default: return method;
     }
   };
