@@ -15,6 +15,8 @@ import ClientOnly from '@/components/ClientOnly';
 import HydrationBoundary from '@/components/HydrationBoundary';
 import NoSSR from '@/components/NoSSR';
 import ImageUpload from '@/components/ImageUpload';
+import DeleteProductConfirmDialog from '@/components/DeleteProductConfirmDialog';
+import { toast } from 'sonner';
 import { 
   Building2, 
   Bell, 
@@ -103,6 +105,11 @@ export default function ProductsPage() {
   
   // Estados para o upload direto de 3D
   const [isDirect3DUploadOpen, setIsDirect3DUploadOpen] = useState(false);
+  
+  // Estados para o modal de confirmação de exclusão
+  const [productToDelete, setProductToDelete] = useState<any>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -273,20 +280,86 @@ export default function ProductsPage() {
     loadProductsData();
   };
 
+  // Abrir modal de confirmação de exclusão
+  const handleDeleteProduct = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    setProductToDelete(product);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // Confirmar exclusão
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      console.log('Deletando produto:', productToDelete.id);
+      
+      const response = await fetch(`http://localhost:3001/api/admin/products/${productToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token || ''}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        toast.success('Produto deletado com sucesso!', {
+          description: `${productToDelete.name} foi removido do sistema.`,
+          duration: 4000,
+        });
+        loadProductsData();
+        setIsDeleteDialogOpen(false);
+        setProductToDelete(null);
+      } else {
+        const errorData = await response.json();
+        toast.error('Erro ao deletar produto', {
+          description: errorData.message || 'Erro desconhecido',
+          duration: 4000,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao deletar produto:', error);
+      toast.error('Erro ao deletar produto', {
+        description: 'Tente novamente mais tarde.',
+        duration: 4000,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Cancelar exclusão
+  const handleCancelDelete = () => {
+    setIsDeleteDialogOpen(false);
+    setProductToDelete(null);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
-            <ProductsSection 
-              products={products}
-              isLoading={isLoading}
-              token={token}
-              onProductsChange={loadProductsData}
-            />
-        </div>
+      <ProductsSection 
+        products={products}
+        isLoading={isLoading}
+        token={token}
+        onProductsChange={loadProductsData}
+        onDeleteProduct={handleDeleteProduct}
+      />
+
+      {/* Modal de Confirmação de Exclusão */}
+      <DeleteProductConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        productName={productToDelete?.name || ''}
+        productCategory={productToDelete?.category}
+        isLoading={isDeleting}
+      />
+    </div>
   );
 }
 
 // Componente da seção de produtos
-function ProductsSection({ products, isLoading, token, onProductsChange }: any) {
+function ProductsSection({ products, isLoading, token, onProductsChange, onDeleteProduct }: any) {
   // Estados para filtros
   const [productFilters, setProductFilters] = useState({
     category: 'all',
@@ -321,41 +394,15 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
     }
   };
 
+  // Visualizar produto por ID (não utilizado atualmente)
+  // Mantido como utilitário opcional; prefira handleViewProduct(product)
+  // function handleViewProductById(productId: string) {
+  //   const product = products.find((p: any) => p.id === productId);
+  //   if (product) {
+  //     handleViewProduct(product);
+  //   }
+  // }
 
-  // Função para deletar produto
-  const handleDeleteProduct = async (productId: string) => {
-    if (!confirm('Tem certeza que deseja deletar este produto?')) {
-      return;
-    }
-
-    try {
-      console.log('Deletando produto:', productId);
-      
-      // Usar fetch direto para deletar produto
-      const response = await fetch(`/api/admin/products/${productId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token || ''}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        console.log('Produto deletado com sucesso');
-        alert('Produto deletado com sucesso!');
-        
-        // Recarregar dados do banco
-        onProductsChange();
-      } else {
-        const errorData = await response.json();
-        console.error('Erro na API:', errorData);
-        alert(`Erro ao deletar produto: ${errorData.message || 'Erro desconhecido'}`);
-      }
-    } catch (error) {
-      console.error('Erro ao deletar produto:', error);
-      alert('Erro ao deletar produto');
-    }
-  };
 
   // Função para filtrar produtos
   const getFilteredProducts = () => {
@@ -413,8 +460,6 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
   
   // Estados para o upload direto de 3D
   const [isDirect3DUploadOpen, setIsDirect3DUploadOpen] = useState(false);
-
-
 
 
   const handleViewProduct = (product: any) => {
@@ -755,7 +800,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                             variant="ghost" 
                             size="sm" 
                             className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                            onClick={() => handleDeleteProduct(product.id)}
+                            onClick={() => onDeleteProduct(product.id)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -860,7 +905,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                onClick={() => handleDeleteProduct(product.id)}
+                                onClick={() => onDeleteProduct(product.id)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>

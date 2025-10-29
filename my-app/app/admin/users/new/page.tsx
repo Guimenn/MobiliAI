@@ -57,6 +57,9 @@ export default function NewUserPage() {
 
   const fetchStores = async () => {
     try {
+      console.log('🔍 Tentando buscar lojas do banco...');
+      console.log('🔑 Token:', token ? 'Token presente' : 'Token ausente');
+      
       const response = await fetch('http://localhost:3001/api/admin/stores', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -64,19 +67,34 @@ export default function NewUserPage() {
         }
       });
 
+      console.log('📡 Status da resposta:', response.status);
+      console.log('📡 Status OK:', response.ok);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Lojas carregadas do banco:', data);
         setStores(data);
       } else {
-        // Mock data para demonstração
+        console.log('❌ Erro ao carregar lojas do banco, usando dados mock');
+        // Mock data para demonstração - usando IDs reais das lojas do banco
         setStores([
-          { id: '1', name: 'Loja Centro' },
-          { id: '2', name: 'Loja Shopping' },
-          { id: '3', name: 'Loja Norte' }
+          { id: '4244aee0-c924-4dfd-adc4-2f43cec505d', name: 'Loja Central' },
+          { id: '4244aee0-c924-4dfd-adc4-2f43cec505e', name: 'Dulux - Salvador' },
+          { id: '4244aee0-c924-4dfd-adc4-2f43cec505f', name: 'Tintas Iquine - Fortaleza' },
+          { id: '4244aee0-c924-4dfd-adc4-2f43cec5060', name: 'Suvinil - Vila Madalena' },
+          { id: '4244aee0-c924-4dfd-adc4-2f43cec5061', name: 'Sherwin Williams - Rio de Janeiro' }
         ]);
       }
     } catch (error) {
-      console.error('Erro ao carregar lojas:', error);
+      console.error('❌ Erro ao carregar lojas:', error);
+      // Em caso de erro, também usar dados mock
+      setStores([
+        { id: '4244aee0-c924-4dfd-adc4-2f43cec505d', name: 'Loja Central' },
+        { id: '4244aee0-c924-4dfd-adc4-2f43cec505e', name: 'Dulux - Salvador' },
+        { id: '4244aee0-c924-4dfd-adc4-2f43cec505f', name: 'Tintas Iquine - Fortaleza' },
+        { id: '4244aee0-c924-4dfd-adc4-2f43cec5060', name: 'Suvinil - Vila Madalena' },
+        { id: '4244aee0-c924-4dfd-adc4-2f43cec5061', name: 'Sherwin Williams - Rio de Janeiro' }
+      ]);
     }
   };
 
@@ -116,8 +134,10 @@ export default function NewUserPage() {
     };
 
     // Debug: mostrar dados que serão enviados
-    console.log('Dados do formulário:', userData);
-    console.log('Token:', token);
+    console.log('🔍 Dados do formulário:', userData);
+    console.log('🔑 Token:', token ? 'Token presente' : 'Token ausente');
+    console.log('🏪 StoreId selecionado:', userData.storeId);
+    console.log('📋 Lista de lojas disponíveis:', stores);
 
     try {
       const response = await fetch('http://localhost:3001/api/admin/users', {

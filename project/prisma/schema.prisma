@@ -25,6 +25,7 @@ model User {
   storeId           String?
   cpf               String?             @unique
   workingHours      Json?
+  avatarUrl         String?
   cartItems         CartItem[]
   cashExpenses      CashExpense[]
   cashFlows         CashFlow[]
@@ -66,6 +67,7 @@ model Store {
   workingDays  String[]    // Ex: ["segunda", "terca", "quarta", "quinta", "sexta", "sabado"]
   lunchStart   String?     // Ex: "12:00"
   lunchEnd     String?     // Ex: "13:00"
+  imageUrl     String?
   cashFlows    CashFlow[]
   dailyCash    DailyCash[]
   products     Product[]
