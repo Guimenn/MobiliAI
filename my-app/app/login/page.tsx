@@ -6,9 +6,10 @@ import { useAppStore } from '@/lib/store';
 import { authAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Loader2, Eye, EyeOff, Home } from 'lucide-react';
+import { Send, Loader2, Eye, EyeOff, Home, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 
 interface ChatMessage {
   id: string;
@@ -56,7 +57,7 @@ export default function LoginPage() {
     if (isAuthenticated && user) {
       // Redirecionamento imediato sem delay
       const redirectPath = user.role === 'ADMIN' 
-        ? '/admin/dashboard' 
+        ? '/admin' 
         : user.role === 'STORE_MANAGER' 
         ? '/manager' 
         : '/';
@@ -366,7 +367,7 @@ export default function LoginPage() {
         setTimeout(() => {
           // Redirecionamento baseado no role do usuário
           const redirectPath = response.user.role === 'ADMIN' 
-            ? '/admin/dashboard' 
+            ? '/admin' 
             : response.user.role === 'STORE_MANAGER' 
             ? '/manager' 
             : '/';
@@ -434,7 +435,18 @@ export default function LoginPage() {
              />
            </div>
 
-           
+           {/* Botão Voltar para Home */}
+           <div className="absolute top-8 left-8 z-10">
+             <Link href="/">
+               <Button
+                 variant="ghost"
+                 className="bg-white/90 hover:bg-white text-[#3e2626] backdrop-blur-sm shadow-lg"
+               >
+                 <ArrowLeft className="h-4 w-4 mr-2" />
+                 Voltar
+               </Button>
+             </Link>
+           </div>
              
             {/* MobiliAI Text Overlay - Centralizado e Proporcional */}
             <div className="absolute inset-0 flex items-center justify-center pt-90 pr-10">
@@ -575,19 +587,35 @@ export default function LoginPage() {
                     value={currentInput}
                     onChange={(e) => {
                       let value = e.target.value;
-                      // Formatação automática do CPF
-                      if (loginStep === 'userInfo' && currentField === 'cpf') {
-                        value = value.replace(/\D/g, '');
-                        if (value.length >= 4) {
-                          value = value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2}).*/, '$1.$2.$3-$4');
+                      // Formatação automática baseada no campo
+                      if (loginStep === 'userInfo') {
+                        switch (currentField) {
+                          case 'cpf':
+                            value = formatCPF(e.target.value);
+                            break;
+                          case 'zipCode':
+                            value = formatCEP(e.target.value);
+                            break;
+                          case 'phone':
+                            value = formatPhone(e.target.value);
+                            break;
+                          case 'state':
+                            value = formatState(e.target.value);
+                            break;
+                          case 'city':
+                            value = formatCity(e.target.value);
+                            break;
+                          case 'address':
+                            value = formatAddress(e.target.value);
+                            break;
+                          case 'name':
+                            value = formatName(e.target.value);
+                            break;
+                          default:
+                            value = e.target.value;
                         }
-                      }
-                      // Formatação automática do CEP
-                      else if (loginStep === 'userInfo' && currentField === 'zipCode') {
-                        value = value.replace(/\D/g, '');
-                        if (value.length >= 5) {
-                          value = value.replace(/^(\d{5})(\d{3}).*/, '$1-$2');
-                        }
+                      } else if (loginStep === 'email') {
+                        value = formatEmail(e.target.value);
                       }
                       setCurrentInput(value);
                     }}

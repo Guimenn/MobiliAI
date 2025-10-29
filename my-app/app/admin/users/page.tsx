@@ -9,105 +9,46 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { adminAPI } from '@/lib/api-admin';
+import { adminAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import ClientOnly from '@/components/ClientOnly';
 import HydrationBoundary from '@/components/HydrationBoundary';
 import NoSSR from '@/components/NoSSR';
 import UserAvatarUpload from '@/components/UserAvatarUpload';
 import { 
-  Building2, 
-  Bell, 
-  LogOut, 
   Users, 
   Store,      
-  Package, 
-  DollarSign, 
-  TrendingUp, 
-  Activity, 
-  BarChart3,
   Building,
-  CheckCircle,
-  Zap, 
-  Plus, 
   UserCheck,
-  Download, 
-  Settings,
-  ArrowUp,
   Search, 
-  Menu,
-  ChevronDown,
   UserPlus,
   Edit, 
   Trash2, 
   Eye, 
   RefreshCw,
   X,
-  Filter,
-  MoreHorizontal,
-  Home,
   FileText,
   User,
-  Users2,
   Grid3X3,
-  ShoppingCart,
   Shield,
-  BookOpen,
-  Layers,
-  History,
   MapPin,
   Phone,
-  Mail,
-  Heart,
-  Star
+  Settings
 } from 'lucide-react';
 import EditUserModal from '@/components/EditUserModal';
+import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 
 export default function UsersPage() {
   const router = useRouter();
   const { user: currentUser, token } = useAppStore();
-  const [user, setUser] = useState<any>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  // Filtros para usuários
-  const [userFilters, setUserFilters] = useState({
-    role: 'all',
-    status: 'all',
-    search: ''
-  });
-  
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterRole, setFilterRole] = useState<'all' | 'ADMIN' | 'STORE_MANAGER' | 'CASHIER'>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [editingUser, setEditingUser] = useState<any>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Simular usuário admin para demonstração
-        const mockUser = {
-          id: 1,
-          name: 'Administrador',
-          email: 'admin@mobiliai.com',
-          role: 'ADMIN'
-        };
-        
-        setUser(mockUser);
-        setLastUpdated(new Date());
-        await loadUsersData();
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-      }
-    };
-
-    // Usar setTimeout para evitar problemas de hidratação
-    const timer = setTimeout(checkAuth, 0);
-    return () => clearTimeout(timer);
+    loadUsersData();
   }, []);
 
   // Atualizar dados a cada 30 segundos
@@ -126,47 +67,21 @@ export default function UsersPage() {
       console.log('Carregando dados de usuários do banco...');
       
       // Carregar dados reais da API
-      const [usersResponse, storesResponse] = await Promise.all([
-        adminAPI.getUsers(token || ''),
+      const [usersData, storesData] = await Promise.all([
+        adminAPI.getUsers(),
         adminAPI.getStores()
       ]);
 
-      console.log('Resposta da API de usuários:', usersResponse);
-      console.log('Resposta da API de lojas:', storesResponse);
-
-      if (usersResponse && usersResponse.ok) {
-        try {
-          const usersData = await usersResponse.json();
           console.log('Dados de usuários recebidos:', usersData);
+      console.log('Dados de lojas recebidos:', storesData);
           
           // Verificar se os dados estão em usersData.users ou se é um array direto
-          const usersArray = usersData?.users || usersData;
-          setUsers(Array.isArray(usersArray) ? usersArray : []);
-        } catch (jsonError) {
-          console.error('Erro ao fazer parse do JSON de usuários:', jsonError);
-          setUsers([]);
-        }
-      } else {
-        console.error('Erro na API de usuários:', usersResponse?.status || 'No status', usersResponse?.statusText || 'No status text');
-        setUsers([]);
-      }
-
-      if (storesResponse && storesResponse.ok) {
-        try {
-          const storesData = await storesResponse.json();
-          console.log('Dados de lojas recebidos:', storesData);
+      const usersArray = Array.isArray(usersData) ? usersData : (usersData?.users || []);
+      setUsers(usersArray);
           
           // Verificar se os dados estão em storesData.stores ou se é um array direto
-          const storesArray = storesData?.stores || storesData;
-          setStores(Array.isArray(storesArray) ? storesArray : []);
-        } catch (jsonError) {
-          console.error('Erro ao fazer parse do JSON de lojas:', jsonError);
-          setStores([]);
-        }
-      } else {
-        console.error('Erro na API de lojas:', storesResponse?.status || 'No status', storesResponse?.statusText || 'No status text');
-        setStores([]);
-      }
+      const storesArray = Array.isArray(storesData) ? storesData : (storesData?.stores || []);
+      setStores(storesArray);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
       setUsers([]);
@@ -176,9 +91,6 @@ export default function UsersPage() {
     }
   };
 
-  const handleLogout = () => {
-    router.push('/login');
-  };
 
   const handleEditUserModal = (user: any) => {
     setEditingUser(user);
@@ -216,228 +128,7 @@ export default function UsersPage() {
   };
 
   return (
-    <NoSSR>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        {/* Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
-          <div className="flex flex-col h-full">
-            {/* Logo */}
-            <div className="flex items-center justify-between p-6 border-b">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-lg flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-[#3e2626]">MobiliAI</h1>
-                  <p className="text-xs text-gray-500">Admin Panel</p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* User Profile */}
-            <div className="p-6 border-b">
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-[#3e2626] text-white">
-                    {user?.name?.charAt(0) || 'A'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {user?.name || 'Administrador'}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {user?.role || 'Administrador'}
-                  </p>
-                </div>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              </div>
-            </div>
-
-            {/* Navigation */}
-            <nav className="flex-1 px-4 py-6 space-y-2">
-              <div className="space-y-1">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  onClick={() => router.push('/admin/dashboard')}
-                >
-                  <Home className="h-4 w-4 mr-3" />
-                  Dashboard
-                  <ChevronDown className="h-4 w-4 ml-auto" />
-                </Button>
-              </div>
-
-              <div className="pt-4">
-                <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  GESTÃO
-                </p>
-                <div className="space-y-1">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/stores')}
-                  >
-                    <Store className="h-4 w-4 mr-3" />
-                    Lojas
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-[#3e2626] bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/users')}
-                  >
-                    <Users className="h-4 w-4 mr-3" />
-                    Usuários
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/products')}
-                  >
-                    <Package className="h-4 w-4 mr-3" />
-                    Produtos
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/sales')}
-                  >
-                    <ShoppingCart className="h-4 w-4 mr-3" />
-                    Vendas
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/reports')}
-                  >
-                    <BarChart3 className="h-4 w-4 mr-3" />
-                    Relatórios
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/customers')}
-                  >
-                    <User className="h-4 w-4 mr-3" />
-                    Clientes
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/settings')}
-                  >
-                    <Settings className="h-4 w-4 mr-3" />
-                    Configurações
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  SISTEMA
-                </p>
-                <div className="space-y-1">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  >
-                    <Activity className="h-4 w-4 mr-3" />
-                    Atividade
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  >
-                    <Shield className="h-4 w-4 mr-3" />
-                    Segurança
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  >
-                    <FileText className="h-4 w-4 mr-3" />
-                    Logs
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                </div>
-              </div>
-            </nav>
-
-            {/* Bottom */}
-            <div className="p-4 border-t">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-medium text-gray-600">N</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="lg:ml-64">
-          {/* Header */}
-          <header className="bg-white shadow-sm border-b">
-            <div className="flex items-center justify-between px-6 py-4">
-              <div className="flex items-center space-x-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSidebarOpen(true)}
-                  className="lg:hidden"
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-                <div>
-                  <h1 className="text-2xl font-bold text-[#3e2626]">Gestão de Usuários</h1>
-                  <p className="text-sm text-gray-600">Gerencie funcionários, gerentes e clientes do sistema</p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search here"
-                    className="pl-10 w-64"
-                  />
-                </div>
-            
-                <div className="flex items-center space-x-3">
-                  <Button variant="ghost" size="sm" className="relative">
-                    <Bell className="h-5 w-5" />
-                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">9</span>
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={handleLogout}>
-                    <LogOut className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </header>
-
-          {/* Content */}
-          <main className="p-6">
+    <div className="space-y-6">
             <UsersSection 
               users={users}
               isLoading={isLoading}
@@ -445,8 +136,6 @@ export default function UsersPage() {
               token={token}
               onUsersChange={loadUsersData}
           />
-        </main>
-      </div>
 
       {/* Modal de Edição */}
       <EditUserModal
@@ -456,7 +145,6 @@ export default function UsersPage() {
         onSave={handleSaveUser}
       />
     </div>
-    </NoSSR>
   );
 }
 
@@ -490,6 +178,42 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
   const [isCreating, setIsCreating] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  // Função para lidar com mudanças nos inputs com formatação
+  const handleInputChange = (field: string, value: string) => {
+    // Formatar valor baseado no campo
+    let formattedValue = value;
+    switch (field) {
+      case 'name':
+        formattedValue = formatName(value);
+        break;
+      case 'email':
+        formattedValue = formatEmail(value);
+        break;
+      case 'phone':
+        formattedValue = formatPhone(value);
+        break;
+      case 'address':
+        formattedValue = formatAddress(value);
+        break;
+      case 'city':
+        formattedValue = formatCity(value);
+        break;
+      case 'state':
+        formattedValue = formatState(value);
+        break;
+      case 'zipCode':
+        formattedValue = formatCEP(value);
+        break;
+      case 'cpf':
+        formattedValue = formatCPF(value);
+        break;
+      default:
+        formattedValue = value;
+    }
+    
+    setNewUser({ ...newUser, [field]: formattedValue });
+  };
+
   // Função para criar novo usuário
   const handleCreateUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.password) {
@@ -520,10 +244,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
       console.log('Dados do usuário a serem enviados:', userData);
 
       // Chamar API para criar usuário
-      const response = await adminAPI.createUser(token || '', userData);
-      
-      if (response.ok) {
-        const createdUser = await response.json();
+      const createdUser = await adminAPI.createUser(userData);
         console.log('Usuário criado com sucesso:', createdUser);
         
         // Upload do avatar se fornecido
@@ -553,11 +274,6 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
         
         // Recarregar dados do banco
         onUsersChange();
-      } else {
-        const errorData = await response.json();
-        console.error('Erro na API:', errorData);
-        alert(`Erro ao criar usuário: ${errorData.message || 'Erro desconhecido'}`);
-      }
     } catch (error) {
       console.error('Erro ao criar usuário:', error);
       alert('Erro ao criar usuário. Tente novamente.');
@@ -1098,7 +814,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="name"
                       value={newUser.name}
-                      onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
                       placeholder="Ex: João Silva"
                     />
                   </div>
@@ -1108,7 +824,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                       id="email"
                       type="email"
                       value={newUser.email}
-                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
                       placeholder="joao@empresa.com"
                     />
                   </div>
@@ -1117,7 +833,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="phone"
                       value={newUser.phone}
-                      onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
                       placeholder="(11) 99999-9999"
                     />
                   </div>
@@ -1186,7 +902,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="cpf"
                       value={newUser.cpf}
-                      onChange={(e) => setNewUser({ ...newUser, cpf: e.target.value })}
+                      onChange={(e) => handleInputChange('cpf', e.target.value)}
                       placeholder="000.000.000-00"
                       required
                     />
@@ -1196,7 +912,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="address"
                       value={newUser.address}
-                      onChange={(e) => setNewUser({ ...newUser, address: e.target.value })}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
                       placeholder="Rua, número"
                     />
                   </div>
@@ -1205,7 +921,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="city"
                       value={newUser.city}
-                      onChange={(e) => setNewUser({ ...newUser, city: e.target.value })}
+                      onChange={(e) => handleInputChange('city', e.target.value)}
                       placeholder="Nome da cidade"
                     />
                   </div>
@@ -1214,7 +930,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="state"
                       value={newUser.state}
-                      onChange={(e) => setNewUser({ ...newUser, state: e.target.value })}
+                      onChange={(e) => handleInputChange('state', e.target.value)}
                       placeholder="SP"
                     />
                   </div>
@@ -1223,7 +939,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange }: any) {
                     <Input
                       id="zipCode"
                       value={newUser.zipCode}
-                      onChange={(e) => setNewUser({ ...newUser, zipCode: e.target.value })}
+                      onChange={(e) => handleInputChange('zipCode', e.target.value)}
                       placeholder="01234-567"
                     />
                   </div>

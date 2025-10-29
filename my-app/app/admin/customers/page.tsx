@@ -9,72 +9,26 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { adminAPI } from '@/lib/api-admin';
+import { adminAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import ClientOnly from '@/components/ClientOnly';
-import HydrationBoundary from '@/components/HydrationBoundary';
-import NoSSR from '@/components/NoSSR';
 import { 
-  Building2, 
-  Bell, 
-  LogOut, 
-  Users, 
-  Store,      
-  Package, 
   DollarSign, 
-  TrendingUp, 
-  Activity, 
-  BarChart3,
-  Building,
   CheckCircle,
-  Zap, 
   Plus,
-  UserCheck,
   Download, 
-  Settings,
-  ArrowUp,
   Search, 
-  Menu,
-  ChevronDown,
-  UserPlus,
-  Edit,
-  Trash2,
-  Eye,
-  RefreshCw,
-  X,
-  Filter,
-  MoreHorizontal,
-  Home,
-  FileText,
-  User,
-  Users2,
-  Grid3X3,
-  ShoppingCart,
-  Shield,
-  BookOpen,
-  Layers,
-  History,
-  MapPin,
-  Phone,
-  Mail,
-  Heart,
-  Star,
-  Tag,
-  BarChart,
-  TrendingDown,
-  Calendar,
-  Clock,
-  CreditCard,
-  Receipt,
   UserPlus as UserPlusIcon,
-  UserMinus,
-  Crown
+  Edit,
+  Eye,
+  Filter,
+  User,
+  Users,
+  UserPlus
 } from 'lucide-react';
 
 export default function CustomersPage() {
   const router = useRouter();
-  const { user: currentUser, token } = useAppStore();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { token } = useAppStore();
   const [customers, setCustomers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -87,23 +41,15 @@ export default function CustomersPage() {
   const [filterStatus, setFilterStatus] = useState('all');
 
   useEffect(() => {
-    const checkAuth = async () => {
-      if (!currentUser || !token) {
-        router.push('/login');
-        return;
-      }
-      await loadCustomersData();
-    };
-
-    checkAuth();
-  }, [currentUser, token, router]);
+    loadCustomersData();
+  }, []);
 
   const loadCustomersData = async () => {
     try {
       setIsLoading(true);
       
       // Carregar usuários do banco de dados
-      const usersResponse = await adminAPI.getUsers(token);
+      const usersResponse = await adminAPI.getUsers();
       if (usersResponse.ok) {
         const usersData = await usersResponse.json();
         // Verificar se usersData é um array e filtrar apenas clientes
@@ -192,10 +138,6 @@ export default function CustomersPage() {
     }
   };
 
-  const handleLogout = () => {
-    router.push('/login');
-  };
-
   const filteredCustomers = customers.filter(customer => {
     const matchesSearch = customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          customer.email?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -206,214 +148,8 @@ export default function CustomersPage() {
   });
 
   return (
-    <NoSSR>
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100"> 
-        {/* Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
-          <div className="flex flex-col h-full">
-            {/* Logo */}
-            <div className="flex items-center justify-between p-6 border-b">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-lg flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-[#3e2626]">MobiliAI</h1>
-                  <p className="text-xs text-gray-500">Admin Panel</p>
-                </div>
-              </div>
-              <Button 
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-      </div>
-
-            {/* User Profile */}
-            <div className="p-6 border-b">
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-[#3e2626] text-white">
-                    {currentUser?.name?.charAt(0) || 'A'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{currentUser?.name || 'Admin'}</p>
-                  <p className="text-xs text-gray-500">{currentUser?.role || 'Administrador'}</p>
-              </div>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              </div>
-            </div>
-
-            {/* Navigation */}
-            <nav className="flex-1 px-4 py-6 space-y-2">
-              <div className="space-y-1">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  onClick={() => router.push('/admin/dashboard')}
-                >
-                  <Home className="h-4 w-4 mr-3" />
-                  Dashboard
-                  <ChevronDown className="h-4 w-4 ml-auto" />
-                </Button>
-              </div>
-
-              <div className="pt-4">
-                <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  GESTÃO
-                </p>
-                <div className="space-y-1">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/stores')}
-                  >
-                    <Store className="h-4 w-4 mr-3" />
-                    Lojas
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/users')}
-                  >
-                    <Users className="h-4 w-4 mr-3" />
-                    Usuários
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/products')}
-                  >
-                    <Package className="h-4 w-4 mr-3" />
-                    Produtos
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/sales')}
-                  >
-                    <ShoppingCart className="h-4 w-4 mr-3" />
-                    Vendas
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/reports')}
-                  >
-                    <BarChart3 className="h-4 w-4 mr-3" />
-                    Relatórios
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-[#3e2626] bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/customers')}
-                  >
-                    <User className="h-4 w-4 mr-3" />
-                    Clientes
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/settings')}
-                  >
-                    <Settings className="h-4 w-4 mr-3" />
-                    Configurações
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-              </div>
-              </div>
-
-              <div className="pt-4">
-                <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  SISTEMA
-                </p>
-                <div className="space-y-1">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  >
-                    <Activity className="h-4 w-4 mr-3" />
-                    Atividade
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  >
-                    <Shield className="h-4 w-4 mr-3" />
-                    Segurança
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  >
-                    <FileText className="h-4 w-4 mr-3" />
-                    Logs
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                </div>
-              </div>
-            </nav>
-
-            {/* Logout */}
-            <div className="p-4 border-t">
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={handleLogout}
-              >
-                <LogOut className="h-4 w-4 mr-3" />
-                Sair
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="lg:ml-64">
-          {/* Header */}
-          <div className="bg-white shadow-sm border-b">
-            <div className="px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSidebarOpen(true)}
-                  className="lg:hidden"
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-            <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-                  <p className="text-sm text-gray-500">Gerencie todos os clientes do sistema</p>
-                </div>
-            </div>
-            <div className="flex items-center space-x-3">
-                <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-                <Button size="sm" className="bg-[#3e2626] hover:bg-[#3e2626]/90">
-                  <UserPlusIcon className="h-4 w-4 mr-2" />
-                  Novo Cliente
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="p-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <Card>
@@ -561,9 +297,7 @@ export default function CustomersPage() {
           )}
         </CardContent>
       </Card>
-          </div>
-        </div>
+      </div>
     </div>
-    </NoSSR>
   );
 }

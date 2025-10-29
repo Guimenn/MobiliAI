@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { adminAPI } from '@/lib/api-admin';
+import { adminAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import ClientOnly from '@/components/ClientOnly';
 import HydrationBoundary from '@/components/HydrationBoundary';
@@ -77,12 +77,9 @@ import Direct3DUploader from '@/components/Direct3DUploader';
 
 export default function ProductsPage() {
   const router = useRouter();
-  const { user: currentUser, token } = useAppStore();
-  const [user, setUser] = useState<any>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { token } = useAppStore();
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Filtros para produtos
   const [productFilters, setProductFilters] = useState({
@@ -110,16 +107,6 @@ export default function ProductsPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Simular usuário admin para demonstração
-        const mockUser = {
-          id: 1,
-          name: 'Administrador',
-          email: 'admin@mobiliai.com',
-          role: 'ADMIN'
-        };
-        
-        setUser(mockUser);
-        setLastUpdated(new Date());
         await loadProductsData();
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
@@ -147,35 +134,22 @@ export default function ProductsPage() {
       console.log('Carregando dados de produtos do banco...');
       
       // Carregar dados reais da API
-      let productsResponse;
       try {
-        productsResponse = await adminAPI.getProducts(token || '');
+        console.log('📦 Chamando adminAPI.getProducts()...');
+        const productsData = await adminAPI.getProducts();
+        console.log('📦 Dados recebidos:', productsData);
+        console.log('📦 Tipo:', typeof productsData);
+        console.log('📦 É array?', Array.isArray(productsData));
+        
+        // A API retorna { products: [...], pagination: {...} }
+        const productsArray = Array.isArray(productsData) 
+          ? productsData 
+          : (productsData?.products || []);
+        
+        console.log('📦 Produtos extraídos:', productsArray.length, 'produtos');
+        setProducts(productsArray);
       } catch (apiError) {
-        console.error('Erro ao chamar API de produtos:', apiError);
-        setProducts([]);
-        return;
-      }
-
-      console.log('Resposta da API de produtos:', productsResponse);
-      console.log('Tipo da resposta:', typeof productsResponse);
-      console.log('Status da resposta:', productsResponse?.status);
-      console.log('OK da resposta:', productsResponse?.ok);
-
-      if (productsResponse && productsResponse.ok) {
-        try {
-          const productsData = await productsResponse.json();
-          console.log('Dados de produtos recebidos:', productsData);
-          
-          // Verificar se os dados estão em productsData.products ou se é um array direto
-          const productsArray = productsData?.products || productsData;
-          setProducts(Array.isArray(productsArray) ? productsArray : []);
-        } catch (jsonError) {
-          console.error('Erro ao fazer parse do JSON:', jsonError);
-          setProducts([]);
-        }
-      } else {
-        console.error('Erro na API de produtos:', productsResponse?.status || 'No status', productsResponse?.statusText || 'No status text');
-        console.error('Resposta completa:', productsResponse);
+        console.error('❌ Erro ao chamar API de produtos:', apiError);
         
         // Fallback para dados mock em caso de erro da API
         console.log('Usando dados mock como fallback...');
@@ -300,238 +274,14 @@ export default function ProductsPage() {
   };
 
   return (
-    <NoSSR>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        {/* Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
-          <div className="flex flex-col h-full">
-            {/* Logo */}
-            <div className="flex items-center justify-between p-6 border-b">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-lg flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-[#3e2626]">MobiliAI</h1>
-                  <p className="text-xs text-gray-500">Admin Panel</p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* User Profile */}
-            <div className="p-6 border-b">
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-[#3e2626] text-white">
-                    {user?.name?.charAt(0) || 'A'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {user?.name || 'Administrador'}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {user?.role || 'Administrador'}
-                  </p>
-                </div>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              </div>
-            </div>
-
-            {/* Navigation */}
-            <nav className="flex-1 px-4 py-6 space-y-2">
-              <div className="space-y-1">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  onClick={() => router.push('/admin/dashboard')}
-                >
-                  <Home className="h-4 w-4 mr-3" />
-                  Dashboard
-                  <ChevronDown className="h-4 w-4 ml-auto" />
-                </Button>
-              </div>
-
-              <div className="pt-4">
-                <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  GESTÃO
-                </p>
-                <div className="space-y-1">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/stores')}
-                  >
-                    <Store className="h-4 w-4 mr-3" />
-                    Lojas
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/users')}
-                  >
-                    <Users className="h-4 w-4 mr-3" />
-                    Usuários
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-[#3e2626] bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/products')}
-                  >
-                    <Package className="h-4 w-4 mr-3" />
-                    Produtos
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/sales')}
-                  >
-                    <ShoppingCart className="h-4 w-4 mr-3" />
-                    Vendas
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/reports')}
-                  >
-                    <BarChart3 className="h-4 w-4 mr-3" />
-                    Relatórios
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/customers')}
-                  >
-                    <User className="h-4 w-4 mr-3" />
-                    Clientes
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                    onClick={() => router.push('/admin/settings')}
-                  >
-                    <Settings className="h-4 w-4 mr-3" />
-                    Configurações
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  SISTEMA
-                </p>
-                <div className="space-y-1">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  >
-                    <Activity className="h-4 w-4 mr-3" />
-                    Atividade
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  >
-                    <Shield className="h-4 w-4 mr-3" />
-                    Segurança
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-gray-600 hover:text-[#3e2626] hover:bg-[#3e2626]/5"
-                  >
-                    <FileText className="h-4 w-4 mr-3" />
-                    Logs
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                </div>
-              </div>
-            </nav>
-
-            {/* Bottom */}
-            <div className="p-4 border-t">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-medium text-gray-600">N</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="lg:ml-64">
-          {/* Header */}
-          <header className="bg-white shadow-sm border-b">
-            <div className="flex items-center justify-between px-6 py-4">
-              <div className="flex items-center space-x-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSidebarOpen(true)}
-                  className="lg:hidden"
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-                <div>
-                  <h1 className="text-2xl font-bold text-[#3e2626]">Gestão de Produtos</h1>
-                  <p className="text-sm text-gray-600">Gerencie o catálogo de produtos da empresa</p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search here"
-                    className="pl-10 w-64"
-                  />
-                </div>
-            
-                <div className="flex items-center space-x-3">
-                  <Button variant="ghost" size="sm" className="relative">
-                    <Bell className="h-5 w-5" />
-                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">9</span>
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={handleLogout}>
-                    <LogOut className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </header>
-
-          {/* Content */}
-          <main className="p-6">
-            <ProductsSection 
-              products={products}
-              isLoading={isLoading}
-              token={token}
-              onProductsChange={loadProductsData}
-            />
-          </main>
-        </div>
-      </div>
-    </NoSSR>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <ProductsSection 
+        products={products}
+        isLoading={isLoading}
+        token={token}
+        onProductsChange={loadProductsData}
+      />
+    </div>
   );
 }
 
@@ -544,179 +294,47 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
     search: ''
   });
 
-  // Estados para modal de novo produto
-  const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
-  const [newProduct, setNewProduct] = useState({
-    name: '',
-    description: '',
-    shortDescription: '',
-    category: 'SOFA',
-    price: 0,
-    costPrice: 0,
-    stock: 0,
-    minStock: 0,
-    style: 'MODERNO',
-    material: 'MADEIRA',
-    colorHex: '',
-    colorName: '',
-    customColor: '',
-    width: 0,
-    height: 0,
-    depth: 0,
-    weight: 0,
-    brand: '',
-    model: '',
-    sku: '',
-    barcode: '',
-    videoUrl: '',
-    tags: [] as string[],
-    keywords: [] as string[],
-    isFeatured: false,
-    isNew: false,
-    isBestSeller: false,
-    isActive: true,
-    isAvailable: true,
-    storeId: ''
-  });
-  const [productImages, setProductImages] = useState<File[]>([]);
-  const [isCreating, setIsCreating] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Função para criar novo produto
-  const handleCreateProduct = async () => {
-    if (!newProduct.name || !newProduct.price || !newProduct.stock) {
-      alert('Por favor, preencha todos os campos obrigatórios.');
-      return;
-    }
-
-    setIsCreating(true);
-    try {
-      console.log('Criando produto no banco:', newProduct);
-      
-      // Preparar dados para envio
-      const productData = {
-        name: newProduct.name,
-        description: newProduct.description,
-        price: newProduct.price,
-        stock: newProduct.stock,
-        category: newProduct.category,
-        sku: newProduct.sku,
-        isActive: newProduct.isActive
-      };
-
-      console.log('Dados do produto a serem enviados:', productData);
-
-      // Chamar API para criar produto
-      const response = await adminAPI.createProduct(token || '', productData);
-      
-      if (response.ok) {
-        const createdProduct = await response.json();
-        console.log('Produto criado com sucesso:', createdProduct);
-        
-        // Upload das imagens se fornecidas
-        if (productImages.length > 0) {
-          console.log('Enviando imagens:', productImages.length);
-          // TODO: Implementar upload das imagens para o servidor
-        }
-        
-        alert('Produto criado com sucesso!');
-        setIsNewProductModalOpen(false);
-        setNewProduct({
-          name: '',
-          description: '',
-          shortDescription: '',
-          category: 'SOFA',
-          price: 0,
-          costPrice: 0,
-          stock: 0,
-          minStock: 0,
-          style: 'MODERNO',
-          material: 'MADEIRA',
-          colorHex: '',
-          colorName: '',
-          customColor: '',
-          width: 0,
-          height: 0,
-          depth: 0,
-          weight: 0,
-          brand: '',
-          model: '',
-          sku: '',
-          barcode: '',
-          videoUrl: '',
-          tags: [],
-          keywords: [],
-          isFeatured: false,
-          isNew: false,
-          isBestSeller: false,
-          isActive: true,
-          isAvailable: true,
-          storeId: ''
-        });
-        setProductImages([]);
-        
-        // Recarregar dados do banco
-        onProductsChange();
-      } else {
-        const errorData = await response.json();
-        console.error('Erro na API:', errorData);
-        alert(`Erro ao criar produto: ${errorData.message || 'Erro desconhecido'}`);
-      }
-    } catch (error) {
-      console.error('Erro ao criar produto:', error);
-      alert('Erro ao criar produto. Tente novamente.');
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  // Função para fechar modal de novo produto
-  const handleCloseNewProductModal = () => {
-    setIsNewProductModalOpen(false);
-    setNewProduct({
-      name: '',
-      description: '',
-      shortDescription: '',
-      category: 'SOFA',
-      price: 0,
-      costPrice: 0,
-      stock: 0,
-      minStock: 0,
-      style: 'MODERNO',
-      material: 'MADEIRA',
-      colorHex: '',
-      colorName: '',
-      customColor: '',
-      width: 0,
-      height: 0,
-      depth: 0,
-      weight: 0,
-      brand: '',
-      model: '',
-      sku: '',
-      barcode: '',
-      videoUrl: '',
-      tags: [],
-      keywords: [],
-      isFeatured: false,
-      isNew: false,
-      isBestSeller: false,
-      isActive: true,
-      isAvailable: true,
-      storeId: ''
-    });
-    setProductImages([]);
+  // Função para abrir modal de novo produto
+  const handleCreateProduct = () => {
+    setSelectedProduct(null);
+    setModalMode('create');
+    setIsModalOpen(true);
   };
 
   // Função para editar produto (versão simplificada)
   const handleEditProductById = async (productId: string) => {
     try {
       console.log('Editando produto:', productId);
-      // TODO: Implementar modal de edição
-      alert('Funcionalidade de edição será implementada em breve');
+      const product = products.find((p: any) => p.id === productId);
+      if (product) {
+        setSelectedProduct(product);
+        setModalMode('edit');
+        setIsModalOpen(true);
+      } else {
+        console.error('Produto não encontrado:', productId);
+      }
     } catch (error) {
       console.error('Erro ao editar produto:', error);
       alert('Erro ao editar produto');
+    }
+  };
+
+  const handleViewProduct = async (productId: string) => {
+    try {
+      console.log('Visualizando produto:', productId);
+      const product = products.find((p: any) => p.id === productId);
+      if (product) {
+        setSelectedProduct(product);
+        setModalMode('view');
+        setIsModalOpen(true);
+      } else {
+        console.error('Produto não encontrado:', productId);
+      }
+    } catch (error) {
+      console.error('Erro ao visualizar produto:', error);
+      alert('Erro ao visualizar produto');
     }
   };
 
@@ -909,7 +527,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange }: any) 
                 Upload 3D
               </Button>
               <Button 
-                onClick={() => setIsNewProductModalOpen(true)}
+                onClick={handleCreateProduct}
                 className="bg-[#3e2626] hover:bg-[#8B4513]"
               >
                 <Plus className="h-4 w-4 mr-2" />

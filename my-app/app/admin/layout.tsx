@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useAppStore } from '@/lib/store';
 import { 
   Building2, 
   Users, 
@@ -26,18 +27,50 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { user, isAuthenticated, token } = useAppStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  
-  // Mock user data temporarily
-  const user = {
-    name: 'Administrador',
-    role: 'ADMIN'
-  };
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    // Aguardar hidratação completa antes de verificar autenticação
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
+
+  // Verificar autenticação e role
+  useEffect(() => {
+    if (!isMounted || isRedirecting) return;
+    
+    // Evitar redirecionamentos desnecessários
+    if (!isAuthenticated || !user || !token) {
+      setIsRedirecting(true);
+      router.push('/login');
+      return;
+    }
+    
+    // Verificar se o usuário é admin
+    if (user.role !== 'ADMIN') {
+      setIsRedirecting(true);
+      // Redirecionar para o dashboard apropriado baseado no role
+      if (user.role === 'STORE_MANAGER') {
+        router.push('/manager');
+      } else {
+        router.push('/');
+      }
+      return;
+    }
+  }, [isMounted, isAuthenticated, user?.role, token, router, isRedirecting]);
+
+  // Reset redirecting state when user changes
+  useEffect(() => {
+    if (isAuthenticated && user && token && user.role === 'ADMIN') {
+      setIsRedirecting(false);
+    }
+  }, [isAuthenticated, user, token]);
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: Building2, current: pathname === '/admin' },
@@ -51,18 +84,20 @@ export default function AdminLayout({
   ];
 
   const handleLogout = () => {
-    // Clear local storage
-    localStorage.clear();
-    sessionStorage.clear();
+    // Usar o logout da store
+    const { logout } = useAppStore.getState();
+    logout();
     router.push('/login');
   };
 
-  if (!isMounted) {
+  if (!isMounted || isRedirecting || !isAuthenticated || !user || !token || user.role !== 'ADMIN') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
+          <p className="text-gray-600">
+            {isRedirecting ? 'Redirecionando...' : 'Carregando...'}
+          </p>
         </div>
       </div>
     );

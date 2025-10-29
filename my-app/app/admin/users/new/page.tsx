@@ -20,6 +20,7 @@ import {
   Clock
 } from 'lucide-react';
 import WorkingHoursConfig from '@/components/WorkingHoursConfig';
+import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 
 export default function NewUserPage() {
   const { user, isAuthenticated, token, isUserAuthenticated } = useAppStore();
@@ -52,7 +53,7 @@ export default function NewUserPage() {
 
     fetchStores();
     fetchManagers();
-  }, [isAuthenticated, user, router, isUserAuthenticated]);
+  }, []); // Remover dependências desnecessárias para evitar re-renders
 
   const fetchStores = async () => {
     try {
@@ -150,9 +151,33 @@ export default function NewUserPage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
+    // Formatar valor baseado no campo
+    let formattedValue = value;
+    switch (name) {
+      case 'name':
+        formattedValue = formatName(value);
+        break;
+      case 'email':
+        formattedValue = formatEmail(value);
+        break;
+      case 'phone':
+        formattedValue = formatPhone(value);
+        break;
+      case 'address':
+        formattedValue = formatAddress(value);
+        break;
+      default:
+        formattedValue = value;
+    }
+    
+    // Evitar atualizações desnecessárias
+    if (formData[name as keyof typeof formData] === formattedValue) {
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: formattedValue
     }));
 
     // Se a loja foi alterada, buscar o gerente correspondente
