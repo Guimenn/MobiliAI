@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
+import { useProducts } from '@/lib/hooks/useProducts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import PromotionalSection from '@/components/PromotionalSection';
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
+import { BackendStatus } from '@/components/BackendStatus';
 import { 
   Search,
   ShoppingCart,
@@ -78,9 +80,12 @@ export default function HomePage() {
   const [searchClosing, setSearchClosing] = useState(false);
   const [searchOpening, setSearchOpening] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Sala de Estar');
-  const [favorites, setFavorites] = useState<number[]>([]);
-  const [cartItems, setCartItems] = useState<number[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [cartItems, setCartItems] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Buscar produtos do banco de dados
+  const { products: allProducts, loading: productsLoading, error: productsError } = useProducts();
 
   // Função auxiliar para renderizar ícones
   const renderIcon = (IconComponent: any, className: string) => {
@@ -88,7 +93,7 @@ export default function HomePage() {
   };
 
   // Função para alternar favorito
-  const toggleFavorite = (productId: number) => {
+  const toggleFavorite = (productId: string) => {
     setFavorites(prev => 
       prev.includes(productId) 
         ? prev.filter(id => id !== productId)
@@ -97,8 +102,12 @@ export default function HomePage() {
   };
 
   // Função para adicionar ao carrinho
-  const addToCart = (productId: number) => {
-    setCartItems(prev => [...prev, productId]);
+  const addToCart = (productId: string) => {
+    const product = allProducts.find(p => p.id === productId);
+    if (product) {
+      useAppStore.getState().addToCart(product);
+      setCartItems(prev => [...prev, productId]);
+    }
   };
 
   // Função para ir para página de favoritos
@@ -247,135 +256,35 @@ export default function HomePage() {
     },
   ];
 
-  const allProducts = [
-    {
-      id: 1,
-      name: 'Sofá 3 Lugares Moderno',
-      price: 2499.99,
-      originalPrice: 2999.99,
-      color: '#3e2626',
-      rating: 4.9,
-      reviews: 156,
-      badge: 'Mais Vendido',
-      category: 'Sala de Estar'
-    },
-    {
-      id: 2,
-      name: 'Cadeira Executiva Premium',
-      price: 899.99,
-      color: '#8B4513',
-      rating: 4.8,
-      reviews: 89,
-      badge: 'Novo',
-      category: 'Quarto'
-    },
-    {
-      id: 3,
-      name: 'Mesa de Centro Elegante',
-      price: 1299.99,
-      originalPrice: 1599.99,
-      color: '#D2B48C',
-      rating: 4.7,
-      reviews: 124,
-      badge: 'Oferta',
-      category: 'Sala de Estar'
-    },
-    {
-      id: 4,
-      name: 'Luminária Pendant Moderna',
-      price: 599.99,
-      color: '#A0522D',
-      rating: 4.6,
-      reviews: 67,
-      badge: null,
-      category: 'Sala de Estar'
-    },
-    {
-      id: 5,
-      name: 'Poltrona Relax Premium',
-      price: 1899.99,
-      color: '#CD853F',
-      rating: 4.9,
-      reviews: 92,
-      badge: null,
-      category: 'Sala de Estar'
-    },
-    {
-      id: 6,
-      name: 'Mesa de Jantar 6 Lugares',
-      price: 2199.99,
-      color: '#DEB887',
-      rating: 4.8,
-      reviews: 78,
-      badge: 'Novo',
-      category: 'Sala de Jantar'
-    },
-    {
-      id: 7,
-      name: 'Cama King Size Premium',
-      price: 3299.99,
-      color: '#8B4513',
-      rating: 4.9,
-      reviews: 134,
-      badge: 'Mais Vendido',
-      category: 'Quarto'
-    },
-    {
-      id: 8,
-      name: 'Armário de Cozinha Moderno',
-      price: 1899.99,
-      color: '#D2B48C',
-      rating: 4.7,
-      reviews: 89,
-      badge: null,
-      category: 'Cozinha'
-    },
-    {
-      id: 9,
-      name: 'Mesa de Jantar 4 Lugares',
-      price: 1599.99,
-      color: '#A0522D',
-      rating: 4.8,
-      reviews: 67,
-      badge: 'Oferta',
-      category: 'Sala de Jantar'
-    },
-    {
-      id: 10,
-      name: 'Cadeira de Jardim Resistente',
-      price: 399.99,
-      color: '#3e2626',
-      rating: 4.6,
-      reviews: 45,
-      badge: null,
-      category: 'Exterior'
-    },
-    {
-      id: 11,
-      name: 'Guarda-roupa 6 Portas',
-      price: 2499.99,
-      color: '#8B4513',
-      rating: 4.8,
-      reviews: 98,
-      badge: 'Novo',
-      category: 'Quarto'
-    },
-    {
-      id: 12,
-      name: 'Conjunto de Mesa e Cadeiras',
-      price: 2199.99,
-      color: '#D2B48C',
-      rating: 4.7,
-      reviews: 76,
-      badge: null,
-      category: 'Sala de Jantar'
-    }
-  ];
+  // Mapear categorias do banco para categorias de exibição
+  const getDisplayCategory = (category: string) => {
+    const categoryMap: { [key: string]: string } = {
+      'sofa': 'Sala de Estar',
+      'mesa': 'Sala de Jantar',
+      'cadeira': 'Sala de Jantar',
+      'armario': 'Quarto',
+      'cama': 'Quarto',
+      'decoracao': 'Sala de Estar',
+      'iluminacao': 'Sala de Estar',
+      'outros': 'Sala de Estar'
+    };
+    return categoryMap[category] || 'Sala de Estar';
+  };
+
+  // Adicionar propriedades extras para exibição
+  const enhancedProducts = allProducts.map(product => ({
+    ...product,
+    displayCategory: getDisplayCategory(product.category),
+    rating: 4.5 + Math.random() * 0.5, // Rating simulado
+    reviews: Math.floor(Math.random() * 200) + 50, // Reviews simuladas
+    badge: Math.random() > 0.7 ? (Math.random() > 0.5 ? 'Novo' : 'Oferta') : null,
+    originalPrice: Math.random() > 0.5 ? product.price * 1.2 : undefined
+  }));
 
   // Filtrar produtos baseado na categoria selecionada
   const filteredProducts = selectedCategory === 'Todos' 
-    ? allProducts 
-    : allProducts.filter(product => product.category === selectedCategory);
+    ? enhancedProducts 
+    : enhancedProducts.filter(product => product.displayCategory === selectedCategory);
 
   // Configurações de paginação
   const productsPerPage = 6;
@@ -533,13 +442,7 @@ export default function HomePage() {
                 <div className="text-sm text-white/80">{slide.subtitle}</div>
               </div>
             </div>
-            {/* botão */}
-            <button 
-              onClick={goNext} 
-              className="absolute bottom-6 right-6 w-10 h-10 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group"
-            >
-              <ArrowRight className="h-4 w-4 text-white rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform duration-300" />
-            </button>
+           
           </div>
         </div>
       );
@@ -1006,100 +909,65 @@ export default function HomePage() {
       </section>
 
       {/* Featured Products Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-white relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `radial-gradient(circle at 2px 2px, #3e2626 1px, transparent 0)`,
+            backgroundSize: '40px 40px'
+          }}></div>
+        </div>
+        
+        <div className="max-w-7xl mx-auto relative z-10">
           {/* Header with Navigation */}
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-16">
             {/* Left Side - Title and Categories */}
             <div className="flex-1">
               {/* Title Section */}
-              <div className="mb-6">
+              <div className="mb-8">
+                <div className="inline-flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-1 bg-gradient-to-r from-[#3e2626] to-[#8B4513] rounded-full"></div>
+                  <span className="text-sm font-medium text-[#3e2626] tracking-wider uppercase">Coleção Premium</span>
+                </div>
                 <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#3e2626] leading-tight">
                   <span className="block">Móveis em Destaque</span>
-                  <span className="block">Para Sua Casa</span>
+                  <span className="block bg-gradient-to-r from-[#3e2626] to-[#8B4513] bg-clip-text text-transparent">
+                    Para Sua Casa
+                  </span>
                 </h2>
+                <p className="text-lg text-gray-600 mt-4 max-w-2xl">
+                  Descubra nossa seleção exclusiva de móveis premium, cuidadosamente escolhidos para transformar seu espaço em um ambiente único e elegante.
+                </p>
               </div>
               
-              {/* Category Navigation - Below Title */}
-              <div className="flex flex-wrap gap-4 items-center">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Sala de Jantar')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Sala de Jantar' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Sala de Jantar
-                  {selectedCategory === 'Sala de Jantar' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Sala de Estar')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Sala de Estar' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Sala de Estar
-                  {selectedCategory === 'Sala de Estar' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Quarto')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Quarto' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Quarto
-                  {selectedCategory === 'Quarto' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Cozinha')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Cozinha' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Cozinha
-                  {selectedCategory === 'Cozinha' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Exterior')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Exterior' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Exterior
-                  {selectedCategory === 'Exterior' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
+              {/* Category Navigation - Modern Pills */}
+              <div className="flex flex-wrap gap-3 items-center">
+                {['Sala de Jantar', 'Sala de Estar', 'Quarto', 'Cozinha', 'Exterior'].map((category) => (
+                  <Button 
+                    key={category}
+                    variant="ghost" 
+                    onClick={() => handleCategoryChange(category)}
+                    className={`px-6 py-3 font-medium transition-all duration-300 text-base rounded-full relative group ${
+                      selectedCategory === category 
+                        ? 'bg-[#3e2626] text-white shadow-lg' 
+                        : 'text-[#3e2626] hover:bg-[#3e2626]/10 hover:text-[#3e2626]'
+                    }`}
+                  >
+                    {category}
+                    {selectedCategory === category && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#3e2626] to-[#8B4513] rounded-full -z-10"></div>
+                    )}
+                  </Button>
+                ))}
 
                 {/* Clear Filter Button */}
                 {selectedCategory !== 'Todos' && selectedCategory !== 'Sala de Estar' && (
                   <Button 
                     variant="outline" 
                     onClick={() => handleCategoryChange('Todos')}
-                    className="border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-700 px-3 py-1 text-sm font-medium transition-all duration-300 ml-2"
+                    className="border-[#3e2626]/30 text-[#3e2626] hover:border-[#3e2626] hover:bg-[#3e2626] hover:text-white px-4 py-3 text-sm font-medium transition-all duration-300 rounded-full ml-2"
                   >
+                    <X className="h-4 w-4 mr-2" />
                     Limpar Filtro
                   </Button>
                 )}
@@ -1107,19 +975,25 @@ export default function HomePage() {
             </div>
 
             {/* Right Side - View All Button */}
-            <div className="flex justify-center lg:justify-end mt-8 lg:mt-0">
-              <div className="flex items-center space-x-3">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-end mt-8 lg:mt-0 space-y-4 lg:space-y-0 lg:space-x-4">
+              {/* Backend Status */}
+              <div className="flex justify-center lg:justify-end">
+                <BackendStatus />
+              </div>
+              
+              <div className="flex items-center space-x-4">
                 {/* Filter Indicator */}
                 {selectedCategory !== 'Todos' && (
-                  <div className="flex items-center space-x-2 bg-gray-100 px-3 py-2 rounded-full">
-                    <span className="text-sm text-gray-600">
-                      Filtro: <span className="font-medium text-[#3e2626]">{selectedCategory}</span>
+                  <div className="flex items-center space-x-3 bg-white/80 backdrop-blur-sm px-4 py-3 rounded-full shadow-lg border border-[#3e2626]/20">
+                    <div className="w-2 h-2 bg-[#3e2626] rounded-full"></div>
+                    <span className="text-sm text-gray-700">
+                      Filtro: <span className="font-semibold text-[#3e2626]">{selectedCategory}</span>
                     </span>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => handleCategoryChange('Todos')}
-                      className="h-6 w-6 p-0 hover:bg-gray-200 rounded-full"
+                      className="h-6 w-6 p-0 hover:bg-[#3e2626]/10 rounded-full"
                     >
                       <X className="h-4 w-4 text-gray-500" />
                     </Button>
@@ -1129,51 +1003,110 @@ export default function HomePage() {
                 <Button 
                   size="lg" 
                   onClick={() => router.push('/products')}
-                  className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-8 py-3 rounded-full font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-2"
+                  className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white hover:from-[#2a1f1f] hover:to-[#6B3410] px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center space-x-3 group"
                 >
                   <span>Ver Todos os Produtos</span>
-                  <ArrowRight className="h-5 w-5" />
+                  <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Products Grid - 2x3 Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredProducts.map((product, index) => (
-              <div key={product.id} className="group relative bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
+          {/* Loading State */}
+          {productsLoading && (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <div className="w-16 h-16 border-4 border-[#3e2626]/20 border-t-[#3e2626] rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-lg text-gray-600">Carregando produtos...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {productsError && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center max-w-lg">
+                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <X className="h-8 w-8 text-orange-500" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">Erro ao Carregar Produtos</h3>
+                <p className="text-lg text-gray-600 mb-4">{productsError}</p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-blue-800">
+                    <strong>Dica:</strong> Verifique se o backend está rodando na porta 3001. 
+                    Os produtos exibidos são dados de exemplo enquanto o backend não estiver disponível.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button 
+                    onClick={() => window.location.reload()} 
+                    className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-6 py-3 rounded-full"
+                  >
+                    Tentar Novamente
+                  </Button>
+                  <Button 
+                    onClick={() => window.open('http://localhost:3001', '_blank')} 
+                    variant="outline"
+                    className="border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white px-6 py-3 rounded-full"
+                  >
+                    Verificar Backend
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Products Grid - Enhanced Layout */}
+          {!productsLoading && !productsError && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {featuredProducts.map((product, index) => (
+              <div key={product.id} className="group relative bg-white rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-[1.03] hover:-translate-y-2">
                 {/* Product Image Container */}
-                <div className="relative">
+                <div className="relative overflow-hidden">
                   <div 
-                    className="aspect-square flex items-center justify-center relative overflow-hidden"
+                    className="aspect-square flex items-center justify-center relative"
                     style={{ backgroundColor: product.color }}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
+                    {/* Gradient Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/10 via-transparent to-black/30"></div>
+                    
+                    {/* Pattern Overlay */}
+                    <div className="absolute inset-0 opacity-20">
+                      <div className="absolute inset-0" style={{
+                        backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.1) 2px, transparent 2px)`,
+                        backgroundSize: '40px 40px'
+                      }}></div>
+                    </div>
                     
                     {/* Product Icon/Visual */}
-                    <div className="relative z-10 text-center">
-                      <Sofa className="h-20 w-20 text-white/90 mx-auto mb-3 drop-shadow-lg" />
-                      <p className="text-white font-semibold text-base">Móvel Premium</p>
+                    <div className="relative z-10 text-center transform group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                        <Sofa className="h-12 w-12 text-white drop-shadow-lg" />
+                      </div>
+                      <p className="text-white font-semibold text-lg">Móvel Premium</p>
                     </div>
 
                     {/* Decorative Elements */}
-                    <div className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full blur-sm"></div>
-                    <div className="absolute bottom-4 left-4 w-6 h-6 bg-white/10 rounded-full blur-sm"></div>
+                    <div className="absolute top-6 right-6 w-12 h-12 bg-white/20 rounded-full blur-lg group-hover:scale-150 transition-transform duration-500"></div>
+                    <div className="absolute bottom-6 left-6 w-8 h-8 bg-white/10 rounded-full blur-md group-hover:scale-125 transition-transform duration-500"></div>
+                    
+                    {/* Shine Effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
                   </div>
 
                   {/* Discount Badge */}
-                  <div className="absolute top-4 left-4">
-                    <div className="w-12 h-12 bg-[#3e2626] rounded-full flex items-center justify-center shadow-lg">
+                  <div className="absolute top-6 left-6">
+                    <div className="w-14 h-14 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-2xl flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform duration-300">
                       <span className="text-white font-bold text-sm">-10%</span>
                     </div>
                   </div>
 
                   {/* Favorite Button */}
-                  <div className="absolute top-4 right-4">
+                  <div className="absolute top-6 right-6">
                     <Button 
                       size="sm" 
                       onClick={() => toggleFavorite(product.id)}
-                      className={`w-10 h-10 shadow-lg rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 ${
+                      className={`w-12 h-12 shadow-xl rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 ${
                         favorites.includes(product.id)
                           ? 'bg-red-500 text-white hover:bg-red-600'
                           : 'bg-white/90 hover:bg-white text-[#3e2626]'
@@ -1184,83 +1117,103 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Product Info Footer - Dark Background */}
-                <div className="bg-[#3e2626] p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xl font-bold text-white">
-                      {product.name}
-                    </h3>
+                {/* Product Info Footer - Enhanced Design */}
+                <div className="bg-gradient-to-br from-[#3e2626] to-[#2a1f1f] p-6 relative overflow-hidden">
+                  {/* Background Pattern */}
+                  <div className="absolute inset-0 opacity-10">
+                    <div className="absolute inset-0" style={{
+                      backgroundImage: `radial-gradient(circle at 15px 15px, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+                      backgroundSize: '30px 30px'
+                    }}></div>
                   </div>
                   
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-2xl font-bold text-white">
-                        R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                      {product.originalPrice && (
-                        <span className="text-lg text-white/70 line-through">
-                          R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      )}
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-white leading-tight">
+                        {product.name}
+                      </h3>
+                      <div className="flex items-center space-x-1">
+                        <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                        <span className="text-white/80 text-sm font-medium">{product.rating}</span>
+                      </div>
                     </div>
                     
-                    <Button 
-                      onClick={() => addToCart(product.id)}
-                      className="bg-white text-[#3e2626] hover:bg-gray-100 shadow-lg rounded-full w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
-                    >
-                      <ShoppingCart className="h-5 w-5" />
-                    </Button>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-2xl font-bold text-white">
+                          R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        {product.originalPrice && (
+                          <span className="text-lg text-white/60 line-through">
+                            R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <Button 
+                        onClick={() => addToCart(product.id)}
+                        className="bg-white text-[#3e2626] hover:bg-gray-100 shadow-xl rounded-2xl w-14 h-14 p-0 hover:scale-110 transition-all duration-300 group"
+                      >
+                        <ShoppingCart className="h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex flex-col items-center justify-center mt-12 space-y-4">
+          {/* Enhanced Pagination */}
+          {!productsLoading && !productsError && totalPages > 1 && (
+            <div className="flex flex-col items-center justify-center mt-16 space-y-6">
               {/* Pagination Info */}
-              <div className="text-center text-gray-600">
-                <p className="text-sm">
-                  Mostrando {startIndex + 1}-{Math.min(endIndex, totalFilteredProducts)} de {totalFilteredProducts} produtos
-                  {selectedCategory !== 'Todos' && (
-                    <span className="block text-xs mt-1">
-                      na categoria <span className="font-medium text-[#3e2626]">{selectedCategory}</span>
-                    </span>
-                  )}
-                </p>
+              <div className="text-center">
+                <div className="inline-flex items-center space-x-2 bg-white/80 backdrop-blur-sm px-6 py-3 rounded-full shadow-lg border border-[#3e2626]/20">
+                  <div className="w-2 h-2 bg-[#3e2626] rounded-full"></div>
+                  <p className="text-sm text-gray-700">
+                    Mostrando <span className="font-semibold text-[#3e2626]">{startIndex + 1}-{Math.min(endIndex, totalFilteredProducts)}</span> de <span className="font-semibold text-[#3e2626]">{totalFilteredProducts}</span> produtos
+                    {selectedCategory !== 'Todos' && (
+                      <span className="block text-xs mt-1 text-gray-500">
+                        na categoria <span className="font-medium text-[#3e2626]">{selectedCategory}</span>
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
 
               {/* Pagination Controls */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 {/* Previous Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-3 border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-medium transition-all duration-300"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  <ArrowLeft className="h-4 w-4 mr-2" />
                   Anterior
                 </Button>
 
                 {/* Page Numbers */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <Button
-                    key={page}
-                    variant={currentPage === page ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-2 ${
-                      currentPage === page
-                        ? 'bg-[#3e2626] text-white hover:bg-[#2a1f1f]'
-                        : 'border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white'
-                    }`}
-                  >
-                    {page}
-                  </Button>
-                ))}
+                <div className="flex items-center space-x-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-12 h-12 rounded-full font-semibold transition-all duration-300 ${
+                        currentPage === page
+                          ? 'bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white shadow-lg hover:shadow-xl'
+                          : 'border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white hover:border-[#3e2626]'
+                      }`}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
 
                 {/* Next Button */}
                 <Button
@@ -1268,26 +1221,28 @@ export default function HomePage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-3 border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-medium transition-all duration-300"
                 >
                   Próxima
-                  <ArrowRight className="h-4 w-4 ml-1" />
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
 
               {/* View All Products Link */}
               {currentPage === totalPages && (
-                <div className="text-center pt-4">
-                  <p className="text-sm text-gray-500 mb-3">
-                    Quer ver todos os produtos disponíveis?
-                  </p>
-                  <Button
-                    onClick={() => router.push('/products')}
-                    className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-6 py-2 rounded-full font-medium transition-all duration-300"
-                  >
-                    Ver Todos os Produtos
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
+                <div className="text-center pt-6">
+                  <div className="bg-gradient-to-r from-[#3e2626]/5 to-[#8B4513]/5 rounded-2xl p-6 border border-[#3e2626]/10">
+                    <p className="text-sm text-gray-600 mb-4">
+                      Quer explorar nossa coleção completa de produtos?
+                    </p>
+                    <Button
+                      onClick={() => router.push('/products')}
+                      className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white hover:from-[#2a1f1f] hover:to-[#6B3410] px-8 py-3 rounded-full font-semibold transition-all duration-300 shadow-lg hover:shadow-xl group"
+                    >
+                      Ver Todos os Produtos
+                      <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
