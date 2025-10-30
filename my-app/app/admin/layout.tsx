@@ -53,10 +53,11 @@ export default function AdminLayout({
     }
     
     // Verificar se o usuário é admin
-    if (user.role !== 'ADMIN') {
+    const userRole = user.role?.toUpperCase();
+    if (userRole !== 'ADMIN') {
       setIsRedirecting(true);
       // Redirecionar para o dashboard apropriado baseado no role
-      if (user.role === 'STORE_MANAGER') {
+      if (userRole === 'STORE_MANAGER') {
         router.push('/manager');
       } else {
         router.push('/');
@@ -90,7 +91,8 @@ export default function AdminLayout({
     router.push('/login');
   };
 
-  if (!isMounted || isRedirecting || !isAuthenticated || !user || !token || user.role !== 'ADMIN') {
+  const userRole = user?.role?.toUpperCase();
+  if (!isMounted || isRedirecting || !isAuthenticated || !user || !token || userRole !== 'ADMIN') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

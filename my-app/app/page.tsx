@@ -90,6 +90,28 @@ export default function HomePage() {
   // Buscar produtos do banco de dados
   const { products: allProducts, loading: productsLoading, error: productsError } = useProducts();
 
+  // Redirecionar usuários logados com roles específicos para seus dashboards
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const userRole = user.role?.toUpperCase();
+      
+      if (userRole === 'ADMIN') {
+        router.replace('/admin');
+        return;
+      }
+      
+      if (userRole === 'STORE_MANAGER') {
+        router.replace('/manager');
+        return;
+      }
+      
+      if (userRole === 'EMPLOYEE' || userRole === 'CASHIER') {
+        router.replace('/employee');
+        return;
+      }
+    }
+  }, [isAuthenticated, user, router]);
+
   // Função auxiliar para renderizar ícones
   const renderIcon = (IconComponent: any, className: string) => {
     return <IconComponent className={className} />;

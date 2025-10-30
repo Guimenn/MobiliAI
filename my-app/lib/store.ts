@@ -5,11 +5,18 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'ADMIN' | 'store_manager' | 'STORE_MANAGER' | 'cashier' | 'CASHIER' | 'customer' | 'CUSTOMER';
+  role: 'admin' | 'ADMIN' | 'store_manager' | 'STORE_MANAGER' | 'cashier' | 'CASHIER' | 'employee' | 'EMPLOYEE' | 'customer' | 'CUSTOMER';
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
   storeId?: string;
+  createdAt?: string;
   store?: {
     id: string;
     name: string;
+    address?: string;
   };
 }
 
