@@ -79,10 +79,13 @@ export default function HomePage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchClosing, setSearchClosing] = useState(false);
   const [searchOpening, setSearchOpening] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('Sala de Estar');
+  const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [cartItems, setCartItems] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [specialOfferProduct, setSpecialOfferProduct] = useState<any | null>(null);
+  const OFFER_DURATION = 30; // segundos por produto (fase de desenvolvimento)
+  const [offerSecondsLeft, setOfferSecondsLeft] = useState(OFFER_DURATION);
 
   // Buscar produtos do banco de dados
   const { products: allProducts, loading: productsLoading, error: productsError } = useProducts();
@@ -301,6 +304,45 @@ export default function HomePage() {
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
     setCurrentPage(1);
+  };
+
+  // Seleciona produto aleatório para oferta especial
+  const pickRandomProduct = () => {
+    if (!allProducts || allProducts.length === 0) return null;
+    const randomIndex = Math.floor(Math.random() * allProducts.length);
+    return allProducts[randomIndex];
+  };
+
+  // Inicializa oferta e cronômetro quando produtos carregarem
+  useEffect(() => {
+    if (allProducts && allProducts.length > 0 && !specialOfferProduct) {
+      const product = pickRandomProduct();
+      setSpecialOfferProduct(product);
+      setOfferSecondsLeft(OFFER_DURATION);
+    }
+  }, [allProducts]);
+
+  // Cronômetro da oferta
+  useEffect(() => {
+    if (!specialOfferProduct) return;
+    const intervalId = setInterval(() => {
+      setOfferSecondsLeft((prev) => {
+        if (prev <= 1) {
+          const nextProduct = pickRandomProduct();
+          setSpecialOfferProduct(nextProduct);
+          return OFFER_DURATION; // reinicia
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [specialOfferProduct]);
+
+  const formatTime = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   const testimonials = [
@@ -525,7 +567,7 @@ export default function HomePage() {
         <Header />
 
         {/* Hero Section */}
-        <section className="relative flex items-center justify-center overflow-hidden h-full">
+        <section className="relative flex items-center justify-center overflow-visible h-full">
           {/* Content */}
           <div className="relative z-10 w-full max-w-5xl px-4 sm:px-6 lg:px-8 text-center mt-30">
             <div className="max-w-5xl mx-auto">
@@ -550,14 +592,166 @@ export default function HomePage() {
               </h1>
             </div>
           </div>
+      {/* Card de transição entre Hero e Categorias (metade sobre o hero, metade abaixo) */}
+      <div className="absolute inset-x-0 bottom-0 translate-y-[150%] sm:translate-y-[150%] md:translate-y-[150%] lg:translate-y-[210%] z-20">
+        <div className="w-[60%] mx-auto ">
+          <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_rgba(0,0,0,0.18)] ring-1 ring-black/5">
+              {/* Decor e fundo */}
+              <div className="absolute inset-0 bg-gray-100" />
+              <div className="absolute -top-24 -left-20 w-80 h-80 bg-black/5 rounded-full blur-3xl" />
+              <div className="absolute inset-0 opacity-[0.02]" style={{
+                backgroundImage: `radial-gradient(circle at 2px 2px, #000 1px, transparent 0)`,
+                backgroundSize: '20px 20px'
+              }} />
+
+             
+
+              <div className="relative px-6 py-8 md:px-12 md:py-12 min-h-[260px] md:min-h-[320px] lg:min-h-[360px]">
+              {/* Conteúdo: Oferta Especial com cronômetro */}
+              {specialOfferProduct ? (
+              <div className="flex flex-col md:flex-row items-stretch gap-10">
+                {/* Visual do produto + decoração */}
+                <div className="relative w-full md:w-[420px] lg:w-[500px]">
+                  {/* anéis de fundo */}
+                  <div className="absolute -inset-6 -z-10 hidden md:block">
+                    <div className="absolute inset-0 rounded-full border-2 border-black/5" />
+                    <div className="absolute inset-6 rounded-full border-2 border-black/10" />
+                    <div className="absolute inset-12 rounded-full border-2 border-black/5" />
+                  </div>
+
+                  <div className="w-full h-56 md:h-64 lg:h-72 rounded-2xl overflow-hidden relative shadow-2xl border border-black/5 bg-white">
+                    {/* Product Image - if available */}
+                    {specialOfferProduct.imageUrl ? (
+                      <Image
+                        src={specialOfferProduct.imageUrl}
+                        alt={specialOfferProduct.name}
+                        width={800}
+                        height={600}
+                        className="w-full h-full object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent" />
+                    )}
+
+                    {/* Selo de desconto */}
+                    <div className="absolute -right-3 top-3">
+                      <div className="bg-white shadow-xl rounded-xl px-3 py-2 text-[#3e2626]">
+                        <div className="text-xl font-extrabold leading-none">30%</div>
+                        <div className="text-[10px] tracking-wider font-semibold text-amber-600">OFF</div>
+                      </div>
+                    </div>
+
+                    {/* Anotação flutuante */}
+                    <div className="absolute left-3 top-3 bg-white/95 backdrop-blur rounded-xl px-3 py-2 shadow-md text-[#3e2626] text-xs font-medium flex items-center gap-2">
+                      <Sofa className="h-4 w-4" /> Conforto premium
+                    </div>
+
+                    {/* Curva decorativa (rabisco) */}
+                    <svg className="absolute -right-6 bottom-8 w-16 h-16 text-black/30" viewBox="0 0 100 100" fill="none">
+                      <path d="M10 60 C 40 10, 60 110, 90 60" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                      <path d="M85 62 l10 -2 l-6 -8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" fill="none" />
+                    </svg>
+
+                    {/* Rodapé: etiqueta e timer */}
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-10">
+                      <span className="inline-flex items-center gap-2 bg-white/95 rounded-xl px-3 py-1.5 text-xs md:text-sm font-medium text-[#3e2626] shadow">
+                        Oferta relâmpago
+                      </span>
+                      <span className="inline-flex items-center gap-1 bg-[#3e2626] text-white rounded-xl px-3 py-1.5 text-xs md:text-sm font-semibold shadow">
+                        ⏱ {formatTime(offerSecondsLeft)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Infos e ações */}
+                <div className="flex-1 grid grid-rows-[auto_1fr_auto] gap-6">
+                  <div>
+                    <h3 className="text-3xl md:text-4xl font-semibold text-[#3e2626] leading-tight tracking-tight">
+                      {specialOfferProduct.name}
+                    </h3>
+                   
+                  </div>
+                    {/* Descrição do produto */}
+                    <div className="mt-3 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="h-7 w-7 rounded-full bg-[#3e2626]/10 text-[#3e2626] flex items-center justify-center">
+                          <Shield className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-[#3e2626]">Qualidade garantida</div>
+                          <div className="text-xs text-gray-600">Até 30% OFF em peças selecionadas</div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="h-7 w-7 rounded-full bg-[#3e2626]/10 text-[#3e2626] flex items-center justify-center">
+                          <Truck className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-[#3e2626]">Frete otimizado</div>
+                          <div className="text-xs text-gray-600">Envio rápido para principais cidades</div>
+                        </div>
+                      </div>
+                     
+                    </div>
+                  
+
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+                    {/* Bloco de preços alinhado */}
+                    <div className="flex items-end gap-3">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-sm font-semibold text-[#3e2626]">R$</span>
+                        <span className="text-4xl md:text-5xl font-bold text-[#3e2626] leading-none">
+                          {(specialOfferProduct.price ? specialOfferProduct.price * 0.7 : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      {specialOfferProduct.price && (
+                        <div className="flex items-baseline gap-1 text-gray-500">
+                          <span className="text-xs line-through">R$</span>
+                          <span className="text-lg md:text-2xl line-through">
+                            {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+                      <span className="ml-1 inline-flex items-center px-2.5 py-1 rounded-lg bg-[#3e2626]/10 text-[#3e2626] text-xs font-semibold">
+                        30% OFF
+                      </span>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex items-center gap-3">
+                      <Button onClick={() => addToCart(specialOfferProduct.id)} className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-2xl px-6 py-3 shadow-md">
+                        Adicionar ao carrinho
+                      </Button>
+                      <Button variant="outline" onClick={() => router.push(`/products?highlight=${specialOfferProduct.id}`)} className="rounded-2xl border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white px-6 py-3">
+                        Ver coleção
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-6">
+                <div>
+                  <h3 className="text-2xl md:text-3xl font-semibold text-[#3e2626]">Oferta especial</h3>
+                  <p className="text-gray-600 mt-2">Carregando produto em destaque...</p>
+                </div>
+                <div className="w-10 h-10 border-4 border-[#3e2626]/20 border-t-[#3e2626] rounded-full animate-spin" />
+              </div>
+            )}
+            </div>
+          </div>
+        </div>
+      </div>
         </section>
       </div>
 
      
 
       {/* Categories Section */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
-        <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+      <section id="categories-anchor" className="pt-40 md:pt-44 lg:pt-80 pb-20 bg-gradient-to-br from-gray-50 to-white">
+        <div className="container mx-auto  mt-10">
          
 
           {/* Grid Layout Customizado - 6 colunas x 5 linhas */}
@@ -643,19 +837,19 @@ export default function HomePage() {
               </div>
             </Link>
 
-            {/* Armário - 1x2 (coluna 6, linhas 1-2) */}
-            <Link href={`/products?category=${categories[3].id}`} className="md:col-span-1 md:row-span-2">
+            {/* Cadeiras - 1x2 (coluna 6, linhas 1-2) */}
+            <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[3].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-4 h-full flex flex-col justify-between">
                   <div className="flex flex-col items-center">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[3].gradient} rounded-xl flex items-center justify-center shadow-md mb-4`}>
-                      {renderIcon(categories[3].icon, "h-6 w-6 text-white")}
+                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[2].gradient} rounded-xl flex items-center justify-center shadow-md mb-4`}>
+                      {renderIcon(categories[2].icon, "h-6 w-6 text-white")}
                     </div>
                     <div className="text-center">
                       <span className="text-2xl font-bold text-[#3e2626]">
-                        {categories[3].count}
+                        {categories[2].count}
                       </span>
                       <p className="text-xs text-gray-500">produtos</p>
                     </div>
@@ -663,10 +857,10 @@ export default function HomePage() {
                   
                   <div className="text-center">
                     <h4 className="text-lg font-bold text-[#3e2626] mb-1">
-                      {categories[3].name}
+                      {categories[2].name}
                     </h4>
                     <p className="text-xs text-gray-600 leading-relaxed">
-                      {categories[3].description}
+                      {categories[2].description}
                     </p>
                   </div>
                 </div>
@@ -736,8 +930,8 @@ export default function HomePage() {
               </div>
             </Link>
 
-            {/* Quadro - 1x1 (coluna 6, linha 3) */}
-            <Link href={`/products?category=${categories[6].id}`} className="md:col-span-1 md:row-span-1">
+            {/* Quadro - 2x1 (coluna 6, linha 3) */}
+            <Link href={`/products?category=${categories[6].id}`} className="md:col-span-2 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
@@ -757,26 +951,7 @@ export default function HomePage() {
               </div>
             </Link>
 
-            {/* Cadeira - 1x1 (coluna 5, linha 4) */}
-            <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-1">
-              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
-                
-                <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
-                  <div className={`w-10 h-10 bg-gradient-to-br ${categories[2].gradient} rounded-lg flex items-center justify-center shadow-sm mb-2`}>
-                    {renderIcon(categories[2].icon, "h-5 w-5 text-white")}
-                  </div>
-                  <div className="text-center">
-                    <h4 className="text-sm font-bold text-[#3e2626] mb-1">
-                      {categories[2].name}
-                    </h4>
-                    <p className="text-xs text-gray-500">{categories[2].count} produtos</p>
-                  </div>
-                </div>
-                
-                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/10 rounded-xl transition-all duration-300"></div>
-              </div>
-            </Link>
+           
 
             {/* Luminária - 2x1 (colunas 3-4, linha 4) */}
             <Link href={`/products?category=${categories[7].id}`} className="md:col-span-2 md:row-span-1">
@@ -849,7 +1024,7 @@ export default function HomePage() {
 
       {/* AI Section */}
       <section className="py-20 bg-gradient-to-br from-white to-gray-50">
-        <div className="max-w-[1000px] mx-auto translate-x-[-130px] gap-12">
+        <div className="container mx-auto gap-12">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center ">
             {/* Left Side - Text Content */}
             <div className="lg:col-span-1 space-y-8 ">
@@ -872,7 +1047,7 @@ export default function HomePage() {
             {/* Right Side - Carousel */}
             <div className="lg:col-span-2 ">
               <div className="relative">
-                <div className="relative overflow-hidden w-[900px]">
+                <div className="relative overflow-hidden ">
                   <div 
                     className="flex space-x-4 items-start transition-all duration-700 ease-in-out"
                     style={{
@@ -909,35 +1084,23 @@ export default function HomePage() {
       </section>
 
       {/* Featured Products Section */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-white relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `radial-gradient(circle at 2px 2px, #3e2626 1px, transparent 0)`,
-            backgroundSize: '40px 40px'
-          }}></div>
-        </div>
-        
-        <div className="max-w-7xl mx-auto relative z-10">
+      <section className="py-20 bg-gray-50">
+        <div className="container mx-auto">
           {/* Header with Navigation */}
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-16">
             {/* Left Side - Title and Categories */}
             <div className="flex-1">
               {/* Title Section */}
-              <div className="mb-8">
+              <div className="mb-8 ml-5">
                 <div className="inline-flex items-center space-x-3 mb-4">
-                  <div className="w-12 h-1 bg-gradient-to-r from-[#3e2626] to-[#8B4513] rounded-full"></div>
+                  <div className="w-12 h-1 bg-[#3e2626] rounded-full"></div>
                   <span className="text-sm font-medium text-[#3e2626] tracking-wider uppercase">Coleção Premium</span>
                 </div>
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#3e2626] leading-tight">
+                <h2 className="text-3xl md:text-5xl lg:text-5xl font-bold text-[#3e2626] leading-tight">
                   <span className="block">Móveis em Destaque</span>
-                  <span className="block bg-gradient-to-r from-[#3e2626] to-[#8B4513] bg-clip-text text-transparent">
-                    Para Sua Casa
-                  </span>
+                  <span className="block text-[#3e2626]">Para Sua Casa</span>
                 </h2>
-                <p className="text-lg text-gray-600 mt-4 max-w-2xl">
-                  Descubra nossa seleção exclusiva de móveis premium, cuidadosamente escolhidos para transformar seu espaço em um ambiente único e elegante.
-                </p>
+                
               </div>
               
               {/* Category Navigation - Modern Pills */}
@@ -954,14 +1117,11 @@ export default function HomePage() {
                     }`}
                   >
                     {category}
-                    {selectedCategory === category && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#3e2626] to-[#8B4513] rounded-full -z-10"></div>
-                    )}
                   </Button>
                 ))}
 
                 {/* Clear Filter Button */}
-                {selectedCategory !== 'Todos' && selectedCategory !== 'Sala de Estar' && (
+                {selectedCategory !== 'Todos' && selectedCategory && (
                   <Button 
                     variant="outline" 
                     onClick={() => handleCategoryChange('Todos')}
@@ -976,11 +1136,6 @@ export default function HomePage() {
 
             {/* Right Side - View All Button */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-end mt-8 lg:mt-0 space-y-4 lg:space-y-0 lg:space-x-4">
-              {/* Backend Status */}
-              <div className="flex justify-center lg:justify-end">
-                <BackendStatus />
-              </div>
-              
               <div className="flex items-center space-x-4">
                 {/* Filter Indicator */}
                 {selectedCategory !== 'Todos' && (
@@ -1003,7 +1158,7 @@ export default function HomePage() {
                 <Button 
                   size="lg" 
                   onClick={() => router.push('/products')}
-                  className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white hover:from-[#2a1f1f] hover:to-[#6B3410] px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center space-x-3 group"
+                  className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-8 py-4 rounded-full font-semibold text-lg shadow-md hover:shadow-lg transition-all duration-300 flex items-center space-x-3 group"
                 >
                   <span>Ver Todos os Produtos</span>
                   <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
@@ -1056,110 +1211,74 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* Products Grid - Enhanced Layout */}
+          {/* Products Grid - Clean Layout */}
           {!productsLoading && !productsError && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {featuredProducts.map((product, index) => (
-              <div key={product.id} className="group relative bg-white rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-[1.03] hover:-translate-y-2">
-                {/* Product Image Container */}
-                <div className="relative overflow-hidden">
-                  <div 
-                    className="aspect-square flex items-center justify-center relative"
-                    style={{ backgroundColor: product.color }}
-                  >
-                    {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-black/10 via-transparent to-black/30"></div>
-                    
-                    {/* Pattern Overlay */}
-                    <div className="absolute inset-0 opacity-20">
-                      <div className="absolute inset-0" style={{
-                        backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.1) 2px, transparent 2px)`,
-                        backgroundSize: '40px 40px'
-                      }}></div>
-                    </div>
-                    
-                    {/* Product Icon/Visual */}
-                    <div className="relative z-10 text-center transform group-hover:scale-110 transition-transform duration-300">
-                      <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                        <Sofa className="h-12 w-12 text-white drop-shadow-lg" />
-                      </div>
-                      <p className="text-white font-semibold text-lg">Móvel Premium</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {featuredProducts.map((product) => (
+                <div key={product.id} className="group relative bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
+                  {/* Product Image Container */}
+                  <div className="relative overflow-hidden">
+                    <div className="aspect-[4/3] flex items-center justify-center relative bg-gray-100">
+                      {/* Product Image - if available */}
+                      {product.imageUrl ? (
+                        <Image
+                          src={product.imageUrl}
+                          alt={product.name}
+                          width={600}
+                          height={450}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="text-center text-gray-400">Sem imagem</div>
+                      )}
                     </div>
 
-                    {/* Decorative Elements */}
-                    <div className="absolute top-6 right-6 w-12 h-12 bg-white/20 rounded-full blur-lg group-hover:scale-150 transition-transform duration-500"></div>
-                    <div className="absolute bottom-6 left-6 w-8 h-8 bg-white/10 rounded-full blur-md group-hover:scale-125 transition-transform duration-500"></div>
-                    
-                    {/* Shine Effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
-                  </div>
-
-                  {/* Discount Badge */}
-                  <div className="absolute top-6 left-6">
-                    <div className="w-14 h-14 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-2xl flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform duration-300">
-                      <span className="text-white font-bold text-sm">-10%</span>
+                    {/* Favorite Button */}
+                    <div className="absolute top-4 right-4">
+                      <Button 
+                        size="sm" 
+                        onClick={() => toggleFavorite(product.id)}
+                        className={`w-8 h-8 shadow-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-105 ${
+                          favorites.includes(product.id)
+                            ? 'bg-red-500 text-white hover:bg-red-600'
+                            : 'bg-white hover:bg-white text-[#3e2626] border border-gray-200'
+                        }`}
+                      >
+                        <Heart className={`h-4 w-4 ${favorites.includes(product.id) ? 'fill-current' : ''}`} />
+                      </Button>
                     </div>
                   </div>
 
-                  {/* Favorite Button */}
-                  <div className="absolute top-6 right-6">
-                    <Button 
-                      size="sm" 
-                      onClick={() => toggleFavorite(product.id)}
-                      className={`w-12 h-12 shadow-xl rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 ${
-                        favorites.includes(product.id)
-                          ? 'bg-red-500 text-white hover:bg-red-600'
-                          : 'bg-white/90 hover:bg-white text-[#3e2626]'
-                      }`}
-                    >
-                      <Heart className={`h-5 w-5 ${favorites.includes(product.id) ? 'fill-current' : ''}`} />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Product Info Footer - Enhanced Design */}
-                <div className="bg-gradient-to-br from-[#3e2626] to-[#2a1f1f] p-6 relative overflow-hidden">
-                  {/* Background Pattern */}
-                  <div className="absolute inset-0 opacity-10">
-                    <div className="absolute inset-0" style={{
-                      backgroundImage: `radial-gradient(circle at 15px 15px, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-                      backgroundSize: '30px 30px'
-                    }}></div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-bold text-white leading-tight">
-                        {product.name}
-                      </h3>
-                      <div className="flex items-center space-x-1">
-                        <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                        <span className="text-white/80 text-sm font-medium">{product.rating}</span>
+                  {/* Product Info Footer - Clean */}
+                  <div className="bg-white p-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-base font-semibold text-[#3e2626] leading-tight">{product.name}</h3>
+                      <div className="flex items-center space-x-1 text-yellow-500">
+                        <Star className="h-4 w-4 fill-current" />
+                        <span className="text-xs font-medium text-gray-600">{product.rating}</span>
                       </div>
                     </div>
-                    
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-2xl font-bold text-white">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg font-bold text-[#3e2626]">
                           R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                         {product.originalPrice && (
-                          <span className="text-lg text-white/60 line-through">
+                          <span className="text-xs text-gray-500 line-through">
                             R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         )}
                       </div>
-                      
                       <Button 
                         onClick={() => addToCart(product.id)}
-                        className="bg-white text-[#3e2626] hover:bg-gray-100 shadow-xl rounded-2xl w-14 h-14 p-0 hover:scale-110 transition-all duration-300 group"
+                        className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-lg w-10 h-10 p-0"
                       >
-                        <ShoppingCart className="h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
+                        <ShoppingCart className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                 </div>
-              </div>
               ))}
             </div>
           )}
@@ -1206,7 +1325,7 @@ export default function HomePage() {
                       onClick={() => setCurrentPage(page)}
                       className={`w-12 h-12 rounded-full font-semibold transition-all duration-300 ${
                         currentPage === page
-                          ? 'bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white shadow-lg hover:shadow-xl'
+                          ? 'bg-[#3e2626] text-white shadow-lg hover:shadow-xl'
                           : 'border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white hover:border-[#3e2626]'
                       }`}
                     >
@@ -1231,13 +1350,13 @@ export default function HomePage() {
               {/* View All Products Link */}
               {currentPage === totalPages && (
                 <div className="text-center pt-6">
-                  <div className="bg-gradient-to-r from-[#3e2626]/5 to-[#8B4513]/5 rounded-2xl p-6 border border-[#3e2626]/10">
+                  <div className="bg-white rounded-2xl p-6 border border-[#3e2626]/10">
                     <p className="text-sm text-gray-600 mb-4">
                       Quer explorar nossa coleção completa de produtos?
                     </p>
                     <Button
                       onClick={() => router.push('/products')}
-                      className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white hover:from-[#2a1f1f] hover:to-[#6B3410] px-8 py-3 rounded-full font-semibold transition-all duration-300 shadow-lg hover:shadow-xl group"
+                      className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-8 py-3 rounded-full font-semibold transition-all duration-300 shadow-md hover:shadow-lg group"
                     >
                       Ver Todos os Produtos
                       <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
@@ -1250,8 +1369,7 @@ export default function HomePage() {
         </div>
       </section>
 
-       {/* Promotional Section */}
-       <PromotionalSection />
+    
 
 
      {/* Footer */}

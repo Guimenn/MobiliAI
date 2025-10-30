@@ -40,3 +40,4 @@ async function testPublicEndpoint() {
 
 // Executar teste
 testPublicEndpoint();
+

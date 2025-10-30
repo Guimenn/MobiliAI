@@ -10,3 +10,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   exports: [PublicProductsService],
 })
 export class PublicModule {}
+
