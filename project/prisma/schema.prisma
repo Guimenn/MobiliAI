@@ -61,12 +61,11 @@ model Store {
   description  String?
   settings     Json?
   workingHours Json?
-  // Horário de funcionamento da loja
-  openingTime  String?     // Ex: "08:00"
-  closingTime  String?     // Ex: "18:00"
-  workingDays  String[]    // Ex: ["segunda", "terca", "quarta", "quinta", "sexta", "sabado"]
-  lunchStart   String?     // Ex: "12:00"
-  lunchEnd     String?     // Ex: "13:00"
+  closingTime  String?
+  lunchEnd     String?
+  lunchStart   String?
+  openingTime  String?
+  workingDays  String[]
   imageUrl     String?
   cashFlows    CashFlow[]
   dailyCash    DailyCash[]
@@ -485,7 +484,6 @@ enum ProductCategory {
   SOFA
   MESA
   CADEIRA
-  ARMARIO
   ESTANTE
   POLTRONA
   QUADRO
@@ -526,4 +524,4 @@ enum MaterialType {
   METAL
   COURO
   TECIDO
-  }
+}

@@ -1,463 +1,488 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { salesAPI, timeClockAPI } from '@/lib/api';
 import { 
+  Clock, 
   ShoppingCart, 
-  Package, 
   DollarSign, 
-  Clock,
-  LogOut,
-  Plus,
-  Search,
-  CreditCard,
+  TrendingUp, 
+  CheckCircle, 
+  XCircle,
   Receipt,
-  CheckCircle,
-  AlertTriangle,
-  TrendingUp,
-  User,
+  Package,
   Calendar,
-  Eye
+  Target,
+  BarChart3,
+  ArrowRight,
+  Loader2,
+  Plus
 } from 'lucide-react';
 
-export default function EmployeeDashboard() {
-  const { user, isAuthenticated, logout } = useAppStore();
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState('pos');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+interface TimeClockEntry {
+  id: string;
+  date: string;
+  clockIn?: string;
+  clockOut?: string;
+  totalHours?: number;
+}
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
+interface SaleEntry {
+  id: string;
+  totalAmount: number;
+  createdAt: string;
+  customer?: { name: string };
+  items?: Array<{ product: { name: string } }>;
+}
+
+export default function EmployeeDashboard() {
+  const { user, isAuthenticated, token } = useAppStore();
+  const router = useRouter();
+  const [timeFilter, setTimeFilter] = useState<'hoje' | '7dias' | '30dias'>('hoje');
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalVendas: 0,
+    numeroVendas: 0,
+    ticketMedio: 0,
+    metaDia: 0
+  });
+  const [lastTimeClockEntries, setLastTimeClockEntries] = useState<any[]>([]);
+  const [lastSales, setLastSales] = useState<any[]>([]);
+  const [hasOpenEntry, setHasOpenEntry] = useState(false);
+  const [currentEntry, setCurrentEntry] = useState<TimeClockEntry | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      router.push('/login');
+      return;
+    }
+  }, [user, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (user?.id && token) {
+      fetchDashboardData();
+    }
+  }, [user?.id, token, timeFilter]);
+
+  const fetchDashboardData = async () => {
+    if (!user?.id || !token) return;
+
+    try {
+      setLoading(true);
+
+      // Buscar dados de vendas e ponto em paralelo
+      const [salesData, timeClockData] = await Promise.all([
+        fetchSalesData(),
+        fetchTimeClockData()
+      ]);
+
+      // Atualizar estatísticas de vendas
+      if (salesData.sales) {
+        const total = salesData.sales.reduce((sum: number, sale: SaleEntry) => 
+          sum + Number(sale.totalAmount), 0);
+        const count = salesData.sales.length;
+        const avg = count > 0 ? total / count : 0;
+        
+        setStats({
+          totalVendas: total,
+          numeroVendas: count,
+          ticketMedio: avg,
+          metaDia: 0 // Calcular meta se necessário
+        });
+
+        // Processar últimas vendas
+        const formattedSales = salesData.sales
+          .slice(0, 5)
+          .map((sale: SaleEntry) => ({
+            cliente: sale.customer?.name || 'Cliente Avulso',
+            produto: sale.items?.[0]?.product?.name || 'Produto',
+            preco: Number(sale.totalAmount),
+            hora: new Date(sale.createdAt).toLocaleTimeString('pt-BR', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })
+          }));
+        
+        setLastSales(formattedSales);
+      }
+
+      // Atualizar dados de ponto
+      if (timeClockData.records) {
+        // Encontrar entrada aberta
+        const openEntry = timeClockData.records.find((entry: TimeClockEntry) => !entry.clockOut);
+        setHasOpenEntry(!!openEntry);
+        setCurrentEntry(openEntry || null);
+
+        // Formatar últimos 5 dias de ponto
+        const formattedEntries = timeClockData.records
+          .slice(0, 5)
+          .map((entry: TimeClockEntry) => {
+            // Parse da data no formato YYYY-MM-DD
+            const [year, month, day] = entry.date.split('-');
+            const formattedDate = `${day}/${month}`;
+            
+            // Formatar total de horas
+            let totalFormatted = '-- h';
+            if (entry.totalHours !== null && entry.totalHours !== undefined) {
+              const hours = Math.floor(entry.totalHours);
+              const minutes = Math.round((entry.totalHours - hours) * 60);
+              totalFormatted = `${hours}h ${minutes}m`;
+            }
+            
+            return {
+              date: formattedDate,
+              entrada: entry.clockIn || '--',
+              saida: entry.clockOut || '--',
+              total: totalFormatted
+            };
+          });
+        
+        setLastTimeClockEntries(formattedEntries);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados do dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const fetchSalesData = async () => {
+    if (!user?.id) return { sales: [] };
+    
+    try {
+      const today = new Date();
+      const startDate = new Date();
+      
+      switch (timeFilter) {
+        case 'hoje':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case '7dias':
+          startDate.setDate(today.getDate() - 7);
+          break;
+        case '30dias':
+          startDate.setDate(today.getDate() - 30);
+          break;
+      }
+
+      // Buscar todas as vendas do período (filtra por loja automaticamente no backend)
+      const allSales = await salesAPI.getByDateRange(
+        startDate.toISOString(),
+        today.toISOString()
+      );
+
+      // Filtrar apenas as vendas do funcionário logado
+      const sales = allSales.filter((sale: SaleEntry & { employeeId: string }) => 
+        sale.employeeId === user.id
+      );
+
+      return { sales };
+    } catch (error) {
+      console.error('Erro ao buscar vendas:', error);
+      return { sales: [] };
+    }
+  };
+
+  const fetchTimeClockData = async () => {
+    if (!user?.id) return { records: [] };
+    
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 5); // Últimos 5 dias
+
+      const data = await timeClockAPI.getHistory(
+        user.id,
+        startDate.toISOString().split('T')[0],
+        endDate.toISOString().split('T')[0]
+      );
+
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar ponto:', error);
+      return { records: [] };
+    }
+  };
+
+  const handleBaterPonto = () => {
+    router.push('/employee/timeclock');
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-[#3e2626] animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">PDV - Ponto de Venda</h1>
-              <p className="text-sm text-gray-600">Sistema de vendas para funcionários</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user?.name || 'Funcionário'}</p>
-                <p className="text-xs text-gray-500">Vendedor</p>
+    <div className="space-y-8">
+      {/* Time Clock Card */}
+      <Card className="bg-white shadow-xl border border-gray-200 rounded-3xl overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white pb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                <Clock className="h-7 w-7" />
               </div>
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sair
-              </Button>
+              <div>
+                <CardTitle className="text-2xl text-white">Controle de Ponto</CardTitle>
+                <p className="text-sm text-white/80 mt-1">Registre sua entrada e saída</p>
+              </div>
+            </div>
+            <Calendar className="h-10 w-10 text-white/50" />
+          </div>
+        </CardHeader>
+        <CardContent className="p-8 space-y-8">
+          {/* Bater Ponto Button */}
+          <div className="flex justify-center">
+            <Button 
+              onClick={handleBaterPonto}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-12 py-8 text-xl font-bold rounded-2xl shadow-2xl flex items-center space-x-4 transform hover:scale-105 transition-all duration-300 group"
+              size="lg"
+            >
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                <Clock className="h-6 w-6" />
+              </div>
+              <span>BATER PONTO AGORA</span>
+              <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
+            </Button>
+          </div>
+
+          {/* Status Atual */}
+          <div className={`rounded-2xl p-6 shadow-lg ${hasOpenEntry ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 'bg-gradient-to-r from-gray-400 to-gray-500'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                  {hasOpenEntry ? <CheckCircle className="h-8 w-8 text-white" /> : <XCircle className="h-8 w-8 text-white" />}
+                </div>
+                <div>
+                  <p className="text-sm text-white/90">Status Atual</p>
+                  {currentEntry ? (
+                    <p className="text-xl font-bold text-white">
+                      Entrada: {currentEntry.clockIn || '--'} | Saída: --
+                    </p>
+                  ) : (
+                    <p className="text-xl font-bold text-white">Ponto fechado</p>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={`w-4 h-4 ${hasOpenEntry ? 'bg-green-300' : 'bg-gray-300'} rounded-full animate-pulse shadow-lg`}></div>
+                <p className="text-xs text-white/80 mt-2">{hasOpenEntry ? 'Em serviço' : 'Fora de serviço'}</p>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs 
-          value={activeTab} 
-          onValueChange={setActiveTab} 
-          className="space-y-6"
-        >
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="pos">PDV</TabsTrigger>
-            <TabsTrigger value="sales">Vendas</TabsTrigger>
-            <TabsTrigger value="products">Produtos</TabsTrigger>
-            <TabsTrigger value="reports">Relatórios</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="pos" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Cart */}
-              <div className="lg:col-span-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <ShoppingCart className="h-5 w-5 mr-2" />
-                      Carrinho de Compras
-                    </CardTitle>
-                    <CardDescription>Carrinho vazio - Adicione produtos para iniciar a venda</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="text-center py-12 text-gray-500">
-                        <ShoppingCart className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                        <p className="text-lg">Nenhum produto no carrinho</p>
-                        <p className="text-sm">Busque e adicione produtos para começar</p>
-                      </div>
-                      
-                      {/* Search */}
-                      <div className="flex space-x-2">
-                        <Input
-                          placeholder="Buscar produtos..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="flex-1"
-                        />
-                        <Button>
-                          <Search className="h-4 w-4 mr-2" />
-                          Buscar
-                        </Button>
-                      </div>
-
-                      {/* Quick Products */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                          <Package className="h-6 w-6 mb-2" />
-                          <span className="text-xs">Produto Rápido</span>
-                        </Button>
-                        <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                          <User className="h-6 w-6 mb-2" />
-                          <span className="text-xs">Cliente Frequente</span>
-                        </Button>
-                      </div>
+          {/* Últimos 5 dias */}
+          <div>
+            <div className="flex items-center space-x-2 mb-4">
+              <BarChart3 className="h-5 w-5 text-[#3e2626]" />
+              <h3 className="text-lg font-bold text-gray-900">Últimos registros</h3>
+            </div>
+            {lastTimeClockEntries.length > 0 ? (
+              <div className="space-y-3">
+                {lastTimeClockEntries.map((entry, index) => (
+                  <div key={index} className="flex items-center justify-between py-4 px-6 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-2xl hover:shadow-lg hover:border-[#3e2626]/30 transition-all duration-300 group">
+                    <div className="flex items-center space-x-4 flex-1">
+                      <div className="w-2 h-2 bg-[#8B4513] rounded-full group-hover:bg-[#3e2626] transition-colors"></div>
+                      <Clock className="h-5 w-5 text-gray-400" />
+                      <span className="text-base font-semibold text-gray-900 min-w-[80px]">{entry.date}</span>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-base text-gray-700 font-medium">{entry.entrada}</span>
+                      <span className="text-gray-400">-</span>
+                      <span className="text-base text-gray-700 font-medium">{entry.saida}</span>
+                    </div>
+                    <div className="w-24 text-right">
+                      <span className="text-base font-bold text-[#3e2626]">{entry.total}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-200">
+                <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">Nenhum registro de ponto encontrado</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-              {/* Checkout */}
+      {/* Sales Overview */}
+      <Card className="bg-white shadow-xl border border-gray-200 rounded-3xl overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white pb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                <TrendingUp className="h-7 w-7" />
+              </div>
               <div>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Finalizar Venda</CardTitle>
-                    <CardDescription>Resumo do pedido</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-center py-8 text-gray-500">
-                      <Receipt className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                      <p className="text-sm">Nenhum item selecionado</p>
-                    </div>
-
-                    <div className="space-y-2 pt-4 border-t">
-                      <div className="flex justify-between text-sm">
-                        <span>Subtotal:</span>
-                        <span>R$ 0,00</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Desconto:</span>
-                        <span>R$ 0,00</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                        <span>Total:</span>
-                        <span>R$ 0,00</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Button className="w-full" disabled>
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        PIX
-                      </Button>
-                      <Button variant="outline" className="w-full" disabled>
-                        <Receipt className="h-4 w-4 mr-2" />
-                        Dinheiro
-                      </Button>
-                      <Button variant="outline" className="w-full" disabled>
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        Cartão
-                      </Button>
-                    </div>
-
-                    <div className="pt-4 border-t">
-                      <Button variant="secondary" className="w-full" disabled>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Finalizar Venda
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="sales" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Minhas Vendas</h2>
-              <div className="flex space-x-2">
-                <Button variant="outline">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Hoje
-                </Button>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Venda
-                </Button>
+                <CardTitle className="text-2xl text-white">Visão de Vendas</CardTitle>
+                <p className="text-sm text-white/80 mt-1">Acompanhe seu desempenho</p>
               </div>
             </div>
 
-            {/* Sales Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Vendas Hoje</CardTitle>
-                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">8</div>
-                  <p className="text-xs text-muted-foreground">
-                    +2 desde ontem
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Faturamento</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">R$ 3.250</div>
-                  <p className="text-xs text-muted-foreground">
-                    +15% vs ontem
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">R$ 406</div>
-                  <p className="text-xs text-muted-foreground">
-                    +8% vs ontem
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Meta do Dia</CardTitle>
-                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">65%</div>
-                  <p className="text-xs text-muted-foreground">
-                    R$ 3.250 / R$ 5.000
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recent Sales */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Vendas Recentes</CardTitle>
-                <CardDescription>Suas vendas do dia atual</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Venda #001234</h3>
-                        <p className="text-sm text-gray-600">Cliente: João Silva</p>
-                        <p className="text-xs text-gray-500">Hoje, 14:30</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg">R$ 1.250,00</p>
-                      <Badge className="bg-green-100 text-green-800">PIX</Badge>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Venda #001233</h3>
-                        <p className="text-sm text-gray-600">Cliente: Maria Santos</p>
-                        <p className="text-xs text-gray-500">Hoje, 12:15</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg">R$ 890,00</p>
-                      <Badge className="bg-blue-100 text-blue-800">Cartão</Badge>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Venda #001232</h3>
-                        <p className="text-sm text-gray-600">Cliente: Pedro Costa</p>
-                        <p className="text-xs text-gray-500">Hoje, 10:45</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg">R$ 2.100,00</p>
-                      <Badge className="bg-yellow-100 text-yellow-800">Dinheiro</Badge>
-                    </div>
-                  </div>
+          </div>
+          
+          {/* Time Filters */}
+          <div className="flex space-x-3 mt-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTimeFilter('hoje')}
+              className={`text-white hover:text-white hover:bg-white/20 ${timeFilter === 'hoje' ? 'bg-white text-[#3e2626] font-semibold shadow-lg' : ''} rounded-xl transition-all duration-300`}
+            >
+              Hoje
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTimeFilter('7dias')}
+              className={`text-white hover:text-white hover:bg-white/20 ${timeFilter === '7dias' ? 'bg-white text-[#3e2626] font-semibold shadow-lg' : ''} rounded-xl transition-all duration-300`}
+            >
+              7 dias
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTimeFilter('30dias')}
+              className={`text-white hover:text-white hover:bg-white/20 ${timeFilter === '30dias' ? 'bg-white text-[#3e2626] font-semibold shadow-lg' : ''} rounded-xl transition-all duration-300`}
+            >
+              30 dias
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-8 space-y-8">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden relative group">
+              <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
+                <div className="absolute inset-0" style={{
+                  backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.2) 1px, transparent 1px)`,
+                  backgroundSize: '40px 40px'
+                }}></div>
+              </div>
+              <CardContent className="p-6 relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <DollarSign className="h-10 w-10 text-blue-200 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-blue-100 bg-white/20 px-3 py-1 rounded-full">+12%</span>
                 </div>
+                <p className="text-3xl font-bold mb-1">{formatCurrency(stats.totalVendas)}</p>
+                <p className="text-sm text-blue-100 font-medium">Total Vendido</p>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="products" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Produtos Disponíveis</h2>
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Buscar produtos..."
-                  className="w-64"
-                />
-                <Button variant="outline">
-                  <Search className="h-4 w-4 mr-2" />
-                  Buscar
-                </Button>
+            <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden relative group">
+              <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
+                <div className="absolute inset-0" style={{
+                  backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.2) 1px, transparent 1px)`,
+                  backgroundSize: '40px 40px'
+                }}></div>
               </div>
-            </div>
+              <CardContent className="p-6 relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <ShoppingCart className="h-10 w-10 text-green-200 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-green-100 bg-white/20 px-3 py-1 rounded-full">+8%</span>
+                </div>
+                <p className="text-3xl font-bold mb-1">{stats.numeroVendas}</p>
+                <p className="text-sm text-green-100 font-medium">Nº de Vendas</p>
+              </CardContent>
+            </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Sofá 3 Lugares</span>
-                    <Badge className="bg-green-100 text-green-800">Em Estoque</Badge>
-                  </CardTitle>
-                  <CardDescription>Código: SOF001</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Preço:</span>
-                    <span className="font-bold">R$ 2.500,00</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Estoque:</span>
-                    <span className="text-sm">5 unidades</span>
-                  </div>
-                  <Button className="w-full">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Adicionar ao Carrinho
-                  </Button>
-                </CardContent>
-              </Card>
+            <Card className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden relative group">
+              <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
+                <div className="absolute inset-0" style={{
+                  backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.2) 1px, transparent 1px)`,
+                  backgroundSize: '40px 40px'
+                }}></div>
+              </div>
+              <CardContent className="p-6 relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <Receipt className="h-10 w-10 text-purple-200 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-purple-100 bg-white/20 px-3 py-1 rounded-full">+5%</span>
+                </div>
+                <p className="text-3xl font-bold mb-1">{formatCurrency(stats.ticketMedio)}</p>
+                <p className="text-sm text-purple-100 font-medium">Ticket Médio</p>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Mesa de Jantar</span>
-                    <Badge className="bg-orange-100 text-orange-800">Estoque Baixo</Badge>
-                  </CardTitle>
-                  <CardDescription>Código: MES002</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Preço:</span>
-                    <span className="font-bold">R$ 1.200,00</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Estoque:</span>
-                    <span className="text-sm text-orange-600">2 unidades</span>
-                  </div>
-                  <Button className="w-full">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Adicionar ao Carrinho
-                  </Button>
-                </CardContent>
-              </Card>
+            <Card className="bg-gradient-to-br from-orange-500 to-amber-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden relative group">
+              <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
+                <div className="absolute inset-0" style={{
+                  backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.2) 1px, transparent 1px)`,
+                  backgroundSize: '40px 40px'
+                }}></div>
+              </div>
+              <CardContent className="p-6 relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <Target className="h-10 w-10 text-orange-200 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-orange-100 bg-white/20 px-3 py-1 rounded-full">85%</span>
+                </div>
+                <p className="text-3xl font-bold mb-1">{stats.metaDia}%</p>
+                <p className="text-sm text-orange-100 font-medium">Meta do Dia</p>
+              </CardContent>
+            </Card>
+          </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Cadeira Executiva</span>
-                    <Badge className="bg-green-100 text-green-800">Em Estoque</Badge>
-                  </CardTitle>
-                  <CardDescription>Código: CAD003</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Preço:</span>
-                    <span className="font-bold">R$ 850,00</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Estoque:</span>
-                    <span className="text-sm">8 unidades</span>
-                  </div>
-                  <Button className="w-full">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Adicionar ao Carrinho
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="reports" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Meus Relatórios</h2>
-              <Button>
-                <Receipt className="h-4 w-4 mr-2" />
-                Exportar Relatório
+          {/* Últimas 5 Vendas */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <Package className="h-5 w-5 text-[#3e2626]" />
+                <h3 className="text-lg font-bold text-gray-900">Últimas Vendas</h3>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => router.push('/employee/sales')}
+                className="text-[#3e2626] hover:bg-[#3e2626]/10"
+              >
+                Ver todas <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Relatórios Disponíveis</CardTitle>
-                <CardDescription>Visualize seus relatórios de vendas</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">Relatório de Vendas Diário</h3>
-                      <p className="text-sm text-gray-600">Vendas do dia atual</p>
+            {lastSales.length > 0 ? (
+              <div className="space-y-3">
+                {lastSales.map((sale, index) => (
+                  <div key={index} className="flex items-center justify-between py-4 px-6 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-2xl hover:shadow-lg hover:border-[#8B4513]/30 transition-all duration-300 group cursor-pointer">
+                    <div className="flex items-center space-x-4 flex-1">
+                      <div className="w-12 h-12 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <ShoppingCart className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-base font-bold text-gray-900">{sale.cliente}</p>
+                        <p className="text-sm text-gray-600">{sale.produto}</p>
+                      </div>
                     </div>
-                    <Button variant="outline" size="sm">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Visualizar
-                    </Button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">Relatório de Vendas Semanal</h3>
-                      <p className="text-sm text-gray-600">Vendas da semana atual</p>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-[#3e2626]">{formatCurrency(sale.preco)}</p>
+                      <p className="text-xs text-gray-500">{sale.hora}</p>
                     </div>
-                    <Button variant="outline" size="sm">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Visualizar
-                    </Button>
                   </div>
-                  
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">Relatório de Performance</h3>
-                      <p className="text-sm text-gray-600">Sua performance de vendas</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Visualizar
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-200">
+                <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">Nenhuma venda encontrada</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
