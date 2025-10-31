@@ -368,12 +368,12 @@ export default function EmployeeProductsPage() {
       </div>
 
       {/* Header with Search and Actions */}
-      <Card className="bg-white">
-        <CardHeader>
+      <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white pb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <CardTitle className="text-xl font-bold">Produtos</CardTitle>
-              <CardDescription>Gerencie o catálogo de produtos</CardDescription>
+              <CardTitle className="text-2xl font-bold text-white mb-1">Produtos</CardTitle>
+              <CardDescription className="text-white/90">Gerencie o catálogo de produtos da loja</CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative">
@@ -382,12 +382,12 @@ export default function EmployeeProductsPage() {
                   placeholder="Buscar produtos..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full sm:w-64 pl-10"
+                  className="w-full sm:w-64 pl-10 bg-white border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
                 />
               </div>
               <Button 
                 onClick={handleCreateProduct}
-                className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white"
+                className="bg-white text-[#3e2626] hover:bg-white/90 border border-white/30 shadow-md font-semibold"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Produto
@@ -423,51 +423,73 @@ export default function EmployeeProductsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => (
-            <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) && (
-                <div className="aspect-video w-full overflow-hidden bg-gray-100 relative">
+            <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 rounded-2xl group">
+              {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) ? (
+                <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
                   <img
                     src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl}
                     alt={product.name}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                   {product.imageUrls && product.imageUrls.length > 1 && (
-                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                    <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full font-medium shadow-lg">
                       +{product.imageUrls.length - 1} mais
                     </div>
                   )}
+                  <div className="absolute top-3 right-3">
+                    <Badge className={
+                      product.stock > 10 
+                        ? 'bg-green-500 text-white border-0 shadow-md' 
+                        : product.stock > 0 
+                        ? 'bg-orange-500 text-white border-0 shadow-md' 
+                        : 'bg-red-500 text-white border-0 shadow-md'
+                    }>
+                      {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
+                    </Badge>
+                  </div>
+                </div>
+              ) : (
+                <div className="aspect-video w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
+                  <Package className="h-16 w-16 text-gray-300" />
+                  <div className="absolute top-3 right-3">
+                    <Badge className={
+                      product.stock > 10 
+                        ? 'bg-green-500 text-white border-0 shadow-md' 
+                        : product.stock > 0 
+                        ? 'bg-orange-500 text-white border-0 shadow-md' 
+                        : 'bg-red-500 text-white border-0 shadow-md'
+                    }>
+                      {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
+                    </Badge>
+                  </div>
                 </div>
               )}
-              <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                  <CardTitle className="text-lg font-bold line-clamp-1">{product.name}</CardTitle>
-                  <Badge className={
-                    product.stock > 10 
-                      ? 'bg-green-100 text-green-800 border-green-200' 
-                      : product.stock > 0 
-                      ? 'bg-orange-100 text-orange-800 border-orange-200' 
-                      : 'bg-red-100 text-red-800 border-red-200'
-                  }>
-                    {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
-                  </Badge>
-                </div>
-                <CardDescription className="line-clamp-2 mt-1">{product.description}</CardDescription>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-bold text-gray-900 line-clamp-2 mb-2 min-h-[3.5rem]">
+                  {product.name}
+                </CardTitle>
+                {product.description && (
+                  <CardDescription className="line-clamp-2 text-sm text-gray-600 min-h-[2.5rem]">
+                    {product.description}
+                  </CardDescription>
+                )}
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-t border-gray-100">
-                  <span className="text-sm font-medium text-gray-600">Preço:</span>
-                  <span className="font-bold text-lg text-gray-900">{formatCurrency(product.price)}</span>
+              <CardContent className="space-y-4 pt-0">
+                <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
+                  <span className="text-sm font-medium text-gray-600">Preço</span>
+                  <span className="font-bold text-xl text-[#3e2626]">{formatCurrency(product.price)}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600">Estoque:</span>
-                  <span className="font-semibold text-gray-900">{product.stock} un.</span>
+                <div className="flex items-center justify-between py-2 px-4 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-600">Estoque</span>
+                  <span className="font-semibold text-gray-900">{product.stock} unidades</span>
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => handleViewProduct(product)}
-                    className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
+                    className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 flex-1 transition-all"
+                    title="Visualizar"
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -475,16 +497,17 @@ export default function EmployeeProductsPage() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => handleEditProduct(product)}
-                    className="flex-1 border-gray-300 hover:bg-gray-50"
+                    className="flex-1 border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white transition-all font-medium"
                   >
-                    <Edit className="h-4 w-4 mr-2" />
+                    <Edit className="h-4 w-4 mr-1.5" />
                     Editar
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm"
                     onClick={() => handleDeleteProduct(product)}
-                    className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                    className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all"
+                    title="Excluir"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -497,60 +520,77 @@ export default function EmployeeProductsPage() {
 
       {/* Modal de Produto */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden animate-in zoom-in-95 duration-300">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b bg-gray-50">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-lg flex items-center justify-center">
-                  <Package className="h-5 w-5 text-white" />
+            <div className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
+                    <Package className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      {productModalMode === 'create' ? 'Novo Produto' : productModalMode === 'view' ? 'Visualizar Produto' : 'Editar Produto'}
+                    </h2>
+                    <p className="text-sm text-white/90 mt-0.5">
+                      {productModalMode === 'view' ? 'Visualização dos detalhes do produto' : 'Preencha as informações do produto'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {productModalMode === 'create' ? 'Novo Produto' : productModalMode === 'view' ? 'Visualizar Produto' : 'Editar Produto'}
-                  </h2>
-                  <p className="text-sm text-gray-600">
-                    {productModalMode === 'view' ? 'Visualização dos detalhes do produto' : 'Preencha as informações do produto'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {productModalMode === 'view' && (
+                <div className="flex items-center space-x-2">
+                  {productModalMode === 'view' && (
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        if (selectedProduct) handleEditProduct(selectedProduct);
+                      }}
+                      className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar
+                    </Button>
+                  )}
+                  {productModalMode !== 'view' && (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        onClick={handleCloseModal} 
+                        disabled={isLoading}
+                        className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        onClick={handleSaveProduct} 
+                        disabled={isLoading}
+                        className="bg-white text-[#3e2626] hover:bg-white/90 border border-white/30 shadow-lg font-semibold"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {isLoading ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                    </>
+                  )}
                   <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      if (selectedProduct) handleEditProduct(selectedProduct);
-                    }}
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleCloseModal}
+                    className="text-white hover:bg-white/20 rounded-lg"
                   >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Editar
+                    <X className="h-5 w-5" />
                   </Button>
-                )}
-                {productModalMode !== 'view' && (
-                  <>
-                    <Button variant="outline" onClick={handleCloseModal} disabled={isLoading} size="sm">
-                      Cancelar
-                    </Button>
-                    <Button onClick={handleSaveProduct} disabled={isLoading} className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white">
-                      <Save className="h-4 w-4 mr-2" />
-                      {isLoading ? 'Salvando...' : 'Salvar'}
-                    </Button>
-                  </>
-                )}
-                <Button variant="ghost" size="sm" onClick={handleCloseModal}>
-                  <X className="h-4 w-4" />
-                </Button>
+                </div>
               </div>
             </div>
 
             {/* Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="p-8 overflow-y-auto max-h-[calc(95vh-140px)] bg-gradient-to-br from-gray-50 to-white">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Image Section */}
                 <div className="space-y-4">
                   {(existingImages.length > 0 || uploadedImages.length > 0) && productModalMode === 'view' ? (
                     // Carrossel para visualização
-                    <div className="aspect-square bg-gray-100 rounded-xl relative overflow-hidden group">
+                    <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl relative overflow-hidden group shadow-xl border border-gray-200">
                       {existingImages.length > 0 || uploadedImages.length > 0 ? (
                         <img
                           src={existingImages.length > 0 
@@ -561,7 +601,9 @@ export default function EmployeeProductsPage() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <Package className="h-16 w-16 text-gray-300" />
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="h-20 w-20 text-gray-300" />
+                        </div>
                       )}
                       
                       {/* Botões de navegação */}
@@ -569,13 +611,13 @@ export default function EmployeeProductsPage() {
                         <>
                           <button
                             onClick={() => setCurrentImageIndex((prev) => prev === 0 ? (existingImages.length || uploadedImages.length) - 1 : prev - 1)}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 backdrop-blur-sm text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-xl"
                           >
                             <ChevronLeft className="h-5 w-5" />
                           </button>
                           <button
                             onClick={() => setCurrentImageIndex((prev) => (prev + 1) % (existingImages.length || uploadedImages.length))}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 backdrop-blur-sm text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-xl"
                           >
                             <ChevronRight className="h-5 w-5" />
                           </button>
@@ -584,13 +626,13 @@ export default function EmployeeProductsPage() {
                       
                       {/* Indicadores */}
                       {(existingImages.length > 1 || uploadedImages.length > 1) && (
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-2">
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full">
                           {(existingImages.length > 0 ? existingImages : uploadedImages).map((_, index) => (
                             <button
                               key={index}
                               onClick={() => setCurrentImageIndex(index)}
-                              className={`w-2 h-2 rounded-full transition-all ${
-                                index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                              className={`w-2.5 h-2.5 rounded-full transition-all ${
+                                index === currentImageIndex ? 'bg-white' : 'bg-white/50 hover:bg-white/75'
                               }`}
                             />
                           ))}
@@ -599,7 +641,7 @@ export default function EmployeeProductsPage() {
                       
                       {/* Contador */}
                       {(existingImages.length > 1 || uploadedImages.length > 1) && (
-                        <div className="absolute top-3 right-3 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                        <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm text-white text-sm px-3 py-1.5 rounded-full font-medium shadow-lg">
                           {currentImageIndex + 1} / {existingImages.length || uploadedImages.length}
                         </div>
                       )}
@@ -607,7 +649,7 @@ export default function EmployeeProductsPage() {
                   ) : (
                     // Upload/Edição de imagens
                     <>
-                      <div className="aspect-square bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
+                      <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 shadow-lg">
                         {existingImages.length > 0 || uploadedImages.length > 0 ? (
                           <img
                             src={existingImages.length > 0 
@@ -618,7 +660,10 @@ export default function EmployeeProductsPage() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <Package className="h-16 w-16 text-gray-300" />
+                          <div className="text-center">
+                            <Package className="h-16 w-16 text-gray-400 mx-auto mb-2" />
+                            <p className="text-sm text-gray-500">Nenhuma imagem</p>
+                          </div>
                         )}
                       </div>
                       
@@ -636,16 +681,18 @@ export default function EmployeeProductsPage() {
                 {/* Product Details */}
                 <div className="space-y-6">
                   {/* Informações Básicas */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center">
-                        <Tag className="h-4 w-4 mr-2" />
+                  <Card className="border border-gray-200 shadow-md rounded-xl overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 pb-4">
+                      <CardTitle className="text-base font-bold flex items-center text-gray-900">
+                        <div className="w-8 h-8 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-lg flex items-center justify-center mr-3">
+                          <Tag className="h-4 w-4 text-white" />
+                        </div>
                         Informações Básicas
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-5 p-6 bg-white">
                       <div>
-                        <Label htmlFor="modal-name" className="text-sm font-medium">
+                        <Label htmlFor="modal-name" className="text-sm font-semibold text-gray-700 mb-2 block">
                           Nome do Produto *
                         </Label>
                         <Input
@@ -653,12 +700,13 @@ export default function EmployeeProductsPage() {
                           value={editedProduct?.name || ''}
                           onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, name: e.target.value } : null)}
                           placeholder="Nome do produto"
-                          className="mt-1"
+                          className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                          disabled={productModalMode === 'view'}
                         />
                       </div>
 
                       <div>
-                        <Label htmlFor="modal-description" className="text-sm font-medium">
+                        <Label htmlFor="modal-description" className="text-sm font-semibold text-gray-700 mb-2 block">
                           Descrição
                         </Label>
                         <textarea
@@ -666,21 +714,23 @@ export default function EmployeeProductsPage() {
                           value={editedProduct?.description || ''}
                           onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, description: e.target.value } : null)}
                           placeholder="Descrição do produto"
-                          className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent resize-none"
-                          rows={3}
+                          className="mt-1.5 w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B4513] focus:border-[#8B4513] resize-none transition-all"
+                          rows={4}
+                          disabled={productModalMode === 'view'}
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="modal-category" className="text-sm font-medium">
+                          <Label htmlFor="modal-category" className="text-sm font-semibold text-gray-700 mb-2 block">
                             Categoria *
                           </Label>
                           <select
                             id="modal-category"
                             value={editedProduct?.category || ''}
                             onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, category: e.target.value } : null)}
-                            className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent"
+                            className="w-full mt-1.5 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B4513] focus:border-[#8B4513] bg-white transition-all"
+                            disabled={productModalMode === 'view'}
                           >
                             <option value="SOFA">Sofá</option>
                             <option value="MESA">Mesa</option>
@@ -695,7 +745,7 @@ export default function EmployeeProductsPage() {
                         </div>
 
                         <div>
-                          <Label htmlFor="modal-brand" className="text-sm font-medium">
+                          <Label htmlFor="modal-brand" className="text-sm font-semibold text-gray-700 mb-2 block">
                             Marca
                           </Label>
                           <Input
@@ -703,14 +753,15 @@ export default function EmployeeProductsPage() {
                             value={editedProduct?.brand || ''}
                             onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, brand: e.target.value } : null)}
                             placeholder="Marca"
-                            className="mt-1"
+                            className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                            disabled={productModalMode === 'view'}
                           />
                         </div>
                       </div>
 
                       <div>
-                        <Label htmlFor="modal-sku" className="text-sm font-medium flex items-center">
-                          <Hash className="h-3 w-3 mr-1" />
+                        <Label htmlFor="modal-sku" className="text-sm font-semibold text-gray-700 mb-2 block flex items-center">
+                          <Hash className="h-4 w-4 mr-1.5" />
                           SKU
                         </Label>
                         <Input
@@ -718,28 +769,31 @@ export default function EmployeeProductsPage() {
                           value={editedProduct?.sku || ''}
                           onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, sku: e.target.value } : null)}
                           placeholder="Código SKU"
-                          className="mt-1"
+                          className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                          disabled={productModalMode === 'view'}
                         />
                       </div>
                     </CardContent>
                   </Card>
 
                   {/* Preço e Estoque */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center">
-                        <DollarSign className="h-4 w-4 mr-2" />
+                  <Card className="border border-gray-200 shadow-md rounded-xl overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 pb-4">
+                      <CardTitle className="text-base font-bold flex items-center text-gray-900">
+                        <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center mr-3">
+                          <DollarSign className="h-4 w-4 text-white" />
+                        </div>
                         Preço e Estoque
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-5 p-6 bg-white">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="modal-price" className="text-sm font-medium">
+                          <Label htmlFor="modal-price" className="text-sm font-semibold text-gray-700 mb-2 block">
                             Preço *
                           </Label>
-                          <div className="relative mt-1">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
+                          <div className="relative mt-1.5">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">R$</span>
                             <Input
                               id="modal-price"
                               type="number"
@@ -748,13 +802,14 @@ export default function EmployeeProductsPage() {
                               value={editedProduct?.price || 0}
                               onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, price: parseFloat(e.target.value) || 0 } : null)}
                               placeholder="0.00"
-                              className="pl-10"
+                              className="pl-12 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] text-lg font-semibold"
+                              disabled={productModalMode === 'view'}
                             />
                           </div>
                         </div>
 
                         <div>
-                          <Label htmlFor="modal-stock" className="text-sm font-medium">
+                          <Label htmlFor="modal-stock" className="text-sm font-semibold text-gray-700 mb-2 block">
                             Estoque *
                           </Label>
                           <Input
@@ -764,7 +819,8 @@ export default function EmployeeProductsPage() {
                             value={editedProduct?.stock || 0}
                             onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, stock: parseInt(e.target.value) || 0 } : null)}
                             placeholder="0"
-                            className="mt-1"
+                            className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] text-lg font-semibold"
+                            disabled={productModalMode === 'view'}
                           />
                         </div>
                       </div>
@@ -772,16 +828,18 @@ export default function EmployeeProductsPage() {
                   </Card>
 
                   {/* Especificações Adicionais */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center">
-                        <Hash className="h-4 w-4 mr-2" />
+                  <Card className="border border-gray-200 shadow-md rounded-xl overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 pb-4">
+                      <CardTitle className="text-base font-bold flex items-center text-gray-900">
+                        <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center mr-3">
+                          <Hash className="h-4 w-4 text-white" />
+                        </div>
                         Especificações Adicionais
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-5 p-6 bg-white">
                       <div>
-                        <Label htmlFor="modal-colorName" className="text-sm font-medium">
+                        <Label htmlFor="modal-colorName" className="text-sm font-semibold text-gray-700 mb-2 block">
                           Nome da Cor
                         </Label>
                         <Input
@@ -789,13 +847,14 @@ export default function EmployeeProductsPage() {
                           value={editedProduct?.colorName || ''}
                           onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, colorName: e.target.value } : null)}
                           placeholder="Nome da cor"
-                          className="mt-1"
+                          className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                          disabled={productModalMode === 'view'}
                         />
                       </div>
 
                       <div>
-                        <Label htmlFor="modal-supplierId" className="text-sm font-medium flex items-center">
-                          <Building className="h-3 w-3 mr-1" />
+                        <Label htmlFor="modal-supplierId" className="text-sm font-semibold text-gray-700 mb-2 block flex items-center">
+                          <Building className="h-4 w-4 mr-1.5" />
                           Fornecedor
                         </Label>
                         <Input
@@ -803,42 +862,46 @@ export default function EmployeeProductsPage() {
                           value={editedProduct?.supplierId || ''}
                           onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, supplierId: e.target.value } : null)}
                           placeholder="ID do fornecedor"
-                          className="mt-1"
+                          className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                          disabled={productModalMode === 'view'}
                         />
                       </div>
 
                       <div>
-                        <Label className="text-sm font-medium">Dimensões</Label>
-                        <div className="grid grid-cols-3 gap-2 mt-1">
+                        <Label className="text-sm font-semibold text-gray-700 mb-2 block">Dimensões (cm)</Label>
+                        <div className="grid grid-cols-3 gap-3 mt-1.5">
                           <Input
                             id="modal-width"
                             value={editedProduct?.width || ''}
                             onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, width: e.target.value } : null)}
-                            placeholder="Largura (cm)"
-                            className="text-sm"
+                            placeholder="Largura"
+                            className="border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                            disabled={productModalMode === 'view'}
                           />
                           <Input
                             id="modal-height"
                             value={editedProduct?.height || ''}
                             onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, height: e.target.value } : null)}
-                            placeholder="Altura (cm)"
-                            className="text-sm"
+                            placeholder="Altura"
+                            className="border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                            disabled={productModalMode === 'view'}
                           />
                           <Input
                             id="modal-depth"
                             value={editedProduct?.depth || ''}
                             onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, depth: e.target.value } : null)}
-                            placeholder="Profundidade (cm)"
-                            className="text-sm"
+                            placeholder="Profundidade"
+                            className="border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                            disabled={productModalMode === 'view'}
                           />
                         </div>
                       </div>
 
                       <div>
-                        <Label htmlFor="modal-weight" className="text-sm font-medium">
+                        <Label htmlFor="modal-weight" className="text-sm font-semibold text-gray-700 mb-2 block">
                           Peso
                         </Label>
-                        <div className="relative mt-1">
+                        <div className="relative mt-1.5">
                           <Input
                             id="modal-weight"
                             type="number"
@@ -847,9 +910,10 @@ export default function EmployeeProductsPage() {
                             value={editedProduct?.weight || ''}
                             onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, weight: parseFloat(e.target.value) || 0 } : null)}
                             placeholder="Ex: 25.5"
-                            className="pr-8"
+                            className="pr-12 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                            disabled={productModalMode === 'view'}
                           />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">kg</span>
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 font-medium text-sm">kg</span>
                         </div>
                       </div>
                     </CardContent>

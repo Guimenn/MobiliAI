@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAppStore } from '@/lib/store';
 import { 
   Package, 
@@ -143,8 +144,14 @@ export default function EmployeeLayout({
           {/* Logo */}
           <div className="px-6 py-8 border-b border-gray-200">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-2xl flex items-center justify-center shadow-lg">
-                <Package className="h-6 w-6 text-white" />
+              <div className="w-12 h-12 relative flex items-center justify-center">
+                <Image
+                  src="/logo.png"
+                  alt="MobiliAI Logo"
+                  width={48}
+                  height={48}
+                  className="object-contain"
+                />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">MobiliAI</h1>
@@ -218,7 +225,6 @@ export default function EmployeeLayout({
                     <Menu className="h-5 w-5" />
                   </Button>
                   <div className="flex items-center space-x-3 mb-1">
-                    <Sparkles className="h-6 w-6 text-yellow-300 animate-pulse" />
                     <h1 className="text-3xl font-bold text-white">Bem-vindo, {user?.name || 'Funcionário'}!</h1>
                   </div>
                   <p className="text-sm text-white/90">{currentDate}</p>
@@ -228,9 +234,14 @@ export default function EmployeeLayout({
                   onClick={() => router.push('/employee/profile')}
                   className="hidden lg:flex items-center space-x-3 px-3 py-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-all duration-300 cursor-pointer"
                 >
-                  <Avatar className="h-10 w-10 ring-2 ring-white/30">
+                  <Avatar className="h-10 w-10 ring-2 ring-white/30 flex-shrink-0">
+                    <AvatarImage 
+                      src={user?.avatarUrl || ''} 
+                      alt={user?.name || 'Usuário'}
+                      className="object-cover"
+                    />
                     <AvatarFallback className="bg-white/30 text-white font-bold">
-                      {user?.name?.charAt(0) || 'F'}
+                      {user?.name?.charAt(0).toUpperCase() || 'F'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="text-right">
@@ -243,32 +254,44 @@ export default function EmployeeLayout({
           </div>
         ) : (
           pathname === '/employee/profile' ? null : (
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+            <header className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] border-b border-[#3e2626]/20 sticky top-0 z-30 shadow-lg">
               <div className="flex items-center justify-between px-6 py-4">
                 <div className="flex items-center">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="lg:hidden mr-3"
+                    className="lg:hidden mr-3 text-white hover:bg-white/20"
                     onClick={() => setSidebarOpen(!sidebarOpen)}
                   >
                     <Menu className="h-5 w-5" />
                   </Button>
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-2xl font-bold text-white">
                       {navigation.find(item => item.current)?.name || 'Dashboard'}
                     </h1>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  <div className="hidden md:flex items-center space-x-3 px-4 py-2 bg-gray-50 rounded-lg">
-                    <User className="h-4 w-4 text-gray-400" />
+                  <button
+                    onClick={() => router.push('/employee/profile')}
+                    className="hidden md:flex items-center space-x-3 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30 hover:bg-white/30 transition-all duration-300 cursor-pointer"
+                  >
+                    <Avatar className="h-10 w-10 ring-2 ring-white/30 flex-shrink-0">
+                      <AvatarImage 
+                        src={user?.avatarUrl || ''} 
+                        alt={user?.name || 'Usuário'}
+                        className="object-cover"
+                      />
+                      <AvatarFallback className="bg-white/30 text-white font-bold">
+                        {user?.name?.charAt(0).toUpperCase() || 'F'}
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                      <p className="text-xs text-gray-500">Funcionário</p>
+                      <p className="text-sm font-semibold text-white">{user.name}</p>
+                      <p className="text-xs text-white/80">Funcionário</p>
                     </div>
-                  </div>
+                  </button>
                 </div>
               </div>
             </header>

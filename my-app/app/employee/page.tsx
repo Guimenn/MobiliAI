@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { salesAPI, timeClockAPI } from '@/lib/api';
 import { 
@@ -14,13 +14,11 @@ import {
   CheckCircle, 
   XCircle,
   Receipt,
-  Package,
-  Calendar,
   Target,
-  BarChart3,
   ArrowRight,
   Loader2,
-  Plus
+  User,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface TimeClockEntry {
@@ -29,6 +27,7 @@ interface TimeClockEntry {
   clockIn?: string;
   clockOut?: string;
   totalHours?: number;
+  status?: string;
 }
 
 interface SaleEntry {
@@ -37,23 +36,32 @@ interface SaleEntry {
   createdAt: string;
   customer?: { name: string };
   items?: Array<{ product: { name: string } }>;
+  employeeId?: string;
 }
 
 export default function EmployeeDashboard() {
   const { user, isAuthenticated, token } = useAppStore();
   const router = useRouter();
-  const [timeFilter, setTimeFilter] = useState<'hoje' | '7dias' | '30dias'>('hoje');
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+  
+  // Time Clock Data
+  const [lastTimeClock, setLastTimeClock] = useState<TimeClockEntry | null>(null);
+  const [hoursWorkedToday, setHoursWorkedToday] = useState({ hours: 0, minutes: 0 });
+  const [hasOpenEntry, setHasOpenEntry] = useState(false);
+  const [workStatus, setWorkStatus] = useState<'Trabalhando' | 'Fora de Serviço'>('Fora de Serviço');
+  const [nextAction, setNextAction] = useState<'Entrada' | 'Saída'>('Entrada');
+  const [timeClockHistory, setTimeClockHistory] = useState<TimeClockEntry[]>([]);
+  
+  // Sales Data
+  const [salesStats, setSalesStats] = useState({
     totalVendas: 0,
     numeroVendas: 0,
     ticketMedio: 0,
-    metaDia: 0
+    metaDia: 5000,
+    progressoMeta: 0,
   });
-  const [lastTimeClockEntries, setLastTimeClockEntries] = useState<any[]>([]);
-  const [lastSales, setLastSales] = useState<any[]>([]);
-  const [hasOpenEntry, setHasOpenEntry] = useState(false);
-  const [currentEntry, setCurrentEntry] = useState<TimeClockEntry | null>(null);
+  const [salesHistory, setSalesHistory] = useState<SaleEntry[]>([]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -63,10 +71,21 @@ export default function EmployeeDashboard() {
   }, [user, isAuthenticated, router]);
 
   useEffect(() => {
+    // Atualizar relógio a cada segundo
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     if (user?.id && token) {
       fetchDashboardData();
+      // Atualizar dados a cada 30 segundos
+      const interval = setInterval(fetchDashboardData, 30000);
+      return () => clearInterval(interval);
     }
-  }, [user?.id, token, timeFilter]);
+  }, [user?.id, token]);
 
   const fetchDashboardData = async () => {
     if (!user?.id || !token) return;
@@ -80,68 +99,69 @@ export default function EmployeeDashboard() {
         fetchTimeClockData()
       ]);
 
-      // Atualizar estatísticas de vendas
+      // Processar dados de ponto
+      if (timeClockData.records && timeClockData.records.length > 0) {
+        const today = new Date().toISOString().split('T')[0];
+        const todayEntry = timeClockData.records.find((entry: TimeClockEntry) => entry.date === today);
+        
+        if (todayEntry) {
+          setLastTimeClock(todayEntry);
+          setHasOpenEntry(!todayEntry.clockOut);
+          setWorkStatus(todayEntry.clockOut ? 'Fora de Serviço' : 'Trabalhando');
+          setNextAction(todayEntry.clockOut ? 'Entrada' : 'Saída');
+
+          // Calcular horas trabalhadas hoje
+          if (todayEntry.clockIn && todayEntry.clockOut) {
+            const hours = todayEntry.totalHours || 0;
+            setHoursWorkedToday({
+              hours: Math.floor(hours),
+              minutes: Math.round((hours - Math.floor(hours)) * 60)
+            });
+          } else if (todayEntry.clockIn) {
+            // Calcular horas parciais se ainda está trabalhando
+            const now = new Date();
+            const clockInTime = new Date(`${todayEntry.date}T${todayEntry.clockIn}`);
+            const diffMs = now.getTime() - clockInTime.getTime();
+            const diffHours = diffMs / (1000 * 60 * 60);
+            setHoursWorkedToday({
+              hours: Math.floor(diffHours),
+              minutes: Math.round((diffHours - Math.floor(diffHours)) * 60)
+            });
+          }
+        }
+
+        // Histórico de pontos (últimos 3 registros)
+        setTimeClockHistory(
+          timeClockData.records
+            .slice(0, 3)
+            .map((entry: TimeClockEntry) => ({
+              ...entry,
+              status: entry.clockOut ? 'Registrado' : 'Pendente'
+            }))
+        );
+      }
+
+      // Processar dados de vendas
       if (salesData.sales) {
         const total = salesData.sales.reduce((sum: number, sale: SaleEntry) => 
           sum + Number(sale.totalAmount), 0);
         const count = salesData.sales.length;
         const avg = count > 0 ? total / count : 0;
+        const metaDia = 5000;
+        const progressoMeta = metaDia > 0 ? (total / metaDia) * 100 : 0;
         
-        setStats({
+        setSalesStats({
           totalVendas: total,
           numeroVendas: count,
           ticketMedio: avg,
-          metaDia: 0 // Calcular meta se necessário
+          metaDia: metaDia,
+          progressoMeta: Math.min(progressoMeta, 100),
         });
 
-        // Processar últimas vendas
-        const formattedSales = salesData.sales
-          .slice(0, 5)
-          .map((sale: SaleEntry) => ({
-            cliente: sale.customer?.name || 'Cliente Avulso',
-            produto: sale.items?.[0]?.product?.name || 'Produto',
-            preco: Number(sale.totalAmount),
-            hora: new Date(sale.createdAt).toLocaleTimeString('pt-BR', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            })
-          }));
-        
-        setLastSales(formattedSales);
-      }
-
-      // Atualizar dados de ponto
-      if (timeClockData.records) {
-        // Encontrar entrada aberta
-        const openEntry = timeClockData.records.find((entry: TimeClockEntry) => !entry.clockOut);
-        setHasOpenEntry(!!openEntry);
-        setCurrentEntry(openEntry || null);
-
-        // Formatar últimos 5 dias de ponto
-        const formattedEntries = timeClockData.records
-          .slice(0, 5)
-          .map((entry: TimeClockEntry) => {
-            // Parse da data no formato YYYY-MM-DD
-            const [year, month, day] = entry.date.split('-');
-            const formattedDate = `${day}/${month}`;
-            
-            // Formatar total de horas
-            let totalFormatted = '-- h';
-            if (entry.totalHours !== null && entry.totalHours !== undefined) {
-              const hours = Math.floor(entry.totalHours);
-              const minutes = Math.round((entry.totalHours - hours) * 60);
-              totalFormatted = `${hours}h ${minutes}m`;
-            }
-            
-            return {
-              date: formattedDate,
-              entrada: entry.clockIn || '--',
-              saida: entry.clockOut || '--',
-              total: totalFormatted
-            };
-          });
-        
-        setLastTimeClockEntries(formattedEntries);
+        // Histórico de vendas (últimas 3)
+        setSalesHistory(
+          salesData.sales.slice(0, 3).map((sale: SaleEntry) => sale)
+        );
       }
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
@@ -155,24 +175,13 @@ export default function EmployeeDashboard() {
     
     try {
       const today = new Date();
-      const startDate = new Date();
-      
-      switch (timeFilter) {
-        case 'hoje':
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case '7dias':
-          startDate.setDate(today.getDate() - 7);
-          break;
-        case '30dias':
-          startDate.setDate(today.getDate() - 30);
-          break;
-      }
+      today.setHours(0, 0, 0, 0);
+      const endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
 
-      // Buscar todas as vendas do período (filtra por loja automaticamente no backend)
       const allSales = await salesAPI.getByDateRange(
-        startDate.toISOString(),
-        today.toISOString()
+        today.toISOString(),
+        endDate.toISOString()
       );
 
       // Filtrar apenas as vendas do funcionário logado
@@ -193,7 +202,7 @@ export default function EmployeeDashboard() {
     try {
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setDate(endDate.getDate() - 5); // Últimos 5 dias
+      startDate.setDate(endDate.getDate() - 7); // Últimos 7 dias
 
       const data = await timeClockAPI.getHistory(
         user.id,
@@ -216,6 +225,25 @@ export default function EmployeeDashboard() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const getTimeLabel = (dateString: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    
+    if (dateString === today) return 'Hoje';
+    if (dateString === yesterdayStr) return 'Ontem';
+    return new Date(dateString).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -229,260 +257,289 @@ export default function EmployeeDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Time Clock Card */}
-      <Card className="bg-white shadow-xl border border-gray-200 rounded-3xl overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white pb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                <Clock className="h-7 w-7" />
+      {/* Seção de Ponto */}
+      <div className="space-y-6">
+        {/* Cards Superiores - Ponto */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Último Ponto */}
+          <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm text-gray-500 font-medium mb-2">Último Ponto</p>
+                  <p className="text-3xl font-bold text-gray-900 mb-2">
+                    {lastTimeClock?.clockIn || lastTimeClock?.clockOut || '--:--'}
+                  </p>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-gray-600">
+                      {lastTimeClock?.clockOut ? 'Saída registrada' : lastTimeClock?.clockIn ? 'Entrada registrada' : 'Nenhum registro'}
+                    </span>
+                  </div>
+                </div>
+                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
+                  <Clock className="h-7 w-7 text-green-600" />
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-2xl text-white">Controle de Ponto</CardTitle>
-                <p className="text-sm text-white/80 mt-1">Registre sua entrada e saída</p>
-              </div>
-            </div>
-            <Calendar className="h-10 w-10 text-white/50" />
-          </div>
-        </CardHeader>
-        <CardContent className="p-8 space-y-8">
-          {/* Bater Ponto Button */}
-          <div className="flex justify-center">
-            <Button 
-              onClick={handleBaterPonto}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-12 py-8 text-xl font-bold rounded-2xl shadow-2xl flex items-center space-x-4 transform hover:scale-105 transition-all duration-300 group"
-              size="lg"
-            >
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors">
-                <Clock className="h-6 w-6" />
-              </div>
-              <span>BATER PONTO AGORA</span>
-              <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
-            </Button>
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* Status Atual */}
-          <div className={`rounded-2xl p-6 shadow-lg ${hasOpenEntry ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 'bg-gradient-to-r from-gray-400 to-gray-500'}`}>
+          {/* Horas Trabalhadas */}
+          <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm text-gray-500 font-medium mb-2">Horas Trabalhadas</p>
+                  <p className="text-3xl font-bold text-gray-900 mb-2">
+                    {hoursWorkedToday.hours}h {hoursWorkedToday.minutes}m
+                  </p>
+                  <p className="text-sm text-gray-600">Meta: 8h</p>
+                </div>
+                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
+                  <TrendingUp className="h-7 w-7 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Status */}
+          <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm text-gray-500 font-medium mb-2">Status</p>
+                  <p className="text-3xl font-bold text-gray-900 mb-2">{workStatus}</p>
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    <span className="text-sm text-gray-600">Próximo: {nextAction}</span>
+                  </div>
+                </div>
+                <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center">
+                  <User className="h-7 w-7 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Relógio e Botão Bater Ponto */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Relógio Grande */}
+          <Card className="lg:col-span-2 bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <div className="text-7xl font-bold text-[#3e2626] mb-4">
+                  {formatTime(currentTime)}
+                </div>
+                <p className="text-lg text-gray-600 font-medium">Horário atual</p>
+                <div className="mt-8">
+                  <Button
+                    onClick={handleBaterPonto}
+                    className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white px-12 py-6 text-xl font-bold rounded-2xl shadow-xl flex items-center space-x-3 mx-auto transform hover:scale-105 transition-all duration-300"
+                    size="lg"
+                  >
+                    <Clock className="h-6 w-6" />
+                    <span>Bater Ponto</span>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Histórico de Pontos */}
+          <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-bold text-gray-900">Histórico de Pontos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {timeClockHistory.length > 0 ? (
+                timeClockHistory.map((entry, index) => (
+                  <div key={index} className="space-y-2 pb-4 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-900">
+                        {entry.clockIn ? 'Entrada' : entry.clockOut ? 'Saída' : '--'}
+                      </span>
+                      <span className="text-xs text-gray-500">{getTimeLabel(entry.date)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-base font-medium text-gray-700">
+                        {entry.clockIn || entry.clockOut || '--:--'}
+                      </span>
+                      <div className="flex items-center space-x-1">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-xs text-green-600 font-medium">Registrado</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <Clock className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Nenhum registro</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Seção de Vendas */}
+      <div className="space-y-6">
+        <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                  {hasOpenEntry ? <CheckCircle className="h-8 w-8 text-white" /> : <XCircle className="h-8 w-8 text-white" />}
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                  <ShoppingCart className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-white/90">Status Atual</p>
-                  {currentEntry ? (
-                    <p className="text-xl font-bold text-white">
-                      Entrada: {currentEntry.clockIn || '--'} | Saída: --
-                    </p>
+                  <CardTitle className="text-2xl text-white">Vendas do Dia</CardTitle>
+                  <p className="text-sm text-white/80 mt-1">Acompanhe seu desempenho</p>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            {/* Cards de Métricas de Vendas */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Total Vendido */}
+              <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <DollarSign className="h-8 w-8 text-blue-200" />
+                    <span className="text-xs font-semibold text-blue-100 bg-white/20 px-2 py-1 rounded-full">
+                      {salesStats.progressoMeta.toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold mb-1">{formatCurrency(salesStats.totalVendas)}</p>
+                  <p className="text-xs text-blue-100 font-medium">Total Vendido</p>
+                </CardContent>
+              </Card>
+
+              {/* Nº de Vendas */}
+              <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0 shadow-lg">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <ShoppingCart className="h-8 w-8 text-green-200" />
+                    <span className="text-xs font-semibold text-green-100 bg-white/20 px-2 py-1 rounded-full">
+                      +{salesStats.numeroVendas}
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold mb-1">{salesStats.numeroVendas}</p>
+                  <p className="text-xs text-green-100 font-medium">Nº de Vendas</p>
+                </CardContent>
+              </Card>
+
+              {/* Ticket Médio */}
+              <Card className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white border-0 shadow-lg">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <Receipt className="h-8 w-8 text-purple-200" />
+                    <span className="text-xs font-semibold text-purple-100 bg-white/20 px-2 py-1 rounded-full">
+                      Média
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold mb-1">{formatCurrency(salesStats.ticketMedio)}</p>
+                  <p className="text-xs text-purple-100 font-medium">Ticket Médio</p>
+                </CardContent>
+              </Card>
+
+              {/* Meta do Dia */}
+              <Card className="bg-gradient-to-br from-orange-500 to-amber-600 text-white border-0 shadow-lg">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <Target className="h-8 w-8 text-orange-200" />
+                    <span className="text-xs font-semibold text-orange-100 bg-white/20 px-2 py-1 rounded-full">
+                      {salesStats.progressoMeta.toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold mb-1">{formatCurrency(salesStats.metaDia)}</p>
+                  <p className="text-xs text-orange-100 font-medium">Meta do Dia</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Grid com Histórico de Vendas e Ações Rápidas */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Histórico de Vendas */}
+              <Card className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-bold text-gray-900">Histórico de Vendas</CardTitle>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => router.push('/employee/sales')}
+                      className="text-[#3e2626] hover:bg-[#3e2626]/10"
+                    >
+                      Ver todas <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {salesHistory.length > 0 ? (
+                    salesHistory.map((sale, index) => (
+                      <div key={index} className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl hover:shadow-md transition-all">
+                        <div className="flex items-center space-x-3 flex-1">
+                          <div className="w-10 h-10 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-lg flex items-center justify-center">
+                            <ShoppingCart className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-gray-900">
+                              {sale.customer?.name || 'Cliente Avulso'}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(sale.createdAt).toLocaleTimeString('pt-BR', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-base font-bold text-[#3e2626]">{formatCurrency(Number(sale.totalAmount))}</p>
+                          <div className="flex items-center space-x-1 mt-1">
+                            <CheckCircle className="h-3 w-3 text-green-500" />
+                            <span className="text-xs text-green-600 font-medium">Concluída</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
                   ) : (
-                    <p className="text-xl font-bold text-white">Ponto fechado</p>
+                    <div className="text-center py-8">
+                      <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-sm text-gray-500">Nenhuma venda hoje</p>
+                    </div>
                   )}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className={`w-4 h-4 ${hasOpenEntry ? 'bg-green-300' : 'bg-gray-300'} rounded-full animate-pulse shadow-lg`}></div>
-                <p className="text-xs text-white/80 mt-2">{hasOpenEntry ? 'Em serviço' : 'Fora de serviço'}</p>
-              </div>
-            </div>
-          </div>
+                </CardContent>
+              </Card>
 
-          {/* Últimos 5 dias */}
-          <div>
-            <div className="flex items-center space-x-2 mb-4">
-              <BarChart3 className="h-5 w-5 text-[#3e2626]" />
-              <h3 className="text-lg font-bold text-gray-900">Últimos registros</h3>
-            </div>
-            {lastTimeClockEntries.length > 0 ? (
-              <div className="space-y-3">
-                {lastTimeClockEntries.map((entry, index) => (
-                  <div key={index} className="flex items-center justify-between py-4 px-6 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-2xl hover:shadow-lg hover:border-[#3e2626]/30 transition-all duration-300 group">
-                    <div className="flex items-center space-x-4 flex-1">
-                      <div className="w-2 h-2 bg-[#8B4513] rounded-full group-hover:bg-[#3e2626] transition-colors"></div>
-                      <Clock className="h-5 w-5 text-gray-400" />
-                      <span className="text-base font-semibold text-gray-900 min-w-[80px]">{entry.date}</span>
+              {/* Ação Rápida - Nova Venda */}
+              <Card className="bg-gradient-to-br from-[#3e2626] to-[#8B4513] text-white border-0 shadow-xl">
+                <CardContent className="p-6">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto">
+                      <ShoppingCart className="h-8 w-8" />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-base text-gray-700 font-medium">{entry.entrada}</span>
-                      <span className="text-gray-400">-</span>
-                      <span className="text-base text-gray-700 font-medium">{entry.saida}</span>
-                    </div>
-                    <div className="w-24 text-right">
-                      <span className="text-base font-bold text-[#3e2626]">{entry.total}</span>
+                    <div>
+                      <h3 className="text-lg font-bold mb-2">Nova Venda</h3>
+                      <p className="text-sm text-white/90 mb-4">
+                        Registre uma nova venda rapidamente
+                      </p>
+                      <Button
+                        onClick={() => router.push('/employee/sales')}
+                        className="bg-white text-[#3e2626] hover:bg-white/90 w-full font-semibold"
+                      >
+                        Criar Venda
+                      </Button>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-200">
-                <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">Nenhum registro de ponto encontrado</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sales Overview */}
-      <Card className="bg-white shadow-xl border border-gray-200 rounded-3xl overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white pb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                <TrendingUp className="h-7 w-7" />
-              </div>
-              <div>
-                <CardTitle className="text-2xl text-white">Visão de Vendas</CardTitle>
-                <p className="text-sm text-white/80 mt-1">Acompanhe seu desempenho</p>
-              </div>
+                </CardContent>
+              </Card>
             </div>
-
-          </div>
-          
-          {/* Time Filters */}
-          <div className="flex space-x-3 mt-6">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTimeFilter('hoje')}
-              className={`text-white hover:text-white hover:bg-white/20 ${timeFilter === 'hoje' ? 'bg-white text-[#3e2626] font-semibold shadow-lg' : ''} rounded-xl transition-all duration-300`}
-            >
-              Hoje
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTimeFilter('7dias')}
-              className={`text-white hover:text-white hover:bg-white/20 ${timeFilter === '7dias' ? 'bg-white text-[#3e2626] font-semibold shadow-lg' : ''} rounded-xl transition-all duration-300`}
-            >
-              7 dias
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTimeFilter('30dias')}
-              className={`text-white hover:text-white hover:bg-white/20 ${timeFilter === '30dias' ? 'bg-white text-[#3e2626] font-semibold shadow-lg' : ''} rounded-xl transition-all duration-300`}
-            >
-              30 dias
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-8 space-y-8">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden relative group">
-              <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
-                <div className="absolute inset-0" style={{
-                  backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.2) 1px, transparent 1px)`,
-                  backgroundSize: '40px 40px'
-                }}></div>
-              </div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <DollarSign className="h-10 w-10 text-blue-200 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-semibold text-blue-100 bg-white/20 px-3 py-1 rounded-full">+12%</span>
-                </div>
-                <p className="text-3xl font-bold mb-1">{formatCurrency(stats.totalVendas)}</p>
-                <p className="text-sm text-blue-100 font-medium">Total Vendido</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden relative group">
-              <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
-                <div className="absolute inset-0" style={{
-                  backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.2) 1px, transparent 1px)`,
-                  backgroundSize: '40px 40px'
-                }}></div>
-              </div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <ShoppingCart className="h-10 w-10 text-green-200 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-semibold text-green-100 bg-white/20 px-3 py-1 rounded-full">+8%</span>
-                </div>
-                <p className="text-3xl font-bold mb-1">{stats.numeroVendas}</p>
-                <p className="text-sm text-green-100 font-medium">Nº de Vendas</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden relative group">
-              <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
-                <div className="absolute inset-0" style={{
-                  backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.2) 1px, transparent 1px)`,
-                  backgroundSize: '40px 40px'
-                }}></div>
-              </div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <Receipt className="h-10 w-10 text-purple-200 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-semibold text-purple-100 bg-white/20 px-3 py-1 rounded-full">+5%</span>
-                </div>
-                <p className="text-3xl font-bold mb-1">{formatCurrency(stats.ticketMedio)}</p>
-                <p className="text-sm text-purple-100 font-medium">Ticket Médio</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-orange-500 to-amber-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden relative group">
-              <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
-                <div className="absolute inset-0" style={{
-                  backgroundImage: `radial-gradient(circle at 20px 20px, rgba(255,255,255,0.2) 1px, transparent 1px)`,
-                  backgroundSize: '40px 40px'
-                }}></div>
-              </div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <Target className="h-10 w-10 text-orange-200 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-semibold text-orange-100 bg-white/20 px-3 py-1 rounded-full">85%</span>
-                </div>
-                <p className="text-3xl font-bold mb-1">{stats.metaDia}%</p>
-                <p className="text-sm text-orange-100 font-medium">Meta do Dia</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Últimas 5 Vendas */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <Package className="h-5 w-5 text-[#3e2626]" />
-                <h3 className="text-lg font-bold text-gray-900">Últimas Vendas</h3>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => router.push('/employee/sales')}
-                className="text-[#3e2626] hover:bg-[#3e2626]/10"
-              >
-                Ver todas <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-            {lastSales.length > 0 ? (
-              <div className="space-y-3">
-                {lastSales.map((sale, index) => (
-                  <div key={index} className="flex items-center justify-between py-4 px-6 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-2xl hover:shadow-lg hover:border-[#8B4513]/30 transition-all duration-300 group cursor-pointer">
-                    <div className="flex items-center space-x-4 flex-1">
-                      <div className="w-12 h-12 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                        <ShoppingCart className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-base font-bold text-gray-900">{sale.cliente}</p>
-                        <p className="text-sm text-gray-600">{sale.produto}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-[#3e2626]">{formatCurrency(sale.preco)}</p>
-                      <p className="text-xs text-gray-500">{sale.hora}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-200">
-                <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">Nenhuma venda encontrada</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

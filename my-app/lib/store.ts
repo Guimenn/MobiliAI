@@ -13,6 +13,7 @@ export interface User {
   zipCode?: string;
   storeId?: string;
   createdAt?: string;
+  avatarUrl?: string;
   store?: {
     id: string;
     name: string;
