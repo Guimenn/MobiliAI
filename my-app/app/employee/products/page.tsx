@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { productsAPI } from '@/lib/api';
+import { useProductsHeader } from '@/components/products-header-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +16,6 @@ import { toast } from 'sonner';
 import { 
   Package, 
   Plus,
-  Search,
   Edit,
   Trash2,
   X,
@@ -46,7 +46,7 @@ interface Product {
 export default function EmployeeProductsPage() {
   const { user, token } = useAppStore();
   const router = useRouter();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { searchTerm, setSearchTerm, viewMode, setViewMode, setOnCreateProduct } = useProductsHeader();
   const [isLoading, setIsLoading] = useState(false);
   
   // Produtos
@@ -64,8 +64,37 @@ export default function EmployeeProductsPage() {
   // Carrossel
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+  const handleCreateProduct = () => {
+    setEditedProduct({
+      name: '',
+      description: '',
+      price: 0,
+      stock: 0,
+      category: 'SOFA',
+      brand: '',
+      sku: '',
+      colorName: '',
+      supplierId: '',
+      width: '',
+      height: '',
+      depth: '',
+      weight: '',
+      isActive: true
+    });
+    setExistingImages([]);
+    setUploadedImages([]);
+    setProductModalMode('create');
+    setIsProductModalOpen(true);
+  };
+
   useEffect(() => {
     loadProducts();
+  }, []);
+
+  // Atualizar o handler quando handleCreateProduct mudar
+  useEffect(() => {
+    setOnCreateProduct(handleCreateProduct);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -98,29 +127,6 @@ export default function EmployeeProductsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleCreateProduct = () => {
-    setEditedProduct({
-      name: '',
-      description: '',
-      price: 0,
-      stock: 0,
-      category: 'SOFA',
-      brand: '',
-      sku: '',
-      colorName: '',
-      supplierId: '',
-      width: '',
-      height: '',
-      depth: '',
-      weight: '',
-      isActive: true
-    });
-    setExistingImages([]);
-    setUploadedImages([]);
-    setProductModalMode('create');
-    setIsProductModalOpen(true);
   };
 
   const handleViewProduct = (product: Product) => {
@@ -367,35 +373,16 @@ export default function EmployeeProductsPage() {
         </Card>
       </div>
 
-      {/* Header with Search and Actions */}
-      <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white pb-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <CardTitle className="text-2xl font-bold text-white mb-1">Produtos</CardTitle>
-              <CardDescription className="text-white/90">Gerencie o catálogo de produtos da loja</CardDescription>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar produtos..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full sm:w-64 pl-10 bg-white border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
-                />
-              </div>
-              <Button 
-                onClick={handleCreateProduct}
-                className="bg-white text-[#3e2626] hover:bg-white/90 border border-white/30 shadow-md font-semibold"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Produto
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+      {/* Botão Novo Produto */}
+      <div className="flex justify-start mb-6">
+        <Button 
+          onClick={handleCreateProduct}
+          className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white shadow-lg font-semibold px-6 py-2"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Produto
+        </Button>
+      </div>
 
       {/* Products Grid */}
       {isLoading ? (
@@ -420,7 +407,7 @@ export default function EmployeeProductsPage() {
             </Button>
           </CardContent>
         </Card>
-      ) : (
+      ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => (
             <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 rounded-2xl group">
@@ -513,6 +500,108 @@ export default function EmployeeProductsPage() {
                   </Button>
                 </div>
               </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredProducts.map((product) => (
+            <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-200 rounded-xl group">
+              <div className="flex flex-col sm:flex-row">
+                {/* Imagem */}
+                <div className="w-full sm:w-48 h-48 flex-shrink-0 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
+                  {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) ? (
+                    <>
+                      <img
+                        src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      {product.imageUrls && product.imageUrls.length > 1 && (
+                        <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full font-medium">
+                          +{product.imageUrls.length - 1} mais
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="h-12 w-12 text-gray-300" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <Badge className={
+                      product.stock > 10 
+                        ? 'bg-green-500 text-white border-0 shadow-md' 
+                        : product.stock > 0 
+                        ? 'bg-orange-500 text-white border-0 shadow-md' 
+                        : 'bg-red-500 text-white border-0 shadow-md'
+                    }>
+                      {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Conteúdo */}
+                <div className="flex-1 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <CardTitle className="text-xl font-bold text-gray-900 mb-2">
+                      {product.name}
+                    </CardTitle>
+                    {product.description && (
+                      <CardDescription className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        {product.description}
+                      </CardDescription>
+                    )}
+                    <div className="flex flex-wrap items-center gap-4 mt-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium text-gray-600">Preço:</span>
+                        <span className="font-bold text-lg text-[#3e2626]">{formatCurrency(product.price)}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium text-gray-600">Estoque:</span>
+                        <span className="font-semibold text-gray-900">{product.stock} unidades</span>
+                      </div>
+                      {product.brand && (
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-gray-600">Marca:</span>
+                          <span className="text-sm text-gray-900">{product.brand}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Botões de ação */}
+                  <div className="flex gap-2 sm:flex-col">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleViewProduct(product)}
+                      className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all"
+                      title="Visualizar"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleEditProduct(product)}
+                      className="border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white transition-all font-medium"
+                    >
+                      <Edit className="h-4 w-4 mr-1.5" />
+                      Editar
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDeleteProduct(product)}
+                      className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </Card>
           ))}
         </div>
