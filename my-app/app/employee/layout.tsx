@@ -142,20 +142,20 @@ export default function EmployeeLayout({
       <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-xl border-r border-gray-200 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0`}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="px-6 py-8 border-b border-gray-200">
+          <div className="px-6 py-8 border-b border-[#8B4513]/30 bg-gradient-to-r from-[#3e2626] to-[#8B4513]">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 relative flex items-center justify-center">
+              <div className="w-16 h-16 relative flex items-center justify-center bg-white rounded-xl p-2 border border-white/30 shadow-lg">
                 <Image
                   src="/logo.png"
                   alt="MobiliAI Logo"
-                  width={48}
-                  height={48}
+                  width={56}
+                  height={56}
                   className="object-contain"
                 />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">MobiliAI</h1>
-                <p className="text-xs text-gray-500 font-medium">Painel Funcionário</p>
+                <h1 className="text-xl font-bold text-white">MobiliAI</h1>
+                <p className="text-xs text-white/80 font-medium">Painel Funcionário</p>
               </div>
             </div>
           </div>
