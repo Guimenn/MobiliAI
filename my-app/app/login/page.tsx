@@ -56,10 +56,12 @@ export default function LoginPage() {
   useEffect(() => {
     if (isAuthenticated && user) {
       // Redirecionamento imediato sem delay
-      const redirectPath = user.role === 'ADMIN' 
+      const redirectPath = user.role === 'ADMIN' || user.role === 'admin'
         ? '/admin' 
-        : user.role === 'STORE_MANAGER' 
+        : user.role === 'STORE_MANAGER' || user.role === 'store_manager'
         ? '/manager' 
+        : user.role === 'EMPLOYEE' || user.role === 'employee' || user.role === 'CASHIER' || user.role === 'cashier'
+        ? '/employee'
         : '/';
       
       router.replace(redirectPath);
@@ -309,10 +311,12 @@ export default function LoginPage() {
           // Aguardar um pouco para mostrar a mensagem e depois redirecionar
           setTimeout(() => {
             // Redirecionamento baseado no role do usuário
-            const redirectPath = response.user.role === 'ADMIN' 
+            const redirectPath = response.user.role === 'ADMIN' || response.user.role === 'admin'
               ? '/admin/dashboard' 
-              : response.user.role === 'STORE_MANAGER' 
+              : response.user.role === 'STORE_MANAGER' || response.user.role === 'store_manager'
               ? '/manager' 
+              : response.user.role === 'EMPLOYEE' || response.user.role === 'employee' || response.user.role === 'CASHIER' || response.user.role === 'cashier'
+              ? '/employee'
               : '/';
             
             router.replace(redirectPath);
@@ -366,10 +370,12 @@ export default function LoginPage() {
         // Aguardar um pouco para mostrar a mensagem e depois redirecionar
         setTimeout(() => {
           // Redirecionamento baseado no role do usuário
-          const redirectPath = response.user.role === 'ADMIN' 
+          const redirectPath = response.user.role === 'ADMIN' || response.user.role === 'admin'
             ? '/admin' 
-            : response.user.role === 'STORE_MANAGER' 
+            : response.user.role === 'STORE_MANAGER' || response.user.role === 'store_manager'
             ? '/manager' 
+            : response.user.role === 'EMPLOYEE' || response.user.role === 'employee' || response.user.role === 'CASHIER' || response.user.role === 'cashier'
+            ? '/employee'
             : '/';
           
           router.replace(redirectPath);

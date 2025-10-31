@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import Image from 'next/image';
 
@@ -13,6 +13,13 @@ interface ImageCarouselProps {
 
 export default function ImageCarousel({ images, isOpen, onClose, initialIndex = 0 }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  // Resetar índice quando modal abrir
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentIndex(initialIndex);
+    }
+  }, [isOpen, initialIndex]);
 
   if (!isOpen || images.length === 0) return null;
 

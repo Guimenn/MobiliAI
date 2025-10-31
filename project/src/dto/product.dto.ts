@@ -1,5 +1,5 @@
-import { IsString, IsNumber, IsOptional, IsEnum, IsBoolean, IsUUID } from 'class-validator';
-import { ProductCategory } from '../entities/product.entity';
+import { IsString, IsNumber, IsOptional, IsEnum, IsBoolean, IsUUID, IsArray } from 'class-validator';
+import { ProductCategory } from '@prisma/client';
 
 export class CreateProductDto {
   @IsString()
@@ -8,6 +8,10 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  shortDescription?: string;
 
   @IsEnum(ProductCategory)
   category: ProductCategory;
@@ -28,11 +32,15 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
-  color?: string;
+  colorName?: string;
 
   @IsOptional()
   @IsString()
-  colorCode?: string;
+  colorHex?: string;
+
+  @IsOptional()
+  @IsString()
+  customColor?: string;
 
   @IsOptional()
   @IsString()
@@ -40,15 +48,44 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
-  size?: string;
+  model?: string;
 
   @IsOptional()
   @IsString()
-  unit?: string;
+  sku?: string;
+
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  width?: number;
+
+  @IsOptional()
+  @IsNumber()
+  height?: number;
+
+  @IsOptional()
+  @IsNumber()
+  depth?: number;
+
+  @IsOptional()
+  @IsNumber()
+  weight?: number;
 
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageUrls?: string[];
+
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
 
   @IsUUID()
   storeId: string;
@@ -62,6 +99,10 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  shortDescription?: string;
 
   @IsOptional()
   @IsEnum(ProductCategory)
@@ -85,11 +126,15 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
-  color?: string;
+  colorName?: string;
 
   @IsOptional()
   @IsString()
-  colorCode?: string;
+  colorHex?: string;
+
+  @IsOptional()
+  @IsString()
+  customColor?: string;
 
   @IsOptional()
   @IsString()
@@ -97,15 +142,44 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
-  size?: string;
+  model?: string;
 
   @IsOptional()
   @IsString()
-  unit?: string;
+  sku?: string;
+
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  width?: number;
+
+  @IsOptional()
+  @IsNumber()
+  height?: number;
+
+  @IsOptional()
+  @IsNumber()
+  depth?: number;
+
+  @IsOptional()
+  @IsNumber()
+  weight?: number;
 
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageUrls?: string[];
+
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
 
   @IsOptional()
   @IsBoolean()

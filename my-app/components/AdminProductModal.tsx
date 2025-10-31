@@ -626,7 +626,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
             {/* Image Section */}
             <div className="space-y-4">
               <div 
-                className="aspect-square bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                className="relative aspect-square bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => {
                   const allImages = [
                     ...existingImages, 

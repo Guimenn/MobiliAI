@@ -789,6 +789,21 @@ function ProductsSection({ products, isLoading, token, onProductsChange, onDelet
               return (
                 <Card key={product.id} className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 overflow-hidden">
                   <CardContent className="p-0">
+                    {/* Imagem do produto */}
+                    {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) && (
+                      <div className="aspect-video w-full overflow-hidden bg-gray-100 relative">
+                        <img
+                          src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl}
+                          alt={product.name}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                        />
+                        {product.imageUrls && product.imageUrls.length > 1 && (
+                          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                            +{product.imageUrls.length - 1} mais
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 p-6">
                       <div className="flex items-center space-x-4">
                         <div className="w-12 h-12 bg-[#3e2626] rounded-xl flex items-center justify-center">

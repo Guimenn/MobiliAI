@@ -872,4 +872,51 @@ export const customerAPI = {
   }
 };
 
+// Time Clock API
+export const timeClockAPI = {
+  getHistory: async (employeeId: string, startDate?: string, endDate?: string) => {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get(`/time-clock/history/${employeeId}`, { params });
+    return response.data;
+  },
+
+  clockIn: async (data: {
+    employeeId: string;
+    photo?: string;
+    latitude?: number;
+    longitude?: number;
+    address?: string;
+    notes?: string;
+  }) => {
+    const response = await api.post('/time-clock/clock-in', data);
+    return response.data;
+  },
+
+  clockOut: async (data: {
+    employeeId: string;
+    photo?: string;
+    latitude?: number;
+    longitude?: number;
+    address?: string;
+    notes?: string;
+  }) => {
+    const response = await api.post('/time-clock/clock-out', data);
+    return response.data;
+  },
+
+  register: async (data: {
+    employeeId: string;
+    photo?: string;
+    latitude?: number;
+    longitude?: number;
+    address?: string;
+    notes?: string;
+  }) => {
+    const response = await api.post('/time-clock/register', data);
+    return response.data;
+  },
+};
+
 export default api;

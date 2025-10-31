@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
+import { useProducts } from '@/lib/hooks/useProducts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import PromotionalSection from '@/components/PromotionalSection';
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
+import { BackendStatus } from '@/components/BackendStatus';
 import { 
   Search,
   ShoppingCart,
@@ -77,10 +79,38 @@ export default function HomePage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchClosing, setSearchClosing] = useState(false);
   const [searchOpening, setSearchOpening] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('Sala de Estar');
-  const [favorites, setFavorites] = useState<number[]>([]);
-  const [cartItems, setCartItems] = useState<number[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('Todos');
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [cartItems, setCartItems] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [specialOfferProduct, setSpecialOfferProduct] = useState<any | null>(null);
+  const OFFER_DURATION = 30; // segundos por produto (fase de desenvolvimento)
+  const [offerSecondsLeft, setOfferSecondsLeft] = useState(OFFER_DURATION);
+
+  // Buscar produtos do banco de dados
+  const { products: allProducts, loading: productsLoading, error: productsError } = useProducts();
+
+  // Redirecionar usuários logados com roles específicos para seus dashboards
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const userRole = user.role?.toUpperCase();
+      
+      if (userRole === 'ADMIN') {
+        router.replace('/admin');
+        return;
+      }
+      
+      if (userRole === 'STORE_MANAGER') {
+        router.replace('/manager');
+        return;
+      }
+      
+      if (userRole === 'EMPLOYEE' || userRole === 'CASHIER') {
+        router.replace('/employee');
+        return;
+      }
+    }
+  }, [isAuthenticated, user, router]);
 
   // Função auxiliar para renderizar ícones
   const renderIcon = (IconComponent: any, className: string) => {
@@ -88,7 +118,7 @@ export default function HomePage() {
   };
 
   // Função para alternar favorito
-  const toggleFavorite = (productId: number) => {
+  const toggleFavorite = (productId: string) => {
     setFavorites(prev => 
       prev.includes(productId) 
         ? prev.filter(id => id !== productId)
@@ -97,8 +127,12 @@ export default function HomePage() {
   };
 
   // Função para adicionar ao carrinho
-  const addToCart = (productId: number) => {
-    setCartItems(prev => [...prev, productId]);
+  const addToCart = (productId: string) => {
+    const product = allProducts.find(p => p.id === productId);
+    if (product) {
+      useAppStore.getState().addToCart(product);
+      setCartItems(prev => [...prev, productId]);
+    }
   };
 
   // Função para ir para página de favoritos
@@ -247,135 +281,35 @@ export default function HomePage() {
     },
   ];
 
-  const allProducts = [
-    {
-      id: 1,
-      name: 'Sofá 3 Lugares Moderno',
-      price: 2499.99,
-      originalPrice: 2999.99,
-      color: '#3e2626',
-      rating: 4.9,
-      reviews: 156,
-      badge: 'Mais Vendido',
-      category: 'Sala de Estar'
-    },
-    {
-      id: 2,
-      name: 'Cadeira Executiva Premium',
-      price: 899.99,
-      color: '#8B4513',
-      rating: 4.8,
-      reviews: 89,
-      badge: 'Novo',
-      category: 'Quarto'
-    },
-    {
-      id: 3,
-      name: 'Mesa de Centro Elegante',
-      price: 1299.99,
-      originalPrice: 1599.99,
-      color: '#D2B48C',
-      rating: 4.7,
-      reviews: 124,
-      badge: 'Oferta',
-      category: 'Sala de Estar'
-    },
-    {
-      id: 4,
-      name: 'Luminária Pendant Moderna',
-      price: 599.99,
-      color: '#A0522D',
-      rating: 4.6,
-      reviews: 67,
-      badge: null,
-      category: 'Sala de Estar'
-    },
-    {
-      id: 5,
-      name: 'Poltrona Relax Premium',
-      price: 1899.99,
-      color: '#CD853F',
-      rating: 4.9,
-      reviews: 92,
-      badge: null,
-      category: 'Sala de Estar'
-    },
-    {
-      id: 6,
-      name: 'Mesa de Jantar 6 Lugares',
-      price: 2199.99,
-      color: '#DEB887',
-      rating: 4.8,
-      reviews: 78,
-      badge: 'Novo',
-      category: 'Sala de Jantar'
-    },
-    {
-      id: 7,
-      name: 'Cama King Size Premium',
-      price: 3299.99,
-      color: '#8B4513',
-      rating: 4.9,
-      reviews: 134,
-      badge: 'Mais Vendido',
-      category: 'Quarto'
-    },
-    {
-      id: 8,
-      name: 'Armário de Cozinha Moderno',
-      price: 1899.99,
-      color: '#D2B48C',
-      rating: 4.7,
-      reviews: 89,
-      badge: null,
-      category: 'Cozinha'
-    },
-    {
-      id: 9,
-      name: 'Mesa de Jantar 4 Lugares',
-      price: 1599.99,
-      color: '#A0522D',
-      rating: 4.8,
-      reviews: 67,
-      badge: 'Oferta',
-      category: 'Sala de Jantar'
-    },
-    {
-      id: 10,
-      name: 'Cadeira de Jardim Resistente',
-      price: 399.99,
-      color: '#3e2626',
-      rating: 4.6,
-      reviews: 45,
-      badge: null,
-      category: 'Exterior'
-    },
-    {
-      id: 11,
-      name: 'Guarda-roupa 6 Portas',
-      price: 2499.99,
-      color: '#8B4513',
-      rating: 4.8,
-      reviews: 98,
-      badge: 'Novo',
-      category: 'Quarto'
-    },
-    {
-      id: 12,
-      name: 'Conjunto de Mesa e Cadeiras',
-      price: 2199.99,
-      color: '#D2B48C',
-      rating: 4.7,
-      reviews: 76,
-      badge: null,
-      category: 'Sala de Jantar'
-    }
-  ];
+  // Mapear categorias do banco para categorias de exibição
+  const getDisplayCategory = (category: string) => {
+    const categoryMap: { [key: string]: string } = {
+      'sofa': 'Sala de Estar',
+      'mesa': 'Sala de Jantar',
+      'cadeira': 'Sala de Jantar',
+      'armario': 'Quarto',
+      'cama': 'Quarto',
+      'decoracao': 'Sala de Estar',
+      'iluminacao': 'Sala de Estar',
+      'outros': 'Sala de Estar'
+    };
+    return categoryMap[category] || 'Sala de Estar';
+  };
+
+  // Adicionar propriedades extras para exibição
+  const enhancedProducts = allProducts.map(product => ({
+    ...product,
+    displayCategory: getDisplayCategory(product.category),
+    rating: 4.5 + Math.random() * 0.5, // Rating simulado
+    reviews: Math.floor(Math.random() * 200) + 50, // Reviews simuladas
+    badge: Math.random() > 0.7 ? (Math.random() > 0.5 ? 'Novo' : 'Oferta') : null,
+    originalPrice: Math.random() > 0.5 ? product.price * 1.2 : undefined
+  }));
 
   // Filtrar produtos baseado na categoria selecionada
   const filteredProducts = selectedCategory === 'Todos' 
-    ? allProducts 
-    : allProducts.filter(product => product.category === selectedCategory);
+    ? enhancedProducts 
+    : enhancedProducts.filter(product => product.displayCategory === selectedCategory);
 
   // Configurações de paginação
   const productsPerPage = 6;
@@ -392,6 +326,45 @@ export default function HomePage() {
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
     setCurrentPage(1);
+  };
+
+  // Seleciona produto aleatório para oferta especial
+  const pickRandomProduct = () => {
+    if (!allProducts || allProducts.length === 0) return null;
+    const randomIndex = Math.floor(Math.random() * allProducts.length);
+    return allProducts[randomIndex];
+  };
+
+  // Inicializa oferta e cronômetro quando produtos carregarem
+  useEffect(() => {
+    if (allProducts && allProducts.length > 0 && !specialOfferProduct) {
+      const product = pickRandomProduct();
+      setSpecialOfferProduct(product);
+      setOfferSecondsLeft(OFFER_DURATION);
+    }
+  }, [allProducts]);
+
+  // Cronômetro da oferta
+  useEffect(() => {
+    if (!specialOfferProduct) return;
+    const intervalId = setInterval(() => {
+      setOfferSecondsLeft((prev) => {
+        if (prev <= 1) {
+          const nextProduct = pickRandomProduct();
+          setSpecialOfferProduct(nextProduct);
+          return OFFER_DURATION; // reinicia
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [specialOfferProduct]);
+
+  const formatTime = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   const testimonials = [
@@ -533,13 +506,7 @@ export default function HomePage() {
                 <div className="text-sm text-white/80">{slide.subtitle}</div>
               </div>
             </div>
-            {/* botão */}
-            <button 
-              onClick={goNext} 
-              className="absolute bottom-6 right-6 w-10 h-10 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group"
-            >
-              <ArrowRight className="h-4 w-4 text-white rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform duration-300" />
-            </button>
+           
           </div>
         </div>
       );
@@ -622,7 +589,7 @@ export default function HomePage() {
         <Header />
 
         {/* Hero Section */}
-        <section className="relative flex items-center justify-center overflow-hidden h-full">
+        <section className="relative flex items-center justify-center overflow-visible h-full">
           {/* Content */}
           <div className="relative z-10 w-full max-w-5xl px-4 sm:px-6 lg:px-8 text-center mt-30">
             <div className="max-w-5xl mx-auto">
@@ -647,14 +614,166 @@ export default function HomePage() {
               </h1>
             </div>
           </div>
+      {/* Card de transição entre Hero e Categorias (metade sobre o hero, metade abaixo) */}
+      <div className="absolute inset-x-0 bottom-0 translate-y-[150%] sm:translate-y-[150%] md:translate-y-[150%] lg:translate-y-[210%] z-20">
+        <div className="w-[60%] mx-auto ">
+          <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_rgba(0,0,0,0.18)] ring-1 ring-black/5">
+              {/* Decor e fundo */}
+              <div className="absolute inset-0 bg-gray-100" />
+              <div className="absolute -top-24 -left-20 w-80 h-80 bg-black/5 rounded-full blur-3xl" />
+              <div className="absolute inset-0 opacity-[0.02]" style={{
+                backgroundImage: `radial-gradient(circle at 2px 2px, #000 1px, transparent 0)`,
+                backgroundSize: '20px 20px'
+              }} />
+
+             
+
+              <div className="relative px-6 py-8 md:px-12 md:py-12 min-h-[260px] md:min-h-[320px] lg:min-h-[360px]">
+              {/* Conteúdo: Oferta Especial com cronômetro */}
+              {specialOfferProduct ? (
+              <div className="flex flex-col md:flex-row items-stretch gap-10">
+                {/* Visual do produto + decoração */}
+                <div className="relative w-full md:w-[420px] lg:w-[500px]">
+                  {/* anéis de fundo */}
+                  <div className="absolute -inset-6 -z-10 hidden md:block">
+                    <div className="absolute inset-0 rounded-full border-2 border-black/5" />
+                    <div className="absolute inset-6 rounded-full border-2 border-black/10" />
+                    <div className="absolute inset-12 rounded-full border-2 border-black/5" />
+                  </div>
+
+                  <div className="w-full h-56 md:h-64 lg:h-72 rounded-2xl overflow-hidden relative shadow-2xl border border-black/5 bg-white">
+                    {/* Product Image - if available */}
+                    {specialOfferProduct.imageUrl ? (
+                      <Image
+                        src={specialOfferProduct.imageUrl}
+                        alt={specialOfferProduct.name}
+                        width={800}
+                        height={600}
+                        className="w-full h-full object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent" />
+                    )}
+
+                    {/* Selo de desconto */}
+                    <div className="absolute -right-3 top-3">
+                      <div className="bg-white shadow-xl rounded-xl px-3 py-2 text-[#3e2626]">
+                        <div className="text-xl font-extrabold leading-none">30%</div>
+                        <div className="text-[10px] tracking-wider font-semibold text-amber-600">OFF</div>
+                      </div>
+                    </div>
+
+                    {/* Anotação flutuante */}
+                    <div className="absolute left-3 top-3 bg-white/95 backdrop-blur rounded-xl px-3 py-2 shadow-md text-[#3e2626] text-xs font-medium flex items-center gap-2">
+                      <Sofa className="h-4 w-4" /> Conforto premium
+                    </div>
+
+                    {/* Curva decorativa (rabisco) */}
+                    <svg className="absolute -right-6 bottom-8 w-16 h-16 text-black/30" viewBox="0 0 100 100" fill="none">
+                      <path d="M10 60 C 40 10, 60 110, 90 60" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                      <path d="M85 62 l10 -2 l-6 -8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" fill="none" />
+                    </svg>
+
+                    {/* Rodapé: etiqueta e timer */}
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-10">
+                      <span className="inline-flex items-center gap-2 bg-white/95 rounded-xl px-3 py-1.5 text-xs md:text-sm font-medium text-[#3e2626] shadow">
+                        Oferta relâmpago
+                      </span>
+                      <span className="inline-flex items-center gap-1 bg-[#3e2626] text-white rounded-xl px-3 py-1.5 text-xs md:text-sm font-semibold shadow">
+                        ⏱ {formatTime(offerSecondsLeft)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Infos e ações */}
+                <div className="flex-1 grid grid-rows-[auto_1fr_auto] gap-6">
+                  <div>
+                    <h3 className="text-3xl md:text-4xl font-semibold text-[#3e2626] leading-tight tracking-tight">
+                      {specialOfferProduct.name}
+                    </h3>
+                   
+                  </div>
+                    {/* Descrição do produto */}
+                    <div className="mt-3 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="h-7 w-7 rounded-full bg-[#3e2626]/10 text-[#3e2626] flex items-center justify-center">
+                          <Shield className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-[#3e2626]">Qualidade garantida</div>
+                          <div className="text-xs text-gray-600">Até 30% OFF em peças selecionadas</div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="h-7 w-7 rounded-full bg-[#3e2626]/10 text-[#3e2626] flex items-center justify-center">
+                          <Truck className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-[#3e2626]">Frete otimizado</div>
+                          <div className="text-xs text-gray-600">Envio rápido para principais cidades</div>
+                        </div>
+                      </div>
+                     
+                    </div>
+                  
+
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+                    {/* Bloco de preços alinhado */}
+                    <div className="flex items-end gap-3">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-sm font-semibold text-[#3e2626]">R$</span>
+                        <span className="text-4xl md:text-5xl font-bold text-[#3e2626] leading-none">
+                          {(specialOfferProduct.price ? specialOfferProduct.price * 0.7 : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      {specialOfferProduct.price && (
+                        <div className="flex items-baseline gap-1 text-gray-500">
+                          <span className="text-xs line-through">R$</span>
+                          <span className="text-lg md:text-2xl line-through">
+                            {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+                      <span className="ml-1 inline-flex items-center px-2.5 py-1 rounded-lg bg-[#3e2626]/10 text-[#3e2626] text-xs font-semibold">
+                        30% OFF
+                      </span>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex items-center gap-3">
+                      <Button onClick={() => addToCart(specialOfferProduct.id)} className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-2xl px-6 py-3 shadow-md">
+                        Adicionar ao carrinho
+                      </Button>
+                      <Button variant="outline" onClick={() => router.push(`/products?highlight=${specialOfferProduct.id}`)} className="rounded-2xl border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white px-6 py-3">
+                        Ver coleção
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-6">
+                <div>
+                  <h3 className="text-2xl md:text-3xl font-semibold text-[#3e2626]">Oferta especial</h3>
+                  <p className="text-gray-600 mt-2">Carregando produto em destaque...</p>
+                </div>
+                <div className="w-10 h-10 border-4 border-[#3e2626]/20 border-t-[#3e2626] rounded-full animate-spin" />
+              </div>
+            )}
+            </div>
+          </div>
+        </div>
+      </div>
         </section>
       </div>
 
      
 
       {/* Categories Section */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
-        <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+      <section id="categories-anchor" className="pt-40 md:pt-44 lg:pt-80 pb-20 bg-gradient-to-br from-gray-50 to-white">
+        <div className="container mx-auto  mt-10">
          
 
           {/* Grid Layout Customizado - 6 colunas x 5 linhas */}
@@ -740,19 +859,19 @@ export default function HomePage() {
               </div>
             </Link>
 
-            {/* Armário - 1x2 (coluna 6, linhas 1-2) */}
-            <Link href={`/products?category=${categories[3].id}`} className="md:col-span-1 md:row-span-2">
+            {/* Cadeiras - 1x2 (coluna 6, linhas 1-2) */}
+            <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[3].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-4 h-full flex flex-col justify-between">
                   <div className="flex flex-col items-center">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[3].gradient} rounded-xl flex items-center justify-center shadow-md mb-4`}>
-                      {renderIcon(categories[3].icon, "h-6 w-6 text-white")}
+                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[2].gradient} rounded-xl flex items-center justify-center shadow-md mb-4`}>
+                      {renderIcon(categories[2].icon, "h-6 w-6 text-white")}
                     </div>
                     <div className="text-center">
                       <span className="text-2xl font-bold text-[#3e2626]">
-                        {categories[3].count}
+                        {categories[2].count}
                       </span>
                       <p className="text-xs text-gray-500">produtos</p>
                     </div>
@@ -760,10 +879,10 @@ export default function HomePage() {
                   
                   <div className="text-center">
                     <h4 className="text-lg font-bold text-[#3e2626] mb-1">
-                      {categories[3].name}
+                      {categories[2].name}
                     </h4>
                     <p className="text-xs text-gray-600 leading-relaxed">
-                      {categories[3].description}
+                      {categories[2].description}
                     </p>
                   </div>
                 </div>
@@ -833,8 +952,8 @@ export default function HomePage() {
               </div>
             </Link>
 
-            {/* Quadro - 1x1 (coluna 6, linha 3) */}
-            <Link href={`/products?category=${categories[6].id}`} className="md:col-span-1 md:row-span-1">
+            {/* Quadro - 2x1 (coluna 6, linha 3) */}
+            <Link href={`/products?category=${categories[6].id}`} className="md:col-span-2 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
@@ -854,26 +973,7 @@ export default function HomePage() {
               </div>
             </Link>
 
-            {/* Cadeira - 1x1 (coluna 5, linha 4) */}
-            <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-1">
-              <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
-                
-                <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
-                  <div className={`w-10 h-10 bg-gradient-to-br ${categories[2].gradient} rounded-lg flex items-center justify-center shadow-sm mb-2`}>
-                    {renderIcon(categories[2].icon, "h-5 w-5 text-white")}
-                  </div>
-                  <div className="text-center">
-                    <h4 className="text-sm font-bold text-[#3e2626] mb-1">
-                      {categories[2].name}
-                    </h4>
-                    <p className="text-xs text-gray-500">{categories[2].count} produtos</p>
-                  </div>
-                </div>
-                
-                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/10 rounded-xl transition-all duration-300"></div>
-              </div>
-            </Link>
+           
 
             {/* Luminária - 2x1 (colunas 3-4, linha 4) */}
             <Link href={`/products?category=${categories[7].id}`} className="md:col-span-2 md:row-span-1">
@@ -946,7 +1046,7 @@ export default function HomePage() {
 
       {/* AI Section */}
       <section className="py-20 bg-gradient-to-br from-white to-gray-50">
-        <div className="max-w-[1000px] mx-auto translate-x-[-130px] gap-12">
+        <div className="container mx-auto gap-12">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center ">
             {/* Left Side - Text Content */}
             <div className="lg:col-span-1 space-y-8 ">
@@ -969,7 +1069,7 @@ export default function HomePage() {
             {/* Right Side - Carousel */}
             <div className="lg:col-span-2 ">
               <div className="relative">
-                <div className="relative overflow-hidden w-[900px]">
+                <div className="relative overflow-hidden ">
                   <div 
                     className="flex space-x-4 items-start transition-all duration-700 ease-in-out"
                     style={{
@@ -1006,100 +1106,50 @@ export default function HomePage() {
       </section>
 
       {/* Featured Products Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-20 bg-gray-50">
+        <div className="container mx-auto">
           {/* Header with Navigation */}
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-16">
             {/* Left Side - Title and Categories */}
             <div className="flex-1">
               {/* Title Section */}
-              <div className="mb-6">
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#3e2626] leading-tight">
+              <div className="mb-8 ml-5">
+                <div className="inline-flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-1 bg-[#3e2626] rounded-full"></div>
+                  <span className="text-sm font-medium text-[#3e2626] tracking-wider uppercase">Coleção Premium</span>
+                </div>
+                <h2 className="text-3xl md:text-5xl lg:text-5xl font-bold text-[#3e2626] leading-tight">
                   <span className="block">Móveis em Destaque</span>
-                  <span className="block">Para Sua Casa</span>
+                  <span className="block text-[#3e2626]">Para Sua Casa</span>
                 </h2>
+                
               </div>
               
-              {/* Category Navigation - Below Title */}
-              <div className="flex flex-wrap gap-4 items-center">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Sala de Jantar')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Sala de Jantar' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Sala de Jantar
-                  {selectedCategory === 'Sala de Jantar' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Sala de Estar')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Sala de Estar' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Sala de Estar
-                  {selectedCategory === 'Sala de Estar' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Quarto')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Quarto' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Quarto
-                  {selectedCategory === 'Quarto' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Cozinha')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Cozinha' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Cozinha
-                  {selectedCategory === 'Cozinha' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => handleCategoryChange('Exterior')}
-                  className={`px-0 py-1 font-medium transition-all duration-300 text-lg relative ${
-                    selectedCategory === 'Exterior' 
-                      ? 'text-[#3e2626]' 
-                      : 'text-[#3e2626] hover:text-[#3e2626] hover:bg-transparent'
-                  }`}
-                >
-                  Exterior
-                  {selectedCategory === 'Exterior' && (
-                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></div>
-                  )}
-                </Button>
+              {/* Category Navigation - Modern Pills */}
+              <div className="flex flex-wrap gap-3 items-center">
+                {['Sala de Jantar', 'Sala de Estar', 'Quarto', 'Cozinha', 'Exterior'].map((category) => (
+                  <Button 
+                    key={category}
+                    variant="ghost" 
+                    onClick={() => handleCategoryChange(category)}
+                    className={`px-6 py-3 font-medium transition-all duration-300 text-base rounded-full relative group ${
+                      selectedCategory === category 
+                        ? 'bg-[#3e2626] text-white shadow-lg' 
+                        : 'text-[#3e2626] hover:bg-[#3e2626]/10 hover:text-[#3e2626]'
+                    }`}
+                  >
+                    {category}
+                  </Button>
+                ))}
 
                 {/* Clear Filter Button */}
-                {selectedCategory !== 'Todos' && selectedCategory !== 'Sala de Estar' && (
+                {selectedCategory !== 'Todos' && selectedCategory && (
                   <Button 
                     variant="outline" 
                     onClick={() => handleCategoryChange('Todos')}
-                    className="border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-700 px-3 py-1 text-sm font-medium transition-all duration-300 ml-2"
+                    className="border-[#3e2626]/30 text-[#3e2626] hover:border-[#3e2626] hover:bg-[#3e2626] hover:text-white px-4 py-3 text-sm font-medium transition-all duration-300 rounded-full ml-2"
                   >
+                    <X className="h-4 w-4 mr-2" />
                     Limpar Filtro
                   </Button>
                 )}
@@ -1107,19 +1157,20 @@ export default function HomePage() {
             </div>
 
             {/* Right Side - View All Button */}
-            <div className="flex justify-center lg:justify-end mt-8 lg:mt-0">
-              <div className="flex items-center space-x-3">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-end mt-8 lg:mt-0 space-y-4 lg:space-y-0 lg:space-x-4">
+              <div className="flex items-center space-x-4">
                 {/* Filter Indicator */}
                 {selectedCategory !== 'Todos' && (
-                  <div className="flex items-center space-x-2 bg-gray-100 px-3 py-2 rounded-full">
-                    <span className="text-sm text-gray-600">
-                      Filtro: <span className="font-medium text-[#3e2626]">{selectedCategory}</span>
+                  <div className="flex items-center space-x-3 bg-white/80 backdrop-blur-sm px-4 py-3 rounded-full shadow-lg border border-[#3e2626]/20">
+                    <div className="w-2 h-2 bg-[#3e2626] rounded-full"></div>
+                    <span className="text-sm text-gray-700">
+                      Filtro: <span className="font-semibold text-[#3e2626]">{selectedCategory}</span>
                     </span>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => handleCategoryChange('Todos')}
-                      className="h-6 w-6 p-0 hover:bg-gray-200 rounded-full"
+                      className="h-6 w-6 p-0 hover:bg-[#3e2626]/10 rounded-full"
                     >
                       <X className="h-4 w-4 text-gray-500" />
                     </Button>
@@ -1129,138 +1180,181 @@ export default function HomePage() {
                 <Button 
                   size="lg" 
                   onClick={() => router.push('/products')}
-                  className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-8 py-3 rounded-full font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-2"
+                  className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-8 py-4 rounded-full font-semibold text-lg shadow-md hover:shadow-lg transition-all duration-300 flex items-center space-x-3 group"
                 >
                   <span>Ver Todos os Produtos</span>
-                  <ArrowRight className="h-5 w-5" />
+                  <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Products Grid - 2x3 Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredProducts.map((product, index) => (
-              <div key={product.id} className="group relative bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
-                {/* Product Image Container */}
-                <div className="relative">
-                  <div 
-                    className="aspect-square flex items-center justify-center relative overflow-hidden"
-                    style={{ backgroundColor: product.color }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
-                    
-                    {/* Product Icon/Visual */}
-                    <div className="relative z-10 text-center">
-                      <Sofa className="h-20 w-20 text-white/90 mx-auto mb-3 drop-shadow-lg" />
-                      <p className="text-white font-semibold text-base">Móvel Premium</p>
-                    </div>
+          {/* Loading State */}
+          {productsLoading && (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <div className="w-16 h-16 border-4 border-[#3e2626]/20 border-t-[#3e2626] rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-lg text-gray-600">Carregando produtos...</p>
+              </div>
+            </div>
+          )}
 
-                    {/* Decorative Elements */}
-                    <div className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full blur-sm"></div>
-                    <div className="absolute bottom-4 left-4 w-6 h-6 bg-white/10 rounded-full blur-sm"></div>
-                  </div>
-
-                  {/* Discount Badge */}
-                  <div className="absolute top-4 left-4">
-                    <div className="w-12 h-12 bg-[#3e2626] rounded-full flex items-center justify-center shadow-lg">
-                      <span className="text-white font-bold text-sm">-10%</span>
-                    </div>
-                  </div>
-
-                  {/* Favorite Button */}
-                  <div className="absolute top-4 right-4">
-                    <Button 
-                      size="sm" 
-                      onClick={() => toggleFavorite(product.id)}
-                      className={`w-10 h-10 shadow-lg rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 ${
-                        favorites.includes(product.id)
-                          ? 'bg-red-500 text-white hover:bg-red-600'
-                          : 'bg-white/90 hover:bg-white text-[#3e2626]'
-                      }`}
-                    >
-                      <Heart className={`h-5 w-5 ${favorites.includes(product.id) ? 'fill-current' : ''}`} />
-                    </Button>
-                  </div>
+          {/* Error State */}
+          {productsError && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center max-w-lg">
+                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <X className="h-8 w-8 text-orange-500" />
                 </div>
-
-                {/* Product Info Footer - Dark Background */}
-                <div className="bg-[#3e2626] p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xl font-bold text-white">
-                      {product.name}
-                    </h3>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-2xl font-bold text-white">
-                        R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                      {product.originalPrice && (
-                        <span className="text-lg text-white/70 line-through">
-                          R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <Button 
-                      onClick={() => addToCart(product.id)}
-                      className="bg-white text-[#3e2626] hover:bg-gray-100 shadow-lg rounded-full w-12 h-12 p-0 hover:scale-110 transition-all duration-300"
-                    >
-                      <ShoppingCart className="h-5 w-5" />
-                    </Button>
-                  </div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">Erro ao Carregar Produtos</h3>
+                <p className="text-lg text-gray-600 mb-4">{productsError}</p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-blue-800">
+                    <strong>Dica:</strong> Verifique se o backend está rodando na porta 3001. 
+                    Os produtos exibidos são dados de exemplo enquanto o backend não estiver disponível.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button 
+                    onClick={() => window.location.reload()} 
+                    className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-6 py-3 rounded-full"
+                  >
+                    Tentar Novamente
+                  </Button>
+                  <Button 
+                    onClick={() => window.open('http://localhost:3001', '_blank')} 
+                    variant="outline"
+                    className="border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white px-6 py-3 rounded-full"
+                  >
+                    Verificar Backend
+                  </Button>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex flex-col items-center justify-center mt-12 space-y-4">
+          {/* Products Grid - Clean Layout */}
+          {!productsLoading && !productsError && (
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {featuredProducts.map((product) => (
+                <div key={product.id} className="group relative bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
+                  {/* Product Image Container */}
+                  <div className="relative overflow-hidden">
+                    <div className="aspect-[4/3] flex items-center justify-center relative bg-gray-100">
+                      {/* Product Image - if available */}
+                      {product.imageUrl ? (
+                        <Image
+                          src={product.imageUrl}
+                          alt={product.name}
+                          width={600}
+                          height={450}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="text-center text-gray-400">Sem imagem</div>
+                      )}
+                    </div>
+
+                    {/* Favorite Button */}
+                    <div className="absolute top-4 right-4">
+                      <Button 
+                        size="sm" 
+                        onClick={() => toggleFavorite(product.id)}
+                        className={`w-8 h-8 shadow-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-105 ${
+                          favorites.includes(product.id)
+                            ? 'bg-red-500 text-white hover:bg-red-600'
+                            : 'bg-white hover:bg-white text-[#3e2626] border border-gray-200'
+                        }`}
+                      >
+                        <Heart className={`h-4 w-4 ${favorites.includes(product.id) ? 'fill-current' : ''}`} />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Product Info Footer - Clean */}
+                  <div className="bg-white p-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-base font-semibold text-[#3e2626] leading-tight">{product.name}</h3>
+                      <div className="flex items-center space-x-1 text-yellow-500">
+                        <Star className="h-4 w-4 fill-current" />
+                        <span className="text-xs font-medium text-gray-600">{product.rating}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg font-bold text-[#3e2626]">
+                          R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        {product.originalPrice && (
+                          <span className="text-xs text-gray-500 line-through">
+                            R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
+                      <Button 
+                        onClick={() => addToCart(product.id)}
+                        className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-lg w-10 h-10 p-0"
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Enhanced Pagination */}
+          {!productsLoading && !productsError && totalPages > 1 && (
+            <div className="flex flex-col items-center justify-center mt-16 space-y-6">
               {/* Pagination Info */}
-              <div className="text-center text-gray-600">
-                <p className="text-sm">
-                  Mostrando {startIndex + 1}-{Math.min(endIndex, totalFilteredProducts)} de {totalFilteredProducts} produtos
-                  {selectedCategory !== 'Todos' && (
-                    <span className="block text-xs mt-1">
-                      na categoria <span className="font-medium text-[#3e2626]">{selectedCategory}</span>
-                    </span>
-                  )}
-                </p>
+              <div className="text-center">
+                <div className="inline-flex items-center space-x-2 bg-white/80 backdrop-blur-sm px-6 py-3 rounded-full shadow-lg border border-[#3e2626]/20">
+                  <div className="w-2 h-2 bg-[#3e2626] rounded-full"></div>
+                  <p className="text-sm text-gray-700">
+                    Mostrando <span className="font-semibold text-[#3e2626]">{startIndex + 1}-{Math.min(endIndex, totalFilteredProducts)}</span> de <span className="font-semibold text-[#3e2626]">{totalFilteredProducts}</span> produtos
+                    {selectedCategory !== 'Todos' && (
+                      <span className="block text-xs mt-1 text-gray-500">
+                        na categoria <span className="font-medium text-[#3e2626]">{selectedCategory}</span>
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
 
               {/* Pagination Controls */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 {/* Previous Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-3 border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-medium transition-all duration-300"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  <ArrowLeft className="h-4 w-4 mr-2" />
                   Anterior
                 </Button>
 
                 {/* Page Numbers */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <Button
-                    key={page}
-                    variant={currentPage === page ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-2 ${
-                      currentPage === page
-                        ? 'bg-[#3e2626] text-white hover:bg-[#2a1f1f]'
-                        : 'border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white'
-                    }`}
-                  >
-                    {page}
-                  </Button>
-                ))}
+                <div className="flex items-center space-x-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-12 h-12 rounded-full font-semibold transition-all duration-300 ${
+                        currentPage === page
+                          ? 'bg-[#3e2626] text-white shadow-lg hover:shadow-xl'
+                          : 'border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white hover:border-[#3e2626]'
+                      }`}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
 
                 {/* Next Button */}
                 <Button
@@ -1268,26 +1362,28 @@ export default function HomePage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-3 border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-medium transition-all duration-300"
                 >
                   Próxima
-                  <ArrowRight className="h-4 w-4 ml-1" />
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
 
               {/* View All Products Link */}
               {currentPage === totalPages && (
-                <div className="text-center pt-4">
-                  <p className="text-sm text-gray-500 mb-3">
-                    Quer ver todos os produtos disponíveis?
-                  </p>
-                  <Button
-                    onClick={() => router.push('/products')}
-                    className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-6 py-2 rounded-full font-medium transition-all duration-300"
-                  >
-                    Ver Todos os Produtos
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
+                <div className="text-center pt-6">
+                  <div className="bg-white rounded-2xl p-6 border border-[#3e2626]/10">
+                    <p className="text-sm text-gray-600 mb-4">
+                      Quer explorar nossa coleção completa de produtos?
+                    </p>
+                    <Button
+                      onClick={() => router.push('/products')}
+                      className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-8 py-3 rounded-full font-semibold transition-all duration-300 shadow-md hover:shadow-lg group"
+                    >
+                      Ver Todos os Produtos
+                      <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1295,8 +1391,7 @@ export default function HomePage() {
         </div>
       </section>
 
-       {/* Promotional Section */}
-       <PromotionalSection />
+    
 
 
      {/* Footer */}
