@@ -23,6 +23,7 @@ import { TimeClockModule } from './time-clock/time-clock.module';
 import { TimeClockService } from './time-clock/time-clock.service';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TrellisModule } from './trellis/trellis.module';
+import { PublicModule } from './public/public.module';
 
 
 @Module({
@@ -56,6 +57,7 @@ import { TrellisModule } from './trellis/trellis.module';
     TimeClockModule,
     DashboardModule,
     TrellisModule,
+    PublicModule,
   ],
   controllers: [AppController],
   providers: [AppService, TimeClockService],
