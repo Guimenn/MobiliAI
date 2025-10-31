@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api';
+import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ interface AdminProductModalProps {
 }
 
 export default function AdminProductModal({ product, isOpen, mode, onClose, onProductUpdated, onProductDeleted }: AdminProductModalProps) {
+  const { token } = useAppStore();
   const [isEditing, setIsEditing] = useState(mode === 'edit' || mode === 'create');
   const [editedProduct, setEditedProduct] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +43,8 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
         sku: '',
         isActive: true,
         rating: 0,
-        reviews: 0
+        reviews: 0,
+        is3D: false
       });
       setExistingImages([]);
       setUploadedImages([]);
@@ -222,116 +225,155 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
           depth: productData.depth
         });
         
-        // Verificar token de autenticação
-        const token = localStorage.getItem('token');
-        console.log('🔑 Token presente:', !!token);
-        console.log('🔑 Token (primeiros 20 chars):', token?.substring(0, 20));
-        
-        // Verificar se o usuário está logado
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        console.log('👤 Usuário logado:', user);
-        console.log('👤 Role do usuário:', user.role);
+        // Se há imagens novas, usar FormData para enviar com suporte a 3D
+        let uploadedImageUrls: string[] = [];
+        if (uploadedImages.length > 0) {
+          console.log('📤 Enviando produto com', uploadedImages.length, 'imagens via FormData...');
+          
+          try {
+            // Criar FormData para enviar com arquivos
+            const formData = new FormData();
+            
+            // Adicionar campos do produto de forma controlada
+            formData.append('name', productData.name);
+            formData.append('description', productData.description || '');
+            formData.append('category', productData.category);
+            formData.append('price', productData.price.toString());
+            formData.append('stock', productData.stock.toString());
+            formData.append('sku', productData.sku || '');
+            formData.append('isAvailable', productData.isAvailable ? 'true' : 'false');
+            formData.append('colorName', productData.colorName || '');
+            formData.append('brand', productData.brand || '');
+            formData.append('storeId', productData.storeId);
+            
+            // Adicionar campos opcionais apenas se tiverem valor
+            if (productData.colorHex) {
+              formData.append('colorHex', productData.colorHex);
+            }
+            if (productData.weight) {
+              formData.append('weight', productData.weight.toString());
+            }
+            if (productData.width) {
+              formData.append('width', productData.width.toString());
+            }
+            if (productData.height) {
+              formData.append('height', productData.height.toString());
+            }
+            if (productData.depth) {
+              formData.append('depth', productData.depth.toString());
+            }
+            if (productData.style) {
+              formData.append('style', productData.style);
+            }
+            if (productData.supplierId) {
+              formData.append('supplierId', productData.supplierId);
+            }
+            
+            // Adicionar is3D
+            if (editedProduct.is3D) {
+              formData.append('is3D', 'true');
+            }
+            
+            // Adicionar imagens existentes se houver
+            if (existingImages && existingImages.length > 0) {
+              existingImages.forEach((url: string) => {
+                formData.append('existingImageUrls', url);
+              });
+            }
 
-      // Fazer upload das imagens primeiro (se houver)
-      let uploadedImageUrls: string[] = [];
-      if (uploadedImages.length > 0) {
-        console.log('📤 Fazendo upload de', uploadedImages.length, 'imagens...');
-        console.log('📤 Arquivos para upload:', uploadedImages.map(f => ({ name: f.name, size: f.size, type: f.type })));
-        
-        try {
-          // Gerar um ID temporário para o produto (será substituído pelo ID real)
-          const tempProductId = `temp-${Date.now()}`;
-          console.log('🆔 ID temporário do produto:', tempProductId);
-          
-          uploadedImageUrls = await uploadMultipleProductImages(uploadedImages, tempProductId);
-          console.log('✅ Upload de imagens concluído:', uploadedImageUrls);
-          
-          // Verificar se todas as URLs foram geradas
-          if (uploadedImageUrls.length !== uploadedImages.length) {
-            console.warn('⚠️ Número de URLs geradas diferente do número de arquivos:', {
-              arquivos: uploadedImages.length,
-              urls: uploadedImageUrls.length
+            // Adicionar novos arquivos
+            uploadedImages.forEach((file) => {
+              formData.append('images', file);
             });
+
+            console.log('📦 Enviando FormData com imagens...');
+
+            // Enviar via fetch com FormData
+            const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+            const response = await fetch(`${API_BASE_URL}/admin/products`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+              body: formData
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ message: 'Erro desconhecido' }));
+              throw new Error(errorData.message || `Erro: ${response.statusText}`);
+            }
+
+            result = await response.json();
+            console.log('✅ Produto criado com sucesso via FormData:', result);
+            
+          } catch (uploadError: any) {
+            console.error('❌ Erro ao criar produto com imagens:', uploadError);
+            toast.error('Erro ao criar produto', {
+              description: `Erro: ${uploadError.message || 'Erro desconhecido'}`,
+              duration: 6000,
+            });
+            return;
           }
-        } catch (uploadError: any) {
-          console.error('❌ Erro no upload de imagens:', uploadError);
-          console.error('❌ Detalhes do erro:', {
-            message: uploadError.message,
-            stack: uploadError.stack,
-            name: uploadError.name
+        } else {
+          console.log('ℹ️ Nenhuma imagem nova, criando produto sem FormData');
+          // Criar produto sem imagens
+          try {
+            result = await adminAPI.createProduct(productData);
+          } catch (error: any) {
+            console.error('🚨 Erro detalhado:', error);
+            console.error('🚨 Resposta do servidor:', error.response?.data);
+            console.error('🚨 Status:', error.response?.status);
+            console.error('🚨 Headers:', error.response?.headers);
+            
+            // Tratar erros de validação específicos
+            if (error.response?.status === 400) {
+              const validationErrors = error.response?.data?.message || error.response?.data;
+              console.error('🚨 Erros de validação:', validationErrors);
+              console.error('🚨 Dados completos da resposta:', error.response?.data);
+              
+              // Se for um array de erros de validação
+              if (Array.isArray(validationErrors)) {
+                console.error('🚨 Array de erros:', validationErrors);
+                const errorMessages = validationErrors.map((err: any, index: number) => {
+                  console.error(`🚨 Erro ${index}:`, err);
+                  const property = err.property || err.field || 'campo';
+                  const constraints = err.constraints || err.messages || err.message || 'erro desconhecido';
+                  const constraintValues = typeof constraints === 'object' ? Object.values(constraints) : [constraints];
+                  return `${property}: ${constraintValues.join(', ')}`;
+                }).join('\n');
+                throw new Error(`Erro de validação:\n${errorMessages}`);
+              }
+              
+              // Se for uma string de erro
+              if (typeof validationErrors === 'string') {
+                throw new Error(`Erro de validação: ${validationErrors}`);
+              }
+              
+              // Se for um objeto de erro
+              if (typeof validationErrors === 'object' && validationErrors !== null) {
+                const errorMessages = Object.entries(validationErrors).map(([key, value]) => 
+                  `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
+                ).join('\n');
+                throw new Error(`Erro de validação:\n${errorMessages}`);
+              }
+            }
+            
+            throw error;
+          }
+          
+          console.log('✅ Produto criado com sucesso:', result);
+          console.log('🖼️ Imagens do produto:', result.imageUrls);
+          console.log('🖼️ Imagem principal:', result.imageUrl);
+          
+          toast.success('Produto criado com sucesso!', {
+            description: `${editedProduct.name} foi criado.`,
+            duration: 4000,
           });
-          toast.error('Erro no upload de imagens', {
-            description: `Erro: ${uploadError.message || 'Erro desconhecido'}`,
-            duration: 6000,
-          });
-          return;
         }
-      } else {
-        console.log('ℹ️ Nenhuma imagem nova para upload');
       }
-
-        // Adicionar URLs das imagens aos dados do produto
-        const finalProductData = {
-          ...productData,
-          imageUrls: [...existingImages, ...uploadedImageUrls]
-        };
-
-        console.log('📦 Dados finais do produto:', finalProductData);
-
-        // Criar novo produto
-        try {
-          result = await adminAPI.createProduct(finalProductData);
-        } catch (error: any) {
-          console.error('🚨 Erro detalhado:', error);
-          console.error('🚨 Resposta do servidor:', error.response?.data);
-          console.error('🚨 Status:', error.response?.status);
-          console.error('🚨 Headers:', error.response?.headers);
-          
-          // Tratar erros de validação específicos
-          if (error.response?.status === 400) {
-            const validationErrors = error.response?.data?.message || error.response?.data;
-            console.error('🚨 Erros de validação:', validationErrors);
-            console.error('🚨 Dados completos da resposta:', error.response?.data);
-            
-            // Se for um array de erros de validação
-            if (Array.isArray(validationErrors)) {
-              console.error('🚨 Array de erros:', validationErrors);
-              const errorMessages = validationErrors.map((err: any, index: number) => {
-                console.error(`🚨 Erro ${index}:`, err);
-                const property = err.property || err.field || 'campo';
-                const constraints = err.constraints || err.messages || err.message || 'erro desconhecido';
-                const constraintValues = typeof constraints === 'object' ? Object.values(constraints) : [constraints];
-                return `${property}: ${constraintValues.join(', ')}`;
-              }).join('\n');
-              throw new Error(`Erro de validação:\n${errorMessages}`);
-            }
-            
-            // Se for uma string de erro
-            if (typeof validationErrors === 'string') {
-              throw new Error(`Erro de validação: ${validationErrors}`);
-            }
-            
-            // Se for um objeto de erro
-            if (typeof validationErrors === 'object' && validationErrors !== null) {
-              const errorMessages = Object.entries(validationErrors).map(([key, value]) => 
-                `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
-              ).join('\n');
-              throw new Error(`Erro de validação:\n${errorMessages}`);
-            }
-          }
-          
-          throw error;
-        }
-        
-        console.log('✅ Produto criado com sucesso:', result);
-        console.log('🖼️ Imagens do produto:', result.imageUrls);
-        console.log('🖼️ Imagem principal:', result.imageUrl);
-        
-        toast.success('Produto criado com sucesso!', {
-          description: `${editedProduct.name} foi criado.`,
-          duration: 4000,
-        });
-      } else {
+      
+      // Modo de edição
+      if (mode === 'edit' && editedProduct.id) {
         // Fazer upload das novas imagens (se houver)
         let newUploadedImageUrls: string[] = [];
         if (uploadedImages.length > 0) {
@@ -349,31 +391,45 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
           }
         }
 
+        // Para edição, manter o modelo 3D existente ou deixar indefinido
+        // A geração de 3D na edição pode ser implementada depois se necessário
+        let updatedModel3DUrl = product?.model3DUrl;
+
         // Atualizar produto existente
-        result = await adminAPI.updateProduct(editedProduct.id, {
-          name: editedProduct.name,
-          description: editedProduct.description,
-          category: editedProduct.category,
-          price: editedProduct.price,
-          stock: editedProduct.stock,
-          sku: editedProduct.sku,
-          isActive: editedProduct.isActive,
-          colorName: editedProduct.colorName,
-          colorHex: editedProduct.colorHex,
-          brand: editedProduct.brand,
-          supplierId: editedProduct.supplierId,
-          width: editedProduct.width,
-          height: editedProduct.height,
-          depth: editedProduct.depth,
-          weight: editedProduct.weight,
-          style: editedProduct.style,
-          imageUrls: [...existingImages, ...newUploadedImageUrls],
-        });
-        
-        toast.success('Produto atualizado com sucesso!', {
-          description: `${editedProduct.name} foi atualizado.`,
-          duration: 4000,
-        });
+        try {
+          result = await adminAPI.updateProduct(editedProduct.id, {
+            name: editedProduct.name,
+            description: editedProduct.description,
+            category: editedProduct.category,
+            price: editedProduct.price,
+            stock: editedProduct.stock,
+            sku: editedProduct.sku,
+            isActive: editedProduct.isActive,
+            colorName: editedProduct.colorName,
+            colorHex: editedProduct.colorHex,
+            brand: editedProduct.brand,
+            supplierId: editedProduct.supplierId,
+            width: editedProduct.width,
+            height: editedProduct.height,
+            depth: editedProduct.depth,
+            weight: editedProduct.weight,
+            style: editedProduct.style,
+            imageUrls: [...existingImages, ...newUploadedImageUrls],
+            model3DUrl: updatedModel3DUrl, // Incluir modelo 3D atualizado
+          });
+          
+          toast.success('Produto atualizado com sucesso!', {
+            description: `${editedProduct.name} foi atualizado.`,
+            duration: 4000,
+          });
+        } catch (error: any) {
+          console.error('🚨 Erro ao atualizar produto:', error);
+          throw error;
+        }
+      }
+
+      if (!result) {
+        throw new Error('Nenhuma operação foi realizada');
       }
 
       onProductUpdated(result);
@@ -802,14 +858,28 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                           />
                           <span className="text-sm text-gray-700">Produto Ativo</span>
                         </label>
+                        <label className="flex items-center ml-4">
+                          <input
+                            type="checkbox"
+                            checked={editedProduct?.is3D || false}
+                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, is3D: e.target.checked } : null)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-700">Gerar Modelo 3D</span>
+                        </label>
                       </div>
                     ) : (
-                      <div className="mt-1">
+                      <div className="mt-1 space-y-2">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                           product?.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}>
                           {product?.isActive ? 'Ativo' : 'Inativo'}
                         </span>
+                        {product?.model3DUrl && (
+                          <span className="ml-2 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                            3D Disponível
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

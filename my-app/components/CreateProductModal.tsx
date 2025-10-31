@@ -43,7 +43,8 @@ export default function CreateProductModal({ isOpen, onClose, onProductCreated }
     isFeatured: false,
     isNew: false,
     isBestSeller: false,
-    isAvailable: true
+    isAvailable: true,
+    is3D: false
   });
 
   const categories = [
@@ -194,7 +195,8 @@ export default function CreateProductModal({ isOpen, onClose, onProductCreated }
         isFeatured: false,
         isNew: false,
         isBestSeller: false,
-        isAvailable: true
+        isAvailable: true,
+        is3D: false
       });
       setSelectedImages([]);
       setImagePreviews([]);
@@ -570,7 +572,7 @@ export default function CreateProductModal({ isOpen, onClose, onProductCreated }
 
                   {/* Checkboxes */}
                   <div className="space-y-2">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-4 flex-wrap gap-y-2">
                       <label className="flex items-center">
                         <input
                           type="checkbox"
@@ -599,6 +601,16 @@ export default function CreateProductModal({ isOpen, onClose, onProductCreated }
                           className="mr-2"
                         />
                         <span className="text-sm">Mais Vendido</span>
+                      </label>
+
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={productData.is3D}
+                          onChange={(e) => setProductData(prev => ({ ...prev, is3D: e.target.checked }))}
+                          className="mr-2"
+                        />
+                        <span className="text-sm">Gerar Modelo 3D</span>
                       </label>
                     </div>
                   </div>

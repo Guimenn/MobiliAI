@@ -30,6 +30,7 @@ interface Product {
   brand?: string;
   stock: number;
   isActive: boolean;
+  model3DUrl?: string;
   model3D?: {
     modelUrl: string;
     previewUrl?: string;
@@ -159,7 +160,8 @@ function ProductModel({ product, color }: { product: Product; color: string }) {
   };
 
   // Verificar se há um modelo 3D real para carregar
-  if (product.model3D?.modelUrl) {
+  const modelUrl = product.model3DUrl || product.model3D?.modelUrl;
+  if (modelUrl) {
     return (
       <Suspense fallback={
         <mesh position={[0, 0, 0]}>
@@ -168,7 +170,7 @@ function ProductModel({ product, color }: { product: Product; color: string }) {
         </mesh>
       }>
         <GLTFModel 
-          modelUrl={product.model3D.modelUrl}
+          modelUrl={modelUrl}
           color={color}
         />
       </Suspense>

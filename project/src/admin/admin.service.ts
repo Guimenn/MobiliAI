@@ -2,13 +2,15 @@ import { Injectable, ForbiddenException, NotFoundException, BadRequestException 
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole, ProductCategory, ProductStyle, MaterialType } from '@prisma/client';
 import { UploadService } from '../upload/upload.service';
+import { TrellisService } from '../trellis/trellis.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AdminService {
   constructor(
     private prisma: PrismaService,
-    private uploadService: UploadService
+    private uploadService: UploadService,
+    private trellisService: TrellisService
   ) {}
 
   // ==================== DASHBOARD E ESTATÍSTICAS ====================
@@ -643,6 +645,7 @@ export class AdminService {
     isAvailable?: boolean;
     storeId: string;
     supplierId?: string;
+    is3D?: boolean;
   }, files?: Express.Multer.File[]) {
     // Verificar se loja existe
     const store = await this.prisma.store.findUnique({
@@ -662,12 +665,13 @@ export class AdminService {
       }
     }
 
-    // Criar produto primeiro
+    // Criar produto primeiro (remover is3D pois não é campo do Prisma)
+    const { is3D, ...productDataForDb } = productData;
     const product = await this.prisma.product.create({
       data: {
-        ...productData,
-        minStock: productData.minStock || 0,
-        isAvailable: productData.isAvailable ?? true
+        ...productDataForDb,
+        minStock: productDataForDb.minStock || 0,
+        isAvailable: productDataForDb.isAvailable ?? true
       },
       include: {
         store: { select: { id: true, name: true } },
@@ -680,12 +684,27 @@ export class AdminService {
       try {
         const imageUrls = await this.uploadService.uploadMultipleProductImages(files, product.id);
         
-        // Atualizar produto com as imagens
+        // Se is3D está marcado, gerar modelo 3D
+        let model3DUrl: string | undefined = undefined;
+        if (is3D && files[0]) {
+          try {
+            console.log('🎨 Gerando modelo 3D com TRELLIS...');
+            const result = await this.trellisService.generate3DModel(files[0]);
+            model3DUrl = result.glbUrl;
+            console.log('✅ Modelo 3D gerado:', model3DUrl);
+          } catch (error) {
+            console.error('❌ Erro ao gerar modelo 3D:', error);
+            // Continuar mesmo se falhar a geração 3D
+          }
+        }
+        
+        // Atualizar produto com as imagens e modelo 3D
         const updatedProduct = await this.prisma.product.update({
           where: { id: product.id },
           data: { 
             imageUrls,
-            imageUrl: imageUrls[0] // Primeira imagem como principal
+            imageUrl: imageUrls[0], // Primeira imagem como principal
+            model3DUrl
           },
           include: {
             store: { select: { id: true, name: true } },
@@ -721,6 +740,35 @@ export class AdminService {
         supplier: { select: { id: true, name: true } }
       }
     });
+  }
+
+  async generate3DForProduct(id: string, image?: Express.Multer.File) {
+    if (!image) {
+      throw new BadRequestException('Imagem é obrigatória para gerar modelo 3D');
+    }
+
+    try {
+      console.log('🎨 Gerando modelo 3D para produto existente...');
+      const result = await this.trellisService.generate3DModel(image);
+      
+      // Atualizar produto com o modelo 3D gerado
+      const updatedProduct = await this.prisma.product.update({
+        where: { id },
+        data: { 
+          model3DUrl: result.glbUrl
+        },
+        include: {
+          store: { select: { id: true, name: true } },
+          supplier: { select: { id: true, name: true } }
+        }
+      });
+
+      console.log('✅ Modelo 3D gerado e salvo:', result.glbUrl);
+      return updatedProduct;
+    } catch (error) {
+      console.error('❌ Erro ao gerar modelo 3D:', error);
+      throw new BadRequestException(`Erro ao gerar modelo 3D: ${error.message}`);
+    }
   }
 
   async deleteProduct(id: string) {
@@ -1444,5 +1492,300 @@ export class AdminService {
       isLate,
       minutesLate
     };
+  }
+
+  // ==================== RELATÓRIOS ====================
+
+  async getAllReports() {
+    return this.prisma.report.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async createReport(reportData: {
+    name: string;
+    type: string;
+    period: string;
+    status: string;
+    data?: any;
+    userId?: string;
+    storeId?: string;
+  }) {
+    return this.prisma.report.create({
+      data: reportData
+    });
+  }
+
+  async deleteReport(id: string) {
+    return this.prisma.report.delete({
+      where: { id }
+    });
+  }
+
+  async generateDailyReport(date: Date = new Date()) {
+    // Definir início e fim do dia
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Buscar todas as lojas
+    const stores = await this.prisma.store.findMany({
+      include: {
+        products: true
+      }
+    });
+
+    // Buscar vendas do dia
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        createdAt: {
+          gte: startOfDay,
+          lte: endOfDay
+        }
+      },
+      include: {
+        customer: true,
+        employee: true,
+        store: true,
+        items: {
+          include: {
+            product: true
+          }
+        }
+      }
+    });
+
+    // Buscar registros de ponto do dia
+    const timeClocks = await this.prisma.timeClock.findMany({
+      where: {
+        date: date.toISOString().split('T')[0]
+      },
+      include: {
+        employee: true
+      }
+    });
+
+    // Buscar caixas do dia
+    const dailyCash = await this.prisma.dailyCash.findMany({
+      where: {
+        date: {
+          gte: startOfDay,
+          lte: endOfDay
+        }
+      },
+      include: {
+        store: true,
+        user: true
+      }
+    });
+
+    // Calcular métricas gerais
+    const totalRevenue = sales.reduce((sum, sale) => sum + Number(sale.totalAmount || 0), 0);
+    const totalSales = sales.length;
+    const averageTicket = totalSales > 0 ? totalRevenue / totalSales : 0;
+    
+    // Métricas por método de pagamento
+    const paymentMethods = sales.reduce((acc, sale) => {
+      const method = sale.paymentMethod;
+      if (!acc[method]) {
+        acc[method] = { count: 0, total: 0 };
+      }
+      acc[method].count++;
+      acc[method].total += Number(sale.totalAmount || 0);
+      return acc;
+    }, {} as Record<string, { count: number; total: number }>);
+
+    // Métricas por loja
+    const storeMetrics = stores.map(store => {
+      const storeSales = sales.filter(s => s.storeId === store.id);
+      const storeRevenue = storeSales.reduce((sum, sale) => sum + Number(sale.totalAmount || 0), 0);
+      const storeDailyCash = dailyCash.find(dc => dc.storeId === store.id);
+      
+      return {
+        storeId: store.id,
+        storeName: store.name,
+        totalSales: storeSales.length,
+        totalRevenue: storeRevenue,
+        averageTicket: storeSales.length > 0 ? storeRevenue / storeSales.length : 0,
+        isActive: store.isActive,
+        openingAmount: storeDailyCash?.openingAmount ? Number(storeDailyCash.openingAmount) : 0,
+        closingAmount: storeDailyCash?.closingAmount ? Number(storeDailyCash.closingAmount) : 0,
+        hasCashOpen: !!storeDailyCash?.isOpen
+      };
+    });
+
+    // Métricas por vendedor
+    const employeeMetrics = sales.reduce((acc, sale) => {
+      const employeeId = sale.employeeId;
+      if (!acc[employeeId]) {
+        acc[employeeId] = {
+          employeeId: employeeId,
+          employeeName: sale.employee?.name || 'Desconhecido',
+          storeName: sale.store?.name || 'Sem loja',
+          totalSales: 0,
+          totalRevenue: 0,
+          sales: []
+        };
+      }
+      acc[employeeId].totalSales++;
+      acc[employeeId].totalRevenue += Number(sale.totalAmount || 0);
+      acc[employeeId].sales.push(sale);
+      return acc;
+    }, {} as Record<string, any>);
+
+    const topEmployees = Object.values(employeeMetrics)
+      .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue)
+      .slice(0, 10);
+
+    // Métricas de presença
+    const attendanceMetrics = {
+      totalEmployees: Object.keys(timeClocks.reduce((acc, tc) => {
+        acc[tc.employeeId] = true;
+        return acc;
+      }, {} as Record<string, boolean>)).length,
+      totalLates: timeClocks.filter(tc => (tc.minutesLate || 0) > 0).length,
+      totalOvertime: timeClocks.filter(tc => (tc.overtimeHours || 0) > 0).length,
+      averageHours: timeClocks.length > 0 
+        ? timeClocks.reduce((sum, tc) => sum + (tc.totalHours || 0), 0) / timeClocks.length 
+        : 0
+    };
+
+    // Métricas de produtos
+    const productMetrics = sales.reduce((acc, sale) => {
+      sale.items.forEach(item => {
+        const productId = item.productId;
+        const product = item.product;
+        if (!acc[productId]) {
+          acc[productId] = {
+            productId,
+            productName: product?.name || 'Desconhecido',
+            category: product?.category || 'OUTROS',
+            quantity: 0,
+            revenue: 0
+          };
+        }
+        acc[productId].quantity += item.quantity;
+        acc[productId].revenue += Number(item.totalPrice || 0);
+      });
+      return acc;
+    }, {} as Record<string, any>);
+
+    const topProducts = Object.values(productMetrics)
+      .sort((a: any, b: any) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    // Buscar vendas dos últimos 7 dias para gráfico de tendência
+    const sevenDaysAgo = new Date(date);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const recentSales = await this.prisma.sale.findMany({
+      where: {
+        createdAt: {
+          gte: sevenDaysAgo,
+          lte: endOfDay
+        }
+      },
+      select: {
+        createdAt: true,
+        totalAmount: true
+      }
+    });
+
+    // Processar vendas por período (últimos 7 dias)
+    const salesByPeriodMap = new Map<string, number>();
+    recentSales.forEach(sale => {
+      const saleDate = new Date(sale.createdAt);
+      const dateKey = saleDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const currentAmount = salesByPeriodMap.get(dateKey) || 0;
+      salesByPeriodMap.set(dateKey, currentAmount + Number(sale.totalAmount || 0));
+    });
+
+    // Converter para array e ordenar
+    const salesByPeriod = Array.from(salesByPeriodMap.entries())
+      .map(([date, revenue]) => ({ date, revenue }))
+      .sort((a, b) => {
+        const dateA = a.date.split('/').reverse().join('-');
+        const dateB = b.date.split('/').reverse().join('-');
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
+      })
+      .slice(-7); // Últimos 7 dias
+
+    // Construir relatório completo
+    const report = {
+      date: date.toISOString().split('T')[0],
+      generatedAt: new Date().toISOString(),
+      
+      // Resumo geral
+      summary: {
+        totalRevenue,
+        totalSales,
+        averageTicket,
+        totalStores: stores.length,
+        activeStores: stores.filter(s => s.isActive).length
+      },
+      
+      // Métricas de pagamento
+      paymentMethods: Object.entries(paymentMethods).map(([method, data]: [string, any]) => ({
+        method,
+        count: data.count,
+        total: data.total,
+        percentage: totalSales > 0 ? (data.count / totalSales * 100) : 0
+      })),
+      
+      // Métricas por loja
+      stores: storeMetrics.sort((a, b) => b.totalRevenue - a.totalRevenue),
+      
+      // Top vendedores
+      topEmployees: topEmployees,
+      
+      // Métricas de presença
+      attendance: attendanceMetrics,
+      
+      // Top produtos (já processados)
+      topProducts: topProducts.map((p: any) => ({
+        productId: p.productId,
+        productName: p.productName,
+        category: p.category,
+        quantity: p.quantity,
+        revenue: p.revenue
+      })),
+      
+      // Análise de clientes
+      customers: {
+        total: Object.keys(sales.reduce((acc, sale) => {
+          if (sale.customerId) acc[sale.customerId] = true;
+          return acc;
+        }, {} as Record<string, boolean>)).length,
+        newCustomers: sales.filter(sale => sale.customer?.createdAt && new Date(sale.customer.createdAt) >= startOfDay).length
+      },
+
+      // Dados para gráficos
+      charts: {
+        // Vendas por período (últimos 7 dias)
+        salesByPeriod: salesByPeriod,
+        
+        // Top 5 produtos para gráfico
+        topProductsChart: topProducts.slice(0, 5).map((p: any) => ({
+          name: p.productName,
+          quantity: p.quantity,
+          revenue: p.revenue
+        }))
+      }
+    };
+
+    // Salvar relatório no banco
+    const savedReport = await this.prisma.report.create({
+      data: {
+        name: `Relatório Diário - ${date.toLocaleDateString('pt-BR')}`,
+        type: 'daily',
+        period: date.toISOString().split('T')[0],
+        status: 'completed',
+        data: report as any
+      }
+    });
+
+    return savedReport;
   }
 }

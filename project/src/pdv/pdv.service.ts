@@ -132,6 +132,10 @@ export class PdvService {
       return sum + (Number(product.price) * item.quantity);
     }, 0);
 
+    // Determinar status baseado no método de pagamento
+    // Vendas físicas devem ser COMPLETED, exceto cartão de crédito (PENDING para pagamento posterior)
+    const saleStatus = createSaleDto.paymentMethod === 'CREDIT_CARD' ? 'PENDING' : 'COMPLETED';
+
     // Criar venda
     const sale = await this.prisma.sale.create({
       data: {
@@ -139,7 +143,7 @@ export class PdvService {
         totalAmount,
         discount: createSaleDto.discount || 0,
         tax: createSaleDto.tax || 0,
-        status: 'PENDING',
+        status: saleStatus,
         paymentMethod: createSaleDto.paymentMethod,
         paymentReference: createSaleDto.paymentReference,
         notes: createSaleDto.notes,

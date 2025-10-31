@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { AdminService } from './admin.service';
 import { AdminCategoriesService } from './admin-categories.service';
 import { AdminSystemService } from './admin-system.service';
@@ -313,7 +314,16 @@ export class AdminController {
   }
 
   @Post('products')
-  async createProduct(@Body() productData: CreateProductDto) {
+  @UseInterceptors(FilesInterceptor('images', 10))
+  async createProduct(
+    @Body() productData: CreateProductDto,
+    @UploadedFiles() files?: Express.Multer.File[]
+  ) {
+    // Se há arquivos enviados, usar createProductWithImages
+    if (files && files.length > 0) {
+      return this.adminService.createProductWithImages(productData as any, files);
+    }
+    // Caso contrário, usar createProduct normal
     return this.adminService.createProduct(productData as any);
   }
 
@@ -323,6 +333,16 @@ export class AdminController {
     @Body() productData: any
   ) {
     return this.adminService.updateProduct(id, productData);
+  }
+
+  @Post('products/:id/generate-3d')
+  @UseInterceptors(FilesInterceptor('images', 1))
+  async generate3DForProduct(
+    @Param('id') id: string,
+    @UploadedFiles() files?: Express.Multer.File[]
+  ) {
+    console.log('📥 Recebida requisição para gerar 3D. Files recebidos:', files?.length || 0);
+    return this.adminService.generate3DForProduct(id, files?.[0]);
   }
 
   @Delete('products/:id')
@@ -546,5 +566,36 @@ export class AdminController {
   @Get('performance')
   async getPerformanceReport() {
     return this.adminNotificationsService.getPerformanceReport();
+  }
+
+  // ==================== RELATÓRIOS SALVOS ====================
+
+  @Get('reports')
+  async getAllReports() {
+    return this.adminService.getAllReports();
+  }
+
+  @Post('reports')
+  async createReport(@Body() reportData: {
+    name: string;
+    type: string;
+    period: string;
+    status: string;
+    data?: any;
+    userId?: string;
+    storeId?: string;
+  }) {
+    return this.adminService.createReport(reportData);
+  }
+
+  @Post('reports/generate-daily')
+  async generateDailyReport(@Query('date') date?: string) {
+    const reportDate = date ? new Date(date) : new Date();
+    return this.adminService.generateDailyReport(reportDate);
+  }
+
+  @Delete('reports/:id')
+  async deleteReport(@Param('id') id: string) {
+    return this.adminService.deleteReport(id);
   }
 }

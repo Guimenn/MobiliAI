@@ -489,6 +489,74 @@ function ProductsSection({ products, isLoading, token, onProductsChange, onDelet
     setProductFor3D(null);
   };
 
+  const handleGenerate3D = async (product: any) => {
+    if (!product.imageUrls || product.imageUrls.length === 0) {
+      toast.error('Produto sem imagem', {
+        description: 'Produto precisa ter pelo menos uma imagem para gerar modelo 3D.',
+        duration: 4000,
+      });
+      return;
+    }
+
+    try {
+      toast.info('Gerando modelo 3D...', {
+        description: 'Isso pode levar alguns minutos.',
+        duration: 3000,
+      });
+
+      // Download da primeira imagem do produto
+      const response = await fetch(product.imageUrls[0]);
+      const blob = await response.blob();
+      const file = new File([blob], 'product-image.jpg', { type: blob.type });
+      
+      console.log('📤 Download da imagem:', {
+        url: product.imageUrls[0],
+        size: blob.size,
+        type: blob.type,
+        fileName: file.name
+      });
+
+      // Criar FormData para enviar ao backend
+      const formData = new FormData();
+      formData.append('images', file);
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+      console.log('📤 Enviando para:', `${API_BASE_URL}/admin/products/${product.id}/generate-3d`);
+      
+      const backendResponse = await fetch(`${API_BASE_URL}/admin/products/${product.id}/generate-3d`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData
+      });
+      
+      console.log('📥 Resposta do backend:', backendResponse.status, backendResponse.statusText);
+
+      if (!backendResponse.ok) {
+        const errorData = await backendResponse.json().catch(() => ({ message: 'Erro desconhecido' }));
+        console.error('❌ Erro do backend:', errorData);
+        throw new Error(errorData.message || 'Erro ao gerar modelo 3D');
+      }
+
+      const result = await backendResponse.json();
+      
+      toast.success('Modelo 3D gerado!', {
+        description: 'Produto atualizado com sucesso.',
+        duration: 4000,
+      });
+
+      // Recarregar produtos
+      onProductsChange();
+    } catch (error: any) {
+      console.error('Erro ao gerar modelo 3D:', error);
+      toast.error('Erro ao gerar modelo 3D', {
+        description: error.message || 'Tente novamente mais tarde.',
+        duration: 4000,
+      });
+    }
+  };
+
   const handlePhotoTo3DConverted = (model3D: any) => {
     // Recarregar produtos após conversão
     onProductsChange();
@@ -783,6 +851,15 @@ function ProductsSection({ products, isLoading, token, onProductsChange, onDelet
                           <Button 
                             variant="ghost" 
                             size="sm" 
+                            className={`h-8 w-8 p-0 ${product.model3DUrl ? 'text-purple-600 hover:text-purple-700' : 'text-gray-400 hover:text-gray-600'}`}
+                            onClick={product.model3DUrl ? () => handleView3D(product) : () => handleGenerate3D(product)}
+                            title={product.model3DUrl ? "Visualizar 3D" : "Gerar Modelo 3D"}
+                          >
+                            <Box className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
                             className="h-8 w-8 p-0"
                             onClick={() => handleViewProduct(product)}
                           >
@@ -885,6 +962,15 @@ function ProductsSection({ products, isLoading, token, onProductsChange, onDelet
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex items-center space-x-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className={`h-8 w-8 p-0 ${product.model3DUrl ? 'text-purple-600 hover:text-purple-700' : 'text-gray-400 hover:text-gray-600'}`}
+                                onClick={product.model3DUrl ? () => handleView3D(product) : () => handleGenerate3D(product)}
+                                title={product.model3DUrl ? "Visualizar 3D" : "Gerar Modelo 3D"}
+                              >
+                                <Box className="h-4 w-4" />
+                              </Button>
                               <Button 
                                 variant="ghost" 
                                 size="sm" 

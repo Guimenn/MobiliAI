@@ -41,6 +41,7 @@ model User {
   sales             Sale[]              @relation("EmployeeSales")
   systemLogs        SystemLog[]
   timeClockRecords  TimeClock[]
+  reports           Report[]
   store             Store?              @relation(fields: [storeId], references: [id])
 
   @@map("users")
@@ -73,6 +74,7 @@ model Store {
   products     Product[]
   sales        Sale[]
   employees    User[]
+  reports      Report[]
 
   @@map("stores")
 }
@@ -103,6 +105,7 @@ model Product {
   imageUrl           String?
   imageUrls          String[]
   videoUrl           String?
+  model3DUrl         String?
   tags               String[]
   keywords           String[]
   isFeatured         Boolean                @default(false)
@@ -527,3 +530,20 @@ enum MaterialType {
   COURO
   TECIDO
   }
+
+model Report {
+  id          String      @id @default(uuid())
+  name        String
+  type        String
+  period      String
+  status      String
+  data        Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  userId      String?
+  storeId     String?
+  user        User?       @relation(fields: [userId], references: [id])
+  store       Store?      @relation(fields: [storeId], references: [id])
+
+  @@map("reports")
+}

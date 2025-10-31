@@ -1,4 +1,5 @@
 import { IsString, IsNumber, IsEnum, IsOptional, IsUUID, IsArray, IsBoolean, Min, MaxLength } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { ProductCategory, ProductStyle, MaterialType } from '@prisma/client';
 
 export class CreateProductDto {
@@ -14,20 +15,24 @@ export class CreateProductDto {
   @IsEnum(ProductCategory)
   category: ProductCategory;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   price: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   costPrice?: number;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   stock: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   minStock?: number;
@@ -56,21 +61,25 @@ export class CreateProductDto {
   material?: MaterialType;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   width?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   height?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   depth?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   weight?: number;
@@ -111,19 +120,48 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   isFeatured?: boolean;
 
   @IsOptional()
   @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   isNew?: boolean;
 
   @IsOptional()
   @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   isBestSeller?: boolean;
 
   @IsOptional()
   @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   isAvailable?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  is3D?: boolean;
 
   @IsUUID()
   storeId: string;

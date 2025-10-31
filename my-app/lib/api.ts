@@ -434,6 +434,29 @@ export const adminAPI = {
     return response.data;
   },
 
+  createReport: async (reportData: any) => {
+    const response = await api.post('/admin/reports', reportData);
+    return response.data;
+  },
+
+  generateDailyReport: async (date?: string) => {
+    const url = date 
+      ? `/admin/reports/generate-daily?date=${encodeURIComponent(date)}`
+      : '/admin/reports/generate-daily';
+    const response = await api.post(url);
+    return response.data;
+  },
+
+  deleteReport: async (id: string) => {
+    const response = await api.delete(`/admin/reports/${id}`);
+    return response.data;
+  },
+
+  // Sales
+  getSales: async () => {
+    const response = await api.get('/admin/sales');
+    return response.data;
+  },
 
   // Stores
   getStores: async () => {

@@ -11,6 +11,7 @@ import { StoresModule } from '../stores/stores.module';
 import { SalesModule } from '../sales/sales.module';
 import { FinancialModule } from '../financial/financial.module';
 import { UploadModule } from '../upload/upload.module';
+import { TrellisModule } from '../trellis/trellis.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UploadModule } from '../upload/upload.module';
     SalesModule,
     FinancialModule,
     UploadModule,
+    TrellisModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, AdminCategoriesService, AdminSystemService, AdminNotificationsService],

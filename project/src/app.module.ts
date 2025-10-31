@@ -22,6 +22,7 @@ import { UploadModule } from './upload/upload.module';
 import { TimeClockModule } from './time-clock/time-clock.module';
 import { TimeClockService } from './time-clock/time-clock.service';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { TrellisModule } from './trellis/trellis.module';
 
 
 @Module({
@@ -54,6 +55,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     UploadModule,
     TimeClockModule,
     DashboardModule,
+    TrellisModule,
   ],
   controllers: [AppController],
   providers: [AppService, TimeClockService],
