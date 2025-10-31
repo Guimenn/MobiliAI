@@ -42,13 +42,14 @@ model User {
   systemLogs        SystemLog[]
   timeClockRecords  TimeClock[]
   reports           Report[]
+  passwordResets    PasswordReset[]
   store             Store?              @relation(fields: [storeId], references: [id])
 
   @@map("users")
 }
 
 model Store {
-  id           String      @id @default(uuid())
+  id           String           @id @default(uuid())
   name         String
   address      String
   city         String
@@ -56,9 +57,9 @@ model Store {
   zipCode      String
   phone        String?
   email        String?
-  isActive     Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
   description  String?
   settings     Json?
   workingHours Json?
@@ -132,7 +133,7 @@ model Product {
   store              Store                  @relation(fields: [storeId], references: [id])
   supplier           Supplier?              @relation(fields: [supplierId], references: [id])
   saleItems          SaleItem[]
-  storeInventory    StoreInventory[]
+  storeInventory     StoreInventory[]
 
   @@map("products")
 }
@@ -529,39 +530,53 @@ enum MaterialType {
   METAL
   COURO
   TECIDO
-  }
+}
 
 model Report {
-  id          String      @id @default(uuid())
-  name        String
-  type        String
-  period      String
-  status      String
-  data        Json?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  userId      String?
-  storeId     String?
-  user        User?       @relation(fields: [userId], references: [id])
-  store       Store?      @relation(fields: [storeId], references: [id])
+  id        String   @id @default(uuid())
+  name      String
+  type      String
+  period    String
+  status    String
+  data      Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String?
+  storeId   String?
+  user      User?    @relation(fields: [userId], references: [id])
+  store     Store?   @relation(fields: [storeId], references: [id])
 
   @@map("reports")
 }
 
 model StoreInventory {
-  id          String      @id @default(uuid())
-  quantity    Int         @default(0)
-  minStock    Int         @default(0)
-  maxStock    Int?
-  location     String?     // Localização física do produto na loja (ex: "Prateleira A-3")
-  notes       String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  storeId     String
-  productId   String
-  store       Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  quantity  Int      @default(0)
+  minStock  Int      @default(0)
+  maxStock  Int?
+  location  String? // Localização física do produto na loja (ex: "Prateleira A-3")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  storeId   String
+  productId String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([storeId, productId])
   @@map("store_inventory")
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([email, code])
+  @@map("password_resets")
 }

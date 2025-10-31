@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProductCategory } from '@prisma/client';
 
 @Injectable()
 export class PublicProductsService {
@@ -10,7 +11,7 @@ export class PublicProductsService {
     
     const where: any = {
       isActive: true,
-      stock: { gt: 0 }
+      // Permitir produtos mesmo com estoque 0 para visualização
     };
     
     if (search) {
@@ -24,7 +25,12 @@ export class PublicProductsService {
     }
     
     if (category) {
-      where.category = category;
+      // Converter categoria para formato do enum (uppercase)
+      const categoryUpper = category.toUpperCase();
+      // Verificar se é um valor válido do enum
+      if (Object.values(ProductCategory).includes(categoryUpper as ProductCategory)) {
+        where.category = categoryUpper;
+      }
     }
     
     if (minPrice !== undefined || maxPrice !== undefined) {

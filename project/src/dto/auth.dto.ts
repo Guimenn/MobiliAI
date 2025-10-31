@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsEnum } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, IsEnum, Matches, Length } from 'class-validator';
 import { UserRole } from '@prisma/client';
 
 export class RegisterDto {
@@ -65,4 +65,23 @@ export class ChangePasswordDto {
 export class CheckEmailDto {
   @IsEmail()
   email: string;
+}
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @Length(6, 6, { message: 'O código deve ter exatamente 6 dígitos' })
+  @Matches(/^\d{6}$/, { message: 'O código deve conter apenas números' })
+  code: string;
+
+  @IsString()
+  @MinLength(6)
+  newPassword: string;
 }

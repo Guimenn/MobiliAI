@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { 
   User, 
@@ -271,6 +271,11 @@ export default function EmployeeProfilePage() {
                 {/* Avatar */}
                 <div className="flex flex-col items-center">
                   <Avatar className="h-28 w-28 mb-4 ring-4 ring-[#8B4513]/20">
+                    <AvatarImage 
+                      src={user?.avatarUrl || ''} 
+                      alt={user?.name || 'Usuário'}
+                      className="object-cover"
+                    />
                     <AvatarFallback className="bg-gradient-to-br from-[#3e2626] to-[#8B4513] text-white text-4xl font-bold">
                       {user?.name?.charAt(0) || 'F'}
                     </AvatarFallback>
