@@ -60,6 +60,11 @@ const config: Config = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        market: {
+          yellow: "#fff159",
+          "yellow-dark": "#f4d400",
+          "blue-light": "#3483fa",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

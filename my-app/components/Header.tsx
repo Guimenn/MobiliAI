@@ -173,7 +173,7 @@ export default function Header() {
                 ? 'bg-black/20 backdrop-blur-sm' 
                 : 'bg-white/95 backdrop-blur-md border-b border-gray-200/50 shadow-sm'
         }`}>
-          <div className="max-w-7xl mx-auto px-4 h-30 sm:px-6 lg:px-8">
+          <div className="container mx-auto px-4 h-30 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
             <Link href="/" className="flex items-center">

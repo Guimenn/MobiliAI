@@ -632,16 +632,13 @@ export default function HomePage() {
               {/* Conteúdo: Oferta Especial com cronômetro */}
               {specialOfferProduct ? (
               <div className="flex flex-col md:flex-row items-stretch gap-10">
-                {/* Visual do produto + decoração */}
-                <div className="relative w-full md:w-[420px] lg:w-[500px]">
-                  {/* anéis de fundo */}
-                  <div className="absolute -inset-6 -z-10 hidden md:block">
-                    <div className="absolute inset-0 rounded-full border-2 border-black/5" />
-                    <div className="absolute inset-6 rounded-full border-2 border-black/10" />
-                    <div className="absolute inset-12 rounded-full border-2 border-black/5" />
-                  </div>
+                {/* LADO ESQUERDO - Foto do produto */}
+                <div className="relative w-full md:w-[420px] lg:w-[500px] flex-shrink-0">
+                  {/* Mancha de tinta decorativa orgânica */}
+                  <div className="absolute -top-8 -left-8 w-32 h-32 bg-gray-100/40 rounded-full blur-3xl hidden md:block"></div>
+                  <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-gray-200/30 rounded-full blur-2xl hidden md:block"></div>
 
-                  <div className="w-full h-56 md:h-64 lg:h-72 rounded-2xl overflow-hidden relative shadow-2xl border border-black/5 bg-white">
+                  <div className="w-full h-56 md:h-64 lg:h-72 rounded-3xl overflow-hidden relative shadow-lg border-2 border-gray-200/60 bg-white" style={{ borderRadius: '24px 48px 32px 40px' }}>
                     {/* Product Image - if available */}
                     {specialOfferProduct.imageUrl ? (
                       <Image
@@ -656,100 +653,121 @@ export default function HomePage() {
                       <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent" />
                     )}
 
-                    {/* Selo de desconto */}
-                    <div className="absolute -right-3 top-3">
-                      <div className="bg-white shadow-xl rounded-xl px-3 py-2 text-[#3e2626]">
-                        <div className="text-xl font-extrabold leading-none">30%</div>
-                        <div className="text-[10px] tracking-wider font-semibold text-amber-600">OFF</div>
+                    {/* Selo de desconto - estilo mais artesanal */}
+                    <div className="absolute -right-2 top-4 transform rotate-3">
+                      <div className="bg-[#3e2626] text-white shadow-lg px-4 py-3 rounded-2xl" style={{ borderRadius: '12px 16px 20px 8px' }}>
+                        <div className="text-2xl font-black leading-none transform -rotate-1">30%</div>
+                        <div className="text-[9px] tracking-widest font-bold uppercase mt-0.5 transform rotate-1">OFF</div>
+                        {/* Rabisco decorativo */}
+                        <svg className="absolute -top-1 -right-1 w-4 h-4 text-gray-400" viewBox="0 0 20 20" fill="none">
+                          <path d="M2 5c3 2 6 1 8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
                       </div>
                     </div>
 
-                    {/* Anotação flutuante */}
-                    <div className="absolute left-3 top-3 bg-white/95 backdrop-blur rounded-xl px-3 py-2 shadow-md text-[#3e2626] text-xs font-medium flex items-center gap-2">
-                      <Sofa className="h-4 w-4" /> Conforto premium
+                    {/* Oferta relâmpago - estilo mais orgânico e humano */}
+                    <div className="absolute left-4 top-4 z-20 transform -rotate-1">
+                      <div className="relative inline-flex items-center gap-2 bg-[#3e2626] text-white rounded-2xl px-4 py-2 shadow-lg" style={{ borderRadius: '16px 8px 20px 12px' }}>
+                        <Zap className="h-4 w-4 fill-white transform rotate-12" />
+                        <span className="text-xs md:text-sm font-bold tracking-tight">Oferta relâmpago</span>
+                      </div>
                     </div>
 
-                    {/* Curva decorativa (rabisco) */}
-                    <svg className="absolute -right-6 bottom-8 w-16 h-16 text-black/30" viewBox="0 0 100 100" fill="none">
-                      <path d="M10 60 C 40 10, 60 110, 90 60" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-                      <path d="M85 62 l10 -2 l-6 -8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" fill="none" />
+                    {/* Anotação com estilo de post-it rabiscado */}
+                    <div className="absolute left-4 top-20 bg-gray-50/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md text-[#3e2626] text-xs font-medium flex items-center gap-2 transform rotate-[-2deg] border border-gray-200">
+                      <Sofa className="h-3.5 w-3.5" /> 
+                      <span className="italic">Conforto premium</span>
+                      {/* Pequeno rabisco decorativo */}
+                      <svg className="absolute -right-1 -bottom-1 w-3 h-3 text-gray-300" viewBox="0 0 10 10">
+                        <path d="M2 8 Q5 6 8 8" stroke="currentColor" strokeWidth="1" fill="none"/>
+                      </svg>
+                    </div>
+
+                    {/* Rabisco decorativo orgânico no canto */}
+                    <svg className="absolute -right-8 bottom-12 w-20 h-20 text-gray-200/60 transform rotate-12" viewBox="0 0 100 100" fill="none">
+                      <path d="M10 50 Q30 20, 50 40 T90 50" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+                      <path d="M15 55 Q35 25, 55 45 T95 55" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
                     </svg>
 
-                    {/* Rodapé: etiqueta e timer */}
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-10">
-                      <span className="inline-flex items-center gap-2 bg-white/95 rounded-xl px-3 py-1.5 text-xs md:text-sm font-medium text-[#3e2626] shadow">
-                        Oferta relâmpago
-                      </span>
-                      <span className="inline-flex items-center gap-1 bg-[#3e2626] text-white rounded-xl px-3 py-1.5 text-xs md:text-sm font-semibold shadow">
-                        ⏱ {formatTime(offerSecondsLeft)}
+                    {/* Timer no rodapé - estilo mais casual */}
+                    <div className="absolute bottom-4 right-4 z-10 transform rotate-1">
+                      <span className="inline-flex items-center gap-2 bg-[#3e2626]/95 backdrop-blur-sm text-white rounded-2xl px-4 py-2.5 text-sm font-bold shadow-lg" style={{ borderRadius: '12px 20px 16px 8px' }}>
+                        <Clock className="h-4 w-4" />
+                        {formatTime(offerSecondsLeft)}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Infos e ações */}
-                <div className="flex-1 grid grid-rows-[auto_1fr_auto] gap-6">
+                {/* LADO DIREITO - Informações empilhadas verticalmente */}
+                <div className="flex-1 flex flex-col gap-6">
+                  {/* Título com estilo mais humano */}
                   <div>
-                    <h3 className="text-3xl md:text-4xl font-semibold text-[#3e2626] leading-tight tracking-tight">
+                    <h3 className="text-3xl md:text-4xl font-bold text-[#3e2626] leading-relaxed tracking-normal" style={{ fontFamily: 'inherit' }}>
                       {specialOfferProduct.name}
                     </h3>
-                   
                   </div>
-                    {/* Descrição do produto */}
-                    <div className="mt-3 space-y-3">
-                      <div className="flex items-start gap-3">
-                        <div className="h-7 w-7 rounded-full bg-[#3e2626]/10 text-[#3e2626] flex items-center justify-center">
-                          <Shield className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-[#3e2626]">Qualidade garantida</div>
-                          <div className="text-xs text-gray-600">Até 30% OFF em peças selecionadas</div>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="h-7 w-7 rounded-full bg-[#3e2626]/10 text-[#3e2626] flex items-center justify-center">
-                          <Truck className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-[#3e2626]">Frete otimizado</div>
-                          <div className="text-xs text-gray-600">Envio rápido para principais cidades</div>
-                        </div>
-                      </div>
-                     
-                    </div>
-                  
 
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
-                    {/* Bloco de preços alinhado */}
-                    <div className="flex items-end gap-3">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-semibold text-[#3e2626]">R$</span>
-                        <span className="text-4xl md:text-5xl font-bold text-[#3e2626] leading-none">
-                          {(specialOfferProduct.price ? specialOfferProduct.price * 0.7 : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
+                  {/* Descrição do produto - estilo mais conversacional */}
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 group">
+                      <div className="h-8 w-8 rounded-full bg-gray-100 text-[#3e2626] flex items-center justify-center flex-shrink-0 shadow-sm border border-gray-200 transform group-hover:rotate-6 transition-transform">
+                        <Shield className="h-4 w-4" />
                       </div>
-                      {specialOfferProduct.price && (
-                        <div className="flex items-baseline gap-1 text-gray-500">
-                          <span className="text-xs line-through">R$</span>
-                          <span className="text-lg md:text-2xl line-through">
-                            {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      )}
-                      <span className="ml-1 inline-flex items-center px-2.5 py-1 rounded-lg bg-[#3e2626]/10 text-[#3e2626] text-xs font-semibold">
-                        30% OFF
+                      <div>
+                        <div className="text-base font-bold text-[#3e2626] mb-1">Qualidade garantida</div>
+                        <div className="text-sm text-gray-600 leading-relaxed">Peças selecionadas com até <span className="font-semibold text-[#3e2626]">30% de desconto</span> - uma oportunidade imperdível!</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 group">
+                      <div className="h-8 w-8 rounded-full bg-gray-100 text-[#3e2626] flex items-center justify-center flex-shrink-0 shadow-sm border border-gray-200 transform group-hover:-rotate-6 transition-transform">
+                        <Truck className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-base font-bold text-[#3e2626] mb-1">Entrega rápida</div>
+                        <div className="text-sm text-gray-600 leading-relaxed">Enviamos para as principais cidades em <span className="font-semibold">poucos dias</span>. Rápido e seguro!</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preços - estilo mais destacado e humano */}
+                  <div className="flex flex-wrap items-end gap-3 pt-2">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-base font-bold text-[#3e2626]">R$</span>
+                      <span className="text-4xl md:text-5xl font-black text-[#3e2626] leading-none tracking-tight">
+                        {(specialOfferProduct.price ? specialOfferProduct.price * 0.7 : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
+                    {specialOfferProduct.price && (
+                      <div className="flex items-baseline gap-1 text-gray-400">
+                        <span className="text-sm line-through font-medium">R$</span>
+                        <span className="text-xl md:text-2xl line-through font-semibold">
+                          {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                    <span className="ml-2 inline-flex items-center px-3 py-1.5 rounded-xl bg-[#3e2626] text-white text-sm font-bold shadow-md transform -rotate-1" style={{ borderRadius: '8px 12px 10px 6px' }}>
+                      -30%
+                    </span>
+                  </div>
 
-                    {/* Ações */}
-                    <div className="flex items-center gap-3">
-                      <Button onClick={() => addToCart(specialOfferProduct.id)} className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-2xl px-6 py-3 shadow-md">
-                        Adicionar ao carrinho
-                      </Button>
-                      <Button variant="outline" onClick={() => router.push(`/products?highlight=${specialOfferProduct.id}`)} className="rounded-2xl border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white px-6 py-3">
-                        Ver coleção
-                      </Button>
-                    </div>
+                  {/* Ações - Botões com estilo mais orgânico */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+                    <Button 
+                      onClick={() => addToCart(specialOfferProduct.id)} 
+                      className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-2xl px-8 py-4 shadow-lg hover:shadow-xl transition-all w-full sm:w-auto text-base font-bold transform hover:scale-[1.02] active:scale-[0.98]"
+                      style={{ borderRadius: '16px 20px 18px 14px' }}
+                    >
+                      🛒 Adicionar ao carrinho
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => router.push(`/products?highlight=${specialOfferProduct.id}`)} 
+                      className="rounded-2xl border-2 border-[#3e2626]/40 text-[#3e2626] hover:bg-[#3e2626] hover:text-white hover:border-[#3e2626] px-8 py-4 w-full sm:w-auto text-base font-bold transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+                      style={{ borderRadius: '18px 14px 16px 20px' }}
+                    >
+                      Ver coleção completa →
+                    </Button>
                   </div>
                 </div>
               </div>
