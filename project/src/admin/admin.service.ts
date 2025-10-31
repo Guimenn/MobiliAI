@@ -359,7 +359,7 @@ export class AdminService {
   // ==================== GESTÃO DE LOJAS ====================
 
   async getAllStores() {
-    return this.prisma.store.findMany({
+    const stores = await this.prisma.store.findMany({
         include: {
           _count: {
             select: {
@@ -370,6 +370,27 @@ export class AdminService {
         },
       orderBy: { createdAt: 'desc' }
     });
+
+    // Adicionar contagem de produtos no estoque (StoreInventory) para cada loja
+    const storesWithInventoryCount = await Promise.all(
+      stores.map(async (store) => {
+        // Contar produtos que estão no estoque desta loja
+        const inventoryCount = await this.prisma.storeInventory.count({
+          where: { storeId: store.id }
+        });
+
+        return {
+          ...store,
+          _count: {
+            ...store._count,
+            products: inventoryCount, // Substituir pela contagem do estoque
+            inventoryProducts: inventoryCount // Manter compatibilidade
+          }
+        };
+      })
+    );
+
+    return storesWithInventoryCount;
   }
 
   async getStoreById(id: string) {
@@ -1787,5 +1808,369 @@ export class AdminService {
     });
 
     return savedReport;
+  }
+
+  // ==================== ESTOQUE POR LOJA ====================
+
+  async getStoreInventory(storeId: string) {
+    // Verificar se a loja existe
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId }
+    });
+
+    if (!store) {
+      throw new NotFoundException('Loja não encontrada');
+    }
+
+    // Buscar todos os produtos com seus estoques na loja
+    const inventory = await this.prisma.storeInventory.findMany({
+      where: { storeId },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            category: true,
+            price: true,
+            costPrice: true,
+            sku: true,
+            barcode: true,
+            imageUrl: true,
+            imageUrls: true,
+            brand: true,
+            colorName: true,
+            colorHex: true,
+            isActive: true,
+            isAvailable: true,
+            stock: true
+          }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    // Adicionar informações de estoque disponível para cada item
+    const inventoryWithStockInfo = await Promise.all(
+      inventory.map(async (item) => {
+        // Buscar estoque distribuído em todas as lojas para este produto
+        const allStoreInventory = await this.prisma.storeInventory.findMany({
+          where: { productId: item.productId },
+          select: { quantity: true, storeId: true }
+        });
+
+        const totalDistributed = allStoreInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+        const distributedInOtherStores = allStoreInventory
+          .filter(inv => inv.storeId !== storeId)
+          .reduce((sum, inv) => sum + inv.quantity, 0);
+        const availableForThisStore = Number(item.product.stock) - distributedInOtherStores;
+
+        return {
+          ...item,
+          stockInfo: {
+            totalStock: Number(item.product.stock),
+            totalDistributed,
+            distributedInOtherStores,
+            availableForThisStore
+          }
+        };
+      })
+    );
+
+    return inventoryWithStockInfo;
+  }
+
+  async getAvailableProductsForStore(storeId: string, search?: string) {
+    // Verificar se a loja existe
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId }
+    });
+
+    if (!store) {
+      throw new NotFoundException('Loja não encontrada');
+    }
+
+    // Buscar produtos que já estão no estoque da loja
+    const existingInventory = await this.prisma.storeInventory.findMany({
+      where: { storeId },
+      select: { productId: true }
+    });
+
+    const existingProductIds = existingInventory.map(inv => inv.productId);
+
+    // Buscar produtos que não estão no estoque
+    const whereClause: any = {
+      isActive: true
+    };
+
+    if (existingProductIds.length > 0) {
+      whereClause.id = { notIn: existingProductIds };
+    }
+
+    if (search) {
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+        { barcode: { contains: search, mode: 'insensitive' } },
+        { brand: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        category: true,
+        price: true,
+        sku: true,
+        barcode: true,
+        imageUrl: true,
+        imageUrls: true,
+        brand: true,
+        colorName: true,
+        colorHex: true,
+        isActive: true,
+        isAvailable: true,
+        stock: true
+      },
+      take: 50,
+      orderBy: { name: 'asc' }
+    });
+
+    // Calcular estoque disponível para cada produto
+    const productsWithStock = await Promise.all(
+      products.map(async (product) => {
+        // Buscar estoque já distribuído em todas as lojas para este produto
+        const distributedInventory = await this.prisma.storeInventory.findMany({
+          where: { productId: product.id },
+          select: { quantity: true }
+        });
+
+        const totalDistributed = distributedInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+        const availableStock = Number(product.stock) - totalDistributed;
+
+        return {
+          ...product,
+          stock: Number(product.stock),
+          distributedStock: totalDistributed,
+          availableStock: availableStock
+        };
+      })
+    );
+
+    return productsWithStock;
+  }
+
+  async updateStoreInventory(storeId: string, productId: string, inventoryData: {
+    quantity?: number;
+    minStock?: number;
+    maxStock?: number;
+    location?: string;
+    notes?: string;
+  }) {
+    // Verificar se a loja existe
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId }
+    });
+
+    if (!store) {
+      throw new NotFoundException('Loja não encontrada');
+    }
+
+    // Verificar se o produto existe
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId }
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produto não encontrado');
+    }
+
+    // Verificar se já existe estoque para este produto na loja
+    const existingInventory = await this.prisma.storeInventory.findUnique({
+      where: {
+        storeId_productId: {
+          storeId,
+          productId
+        }
+      }
+    });
+
+    if (existingInventory) {
+      // Se está atualizando a quantidade, validar estoque disponível
+      if (inventoryData.quantity !== undefined) {
+        // Calcular estoque total já distribuído entre todas as lojas (exceto esta loja)
+        const allStoreInventory = await this.prisma.storeInventory.findMany({
+          where: { productId },
+          select: { quantity: true, storeId: true }
+        });
+
+        const totalDistributed = allStoreInventory.reduce((sum, inv) => {
+          // Não incluir o estoque atual desta loja na soma
+          if (inv.storeId !== storeId) {
+            return sum + inv.quantity;
+          }
+          return sum;
+        }, 0);
+
+        const availableStock = Number(product.stock) - totalDistributed;
+
+        // Validar se há estoque suficiente
+        if (inventoryData.quantity > availableStock) {
+          throw new BadRequestException(
+            `Estoque insuficiente! Estoque total do produto: ${product.stock} unidades. ` +
+            `Já distribuído em outras lojas: ${totalDistributed} unidades. ` +
+            `Disponível para esta loja: ${availableStock} unidades. ` +
+            `Você tentou definir: ${inventoryData.quantity} unidades.`
+          );
+        }
+      }
+
+      // Atualizar estoque existente
+      return this.prisma.storeInventory.update({
+        where: { id: existingInventory.id },
+        data: {
+          quantity: inventoryData.quantity !== undefined ? inventoryData.quantity : existingInventory.quantity,
+          minStock: inventoryData.minStock !== undefined ? inventoryData.minStock : existingInventory.minStock,
+          maxStock: inventoryData.maxStock !== undefined ? inventoryData.maxStock : existingInventory.maxStock,
+          location: inventoryData.location !== undefined ? inventoryData.location : existingInventory.location,
+          notes: inventoryData.notes !== undefined ? inventoryData.notes : existingInventory.notes
+        },
+        include: {
+          product: true
+        }
+      });
+    } else {
+      // Se está criando novo estoque com quantidade, validar estoque disponível
+      const requestedQuantity = inventoryData.quantity || 0;
+      
+      if (requestedQuantity > 0) {
+        // Calcular estoque total já distribuído entre todas as lojas
+        const allStoreInventory = await this.prisma.storeInventory.findMany({
+          where: { productId },
+          select: { quantity: true }
+        });
+
+        const totalDistributed = allStoreInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+        const availableStock = Number(product.stock) - totalDistributed;
+
+        // Validar se há estoque suficiente
+        if (requestedQuantity > availableStock) {
+          throw new BadRequestException(
+            `Estoque insuficiente! Estoque total do produto: ${product.stock} unidades. ` +
+            `Já distribuído entre lojas: ${totalDistributed} unidades. ` +
+            `Disponível: ${availableStock} unidades. ` +
+            `Você tentou adicionar: ${requestedQuantity} unidades.`
+          );
+        }
+      }
+
+      // Criar novo registro de estoque
+      return this.prisma.storeInventory.create({
+        data: {
+          storeId,
+          productId,
+          quantity: requestedQuantity,
+          minStock: inventoryData.minStock || 0,
+          maxStock: inventoryData.maxStock,
+          location: inventoryData.location,
+          notes: inventoryData.notes
+        },
+        include: {
+          product: true
+        }
+      });
+    }
+  }
+
+  async addProductToStore(storeId: string, productId: string, initialQuantity: number = 0, minStock: number = 0) {
+    // Verificar se a loja existe
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId }
+    });
+
+    if (!store) {
+      throw new NotFoundException('Loja não encontrada');
+    }
+
+    // Verificar se o produto existe
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId }
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produto não encontrado');
+    }
+
+    // Verificar se já existe estoque
+    const existingInventory = await this.prisma.storeInventory.findUnique({
+      where: {
+        storeId_productId: {
+          storeId,
+          productId
+        }
+      }
+    });
+
+    if (existingInventory) {
+      throw new BadRequestException('Produto já está no estoque desta loja');
+    }
+
+    // Calcular estoque total já distribuído entre todas as lojas
+    const allStoreInventory = await this.prisma.storeInventory.findMany({
+      where: { productId },
+      select: { quantity: true }
+    });
+
+    const totalDistributed = allStoreInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+    const availableStock = Number(product.stock) - totalDistributed;
+
+    // Validar se há estoque suficiente
+    if (initialQuantity > availableStock) {
+      throw new BadRequestException(
+        `Estoque insuficiente! Estoque total do produto: ${product.stock} unidades. ` +
+        `Já distribuído entre lojas: ${totalDistributed} unidades. ` +
+        `Disponível: ${availableStock} unidades. ` +
+        `Você tentou adicionar: ${initialQuantity} unidades.`
+      );
+    }
+
+    // Criar novo registro de estoque
+    return this.prisma.storeInventory.create({
+      data: {
+        storeId,
+        productId,
+        quantity: initialQuantity,
+        minStock: minStock
+      },
+      include: {
+        product: true
+      }
+    });
+  }
+
+  async removeProductFromStore(storeId: string, productId: string) {
+    // Verificar se existe estoque
+    const inventory = await this.prisma.storeInventory.findUnique({
+      where: {
+        storeId_productId: {
+          storeId,
+          productId
+        }
+      }
+    });
+
+    if (!inventory) {
+      throw new NotFoundException('Produto não encontrado no estoque desta loja');
+    }
+
+    // Remover do estoque
+    await this.prisma.storeInventory.delete({
+      where: { id: inventory.id }
+    });
+
+    return { message: 'Produto removido do estoque da loja com sucesso' };
   }
 }

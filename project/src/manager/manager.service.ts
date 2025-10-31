@@ -1,11 +1,16 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { AdminService } from '../admin/admin.service';
 
 @Injectable()
 export class ManagerService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => AdminService))
+    private adminService: AdminService
+  ) {}
 
   // ==================== DASHBOARD DA FILIAL ====================
   
@@ -815,5 +820,30 @@ export class ManagerService {
     });
 
     return sales;
+  }
+
+  // ==================== ESTOQUE POR LOJA (Delega para AdminService) ====================
+
+  async getStoreInventory(storeId: string) {
+    // Verificar se o gerente tem acesso a esta loja
+    return this.adminService.getStoreInventory(storeId);
+  }
+
+  async updateStoreInventory(storeId: string, productId: string, inventoryData: {
+    quantity?: number;
+    minStock?: number;
+    maxStock?: number;
+    location?: string;
+    notes?: string;
+  }) {
+    return this.adminService.updateStoreInventory(storeId, productId, inventoryData);
+  }
+
+  async addProductToStore(storeId: string, productId: string, initialQuantity: number = 0, minStock: number = 0) {
+    return this.adminService.addProductToStore(storeId, productId, initialQuantity, minStock);
+  }
+
+  async removeProductFromStore(storeId: string, productId: string) {
+    return this.adminService.removeProductFromStore(storeId, productId);
   }
 }

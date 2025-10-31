@@ -74,6 +74,7 @@ model Store {
   sales        Sale[]
   employees    User[]
   reports      Report[]
+  inventory    StoreInventory[]
 
   @@map("stores")
 }
@@ -131,6 +132,7 @@ model Product {
   store              Store                  @relation(fields: [storeId], references: [id])
   supplier           Supplier?              @relation(fields: [supplierId], references: [id])
   saleItems          SaleItem[]
+  storeInventory    StoreInventory[]
 
   @@map("products")
 }
@@ -544,4 +546,22 @@ model Report {
   store       Store?      @relation(fields: [storeId], references: [id])
 
   @@map("reports")
+}
+
+model StoreInventory {
+  id          String      @id @default(uuid())
+  quantity    Int         @default(0)
+  minStock    Int         @default(0)
+  maxStock    Int?
+  location     String?     // Localização física do produto na loja (ex: "Prateleira A-3")
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  storeId     String
+  productId   String
+  store       Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId])
+  @@map("store_inventory")
 }

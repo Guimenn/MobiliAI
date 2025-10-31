@@ -604,6 +604,44 @@ export const adminAPI = {
     const response = await api.get(`/admin/stores/${storeId}/employees`);
     return response.data;
   },
+
+  // Estoque por loja
+  getStoreInventory: async (storeId: string) => {
+    const response = await api.get(`/admin/stores/${storeId}/inventory`);
+    return response.data;
+  },
+
+  updateStoreInventory: async (storeId: string, productId: string, inventoryData: {
+    quantity?: number;
+    minStock?: number;
+    maxStock?: number;
+    location?: string;
+    notes?: string;
+  }) => {
+    const response = await api.put(`/admin/stores/${storeId}/inventory/${productId}`, inventoryData);
+    return response.data;
+  },
+
+  addProductToStore: async (storeId: string, productId: string, initialQuantity: number = 0, minStock: number = 0) => {
+    const response = await api.post(`/admin/stores/${storeId}/inventory/${productId}`, {
+      initialQuantity,
+      minStock
+    });
+    return response.data;
+  },
+
+  removeProductFromStore: async (storeId: string, productId: string) => {
+    const response = await api.delete(`/admin/stores/${storeId}/inventory/${productId}`);
+    return response.data;
+  },
+
+  getAvailableProductsForStore: async (storeId: string, search?: string) => {
+    const url = search
+      ? `/admin/stores/${storeId}/inventory/available-products?search=${encodeURIComponent(search)}`
+      : `/admin/stores/${storeId}/inventory/available-products`;
+    const response = await api.get(url);
+    return response.data;
+  },
 };
 
 // Manager API

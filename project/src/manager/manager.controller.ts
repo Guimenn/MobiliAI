@@ -12,7 +12,7 @@ import { ChangePasswordDto } from '../admin/dto/change-password.dto';
 
 @Controller('manager')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.STORE_MANAGER)
+@Roles(UserRole.STORE_MANAGER, UserRole.ADMIN)
 export class ManagerController {
   constructor(
     private readonly managerService: ManagerService,
@@ -233,5 +233,66 @@ export class ManagerController {
     @Query('days') days: string = '30'
   ) {
     return this.managerInventoryService.getStockMovement(req.user.id, productId, parseInt(days));
+  }
+
+  // ==================== ESTOQUE POR LOJA (StoreInventory) ====================
+  // Permite que gerentes gerenciem estoque da própria loja
+
+  @Get('inventory')
+  async getStoreInventory(@Request() req) {
+    const userStoreId = req.user.storeId;
+    if (!userStoreId) {
+      throw new Error('Usuário não está vinculado a uma loja');
+    }
+    return this.managerService.getStoreInventory(userStoreId);
+  }
+
+  @Put('inventory/:productId')
+  async updateStoreInventory(
+    @Request() req,
+    @Param('productId') productId: string,
+    @Body() inventoryData: {
+      quantity?: number;
+      minStock?: number;
+      maxStock?: number;
+      location?: string;
+      notes?: string;
+    }
+  ) {
+    const userStoreId = req.user.storeId;
+    if (!userStoreId) {
+      throw new Error('Usuário não está vinculado a uma loja');
+    }
+    return this.managerService.updateStoreInventory(userStoreId, productId, inventoryData);
+  }
+
+  @Post('inventory/:productId')
+  async addProductToStore(
+    @Request() req,
+    @Param('productId') productId: string,
+    @Body() data: { initialQuantity?: number; minStock?: number }
+  ) {
+    const userStoreId = req.user.storeId;
+    if (!userStoreId) {
+      throw new Error('Usuário não está vinculado a uma loja');
+    }
+    return this.managerService.addProductToStore(
+      userStoreId,
+      productId,
+      data.initialQuantity || 0,
+      data.minStock || 0
+    );
+  }
+
+  @Delete('inventory/:productId')
+  async removeProductFromStore(
+    @Request() req,
+    @Param('productId') productId: string
+  ) {
+    const userStoreId = req.user.storeId;
+    if (!userStoreId) {
+      throw new Error('Usuário não está vinculado a uma loja');
+    }
+    return this.managerService.removeProductFromStore(userStoreId, productId);
   }
 }

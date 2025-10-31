@@ -60,6 +60,7 @@ import MedicalCertificateModal from '@/components/MedicalCertificateModal';
 import TerminationModal from '@/components/TerminationModal';
 import StoreHoursConfig from '@/components/StoreHoursConfig';
 import StoreSales from './components/StoreSales';
+import StoreInventory from './components/StoreInventory';
 
 export default function StoreDetailsPage() {
   const router = useRouter();
@@ -1024,13 +1025,7 @@ export default function StoreDetailsPage() {
           </div>
         )}
 
-        {activeTab === 'products' && (
-          <div className="text-center py-12">
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Produtos</h3>
-            <p className="text-gray-500">Funcionalidade em desenvolvimento</p>
-          </div>
-        )}
+        {activeTab === 'products' && <StoreInventory storeId={storeId} />}
 
         {activeTab === 'sales' && (
           <div className="space-y-6">

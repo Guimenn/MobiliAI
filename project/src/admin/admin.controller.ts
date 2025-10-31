@@ -598,4 +598,62 @@ export class AdminController {
   async deleteReport(@Param('id') id: string) {
     return this.adminService.deleteReport(id);
   }
+
+  // ==================== ESTOQUE POR LOJA ====================
+  // Permissão para ADMIN e STORE_MANAGER
+
+  @Get('stores/:id/inventory')
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
+  async getStoreInventory(@Param('id') storeId: string) {
+    return this.adminService.getStoreInventory(storeId);
+  }
+
+  @Get('stores/:id/inventory/available-products')
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
+  async getAvailableProductsForStore(
+    @Param('id') storeId: string,
+    @Query('search') search?: string
+  ) {
+    return this.adminService.getAvailableProductsForStore(storeId, search);
+  }
+
+  @Put('stores/:id/inventory/:productId')
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
+  async updateStoreInventory(
+    @Param('id') storeId: string,
+    @Param('productId') productId: string,
+    @Body() inventoryData: {
+      quantity?: number;
+      minStock?: number;
+      maxStock?: number;
+      location?: string;
+      notes?: string;
+    }
+  ) {
+    return this.adminService.updateStoreInventory(storeId, productId, inventoryData);
+  }
+
+  @Post('stores/:id/inventory/:productId')
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
+  async addProductToStore(
+    @Param('id') storeId: string,
+    @Param('productId') productId: string,
+    @Body() data: { initialQuantity?: number; minStock?: number }
+  ) {
+    return this.adminService.addProductToStore(
+      storeId,
+      productId,
+      data.initialQuantity || 0,
+      data.minStock || 0
+    );
+  }
+
+  @Delete('stores/:id/inventory/:productId')
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
+  async removeProductFromStore(
+    @Param('id') storeId: string,
+    @Param('productId') productId: string
+  ) {
+    return this.adminService.removeProductFromStore(storeId, productId);
+  }
 }
