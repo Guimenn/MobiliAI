@@ -27,7 +27,7 @@ export default function LoginPage() {
   const [currentInput, setCurrentInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [loginStep, setLoginStep] = useState<'email' | 'password' | 'userInfo' | 'processing' | 'complete'>('email');
+  const [loginStep, setLoginStep] = useState<'email' | 'password' | 'userInfo' | 'processing' | 'complete' | 'forgotPassword' | 'resetCode' | 'resetPassword'>('email');
   const [credentials, setCredentials] = useState({ 
     email: '', 
     password: '', 
@@ -38,6 +38,11 @@ export default function LoginPage() {
     city: '', 
     state: '', 
     zipCode: '' 
+  });
+  const [resetData, setResetData] = useState({
+    email: '',
+    code: '',
+    newPassword: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
@@ -345,6 +350,80 @@ export default function LoginPage() {
           setCurrentField('password');
         }
       }
+    } else if (loginStep === 'forgotPassword') {
+      // Validar email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(userInput)) {
+        simulateTyping('❌ Por favor, digite um email válido (exemplo: usuario@email.com)', 1500);
+        return;
+      }
+
+      setResetData(prev => ({ ...prev, email: userInput }));
+      setLoginStep('processing');
+
+      try {
+        simulateTyping('Enviando código de recuperação...', 1000);
+        const response = await authAPI.forgotPassword(userInput);
+        
+        // Verificar se o email existe no banco
+        if (response.emailExists) {
+          simulateTyping('✅ Código enviado! Verifique seu email e digite o código de 6 dígitos que você recebeu:', 2000);
+          setLoginStep('resetCode');
+        } else {
+          // Email não existe no banco
+          simulateTyping(`❌ ${response.message}`, 2000);
+          simulateTyping('Digite um email válido cadastrado no sistema:', 1500);
+          setLoginStep('forgotPassword');
+        }
+      } catch (error: any) {
+        const errorMessage = error?.response?.data?.message || 'Erro ao enviar código. Tente novamente.';
+        simulateTyping(`❌ ${errorMessage}`, 1500);
+        simulateTyping('Digite seu email novamente:', 1000);
+        setLoginStep('forgotPassword');
+      }
+    } else if (loginStep === 'resetCode') {
+      // Validar código (6 dígitos)
+      const cleanCode = userInput.replace(/\D/g, '');
+      if (cleanCode.length !== 6) {
+        simulateTyping('❌ O código deve ter 6 dígitos. Digite apenas números:', 1500);
+        return;
+      }
+
+      setResetData(prev => ({ ...prev, code: cleanCode }));
+      simulateTyping('Agora crie uma nova senha:', 1000);
+      setLoginStep('resetPassword');
+    } else if (loginStep === 'resetPassword') {
+      if (userInput.length < 6) {
+        simulateTyping('❌ A senha deve ter pelo menos 6 caracteres:', 1500);
+        return;
+      }
+
+      setResetData(prev => ({ ...prev, newPassword: userInput }));
+      setLoginStep('processing');
+
+      try {
+        simulateTyping('Redefinindo senha...', 1000);
+        await authAPI.resetPassword(resetData.email, resetData.code, userInput);
+        simulateTyping('✅ Senha redefinida com sucesso!', 1500);
+        simulateTyping('Agora você pode fazer login com sua nova senha. Digite seu email:', 2000);
+        setLoginStep('email');
+        setResetData({ email: '', code: '', newPassword: '' });
+      } catch (error: any) {
+        let errorMessage = 'Erro ao redefinir senha';
+        if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        simulateTyping(`❌ ${errorMessage}`, 1500);
+        
+        if (errorMessage.includes('Código')) {
+          simulateTyping('Digite o código novamente:', 1000);
+          setLoginStep('resetCode');
+          setResetData(prev => ({ ...prev, code: '' }));
+        } else {
+          simulateTyping('Digite sua nova senha:', 1000);
+          setLoginStep('resetPassword');
+        }
+      }
     } else if (loginStep === 'password') {
       // Resetar estado de mostrar senha
       setShowPassword(false);
@@ -560,13 +639,13 @@ export default function LoginPage() {
           <div className="p-8 bg-[#fafafa]">
             <form onSubmit={handleSubmit} className="flex space-x-3">
               <div className="flex-1 relative">
-                {loginStep === 'password' ? (
+                {loginStep === 'password' || loginStep === 'resetPassword' ? (
                   <div className="relative">
                     <Input
                       type="password"
                       value={currentInput}
                       onChange={(e) => setCurrentInput(e.target.value)}
-                      placeholder="Digite sua senha"
+                      placeholder={loginStep === 'password' ? 'Digite sua senha' : 'Digite sua nova senha'}
                       className="pr-12 h-14 border-0 bg-gray-100 focus:bg-white focus:ring-0 text-base rounded-2xl"
                       disabled={isLoading}
                     />
@@ -591,7 +670,7 @@ export default function LoginPage() {
                   <Input
                     type={loginStep === 'email' ? 'email' : 'text'}
                     value={currentInput}
-                    onChange={(e) => {
+                      onChange={(e) => {
                       let value = e.target.value;
                       // Formatação automática baseada no campo
                       if (loginStep === 'userInfo') {
@@ -620,14 +699,23 @@ export default function LoginPage() {
                           default:
                             value = e.target.value;
                         }
-                      } else if (loginStep === 'email') {
+                      } else if (loginStep === 'email' || loginStep === 'forgotPassword') {
                         value = formatEmail(e.target.value);
+                      } else if (loginStep === 'resetCode') {
+                        // Apenas números, máximo 6 dígitos
+                        value = e.target.value.replace(/\D/g, '').slice(0, 6);
                       }
                       setCurrentInput(value);
                     }}
                       placeholder={
                         loginStep === 'email' 
                           ? 'Digite seu e-mail' 
+                          : loginStep === 'forgotPassword'
+                          ? 'Digite seu email para recuperação'
+                          : loginStep === 'resetCode'
+                          ? 'Digite o código de 6 dígitos'
+                          : loginStep === 'resetPassword'
+                          ? 'Digite sua nova senha'
                           : loginStep === 'userInfo'
                           ? currentField === 'name' 
                             ? 'Digite seu nome completo'
@@ -669,9 +757,24 @@ export default function LoginPage() {
 
             {/* Links */}
             <div className="mt-8 flex justify-center space-x-8 text-base">
-              <Link href="#" className="text-[#3e2626] hover:underline font-medium">
+              <button
+                onClick={() => {
+                  if (loginStep === 'email' || loginStep === 'password') {
+                    setLoginStep('forgotPassword');
+                    setMessages([{
+                      id: generateUniqueId(),
+                      type: 'assistant',
+                      message: 'Esqueceu sua senha? 😊 Digite seu email para receber um código de recuperação:',
+                      timestamp: new Date()
+                    }]);
+                    setCurrentInput('');
+                  }
+                }}
+                className="text-[#3e2626] hover:underline font-medium cursor-pointer"
+                disabled={loginStep === 'processing' || loginStep === 'complete' || loginStep === 'forgotPassword' || loginStep === 'resetCode' || loginStep === 'resetPassword'}
+              >
                 Esqueci minha senha
-              </Link>
+              </button>
               <span className="text-gray-400">
                 Não tem conta? Digite seu email acima!
               </span>

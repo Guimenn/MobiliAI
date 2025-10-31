@@ -1,8 +1,9 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+  import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { RegisterDto, LoginDto, ChangePasswordDto } from '../dto/auth.dto';
+import { RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/auth.dto';
+import { EmailService } from '../email/email.service';
 import { User, UserRole } from '@prisma/client';
 
 type UserWithoutPassword = Omit<User, 'password'>;
@@ -12,6 +13,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<{ user: UserWithoutPassword; token: string }> {
@@ -139,6 +141,136 @@ export class AuthService {
   async checkEmailExists(email: string): Promise<{ exists: boolean }> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     return { exists: !!user };
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string; emailExists: boolean }> {
+    const { email } = forgotPasswordDto;
+
+    // Normalizar email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Verificar se o usuário existe
+    const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (!user) {
+      // Retornar indicando que o email não existe
+      return { 
+        message: 'Este email não está cadastrado em nossa base de dados. Verifique o email e tente novamente.',
+        emailExists: false 
+      };
+    }
+
+    // Gerar código de 6 dígitos (garantir que seja string com 6 dígitos)
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Garantir que o código tem exatamente 6 dígitos
+    if (code.length !== 6) {
+      throw new BadRequestException('Erro ao gerar código. Tente novamente.');
+    }
+
+    // Expira em 15 minutos
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+    // Invalidar códigos anteriores não usados para este email
+    await this.prisma.passwordReset.updateMany({
+      where: {
+        email: normalizedEmail,
+        used: false,
+      },
+      data: {
+        used: true,
+      },
+    });
+
+    // Criar novo código de reset
+    await this.prisma.passwordReset.create({
+      data: {
+        email: normalizedEmail,
+        code,
+        expiresAt,
+        userId: user.id,
+      },
+    });
+
+    // Enviar email com o código
+    await this.emailService.sendPasswordResetCode(normalizedEmail, code);
+
+    return { 
+      message: 'Código enviado com sucesso! Verifique seu email.',
+      emailExists: true 
+    };
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
+    const { email, code, newPassword } = resetPasswordDto;
+
+    // Validar formato do código (exatamente 6 dígitos)
+    const codeRegex = /^\d{6}$/;
+    if (!codeRegex.test(code)) {
+      throw new BadRequestException('Código inválido. O código deve ter exatamente 6 dígitos numéricos.');
+    }
+
+    // Normalizar email para comparação (lowercase)
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // PRIMEIRO: Verificar se o email existe no banco ANTES de qualquer validação de código
+    const user = await this.prisma.user.findUnique({ 
+      where: { email: normalizedEmail } 
+    });
+    if (!user) {
+      // Por segurança, não revelar se o email existe ou não
+      throw new BadRequestException('Código inválido ou expirado. Verifique o código recebido por email.');
+    }
+
+    // Buscar o código de reset EXATO para este email e código
+    // Isso garante que estamos validando o código correto
+    const passwordReset = await this.prisma.passwordReset.findFirst({
+      where: {
+        email: normalizedEmail,
+        code: code, // Buscar pelo código EXATO informado
+        used: false,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!passwordReset) {
+      // Não revelar muito sobre o erro por segurança
+      throw new BadRequestException('Código inválido ou expirado. Verifique o código recebido por email.');
+    }
+
+    // Verificar se o código expirou
+    const now = new Date();
+    if (passwordReset.expiresAt < now) {
+      await this.prisma.passwordReset.update({
+        where: { id: passwordReset.id },
+        data: { used: true },
+      });
+      throw new BadRequestException('Código expirado. Solicite um novo código.');
+    }
+
+    // Verificar se o código pertence ao usuário correto (validação extra de segurança)
+    if (passwordReset.userId && passwordReset.userId !== user.id) {
+      throw new BadRequestException('Código inválido para este usuário.');
+    }
+
+    // Hash da nova senha
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+
+    // Atualizar senha e marcar código como usado (usando transação para garantir atomicidade)
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedNewPassword },
+      }),
+      this.prisma.passwordReset.update({
+        where: { id: passwordReset.id },
+        data: { used: true },
+      }),
+    ]);
+
+    return { message: 'Senha redefinida com sucesso' };
   }
 
   private generateToken(user: User): string {

@@ -84,6 +84,20 @@ export const authAPI = {
     const response = await api.post('/auth/check-email', { email });
     return response.data;
   },
+
+  forgotPassword: async (email: string) => {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  resetPassword: async (email: string, code: string, newPassword: string) => {
+    const response = await api.post('/auth/reset-password', {
+      email,
+      code,
+      newPassword,
+    });
+    return response.data;
+  },
 };
 
 // Products API

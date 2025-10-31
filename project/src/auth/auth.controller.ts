@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Get, UseGuards, Request, Patch } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, ChangePasswordDto, CheckEmailDto } from '../dto/auth.dto';
+import { RegisterDto, LoginDto, ChangePasswordDto, CheckEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 
@@ -35,5 +35,15 @@ export class AuthController {
   async changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto) {
     await this.authService.changePassword(req.user.id, changePasswordDto);
     return { message: 'Senha alterada com sucesso' };
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetPasswordDto);
   }
 }
