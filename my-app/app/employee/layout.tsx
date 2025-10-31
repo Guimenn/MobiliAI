@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAppStore } from '@/lib/store';
+import { useProductsHeader } from '@/components/products-header-context';
+import { ProductsHeaderProvider } from '@/components/products-header-context';
 import { 
   Package, 
   ShoppingCart,
@@ -14,7 +18,152 @@ import {
   User,
   Home,
   Sparkles,
+  Search,
+  Grid3x3,
+  List,
 } from 'lucide-react';
+
+function ProductsHeaderComponent({ 
+  pathname, 
+  sidebarOpen, 
+  setSidebarOpen, 
+  user, 
+  router 
+}: { 
+  pathname: string; 
+  sidebarOpen: boolean; 
+  setSidebarOpen: (open: boolean) => void; 
+  user: any; 
+  router: any;
+}) {
+  const isProductsPage = pathname.startsWith('/employee/products');
+  const { searchTerm, setSearchTerm, viewMode, setViewMode } = useProductsHeader();
+
+  if (!isProductsPage) {
+    return (
+      <header className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] border-b border-[#3e2626]/20 sticky top-0 z-30 shadow-lg">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="lg:hidden mr-3 text-white hover:bg-white/20"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-white">
+                {pathname === '/employee/sales' ? 'Vendas' : pathname === '/employee/timeclock' ? 'Ponto' : 'Dashboard'}
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => router.push('/employee/profile')}
+              className="hidden md:flex items-center space-x-3 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30 hover:bg-white/30 transition-all duration-300 cursor-pointer"
+            >
+              <Avatar className="h-10 w-10 ring-2 ring-white/30 flex-shrink-0">
+                <AvatarImage 
+                  src={user?.avatarUrl || ''} 
+                  alt={user?.name || 'Usuário'}
+                  className="object-cover"
+                />
+                <AvatarFallback className="bg-white/30 text-white font-bold">
+                  {user?.name?.charAt(0).toUpperCase() || 'F'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-white">{user?.name}</p>
+                <p className="text-xs text-white/80">Funcionário</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  return (
+    <header className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] border-b border-[#3e2626]/20 sticky top-0 z-30 shadow-lg">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-6 py-4">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="lg:hidden mr-3 text-white hover:bg-white/20"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-1">Produtos</h1>
+            <p className="text-sm text-white/90">Gerencie o catálogo de produtos da loja</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 flex-1 md:justify-end">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Buscar produtos..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full sm:w-64 pl-10 bg-white border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+            />
+          </div>
+          <div className="flex items-center bg-white/20 backdrop-blur-sm rounded-lg border border-white/30 p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-md transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-white text-[#3e2626] shadow-md'
+                  : 'text-white hover:bg-white/20'
+              }`}
+              title="Visualização em Grid"
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-md transition-all ${
+                viewMode === 'list'
+                  ? 'bg-white text-[#3e2626] shadow-md'
+                  : 'text-white hover:bg-white/20'
+              }`}
+              title="Visualização em Lista"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center">
+          <button
+            onClick={() => router.push('/employee/profile')}
+            className="hidden md:flex items-center space-x-3 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30 hover:bg-white/30 transition-all duration-300 cursor-pointer ml-4"
+          >
+            <Avatar className="h-10 w-10 ring-2 ring-white/30 flex-shrink-0">
+              <AvatarImage 
+                src={user?.avatarUrl || ''} 
+                alt={user?.name || 'Usuário'}
+                className="object-cover"
+              />
+              <AvatarFallback className="bg-white/30 text-white font-bold">
+                {user?.name?.charAt(0).toUpperCase() || 'F'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="text-right">
+              <p className="text-sm font-semibold text-white">{user?.name}</p>
+              <p className="text-xs text-white/80">Funcionário</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
 
 export default function EmployeeLayout({
   children,
@@ -136,19 +285,26 @@ export default function EmployeeLayout({
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-xl border-r border-gray-200 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0`}>
+    <ProductsHeaderProvider>
+      <div className="min-h-screen bg-white">
+        {/* Sidebar */}
+        <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-xl border-r border-gray-200 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0`}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="px-6 py-8 border-b border-gray-200">
+          <div className="px-6 py-8 border-b border-[#8B4513]/30 bg-[#3e2626]">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-2xl flex items-center justify-center shadow-lg">
-                <Package className="h-6 w-6 text-white" />
+              <div className="w-16 h-16 relative flex items-center justify-center bg-white rounded-xl p-2 border border-white/30 shadow-lg">
+                <Image
+                  src="/logo.png"
+                  alt="MobiliAI Logo"
+                  width={56}
+                  height={56}
+                  className="object-contain"
+                />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">MobiliAI</h1>
-                <p className="text-xs text-gray-500 font-medium">Painel Funcionário</p>
+                <h1 className="text-xl font-bold text-white">MobiliAI</h1>
+                <p className="text-xs text-white/80 font-medium">Painel Funcionário</p>
               </div>
             </div>
           </div>
@@ -218,7 +374,6 @@ export default function EmployeeLayout({
                     <Menu className="h-5 w-5" />
                   </Button>
                   <div className="flex items-center space-x-3 mb-1">
-                    <Sparkles className="h-6 w-6 text-yellow-300 animate-pulse" />
                     <h1 className="text-3xl font-bold text-white">Bem-vindo, {user?.name || 'Funcionário'}!</h1>
                   </div>
                   <p className="text-sm text-white/90">{currentDate}</p>
@@ -228,9 +383,14 @@ export default function EmployeeLayout({
                   onClick={() => router.push('/employee/profile')}
                   className="hidden lg:flex items-center space-x-3 px-3 py-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-all duration-300 cursor-pointer"
                 >
-                  <Avatar className="h-10 w-10 ring-2 ring-white/30">
+                  <Avatar className="h-10 w-10 ring-2 ring-white/30 flex-shrink-0">
+                    <AvatarImage 
+                      src={user?.avatarUrl || ''} 
+                      alt={user?.name || 'Usuário'}
+                      className="object-cover"
+                    />
                     <AvatarFallback className="bg-white/30 text-white font-bold">
-                      {user?.name?.charAt(0) || 'F'}
+                      {user?.name?.charAt(0).toUpperCase() || 'F'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="text-right">
@@ -243,35 +403,13 @@ export default function EmployeeLayout({
           </div>
         ) : (
           pathname === '/employee/profile' ? null : (
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-              <div className="flex items-center justify-between px-6 py-4">
-                <div className="flex items-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="lg:hidden mr-3"
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                  >
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
-                      {navigation.find(item => item.current)?.name || 'Dashboard'}
-                    </h1>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-4">
-                  <div className="hidden md:flex items-center space-x-3 px-4 py-2 bg-gray-50 rounded-lg">
-                    <User className="h-4 w-4 text-gray-400" />
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                      <p className="text-xs text-gray-500">Funcionário</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </header>
+            <ProductsHeaderComponent 
+              pathname={pathname}
+              sidebarOpen={sidebarOpen}
+              setSidebarOpen={setSidebarOpen}
+              user={user}
+              router={router}
+            />
           )
         )}
 
@@ -288,6 +426,7 @@ export default function EmployeeLayout({
           onClick={() => setSidebarOpen(false)}
         />
       )}
-    </div>
+      </div>
+    </ProductsHeaderProvider>
   )
 }
