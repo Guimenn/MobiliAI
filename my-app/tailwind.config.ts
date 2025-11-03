@@ -60,6 +60,18 @@ const config: Config = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        brand: {
+          50: "#F8F5F2",
+          100: "#EFE8E2",
+          200: "#E1D4C8",
+          300: "#C6B09A",
+          400: "#A98069",
+          500: "#7A4F2B",
+          600: "#5a3a3a",
+          700: "#3e2626",
+          800: "#2b1917",
+          900: "#1d100f",
+        },
         market: {
           yellow: "#fff159",
           "yellow-dark": "#f4d400",

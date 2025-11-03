@@ -30,7 +30,9 @@ import {
   Layers,
   Sparkles,
   Shield,
-  CreditCard
+  CreditCard,
+  Clock,
+  Zap
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -85,6 +87,11 @@ export default function ProductsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+
+  // Oferta Relâmpago
+  const [specialOfferProduct, setSpecialOfferProduct] = useState<Product | null>(null);
+  const OFFER_DURATION = 30; // segundos por produto
+  const [offerSecondsLeft, setOfferSecondsLeft] = useState(OFFER_DURATION);
 
   // Debounce de busca
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
@@ -203,6 +210,49 @@ export default function ProductsPage() {
     return 'Localização não cadastrada';
   };
 
+  // Seleciona produto aleatório para oferta especial
+  const pickRandomProduct = () => {
+    if (!products || products.length === 0) return null;
+    const inStockProducts = products.filter(p => (p.stock || 0) > 0);
+    if (inStockProducts.length === 0) return null;
+    const randomIndex = Math.floor(Math.random() * inStockProducts.length);
+    return inStockProducts[randomIndex];
+  };
+
+  // Inicializa oferta e cronômetro quando produtos carregarem
+  useEffect(() => {
+    if (products && products.length > 0 && !specialOfferProduct) {
+      const product = pickRandomProduct();
+      setSpecialOfferProduct(product || null);
+      setOfferSecondsLeft(OFFER_DURATION);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
+
+  // Cronômetro da oferta
+  useEffect(() => {
+    if (!specialOfferProduct) return;
+    const intervalId = setInterval(() => {
+      setOfferSecondsLeft((prev) => {
+        if (prev <= 1) {
+          const nextProduct = pickRandomProduct();
+          setSpecialOfferProduct(nextProduct || null);
+          return OFFER_DURATION; // reinicia
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [specialOfferProduct]);
+
+  const formatTime = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
     
@@ -217,7 +267,7 @@ export default function ProductsPage() {
           <div className="flex-shrink-0 lg:w-80">
             <div className="bg-white border border-gray-200 rounded-xl p-3">
               <div className="flex items-center gap-3">
-                <div className="bg-blue-600 rounded-full p-1.5">
+                <div className="bg-brand-700 rounded-full p-1.5">
                   <MapPin className="h-4 w-4 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -236,7 +286,7 @@ export default function ProductsPage() {
                 {!isAuthenticated && (
                   <Button
                     onClick={() => router.push('/login')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-brand-700 hover:bg-brand-700/90 text-white"
                     size="sm"
                   >
                     Criar
@@ -282,18 +332,18 @@ export default function ProductsPage() {
                   >
                     <div className={`relative w-20 h-20 rounded-full bg-white border-2 flex items-center justify-center transition-all duration-200 ${
                       isSelected
-                        ? 'border-blue-500 shadow-lg scale-110'
+                        ? 'border-brand-600 shadow-lg scale-110'
                         : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                     }`}>
                       <Icon className={`h-8 w-8 transition-colors duration-200 ${
-                        isSelected ? 'text-blue-600' : 'text-gray-700'
+                        isSelected ? 'text-brand-700' : 'text-gray-700'
                       }`} />
                       {isSelected && (
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-blue-500 rounded-full" />
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-brand-600 rounded-full" />
                       )}
                     </div>
                     <span className={`text-xs font-medium transition-colors duration-200 ${
-                      isSelected ? 'text-blue-600 font-semibold' : 'text-gray-700'
+                      isSelected ? 'text-brand-700 font-semibold' : 'text-gray-700'
                     }`}>
                       {categoryNames[cat] || cat}
                     </span>
@@ -307,11 +357,11 @@ export default function ProductsPage() {
         
 
         {/* Título, Banner e Ordenação */}
-        <div className="mb-4 space-y-4">
+        <div className="mb-4 space-y-4 ">
           
           {/* Breadcrumbs */}
-        <Breadcrumb className="mb-4 mt-16">
-          <BreadcrumbList className="mt-16">
+        <Breadcrumb className="mb-4 mt-8">
+          <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink href="/">Início</BreadcrumbLink>
             </BreadcrumbItem>
@@ -325,128 +375,213 @@ export default function ProductsPage() {
         </Breadcrumb>
 
 
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 ">
-              <h1 className="text-2xl font-semibold text-gray-900">
+          <div>
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900 mb-1">
                 {searchTerm ? `Resultados para "${searchTerm}"` : 'Nossos Produtos'}
               </h1>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-gray-600">
                 {filteredProducts.length} {filteredProducts.length === 1 ? 'produto encontrado' : 'produtos encontrados'}
               </p>
             </div>
-            
-            {/* Banner de Produtos Recém-Chegados */}
-            {!searchTerm && paginatedProducts.length > 0 && (
-              <div className="flex-[3] min-w-0 mb-8">
-                <div className="bg-white border border-gray-100 rounded-xl shadow-md overflow-hidden w-full">
-                  {/* Label Ad */}
-                  <div className="px-8 pt-4 pb-2 bg-gray-50/50">
-                    <span className="text-xs text-gray-400 font-medium tracking-wide">PUBLICIDADE</span>
-                  </div>
+          </div>
+
+          {/* Oferta Relâmpago e Banner Publicitário */}
+          {!searchTerm && (
+            <div className="mb-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Oferta Relâmpago */}
+              {specialOfferProduct && (
+                <div 
+                  className="lg:col-span-3 relative bg-gradient-to-br from-white via-gray-50/30 to-white border border-gray-200 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-2xl hover:border-[#3e2626]/30 transition-all duration-300 group h-full"
+                  onClick={() => router.push(`/products/${specialOfferProduct.id}`)}
+                >
+                  {/* Background Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#3e2626]/5 via-transparent to-red-500/5 opacity-50"></div>
                   
-                  {/* Conteúdo do Banner */}
-                  <div className="flex items-center gap-8 px-8 py-6">
-                    {/* Logo e Texto */}
-                    <div className="flex-shrink-0">
-                      <div className="flex items-center gap-4">
-                        <div className="w-20 h-20 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-blue-100">
-                          <Package className="h-10 w-10 text-white" />
-                        </div>
-          <div>
-                          <div className="text-3xl font-bold text-gray-900 leading-tight tracking-tight">
-                            Mobili<span className="text-blue-600">AI</span>
+                  {/* Background Pattern */}
+                  <div className="absolute inset-0 opacity-[0.03]">
+                    <div className="absolute inset-0" style={{
+                      backgroundImage: `radial-gradient(circle at 30px 30px, rgba(0,0,0,0.1) 2px, transparent 2px)`,
+                      backgroundSize: '60px 60px'
+                    }}></div>
+                  </div>
+
+                  {/* Oferta Relâmpago Badge */}
+                  <div className="absolute top-3 left-3 z-20 transform -rotate-1">
+                    <div className="relative inline-flex items-center gap-1.5 bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white rounded-xl px-3 py-1.5 shadow-xl border border-[#3e2626]/20">
+                      <Zap className="h-4 w-4 fill-yellow-300 text-yellow-300 transform rotate-12 animate-pulse" />
+                      <span className="text-xs font-extrabold tracking-tight">Oferta Relâmpago</span>
+                    </div>
+                  </div>
+
+                  {/* Timer */}
+                  <div className="absolute top-3 right-3 z-20 transform rotate-1">
+                    <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl px-3 py-1.5 text-xs font-bold shadow-xl border border-red-400/30">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span className="font-mono">{formatTime(offerSecondsLeft)}</span>
+                    </div>
+                  </div>
+
+                  {/* Conteúdo Principal */}
+                  <div className="relative z-10 px-4 pb-4 pt-12">
+                    <div className="flex flex-col items-center text-center gap-3">
+                      {/* Imagem do Produto */}
+                      {specialOfferProduct.imageUrl ? (
+                        <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 p-0.5 shadow-lg group-hover:shadow-xl transition-all duration-300">
+                          <div className="w-full h-full rounded-lg overflow-hidden border border-white bg-white">
+                            <img
+                              src={specialOfferProduct.imageUrl}
+                              alt={specialOfferProduct.name}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
                           </div>
-                          <div className="text-sm text-gray-600 font-medium">Pinturas & Acabamentos</div>
+                        </div>
+                      ) : (
+                        <div className="w-24 h-24 rounded-xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center shadow-md">
+                          <Package className="h-8 w-8 text-gray-400" />
+                        </div>
+                      )}
+
+                      {/* Info do Produto */}
+                      <div className="w-full space-y-2">
+                        {/* Categoria/Brand */}
+                        <div className="flex items-center justify-center gap-1.5">
+                          {specialOfferProduct.brand && (
+                            <>
+                              <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                                {specialOfferProduct.brand}
+                              </span>
+                              <span className="text-gray-300 text-xs">•</span>
+                            </>
+                          )}
+                          <span className="text-xs font-semibold text-gray-600 uppercase">
+                            {specialOfferProduct.category}
+                          </span>
+                        </div>
+
+                        {/* Título */}
+                        <h3 className="text-gray-900 font-black text-sm leading-tight line-clamp-2 min-h-[2.5rem] group-hover:text-[#3e2626] transition-colors px-1">
+                          {specialOfferProduct.name}
+                        </h3>
+                        
+                        {/* Preços */}
+                        <div className="space-y-1">
+                          {specialOfferProduct.price && (
+                            <div className="flex items-center justify-center gap-1.5">
+                              <span className="text-xs line-through text-gray-400 font-semibold">
+                                R$ {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white text-xs font-black shadow-sm">
+                                -30%
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-baseline justify-center gap-0.5">
+                            <span className="text-xs font-bold text-gray-600">R$</span>
+                            <span className="text-2xl font-black text-[#3e2626] leading-none">
+                              {(specialOfferProduct.price ? specialOfferProduct.price * 0.7 : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Badges */}
+                        <div className="flex items-center justify-center pt-0.5">
+                          <div className="flex items-center bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full px-2.5 py-1 shadow-sm">
+                            <Truck className="h-3 w-3 mr-1" />
+                            <span className="text-xs font-bold">Frete Grátis</span>
+                          </div>
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
 
-                    {/* Linha divisória */}
-                    <div className="hidden md:block h-20 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent"></div>
-
-                    {/* Chamada */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-bold text-gray-900 mb-2 leading-snug">
-                        Confira produtos incríveis e aproveite as melhores ofertas!
-                      </h3>
-                      <button className="text-blue-600 hover:text-blue-700 font-semibold text-base inline-flex items-center gap-2 group transition-colors">
-                        Ir para a loja
-                        <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                      </button>
+              {/* Banner Publicitário */}
+              {paginatedProducts.length > 0 && (
+                <div className="lg:col-span-9 h-full">
+                  <div className="bg-gradient-to-br from-white via-brand-400/5 to-brand-700/5 border border-gray-200 rounded-xl shadow-lg overflow-hidden w-full h-full flex flex-col hover:shadow-xl transition-all duration-300">
+                    {/* Label Ad */}
+                    <div className="px-3 pt-1.5 pb-1 bg-gradient-to-r from-gray-50/80 to-gray-100/50 border-b border-gray-100">
+                      <span className="text-[9px] text-gray-500 font-bold tracking-widest uppercase">PUBLICIDADE</span>
                     </div>
+                    
+                    {/* Conteúdo do Banner */}
+                    <div className="grid grid-cols-12 items-center gap-4 px-8 py-2 h-full">
+                      {/* Logo e Branding */}
+                      <div className="col-span-3 flex items-center">
+                        <div className="flex items-center">
+                          <img
+                            src="/logoCompleta.svg"
+                            alt="MobiliAI"
+                            className="h-32 md:h-48 w-auto"
+                          />
+                        </div>
+                      </div>
 
-                    {/* Preview de Produtos */}
-                    <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
-                      {paginatedProducts.slice(0, 3).map((product, idx) => (
-                        <div
-                          key={product.id}
-                          className="relative group"
-                        >
-                          <div className="w-28 h-28 rounded-xl overflow-hidden border-2 border-gray-100 bg-white hover:border-blue-300 hover:shadow-lg transition-all duration-200">
-                            {product.imageUrl ? (
-                              <img
-                                src={product.imageUrl}
-                                alt={product.name}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                                <Package className="h-8 w-8 text-gray-400" />
-                              </div>
+                      {/* Chamada */}
+                      <div className="col-span-6 min-w-0 md:pl-4 pl-3 md:border-l md:border-gray-200">
+                        <h3 className="text-2xl font-black text-gray-900 leading-snug mb-1">
+                          Produtos Exclusivos com{' '}
+                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-700 to-brand-600">
+                            Inteligência Artificial
+                          </span>
+                        </h3>
+                        <p className="text-base text-gray-600 font-semibold leading-tight">
+                          Descubra móveis únicos e aproveite ofertas imperdíveis
+                        </p>
+                      </div>
+
+                      {/* Preview de Produtos */}
+                      <div className="hidden lg:grid col-span-3 grid-cols-3 gap-3 justify-items-end">
+                        {paginatedProducts.slice(0, 3).map((product, idx) => (
+                          <div
+                            key={product.id}
+                            className="relative group"
+                            style={{ zIndex: 3 - idx }}
+                          >
+                            <div className="w-full aspect-square max-w-none rounded-xl overflow-hidden border-2 border-white bg-white shadow-md hover:shadow-lg hover:border-brand-300 hover:-translate-y-0.5 transition-all duration-300">
+                              {product.imageUrl ? (
+                                <img
+                                  src={product.imageUrl}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                                  <Package className="h-6 w-6 text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            {idx < 2 && (
+                              <div className="absolute -right-1 top-1/2 -translate-y-1/2 translate-x-1/2 w-1.5 h-1.5 bg-brand-600 rounded-full border border-white shadow-sm"></div>
                             )}
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Ordenação */}
-          <div className="flex items-center justify-end ">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
-              className="border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:border-market-blue-light"
-            >
-              <option value="name">Ordenar por: Mais relevantes</option>
-              <option value="price">Menor preço</option>
-              <option value="stock">Maior estoque</option>
-            </select>
-          </div>
-
-          {/* Badges de Benefícios */}
-          <div className="flex flex-wrap items-center gap-4 pt-2">
-            <div className="flex items-center gap-2 text-gray-700">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-              </div>
-              <span className="text-sm font-medium">Compra 100% segura</span>
+              )}
+              
             </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <Truck className="h-5 w-5 text-blue-600" />
-              </div>
-              <span className="text-sm font-medium">Frete grátis acima de R$ 299</span>
+            
+          )}
+         {/* Ordenação */}
+         <div className="flex items-center justify-end mt-16">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
+                className="border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:border-brand-500"
+              >
+                <option value="name">Ordenar por: Mais relevantes</option>
+                <option value="price">Menor preço</option>
+                <option value="stock">Maior estoque</option>
+              </select>
             </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                <Shield className="h-5 w-5 text-purple-600" />
-              </div>
-              <span className="text-sm font-medium">Garantia de qualidade</span>
-            </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                <CreditCard className="h-5 w-5 text-orange-600" />
-              </div>
-              <span className="text-sm font-medium">Pagamento em até 12x</span>
-            </div>
-          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Sidebar de filtros estilo Mercado Livre */}
           <aside className={`lg:col-span-3 ${mobileFiltersOpen ? '' : 'hidden'} lg:block`}>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 sticky top-20 p-4">
@@ -470,9 +605,9 @@ export default function ProductsPage() {
                 <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300 text-market-blue-light focus:ring-market-blue-light"
+                    className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                   />
-                  <Truck className="h-4 w-4 text-market-blue-light" />
+                  <Truck className="h-4 w-4 text-brand-600" />
                   <span className="text-sm text-gray-700">Frete grátis</span>
                 </label>
               </div>
@@ -488,7 +623,7 @@ export default function ProductsPage() {
                       value="all"
                       checked={selectedCategory === 'all'}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-4 h-4 border-gray-300 text-market-blue-light focus:ring-market-blue-light"
+                      className="w-4 h-4 border-gray-300 text-brand-600 focus:ring-brand-500"
                     />
                     <span className="text-sm text-gray-700">Todas as categorias</span>
                   </label>
@@ -500,7 +635,7 @@ export default function ProductsPage() {
                         value={cat}
                         checked={selectedCategory === cat}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="w-4 h-4 border-gray-300 text-market-blue-light focus:ring-market-blue-light"
+                        className="w-4 h-4 border-gray-300 text-brand-600 focus:ring-brand-500"
                       />
                       <span className="text-sm text-gray-700">
                         {categoryNames[cat] || cat.charAt(0).toUpperCase() + cat.slice(1)}
@@ -575,6 +710,8 @@ export default function ProductsPage() {
               Filtros
               {mobileFiltersOpen && <ChevronDown className="h-4 w-4 ml-2" />}
             </Button>
+
+            
 
             {loading ? (
               <div className="grid sm:grid-cols-2 gap-4">
@@ -693,7 +830,7 @@ export default function ProductsPage() {
                                 <span>Frete grátis</span>
                               </div>
                             )}
-                            <div className="flex items-center gap-1 text-xs text-blue-600">
+                            <div className="flex items-center gap-1 text-xs text-brand-700">
                               <CheckCircle2 className="h-3 w-3" />
                               <span>Compra garantida</span>
                         </div>
@@ -706,7 +843,7 @@ export default function ProductsPage() {
                               handleAddToCart(product);
                             }}
                             disabled={(product.stock || 0) === 0}
-                            className="w-full bg-market-blue-light hover:bg-market-blue-light/90 text-white"
+                            className="w-full bg-brand-700 hover:bg-brand-700/90 text-white"
                             size="sm"
                           >
                             <ShoppingCart className="h-4 w-4 mr-2" />
