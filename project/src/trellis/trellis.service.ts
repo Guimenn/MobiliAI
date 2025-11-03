@@ -1,11 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Client } from '@gradio/client';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class TrellisService {
   private readonly logger = new Logger(TrellisService.name);
   private client: Client | null = null;
   private initPromise: Promise<Client> | null = null;
+
+  constructor(private uploadService: UploadService) {}
 
   private async initializeClient(): Promise<Client> {
     if (this.client) {
@@ -62,14 +65,22 @@ export class TrellisService {
       textureSize = 256, // Reduzido ainda mais para ser mais rápido (256px)
     } = options;
 
+    // Fazer upload temporário para obter URL pública
+    // O cliente Gradio precisa de uma URL pública, não um arquivo local
+    const tempProductId = `trellis_temp_${Date.now()}`;
+    let imageUrl: string;
+    
     try {
       this.logger.log('Generating 3D model from image');
+      
+      // Fazer upload temporário para obter URL pública
+      this.logger.log('Uploading image to temporary URL...');
+      imageUrl = await this.uploadService.uploadProductImage(image, tempProductId);
+      this.logger.log(`Image uploaded to: ${imageUrl}`);
 
-      // Converter buffer para Blob, pois o Gradio espera um File/Blob
-      const imageBlob = new Blob([image.buffer], { type: image.mimetype });
-
+      // Passar a URL pública para o cliente Gradio
       const result = await this.client.predict('/generate_and_extract_glb', {
-        image: imageBlob,
+        image: imageUrl,
         multiimages: [],
         seed,
         ss_guidance_strength: ssGuidanceStrength,
@@ -107,6 +118,16 @@ export class TrellisService {
       }
       
       throw new Error(`Failed to generate 3D model: ${error.message}`);
+    } finally {
+      // Limpar arquivo temporário do Supabase
+      try {
+        if (imageUrl) {
+          await this.uploadService.deleteProductImage(imageUrl);
+          this.logger.log('Temporary image file cleaned up from Supabase');
+        }
+      } catch (cleanupError) {
+        this.logger.warn('Failed to cleanup temporary image file from Supabase', cleanupError);
+      }
     }
   }
 
@@ -115,21 +136,46 @@ export class TrellisService {
       await this.initializeClient();
     }
 
+    // Fazer upload temporário para obter URL pública
+    const tempProductId = `trellis_preprocess_temp_${Date.now()}`;
+    let imageUrl: string;
+    
     try {
       this.logger.log('Preprocessing image');
 
-      // Converter buffer para Blob, pois o Gradio espera um File/Blob
-      const imageBlob = new Blob([image.buffer], { type: image.mimetype });
+      // Fazer upload temporário para obter URL pública
+      this.logger.log('Uploading image to temporary URL...');
+      imageUrl = await this.uploadService.uploadProductImage(image, tempProductId);
+      this.logger.log(`Image uploaded to: ${imageUrl}`);
 
+      // Passar a URL pública para o cliente Gradio
       const result = await this.client.predict('/preprocess_image', {
-        image: imageBlob,
+        image: imageUrl,
       });
 
       // Retorna o buffer da imagem processada
+      // Se o resultado for uma URL, fazer download
+      if (typeof result.data === 'string') {
+        if (result.data.startsWith('http')) {
+          const response = await fetch(result.data);
+          return Buffer.from(await response.arrayBuffer());
+        }
+      }
+      
       return result.data;
     } catch (error) {
       this.logger.error('Error preprocessing image', error);
       throw new Error(`Failed to preprocess image: ${error.message}`);
+    } finally {
+      // Limpar arquivo temporário do Supabase
+      try {
+        if (imageUrl) {
+          await this.uploadService.deleteProductImage(imageUrl);
+          this.logger.log('Temporary image file cleaned up from Supabase');
+        }
+      } catch (cleanupError) {
+        this.logger.warn('Failed to cleanup temporary image file from Supabase', cleanupError);
+      }
     }
   }
 }

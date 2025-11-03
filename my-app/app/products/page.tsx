@@ -80,6 +80,7 @@ export default function ProductsPage() {
   const [selectedColor, setSelectedColor] = useState<string>(searchParams.get('color') || '');
   const [minPrice, setMinPrice] = useState<string>(searchParams.get('min') || '');
   const [maxPrice, setMaxPrice] = useState<string>(searchParams.get('max') || '');
+  const [hasDiscount, setHasDiscount] = useState<boolean>(searchParams.get('discount') === 'true');
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock'>((searchParams.get('sort') as any) || 'name');
   const [page, setPage] = useState<number>(Number(searchParams.get('page') || 1));
   const pageSize = 12;
@@ -87,6 +88,10 @@ export default function ProductsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  
+  // Estados temporários para preço (não atualizam automaticamente)
+  const [tempMinPrice, setTempMinPrice] = useState<string>(searchParams.get('min') || '');
+  const [tempMaxPrice, setTempMaxPrice] = useState<string>(searchParams.get('max') || '');
 
   // Oferta Relâmpago
   const [specialOfferProduct, setSpecialOfferProduct] = useState<Product | null>(null);
@@ -100,6 +105,12 @@ export default function ProductsPage() {
     return () => clearTimeout(id);
   }, [searchTerm]);
 
+  // Sincronizar valores temporários quando os valores atuais mudarem
+  useEffect(() => {
+    setTempMinPrice(minPrice);
+    setTempMaxPrice(maxPrice);
+  }, [minPrice, maxPrice]);
+
   // Persistir estado na URL
   useEffect(() => {
     const params = new URLSearchParams();
@@ -108,11 +119,12 @@ export default function ProductsPage() {
     if (selectedColor) params.set('color', selectedColor);
     if (minPrice) params.set('min', minPrice);
     if (maxPrice) params.set('max', maxPrice);
+    if (hasDiscount) params.set('discount', 'true');
     if (sortBy && sortBy !== 'name') params.set('sort', sortBy);
     if (page && page > 1) params.set('page', String(page));
     const qs = params.toString();
     router.replace(`/products${qs ? `?${qs}` : ''}`);
-  }, [debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, sortBy, page, router]);
+  }, [debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount, sortBy, page, router]);
 
   const categories = useMemo(() => {
     // Categorias do banco de dados (uppercase)
@@ -134,11 +146,19 @@ export default function ProductsPage() {
           product.category?.toString().toUpperCase() === selectedCategory.toUpperCase();
         const matchesColor = !selectedColor || product.color === selectedColor;
         const price = Number(product.price) || 0;
-        const matchesMin = !minPrice || price >= Number(minPrice);
-        const matchesMax = !maxPrice || price <= Number(maxPrice);
-        return matchesSearch && matchesCategory && matchesColor && matchesMin && matchesMax;
+        const matchesMin = !minPrice || minPrice === '' || price >= Number(minPrice);
+        const matchesMax = !maxPrice || maxPrice === '' || price <= Number(maxPrice);
+        // Filtro de desconto: produtos que estão em promoção
+        // Quando o filtro está ativo (hasDiscount = true), mostra apenas produtos com estoque disponível
+        // que podem receber desconto (produtos ativos e disponíveis)
+        let matchesDiscount = true;
+        if (hasDiscount) {
+          // Apenas produtos com estoque disponível podem ter desconto
+          matchesDiscount = (product.stock || 0) > 0;
+        }
+        return matchesSearch && matchesCategory && matchesColor && matchesMin && matchesMax && matchesDiscount;
       });
-  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice]);
+  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount]);
 
   const sortedProducts = useMemo(() => {
     return [...filteredProducts].sort((a, b) => {
@@ -160,13 +180,37 @@ export default function ProductsPage() {
     return sortedProducts.slice(start, start + pageSize);
   }, [sortedProducts, currentPage]);
 
+  // Produtos mais recentes para o banner (primeiros 3 da lista geral)
+  const recentProducts = useMemo(() => {
+    return products.slice(0, 3);
+  }, [products]);
+
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCategory('all');
     setSelectedColor('');
     setMinPrice('');
     setMaxPrice('');
+    setTempMinPrice('');
+    setTempMaxPrice('');
+    setHasDiscount(false);
     setSortBy('name');
+    setPage(1);
+  };
+
+  const applyPriceFilter = () => {
+    // Validar se os valores são números válidos
+    const min = tempMinPrice.trim() ? Number(tempMinPrice) : '';
+    const max = tempMaxPrice.trim() ? Number(tempMaxPrice) : '';
+    
+    // Validar se min <= max se ambos estiverem preenchidos
+    if (min !== '' && max !== '' && min > max) {
+      alert('O preço mínimo não pode ser maior que o preço máximo');
+      return;
+    }
+    
+    setMinPrice(min !== '' ? String(min) : '');
+    setMaxPrice(max !== '' ? String(max) : '');
     setPage(1);
   };
 
@@ -262,9 +306,9 @@ export default function ProductsPage() {
 
       <main className="container mx-auto px-4 py-6">
         {/* Seção de Localização e Categorias */}
-        <div className="mb-6 flex flex-col lg:flex-row gap-4">
+        <div className=" flex flex-col lg:flex-row gap-4 mt-6">
           {/* Localização do Usuário */}
-          <div className="flex-shrink-0 lg:w-80">
+          <div className="flex-shrink-0 lg:w-80 mt-6">
             <div className="bg-white border border-gray-200 rounded-xl p-3">
               <div className="flex items-center gap-3">
                 <div className="bg-brand-700 rounded-full p-1.5">
@@ -314,7 +358,7 @@ export default function ProductsPage() {
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseLeave}
-              className="flex overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing ml-3"
+              className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-3 py-4"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {categories.map((cat) => {
@@ -328,7 +372,7 @@ export default function ProductsPage() {
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className="flex flex-col items-center justify-center gap-4 whitespace-nowrap flex-1 min-w-0"
+                    className="flex flex-col items-center justify-center gap-4 whitespace-nowrap flex-1 min-w-0 px-2"
                   >
                     <div className={`relative w-20 h-20 rounded-full bg-white border-2 flex items-center justify-center transition-all duration-200 ${
                       isSelected
@@ -336,14 +380,14 @@ export default function ProductsPage() {
                         : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                     }`}>
                       <Icon className={`h-8 w-8 transition-colors duration-200 ${
-                        isSelected ? 'text-brand-700' : 'text-gray-700'
+                        isSelected ? 'text-brand-700' : 'text-brand-700'
                       }`} />
                       {isSelected && (
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-brand-600 rounded-full" />
                       )}
                     </div>
                     <span className={`text-xs font-medium transition-colors duration-200 ${
-                      isSelected ? 'text-brand-700 font-semibold' : 'text-gray-700'
+                      isSelected ? 'text-brand-700 font-semibold' : 'text-brand-700'
                     }`}>
                       {categoryNames[cat] || cat}
                     </span>
@@ -363,13 +407,13 @@ export default function ProductsPage() {
         <Breadcrumb className="mb-4 mt-8">
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">Início</BreadcrumbLink>
+              <BreadcrumbLink href="/" className="text-brand-700 hover:text-brand-800">Início</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 text-brand-700" />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <span className="font-medium text-gray-900">Produtos</span>
+              <span className="font-medium text-brand-700">Produtos</span>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -377,7 +421,7 @@ export default function ProductsPage() {
 
           <div>
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900 mb-1">
+              <h1 className="text-2xl font-semibold text-brand-700 mb-1">
                 {searchTerm ? `Resultados para "${searchTerm}"` : 'Nossos Produtos'}
               </h1>
               <p className="text-sm text-gray-600">
@@ -386,161 +430,149 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Oferta Relâmpago e Banner Publicitário */}
+          {/* Seção Principal: Oferta Relâmpago e Produtos Recentes */}
           {!searchTerm && (
-            <div className="mb-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* Oferta Relâmpago */}
+            <div className="mb-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
+              
+              {/* Card de Oferta Relâmpago */}
               {specialOfferProduct && (
                 <div 
-                  className="lg:col-span-3 relative bg-gradient-to-br from-white via-gray-50/30 to-white border border-gray-200 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-2xl hover:border-[#3e2626]/30 transition-all duration-300 group h-full"
+                  className="lg:col-span-3 relative bg-white rounded-lg border-2 border-brand-100 hover:border-brand-300 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer h-72"
                   onClick={() => router.push(`/products/${specialOfferProduct.id}`)}
                 >
-                  {/* Background Gradient Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#3e2626]/5 via-transparent to-red-500/5 opacity-50"></div>
-                  
-                  {/* Background Pattern */}
-                  <div className="absolute inset-0 opacity-[0.03]">
-                    <div className="absolute inset-0" style={{
-                      backgroundImage: `radial-gradient(circle at 30px 30px, rgba(0,0,0,0.1) 2px, transparent 2px)`,
-                      backgroundSize: '60px 60px'
-                    }}></div>
-                  </div>
-
-                  {/* Oferta Relâmpago Badge */}
-                  <div className="absolute top-3 left-3 z-20 transform -rotate-1">
-                    <div className="relative inline-flex items-center gap-1.5 bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white rounded-xl px-3 py-1.5 shadow-xl border border-[#3e2626]/20">
-                      <Zap className="h-4 w-4 fill-yellow-300 text-yellow-300 transform rotate-12 animate-pulse" />
-                      <span className="text-xs font-extrabold tracking-tight">Oferta Relâmpago</span>
+                  {/* Badge Oferta Relâmpago - Topo Esquerdo */}
+                  <div className="absolute top-3 left-3 z-20">
+                    <div className="inline-flex items-center gap-1.5 bg-brand-700 text-black rounded-lg px-3 py-1.5 shadow-lg">
+                      <Zap className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="text-[11px] font-bold uppercase tracking-tight">Oferta Relâmpago</span>
                     </div>
                   </div>
 
-                  {/* Timer */}
-                  <div className="absolute top-3 right-3 z-20 transform rotate-1">
-                    <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl px-3 py-1.5 text-xs font-bold shadow-xl border border-red-400/30">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span className="font-mono">{formatTime(offerSecondsLeft)}</span>
+                  {/* Timer - Topo Direito */}
+                  <div className="absolute top-3 right-3 z-20">
+                    <div className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-lg px-3 py-1.5 shadow-lg">
+                      <Clock className="h-4 w-4" />
+                      <span className="font-mono text-xs font-bold">{formatTime(offerSecondsLeft)}</span>
                     </div>
                   </div>
 
                   {/* Conteúdo Principal */}
-                  <div className="relative z-10 px-4 pb-4 pt-12">
-                    <div className="flex flex-col items-center text-center gap-3">
-                      {/* Imagem do Produto */}
+                  <div className="relative z-10 h-full flex flex-row gap-4 pt-14">
+                    
+                    {/* Seção da Imagem - Esquerda */}
+                    <div className="flex-shrink-0 w-40 h-48 items-center justify-center overflow-hidden">
                       {specialOfferProduct.imageUrl ? (
-                        <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 p-0.5 shadow-lg group-hover:shadow-xl transition-all duration-300">
-                          <div className="w-full h-full rounded-lg overflow-hidden border border-white bg-white">
-                            <img
-                              src={specialOfferProduct.imageUrl}
-                              alt={specialOfferProduct.name}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                            />
-                          </div>
-                        </div>
+                        <img
+                          src={specialOfferProduct.imageUrl}
+                          alt={specialOfferProduct.name}
+                          className="w-full h-full object-cover pl-5  group-hover:scale-105 transition-transform duration-300"
+                        />
                       ) : (
-                        <div className="w-24 h-24 rounded-xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center shadow-md">
-                          <Package className="h-8 w-8 text-gray-400" />
+                        <div className="w-full h-full bg-gray-50 flex items-center justify-center">
+                          <Package className="h-16 w-16 text-gray-300" />
                         </div>
                       )}
+                    </div>
 
-                      {/* Info do Produto */}
-                      <div className="w-full space-y-2">
-                        {/* Categoria/Brand */}
-                        <div className="flex items-center justify-center gap-1.5">
-                          {specialOfferProduct.brand && (
-                            <>
-                              <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
-                                {specialOfferProduct.brand}
-                              </span>
-                              <span className="text-gray-300 text-xs">•</span>
-                            </>
-                          )}
-                          <span className="text-xs font-semibold text-gray-600 uppercase">
-                            {specialOfferProduct.category}
-                          </span>
-                        </div>
-
-                        {/* Título */}
-                        <h3 className="text-gray-900 font-black text-sm leading-tight line-clamp-2 min-h-[2.5rem] group-hover:text-[#3e2626] transition-colors px-1">
+                    {/* Seção de Informações - Direita */}
+                    <div className="flex-1 flex flex-col justify-between h-[calc(100%-3.5rem)]">
+                      
+                      {/* Informações do Produto */}
+                      <div className="space-y-2">
+                        {/* Nome do Produto */}
+                        <h3 className="text-base font-semibold text-gray-900 line-clamp-2 leading-tight">
                           {specialOfferProduct.name}
                         </h3>
                         
-                        {/* Preços */}
-                        <div className="space-y-1">
-                          {specialOfferProduct.price && (
-                            <div className="flex items-center justify-center gap-1.5">
-                              <span className="text-xs line-through text-gray-400 font-semibold">
-                                R$ {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white text-xs font-black shadow-sm">
-                                -30%
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex items-baseline justify-center gap-0.5">
-                            <span className="text-xs font-bold text-gray-600">R$</span>
-                            <span className="text-2xl font-black text-[#3e2626] leading-none">
-                              {(specialOfferProduct.price ? specialOfferProduct.price * 0.7 : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {/* Preço Original e Badge */}
+                        {specialOfferProduct.price && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm text-gray-500 line-through">
+                              R$ {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <span className="inline-flex items-center px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded uppercase">
+                              -30% OFF
                             </span>
                           </div>
-                        </div>
+                        )}
+                      </div>
 
-                        {/* Badges */}
-                        <div className="flex items-center justify-center pt-0.5">
-                          <div className="flex items-center bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full px-2.5 py-1 shadow-sm">
-                            <Truck className="h-3 w-3 mr-1" />
-                            <span className="text-xs font-bold">Frete Grátis</span>
+                      {/* Seção de Preços */}
+                      {specialOfferProduct.price && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-gray-600 font-medium">Por apenas</p>
+                          <div className="text-2xl font-bold text-brand-700">
+                            R$ {(specialOfferProduct.price * 0.7).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" />
+                            Economia de R$ {(specialOfferProduct.price * 0.3).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          
+                          {/* Botão de ação */}
+                          <div >
+                            <div className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 group-hover:text-brand-800 transition-colors">
+                              <span>Ver oferta</span>
+                              <ChevronRight className="h-4 w-4 text-brand-700 group-hover:translate-x-1 transition-transform" />
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Banner Publicitário */}
-              {paginatedProducts.length > 0 && (
-                <div className="lg:col-span-9 h-full">
-                  <div className="bg-gradient-to-br from-white via-brand-400/5 to-brand-700/5 border border-gray-200 rounded-xl shadow-lg overflow-hidden w-full h-full flex flex-col hover:shadow-xl transition-all duration-300">
-                    {/* Label Ad */}
-                    <div className="px-3 pt-1.5 pb-1 bg-gradient-to-r from-gray-50/80 to-gray-100/50 border-b border-gray-100">
-                      <span className="text-[9px] text-gray-500 font-bold tracking-widest uppercase">PUBLICIDADE</span>
-                    </div>
+              {/* Banner de Produtos Recentes */}
+              {recentProducts.length > 0 && (
+                <div className="lg:col-span-9 relative bg-gradient-to-br from-white to-brand-50/20 border-2 border-brand-200 rounded-xl shadow-md overflow-hidden h-72">
+                  <div 
+                    className="relative w-full h-full bg-cover bg-top"
+                    style={{
+                      backgroundImage: `url(/productsPage/banner-products.svg)`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'top right',
+                      backgroundRepeat: 'no-repeat'
+                    }}
+                  >
+                    {/* Overlay com tom marrom sutil */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-brand-900/5 via-brand-700/3 to-transparent"></div>
                     
                     {/* Conteúdo do Banner */}
-                    <div className="grid grid-cols-12 items-center gap-4 px-8 py-2 h-full">
-                      {/* Logo e Branding */}
-                      <div className="col-span-3 flex items-center">
-                        <div className="flex items-center">
+                    <div className="relative z-10 h-full p-6 flex items-center justify-between gap-4">
+                      {/* Logo e Texto */}
+                      <div className="flex flex-col items-center gap-4 flex-1">
+                        <div className="flex-shrink-0">
                           <img
                             src="/logoCompleta.svg"
                             alt="MobiliAI"
-                            className="h-32 md:h-48 w-auto"
+                            className="h-38 w-auto"
                           />
+                        </div>
+
+                        <div className="flex-1">
+                          <h3 className="text-xl font-black text-brand-800">
+                            Confira Nossos{' '}
+                            <span className="text-brand-700">
+                              Produtos Mais Recentes
+                            </span>
+                          </h3>
+                          <p className="text-lg lg:text-sm text-brand-700/80 font-medium">
+                            Descubra as últimas novidades em móveis e decoração
+                          </p>
                         </div>
                       </div>
 
-                      {/* Chamada */}
-                      <div className="col-span-6 min-w-0 md:pl-4 pl-3 md:border-l md:border-gray-200">
-                        <h3 className="text-2xl font-black text-gray-900 leading-snug mb-1">
-                          Produtos Exclusivos com{' '}
-                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-700 to-brand-600">
-                            Inteligência Artificial
-                          </span>
-                        </h3>
-                        <p className="text-base text-gray-600 font-semibold leading-tight">
-                          Descubra móveis únicos e aproveite ofertas imperdíveis
-                        </p>
-                      </div>
-
-                      {/* Preview de Produtos */}
-                      <div className="hidden lg:grid col-span-3 grid-cols-3 gap-3 justify-items-end">
-                        {paginatedProducts.slice(0, 3).map((product, idx) => (
+                      {/* Preview de Produtos Mais Recentes */}
+                      <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+                        {recentProducts.map((product, idx) => (
                           <div
                             key={product.id}
-                            className="relative group"
+                            className="relative group cursor-pointer"
                             style={{ zIndex: 3 - idx }}
+                            onClick={() => router.push(`/products/${product.id}`)}
                           >
-                            <div className="w-full aspect-square max-w-none rounded-xl overflow-hidden border-2 border-white bg-white shadow-md hover:shadow-lg hover:border-brand-300 hover:-translate-y-0.5 transition-all duration-300">
+                            <div className="w-48 h-48 rounded-lg overflow-hidden border-2 border-white bg-white shadow-lg hover:shadow-xl hover:border-brand-300 hover:-translate-y-1 transition-all duration-300">
                               {product.imageUrl ? (
                                 <img
                                   src={product.imageUrl}
@@ -549,11 +581,11 @@ export default function ProductsPage() {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                                  <Package className="h-6 w-6 text-gray-400" />
+                                  <Package className="h-4 w-4 text-gray-400" />
                                 </div>
                               )}
                             </div>
-                            {idx < 2 && (
+                            {idx < recentProducts.length - 1 && (
                               <div className="absolute -right-1 top-1/2 -translate-y-1/2 translate-x-1/2 w-1.5 h-1.5 bg-brand-600 rounded-full border border-white shadow-sm"></div>
                             )}
                           </div>
@@ -565,14 +597,14 @@ export default function ProductsPage() {
               )}
               
             </div>
-            
           )}
-         {/* Ordenação */}
-         <div className="flex items-center justify-end mt-16">
+
+          {/* Ordenação */}
+          <div className="flex items-center justify-end mt-4 mb-4">
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
-                className="border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:border-brand-500"
+                className="border-2 border-brand-200 rounded-lg px-4 py-2 text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
               >
                 <option value="name">Ordenar por: Mais relevantes</option>
                 <option value="price">Menor preço</option>
@@ -584,64 +616,52 @@ export default function ProductsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Sidebar de filtros estilo Mercado Livre */}
           <aside className={`lg:col-span-3 ${mobileFiltersOpen ? '' : 'hidden'} lg:block`}>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 sticky top-20 p-4">
-              {/* Buscar */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Buscar</h3>
-                  <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                    placeholder="Buscar produtos..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
+            <div className="bg-white rounded-lg shadow-sm border-2 border-brand-100 sticky top-20 p-3">
+             
 
               {/* Frete Grátis */}
-              <div className="mb-6 pb-6 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Envio</h3>
-                <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+              <div className="mb-3 pb-3 border-b border-brand-100">
+                <h3 className="text-xs font-semibold text-brand-700 mb-1.5 border-b border-brand-100 pb-1">Envio</h3>
+                <label className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 p-1 rounded">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                    className="w-3.5 h-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                   />
-                  <Truck className="h-4 w-4 text-brand-600" />
-                  <span className="text-sm text-gray-700">Frete grátis</span>
+                  <Truck className="h-3.5 w-3.5 text-brand-600" />
+                  <span className="text-xs text-gray-700">Frete grátis</span>
                 </label>
               </div>
 
               {/* Categoria */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Categoria</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+              <div className="mb-3">
+                <h3 className="text-xs font-semibold text-brand-700 mb-1.5 border-b border-brand-100 pb-1">Categoria</h3>
+                <div className="space-y-0.5">
+                  <label className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 p-1 rounded">
                     <input
                       type="radio"
                       name="category"
                       value="all"
                       checked={selectedCategory === 'all'}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-4 h-4 border-gray-300 text-brand-600 focus:ring-brand-500"
+                      className="w-3.5 h-3.5 border-gray-300 text-brand-600 focus:ring-brand-500"
                     />
-                    <span className="text-sm text-gray-700">Todas as categorias</span>
+                    <span className="text-xs text-gray-700">Todas as categorias</span>
                   </label>
                     {categories.map((cat) => (
-                    <label key={cat} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                    <label key={cat} className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 p-1 rounded">
                       <input
                         type="radio"
                         name="category"
                         value={cat}
                         checked={selectedCategory === cat}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="w-4 h-4 border-gray-300 text-brand-600 focus:ring-brand-500"
+                        className="w-3.5 h-3.5 border-gray-300 text-brand-600 focus:ring-brand-500"
                       />
-                      <span className="text-sm text-gray-700">
+                      <span className="text-xs text-gray-700">
                         {categoryNames[cat] || cat.charAt(0).toUpperCase() + cat.slice(1)}
                       </span>
-                      <span className="text-xs text-gray-500 ml-auto">
-                        ({products.filter(p => p.category?.toString().toLowerCase() === cat).length})
+                      <span className="text-[10px] text-gray-500 ml-auto">
+                        ({products.filter(p => p.category?.toString().toUpperCase() === cat.toUpperCase()).length})
                       </span>
                     </label>
                   ))}
@@ -650,12 +670,12 @@ export default function ProductsPage() {
 
               {/* Cor */}
               {colors.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Cor</h3>
+                <div className="mb-3">
+                  <h3 className="text-xs font-semibold text-brand-700 mb-1.5 border-b border-brand-100 pb-1">Cor</h3>
                   <select
                     value={selectedColor}
                     onChange={(e) => setSelectedColor(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
                   >
                     <option value="">Todas as cores</option>
                     {colors.map((c) => (
@@ -666,32 +686,100 @@ export default function ProductsPage() {
               )}
 
               {/* Preço */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Preço</h3>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    placeholder="Mín"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
-                    className="text-sm"
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Máx"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
-                    className="text-sm"
-                  />
+              <div className="mb-3">
+                <h3 className="text-xs font-semibold text-brand-700 mb-1.5 border-b border-brand-100 pb-1">Preço</h3>
+                <div className="space-y-1.5">
+                  <div className="flex gap-1.5">
+                    <Input
+                      type="number"
+                      placeholder="Mín"
+                      value={tempMinPrice}
+                      onChange={(e) => setTempMinPrice(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          applyPriceFilter();
+                        }
+                      }}
+                      className="text-xs h-8"
+                      min="0"
+                      step="0.01"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Máx"
+                      value={tempMaxPrice}
+                      onChange={(e) => setTempMaxPrice(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          applyPriceFilter();
+                        }
+                      }}
+                      className="text-xs h-8"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button
+                      onClick={applyPriceFilter}
+                      size="sm"
+                      className="flex-1 bg-brand-700 border border-black hover:bg-brand-800 text-black cursor-pointer h-7 text-xs"
+                    >
+                      Aplicar
+                    </Button>
+                    {(minPrice || maxPrice) && (
+                      <Button
+                        onClick={() => {
+                          setTempMinPrice('');
+                          setTempMaxPrice('');
+                          setMinPrice('');
+                          setMaxPrice('');
+                          setPage(1);
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs px-2 border-brand-300 text-brand-700 hover:bg-brand-50"
+                      >
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  {(minPrice || maxPrice) && (
+                    <p className="text-[10px] text-gray-600 text-center">
+                      {minPrice && maxPrice 
+                        ? `R$ ${Number(minPrice).toLocaleString('pt-BR')} - R$ ${Number(maxPrice).toLocaleString('pt-BR')}`
+                        : minPrice
+                        ? `A partir de R$ ${Number(minPrice).toLocaleString('pt-BR')}`
+                        : `Até R$ ${Number(maxPrice).toLocaleString('pt-BR')}`
+                      }
+                    </p>
+                  )}
                 </div>
-                </div>
+              </div>
+
+              {/* Desconto */}
+              <div className="mb-3 pb-3 border-b border-brand-100">
+                <h3 className="text-xs font-semibold text-brand-700 mb-1.5 border-b border-brand-100 pb-1">Desconto</h3>
+                <label className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                  <input
+                    type="checkbox"
+                    checked={hasDiscount}
+                    onChange={(e) => {
+                      setHasDiscount(e.target.checked);
+                      setPage(1);
+                    }}
+                    className="w-3.5 h-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="text-xs text-gray-700">Produtos com desconto</span>
+                </label>
+              </div>
 
               {/* Limpar filtros */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={clearFilters}
-                className="w-full"
+                className="w-full mt-2 border-brand-300 text-brand-700 hover:bg-brand-50 hover:border-brand-400 h-7 text-xs"
               >
                 Limpar filtros
               </Button>
@@ -701,14 +789,14 @@ export default function ProductsPage() {
           {/* Conteúdo principal */}
           <section className="lg:col-span-9">
             {/* Botão de filtros mobile */}
-            <Button
+              <Button
               variant="outline"
               onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
-              className="mb-4 lg:hidden w-full"
+              className="mb-4 lg:hidden w-full border-brand-300 text-brand-700 hover:bg-brand-50 hover:border-brand-400"
             >
-              <Filter className="h-4 w-4 mr-2" />
+              <Filter className="h-4 w-4 mr-2 text-brand-700" />
               Filtros
-              {mobileFiltersOpen && <ChevronDown className="h-4 w-4 ml-2" />}
+              {mobileFiltersOpen && <ChevronDown className="h-4 w-4 ml-2 text-brand-700" />}
             </Button>
 
             
@@ -737,7 +825,7 @@ export default function ProductsPage() {
             ) : (
               <>
                 {/* Grid de produtos estilo Mercado Livre */}
-                <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
                   {paginatedProducts.map((product) => {
                     const hasDiscount = false; // Pode adicionar lógica de desconto
                     const rating = 4.5 + Math.random() * 0.5; // Rating aleatório entre 4.5 e 5
@@ -746,7 +834,7 @@ export default function ProductsPage() {
                     return (
                       <div
                         key={product.id}
-                        className="bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-200 overflow-hidden group cursor-pointer"
+                        className="bg-white rounded-lg border-2 border-brand-100 hover:border-brand-300 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer"
                         onClick={() => router.push(`/products/${product.id}`)}
                       >
                         {/* Imagem do produto */}
@@ -807,7 +895,7 @@ export default function ProductsPage() {
                                 R$ {(Number(product.price) * 1.3).toFixed(2)}
                               </div>
                             )}
-                            <div className="text-2xl font-bold text-gray-900">
+                            <div className="text-2xl font-bold text-brand-700">
                               R$ {Number(product.price).toFixed(2)}
                             </div>
                             {hasDiscount && (
@@ -843,7 +931,7 @@ export default function ProductsPage() {
                               handleAddToCart(product);
                             }}
                             disabled={(product.stock || 0) === 0}
-                            className="w-full bg-brand-700 hover:bg-brand-700/90 text-white"
+                            className="w-full bg-brand-700 hover:bg-brand-800 text-white shadow-md hover:shadow-lg transition-all"
                             size="sm"
                           >
                             <ShoppingCart className="h-4 w-4 mr-2" />
