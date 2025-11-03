@@ -72,6 +72,16 @@ export class ForgotPasswordDto {
   email: string;
 }
 
+export class VerifyResetCodeDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @Length(6, 6, { message: 'O código deve ter exatamente 6 dígitos' })
+  @Matches(/^\d{6}$/, { message: 'O código deve conter apenas números' })
+  code: string;
+}
+
 export class ResetPasswordDto {
   @IsEmail()
   email: string;

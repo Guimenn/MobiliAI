@@ -2,7 +2,7 @@
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/auth.dto';
+import { RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto, VerifyResetCodeDto } from '../dto/auth.dto';
 import { EmailService } from '../email/email.service';
 import { User, UserRole } from '@prisma/client';
 
@@ -199,6 +199,60 @@ export class AuthService {
       message: 'Código enviado com sucesso! Verifique seu email.',
       emailExists: true 
     };
+  }
+
+  async verifyResetCode(verifyResetCodeDto: VerifyResetCodeDto): Promise<{ valid: boolean; message: string }> {
+    const { email, code } = verifyResetCodeDto;
+
+    // Validar formato do código (exatamente 6 dígitos)
+    const codeRegex = /^\d{6}$/;
+    if (!codeRegex.test(code)) {
+      throw new BadRequestException('Código inválido. O código deve ter exatamente 6 dígitos numéricos.');
+    }
+
+    // Normalizar email para comparação (lowercase)
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Verificar se o usuário existe
+    const user = await this.prisma.user.findUnique({ 
+      where: { email: normalizedEmail } 
+    });
+    if (!user) {
+      throw new BadRequestException('Código inválido ou expirado.');
+    }
+
+    // Buscar o código de reset
+    const passwordReset = await this.prisma.passwordReset.findFirst({
+      where: {
+        email: normalizedEmail,
+        code: code,
+        used: false,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!passwordReset) {
+      throw new BadRequestException('Código inválido ou expirado.');
+    }
+
+    // Verificar se o código expirou
+    const now = new Date();
+    if (passwordReset.expiresAt < now) {
+      await this.prisma.passwordReset.update({
+        where: { id: passwordReset.id },
+        data: { used: true },
+      });
+      throw new BadRequestException('Código expirado. Solicite um novo código.');
+    }
+
+    // Verificar se o código pertence ao usuário correto
+    if (passwordReset.userId && passwordReset.userId !== user.id) {
+      throw new BadRequestException('Código inválido para este usuário.');
+    }
+
+    return { valid: true, message: 'Código válido' };
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
