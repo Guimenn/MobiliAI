@@ -44,6 +44,7 @@ export default function LoginPage() {
     code: '',
     newPassword: ''
   });
+  const [currentResetCode, setCurrentResetCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
   const [currentField, setCurrentField] = useState<'name' | 'phone' | 'cpf' | 'zipCode' | 'address' | 'city' | 'state' | 'password' | 'confirmAddress'>('name');
@@ -390,8 +391,26 @@ export default function LoginPage() {
       }
 
       setResetData(prev => ({ ...prev, code: cleanCode }));
-      simulateTyping('Agora crie uma nova senha:', 1000);
-      setLoginStep('resetPassword');
+      setCurrentResetCode(cleanCode);
+      setLoginStep('processing');
+
+      // Validar o código com o backend ANTES de pedir a nova senha
+      try {
+        simulateTyping('Verificando código...', 1000);
+        await authAPI.verifyResetCode(resetData.email, cleanCode);
+        simulateTyping('✅ Código válido! Agora crie uma nova senha:', 1500);
+        setLoginStep('resetPassword');
+      } catch (error: any) {
+        let errorMessage = 'Erro ao verificar código';
+        if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        simulateTyping(`❌ ${errorMessage}`, 1500);
+        simulateTyping('Digite o código novamente:', 1000);
+        setLoginStep('resetCode');
+        setResetData(prev => ({ ...prev, code: '' }));
+        setCurrentResetCode('');
+      }
     } else if (loginStep === 'resetPassword') {
       if (userInput.length < 6) {
         simulateTyping('❌ A senha deve ter pelo menos 6 caracteres:', 1500);
@@ -403,11 +422,14 @@ export default function LoginPage() {
 
       try {
         simulateTyping('Redefinindo senha...', 1000);
-        await authAPI.resetPassword(resetData.email, resetData.code, userInput);
+        // Usar currentResetCode para garantir que temos o código correto
+        const codeToUse = currentResetCode || resetData.code;
+        await authAPI.resetPassword(resetData.email, codeToUse, userInput);
         simulateTyping('✅ Senha redefinida com sucesso!', 1500);
         simulateTyping('Agora você pode fazer login com sua nova senha. Digite seu email:', 2000);
         setLoginStep('email');
         setResetData({ email: '', code: '', newPassword: '' });
+        setCurrentResetCode('');
       } catch (error: any) {
         let errorMessage = 'Erro ao redefinir senha';
         if (error?.response?.data?.message) {
@@ -419,6 +441,7 @@ export default function LoginPage() {
           simulateTyping('Digite o código novamente:', 1000);
           setLoginStep('resetCode');
           setResetData(prev => ({ ...prev, code: '' }));
+          setCurrentResetCode('');
         } else {
           simulateTyping('Digite sua nova senha:', 1000);
           setLoginStep('resetPassword');
@@ -430,19 +453,17 @@ export default function LoginPage() {
       setCredentials(prev => ({ ...prev, password: userInput }));
       setLoginStep('processing');
       
-      // Simular verificação com IA
+      // Mostrar que está verificando
       simulateTyping('Verificando credenciais...', 1000);
-      simulateTyping('Acesso autorizado!', 2000);
 
       try {
         const response = await authAPI.login(credentials.email, userInput);
-        simulateTyping('✅ Login realizado com sucesso!', 1000);
         
         setUser(response.user);
         setToken(response.token);
         setAuthenticated(true);
         
-        simulateTyping('✅ Conta criada com sucesso!', 1000);
+        simulateTyping('✅ Login realizado com sucesso!', 1000);
         simulateTyping('🚀 Redirecionando...', 1500);
         setLoginStep('complete');
 
@@ -458,42 +479,62 @@ export default function LoginPage() {
             : '/';
           
           router.replace(redirectPath);
-        }, 4500);
+        }, 2500);
       } catch (error: unknown) {
         console.error('Erro no login:', error);
-        let errorMessage = 'Erro inesperado ao fazer login';
+        
+        // Determinar o tipo de erro e mostrar mensagem apropriada
+        let errorMessage = '';
+        let needsEmailReset = false;
         
         if ((error as any)?.response?.data?.message) {
           const backendMessage = (error as any).response.data.message;
           if (backendMessage.includes('Email não encontrado')) {
-            errorMessage = 'Este email não está cadastrado.';
-          } else if (backendMessage.includes('Senha incorreta')) {
-            errorMessage = 'Senha incorreta. Verifique e tente novamente.';
+            errorMessage = '❌ Este email não está cadastrado em nosso sistema.';
+            needsEmailReset = true;
+          } else if (backendMessage.includes('Senha incorreta') || backendMessage.toLowerCase().includes('senha')) {
+            errorMessage = '❌ A senha informada está incorreta. Por favor, verifique e tente novamente.';
+            needsEmailReset = true;
           } else if (backendMessage.includes('Usuário inativo')) {
-            errorMessage = 'Sua conta está desativada. Entre em contato com o suporte.';
+            errorMessage = '❌ Sua conta está desativada. Entre em contato com o suporte para reativar.';
+            needsEmailReset = true;
           } else {
-            errorMessage = backendMessage;
+            errorMessage = `❌ ${backendMessage}`;
+            needsEmailReset = true;
           }
         } else if ((error as any)?.response?.status === 401) {
-          errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.';
+          // Erro genérico 401 - pode ser email ou senha
+          errorMessage = '❌ Email ou senha incorretos. Verifique suas credenciais e tente novamente.';
+          needsEmailReset = true;
         } else if ((error as any)?.response?.status === 429) {
-          errorMessage = 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.';
+          errorMessage = '⚠️ Muitas tentativas de login. Aguarde alguns minutos antes de tentar novamente.';
+          needsEmailReset = true;
+        } else {
+          errorMessage = '❌ Ocorreu um erro ao fazer login. Verifique sua conexão e tente novamente.';
+          needsEmailReset = true;
         }
         
-        simulateTyping(`❌ ${errorMessage}`, 1500);
-        simulateTyping('Digite seu email para tentar novamente:', 1000);
-        setLoginStep('email');
-        setCredentials({ 
-          email: '', 
-          password: '', 
-          name: '', 
-          phone: '', 
-          cpf: '',
-          address: '', 
-          city: '', 
-          state: '', 
-          zipCode: '' 
-        });
+        // Mostrar mensagem de erro
+        simulateTyping(errorMessage, 2000);
+        
+        // Se precisar resetar, voltar para o passo do email
+        if (needsEmailReset) {
+          setTimeout(() => {
+            simulateTyping('🔐 Por favor, digite seu email novamente para tentar fazer login:', 1500);
+            setLoginStep('email');
+            setCredentials({ 
+              email: '', 
+              password: '', 
+              name: '', 
+              phone: '', 
+              cpf: '',
+              address: '', 
+              city: '', 
+              state: '', 
+              zipCode: '' 
+            });
+          }, 2500);
+        }
       }
     }
 

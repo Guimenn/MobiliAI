@@ -90,6 +90,11 @@ export const authAPI = {
     return response.data;
   },
 
+  verifyResetCode: async (email: string, code: string) => {
+    const response = await api.post('/auth/verify-reset-code', { email, code });
+    return response.data;
+  },
+
   resetPassword: async (email: string, code: string, newPassword: string) => {
     const response = await api.post('/auth/reset-password', {
       email,

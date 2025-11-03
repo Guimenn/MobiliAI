@@ -1,5 +1,8 @@
 import { config } from 'dotenv';
 import { PrismaClient, ProductCategory } from '@prisma/client';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Carregar variáveis de ambiente
 config();
@@ -11,6 +14,130 @@ const prisma = new PrismaClient({
     },
   },
 });
+
+// Configurar Supabase
+function getSupabaseClient(): SupabaseClient | null {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.warn('⚠️ Supabase não configurado. As imagens não serão enviadas para o bucket.');
+    return null;
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
+}
+
+// Função para ler todas as imagens da pasta
+function getImageFiles(): string[] {
+  // Tentar diferentes caminhos possíveis
+  // Primeiro, tentar encontrar a pasta "MobiliAI" em my-app/public
+  const basePaths = [
+    // Quando executado de dentro de project/
+    path.resolve(process.cwd(), '..', 'my-app', 'public'),
+    // Quando executado da raiz do projeto
+    path.resolve(process.cwd(), 'my-app', 'public'),
+    // Caminho usando __dirname (quando compilado via ts-node)
+    path.resolve(__dirname, '..', 'my-app', 'public'),
+    path.resolve(__dirname, '..', '..', 'my-app', 'public'),
+  ];
+
+  let publicFolder: string | null = null;
+  
+  // Encontrar a pasta public
+  for (const basePath of basePaths) {
+    if (fs.existsSync(basePath)) {
+      publicFolder = basePath;
+      break;
+    }
+  }
+
+  if (!publicFolder) {
+    console.warn(`⚠️ Pasta my-app/public não encontrada. Tentativas:`);
+    basePaths.forEach(p => console.warn(`   - ${p}`));
+    return [];
+  }
+
+  // Listar todas as pastas dentro de public para encontrar "MobiliAI"
+  let imagesFolder: string | null = null;
+  
+  try {
+    const dirs = fs.readdirSync(publicFolder, { withFileTypes: true });
+    
+    for (const dir of dirs) {
+      if (dir.isDirectory() && (dir.name.includes('Mobili') || dir.name.includes('Móveis') || dir.name.includes('MobiliAI'))) {
+        imagesFolder = path.join(publicFolder, dir.name);
+        console.log(`📁 Pasta de imagens encontrada: ${imagesFolder}`);
+        break;
+      }
+    }
+  } catch (error) {
+    console.error('❌ Erro ao ler pasta public:', error);
+    return [];
+  }
+
+  if (!imagesFolder) {
+    console.warn(`⚠️ Pasta "MobiliAI - Móveis" não encontrada em: ${publicFolder}`);
+    console.warn(`   Pastas disponíveis:`, fs.readdirSync(publicFolder, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name));
+    return [];
+  }
+
+  const files = fs.readdirSync(imagesFolder)
+    .filter(file => file.toLowerCase().endsWith('.png'))
+    .map(file => path.join(imagesFolder!, file))
+    .sort((a, b) => {
+      // Ordenar numericamente por nome (1.png, 2.png, ..., 87.png)
+      const numA = parseInt(path.basename(a, '.png')) || 0;
+      const numB = parseInt(path.basename(b, '.png')) || 0;
+      return numA - numB;
+    });
+
+  console.log(`📸 Encontradas ${files.length} imagens na pasta`);
+  return files;
+}
+
+// Função para fazer upload de imagem para o Supabase
+async function uploadImageToSupabase(
+  supabase: SupabaseClient,
+  imagePath: string,
+  productId: string,
+  index: number
+): Promise<string | null> {
+  try {
+    const imageBuffer = fs.readFileSync(imagePath);
+    const fileName = path.basename(imagePath);
+    const fileExtension = path.extname(fileName);
+    const timestamp = Date.now();
+    const uploadFileName = `products/${productId}_${timestamp}_${index}${fileExtension}`;
+
+    console.log(`📤 Fazendo upload de ${fileName}...`);
+
+    const { data, error } = await supabase.storage
+      .from('product-images')
+      .upload(uploadFileName, imageBuffer, {
+        contentType: 'image/png',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error(`❌ Erro ao fazer upload de ${fileName}:`, error.message);
+      return null;
+    }
+
+    // Obter URL pública
+    const { data: publicUrlData } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(uploadFileName);
+
+    console.log(`✅ Upload concluído: ${fileName}`);
+    return publicUrlData.publicUrl;
+  } catch (error) {
+    console.error(`❌ Erro ao processar ${imagePath}:`, error);
+    return null;
+  }
+}
 
 // Base de dados de produtos de móveis com variações
 const furnitureProducts = {
@@ -78,6 +205,16 @@ export async function seedFurnitureProducts() {
   console.log('🛋️ Criando produtos de móveis aleatórios para todas as filiais...');
 
   try {
+    // Inicializar Supabase
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      console.log('✅ Supabase configurado - imagens serão enviadas para o bucket');
+    }
+
+    // Ler todas as imagens da pasta
+    const imageFiles = getImageFiles();
+    let imageIndex = 0; // Índice para distribuir as imagens circularmente
+
     // Buscar todas as lojas
     const stores = await prisma.store.findMany({
       where: { isActive: true },
@@ -163,17 +300,61 @@ export async function seedFurnitureProducts() {
         });
       }
 
-      // Criar produtos em lote
-      const created = await prisma.product.createMany({
-        data: productsToCreate,
-        skipDuplicates: true,
-      });
+      // Criar produtos com imagens
+      console.log(`\n📤 Criando produtos e fazendo upload de imagens para ${store.name}...`);
+      const createdProducts = [];
+      
+      for (let i = 0; i < productsToCreate.length; i++) {
+        const productData = productsToCreate[i];
+        let imageUrl: string | null = null;
+        
+        // Criar produto primeiro para obter o ID
+        const createdProduct = await prisma.product.create({
+          data: productData,
+        });
 
-      totalCreated += created.count;
-      console.log(`✅ Criados ${created.count} produtos para ${store.name}`);
+        // Fazer upload da imagem DEPOIS de criar o produto (para usar o ID real)
+        if (imageFiles.length > 0 && supabase) {
+          // Usar imagem circularmente (se acabarem, volta ao início)
+          const imageFile = imageFiles[imageIndex % imageFiles.length];
+          imageIndex++;
+
+          // Fazer upload usando o ID real do produto
+          imageUrl = await uploadImageToSupabase(
+            supabase,
+            imageFile,
+            createdProduct.id,
+            i
+          );
+
+          if (imageUrl) {
+            // Atualizar produto com a URL da imagem
+            await prisma.product.update({
+              where: { id: createdProduct.id },
+              data: {
+                imageUrl: imageUrl,
+                imageUrls: [imageUrl],
+              },
+            });
+            console.log(`✅ Produto criado e imagem ${i + 1}/${productsToCreate.length} enviada para o bucket`);
+          } else {
+            console.warn(`⚠️ Produto criado mas falha ao enviar imagem ${i + 1}/${productsToCreate.length}`);
+          }
+        } else {
+          console.log(`✅ Produto ${i + 1}/${productsToCreate.length} criado (sem imagem)`);
+        }
+
+        createdProducts.push(createdProduct);
+      }
+
+      totalCreated += createdProducts.length;
+      console.log(`✅ Criados ${createdProducts.length} produtos com imagens para ${store.name}`);
     }
 
     console.log(`\n🎉 Seed concluído! Total de ${totalCreated} produtos criados em ${stores.length} loja(s)`);
+    if (imageFiles.length > 0) {
+      console.log(`📸 ${imageFiles.length} imagens processadas e enviadas para o bucket`);
+    }
   } catch (error) {
     console.error('❌ Erro ao criar produtos:', error);
     throw error;
