@@ -18,7 +18,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/jest/bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node seed.ts",
-    "seed:furniture": "ts-node seed-furniture-products.ts"
+    "seed:furniture": "ts-node seed-furniture-products.ts",
+    "delete:products": "ts-node delete-all-products.ts"
   },
   "engines": {
     "npm": ">=10.0.0",

@@ -430,19 +430,17 @@ export default function LoginPage() {
       setCredentials(prev => ({ ...prev, password: userInput }));
       setLoginStep('processing');
       
-      // Simular verificação com IA
+      // Mostrar que está verificando
       simulateTyping('Verificando credenciais...', 1000);
-      simulateTyping('Acesso autorizado!', 2000);
 
       try {
         const response = await authAPI.login(credentials.email, userInput);
-        simulateTyping('✅ Login realizado com sucesso!', 1000);
         
         setUser(response.user);
         setToken(response.token);
         setAuthenticated(true);
         
-        simulateTyping('✅ Conta criada com sucesso!', 1000);
+        simulateTyping('✅ Login realizado com sucesso!', 1000);
         simulateTyping('🚀 Redirecionando...', 1500);
         setLoginStep('complete');
 
@@ -458,42 +456,62 @@ export default function LoginPage() {
             : '/';
           
           router.replace(redirectPath);
-        }, 4500);
+        }, 2500);
       } catch (error: unknown) {
         console.error('Erro no login:', error);
-        let errorMessage = 'Erro inesperado ao fazer login';
+        
+        // Determinar o tipo de erro e mostrar mensagem apropriada
+        let errorMessage = '';
+        let needsEmailReset = false;
         
         if ((error as any)?.response?.data?.message) {
           const backendMessage = (error as any).response.data.message;
           if (backendMessage.includes('Email não encontrado')) {
-            errorMessage = 'Este email não está cadastrado.';
-          } else if (backendMessage.includes('Senha incorreta')) {
-            errorMessage = 'Senha incorreta. Verifique e tente novamente.';
+            errorMessage = '❌ Este email não está cadastrado em nosso sistema.';
+            needsEmailReset = true;
+          } else if (backendMessage.includes('Senha incorreta') || backendMessage.toLowerCase().includes('senha')) {
+            errorMessage = '❌ A senha informada está incorreta. Por favor, verifique e tente novamente.';
+            needsEmailReset = true;
           } else if (backendMessage.includes('Usuário inativo')) {
-            errorMessage = 'Sua conta está desativada. Entre em contato com o suporte.';
+            errorMessage = '❌ Sua conta está desativada. Entre em contato com o suporte para reativar.';
+            needsEmailReset = true;
           } else {
-            errorMessage = backendMessage;
+            errorMessage = `❌ ${backendMessage}`;
+            needsEmailReset = true;
           }
         } else if ((error as any)?.response?.status === 401) {
-          errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.';
+          // Erro genérico 401 - pode ser email ou senha
+          errorMessage = '❌ Email ou senha incorretos. Verifique suas credenciais e tente novamente.';
+          needsEmailReset = true;
         } else if ((error as any)?.response?.status === 429) {
-          errorMessage = 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.';
+          errorMessage = '⚠️ Muitas tentativas de login. Aguarde alguns minutos antes de tentar novamente.';
+          needsEmailReset = true;
+        } else {
+          errorMessage = '❌ Ocorreu um erro ao fazer login. Verifique sua conexão e tente novamente.';
+          needsEmailReset = true;
         }
         
-        simulateTyping(`❌ ${errorMessage}`, 1500);
-        simulateTyping('Digite seu email para tentar novamente:', 1000);
-        setLoginStep('email');
-        setCredentials({ 
-          email: '', 
-          password: '', 
-          name: '', 
-          phone: '', 
-          cpf: '',
-          address: '', 
-          city: '', 
-          state: '', 
-          zipCode: '' 
-        });
+        // Mostrar mensagem de erro
+        simulateTyping(errorMessage, 2000);
+        
+        // Se precisar resetar, voltar para o passo do email
+        if (needsEmailReset) {
+          setTimeout(() => {
+            simulateTyping('🔐 Por favor, digite seu email novamente para tentar fazer login:', 1500);
+            setLoginStep('email');
+            setCredentials({ 
+              email: '', 
+              password: '', 
+              name: '', 
+              phone: '', 
+              cpf: '',
+              address: '', 
+              city: '', 
+              state: '', 
+              zipCode: '' 
+            });
+          }, 2500);
+        }
       }
     }
 
