@@ -153,7 +153,7 @@ export class EmailService {
       const requestBody = {
         service_id: serviceId,
         template_id: templateId,
-        user_id: userId || publicKey, // User ID ou Public Key
+        user_id: publicKey, // Sempre usar Public Key
         template_params: templateParams,
       };
 
@@ -181,6 +181,11 @@ export class EmailService {
       this.logger.error(`Código: ${code}`);
       this.logger.error(`Erro: ${error?.response?.data?.message || error?.message || 'Erro desconhecido'}`);
       this.logger.error(`Status: ${error?.response?.status || 'N/A'}`);
+      
+      // Log detalhado para debug
+      if (error?.response?.data) {
+        this.logger.error(`Detalhes do erro: ${JSON.stringify(error.response.data)}`);
+      }
       
       // Fallback: mostrar código no console para desenvolvimento
       this.logger.warn(`\n⚠️  CÓDIGO DE RESET (para desenvolvimento):`);

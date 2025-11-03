@@ -44,6 +44,7 @@ export default function LoginPage() {
     code: '',
     newPassword: ''
   });
+  const [currentResetCode, setCurrentResetCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
   const [currentField, setCurrentField] = useState<'name' | 'phone' | 'cpf' | 'zipCode' | 'address' | 'city' | 'state' | 'password' | 'confirmAddress'>('name');
@@ -390,8 +391,26 @@ export default function LoginPage() {
       }
 
       setResetData(prev => ({ ...prev, code: cleanCode }));
-      simulateTyping('Agora crie uma nova senha:', 1000);
-      setLoginStep('resetPassword');
+      setCurrentResetCode(cleanCode);
+      setLoginStep('processing');
+
+      // Validar o código com o backend ANTES de pedir a nova senha
+      try {
+        simulateTyping('Verificando código...', 1000);
+        await authAPI.verifyResetCode(resetData.email, cleanCode);
+        simulateTyping('✅ Código válido! Agora crie uma nova senha:', 1500);
+        setLoginStep('resetPassword');
+      } catch (error: any) {
+        let errorMessage = 'Erro ao verificar código';
+        if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        simulateTyping(`❌ ${errorMessage}`, 1500);
+        simulateTyping('Digite o código novamente:', 1000);
+        setLoginStep('resetCode');
+        setResetData(prev => ({ ...prev, code: '' }));
+        setCurrentResetCode('');
+      }
     } else if (loginStep === 'resetPassword') {
       if (userInput.length < 6) {
         simulateTyping('❌ A senha deve ter pelo menos 6 caracteres:', 1500);
@@ -403,11 +422,14 @@ export default function LoginPage() {
 
       try {
         simulateTyping('Redefinindo senha...', 1000);
-        await authAPI.resetPassword(resetData.email, resetData.code, userInput);
+        // Usar currentResetCode para garantir que temos o código correto
+        const codeToUse = currentResetCode || resetData.code;
+        await authAPI.resetPassword(resetData.email, codeToUse, userInput);
         simulateTyping('✅ Senha redefinida com sucesso!', 1500);
         simulateTyping('Agora você pode fazer login com sua nova senha. Digite seu email:', 2000);
         setLoginStep('email');
         setResetData({ email: '', code: '', newPassword: '' });
+        setCurrentResetCode('');
       } catch (error: any) {
         let errorMessage = 'Erro ao redefinir senha';
         if (error?.response?.data?.message) {
@@ -419,6 +441,7 @@ export default function LoginPage() {
           simulateTyping('Digite o código novamente:', 1000);
           setLoginStep('resetCode');
           setResetData(prev => ({ ...prev, code: '' }));
+          setCurrentResetCode('');
         } else {
           simulateTyping('Digite sua nova senha:', 1000);
           setLoginStep('resetPassword');
