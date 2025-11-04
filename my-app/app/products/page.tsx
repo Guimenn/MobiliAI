@@ -5,6 +5,7 @@ import { useAppStore, Product } from '@/lib/store';
 import { useProducts } from '@/lib/hooks/useProducts';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import FavoriteTooltip from '@/components/FavoriteTooltip';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -838,7 +839,7 @@ export default function ProductsPage() {
                         onClick={() => router.push(`/products/${product.id}`)}
                       >
                         {/* Imagem do produto */}
-                        <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                        <div className="relative aspect-square bg-gray-100 overflow-hidden group">
                         {product.imageUrl ? (
                             <img
                               src={product.imageUrl}
@@ -855,6 +856,8 @@ export default function ProductsPage() {
                               -30%
                             </Badge>
                           )}
+                          {/* Favorite Tooltip */}
+                          <FavoriteTooltip productId={product.id} />
                         </div>
 
                         {/* Conteúdo do produto */}

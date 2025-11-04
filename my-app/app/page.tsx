@@ -12,6 +12,7 @@ import PromotionalSection from '@/components/PromotionalSection';
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import { BackendStatus } from '@/components/BackendStatus';
+import FavoriteTooltip from '@/components/FavoriteTooltip';
 import { 
   Search,
   ShoppingCart,
@@ -1274,20 +1275,8 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* Favorite Button */}
-                    <div className="absolute top-4 right-4">
-                      <Button 
-                        size="sm" 
-                        onClick={() => toggleFavorite(product.id)}
-                        className={`w-8 h-8 shadow-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-105 ${
-                          favorites.includes(product.id)
-                            ? 'bg-red-500 text-white hover:bg-red-600'
-                            : 'bg-white hover:bg-white text-[#3e2626] border border-gray-200'
-                        }`}
-                      >
-                        <Heart className={`h-4 w-4 ${favorites.includes(product.id) ? 'fill-current' : ''}`} />
-                      </Button>
-                    </div>
+                    {/* Favorite Tooltip */}
+                    <FavoriteTooltip productId={product.id} />
                   </div>
 
                   {/* Product Info Footer - Clean */}

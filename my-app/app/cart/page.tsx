@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import FavoriteTooltip from '@/components/FavoriteTooltip';
 import { 
   ShoppingCart,
   Plus,
@@ -563,7 +564,7 @@ export default function CartPage() {
               <Card key={product.id} className="group relative overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
                 <div className="relative">
                   <div 
-                    className="aspect-square flex items-center justify-center relative"
+                    className="aspect-square flex items-center justify-center relative group"
                     style={{ backgroundColor: product.color }}
                   >
                     <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
@@ -571,6 +572,8 @@ export default function CartPage() {
                       {renderCategoryIcon(product.category)}
                       <p className="text-white font-semibold text-sm mt-2">Móvel Premium</p>
                     </div>
+                    {/* Favorite Tooltip */}
+                    <FavoriteTooltip productId={product.id} />
                   </div>
                   
                   {/* Discount Badge */}
@@ -588,14 +591,6 @@ export default function CartPage() {
                     <h3 className="font-bold text-lg text-[#3e2626]">
                       {product.name}
                     </h3>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => addToFavorites(product)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <Heart className="h-5 w-5" />
-                    </Button>
                   </div>
                   
                   <div className="flex items-center space-x-2 mb-4">

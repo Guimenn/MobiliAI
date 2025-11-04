@@ -6,8 +6,12 @@ import { useAppStore, Product } from '@/lib/store';
 import { useProducts } from '@/lib/hooks/useProducts';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import FavoriteTooltip from '@/components/FavoriteTooltip';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -67,6 +71,8 @@ export default function ProductDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [productImages, setProductImages] = useState<string[]>([]);
+  const [cep, setCep] = useState('');
+  const [shippingInfo, setShippingInfo] = useState<string | null>(null);
 
   const productId = params.id as string;
 
@@ -198,6 +204,25 @@ export default function ProductDetailPage() {
     }
   };
 
+  const handleBuyNow = () => {
+    handleAddToCart();
+    router.push('/cart');
+  };
+
+  const handleCalcShipping = () => {
+    if (!cep || cep.replace(/\D/g, '').length < 8) {
+      setShippingInfo('Informe um CEP válido');
+      return;
+    }
+    const available = (product?.stock || 0) > 0;
+    if (!available) {
+      setShippingInfo('Indisponível no momento');
+      return;
+    }
+    const days = Math.floor(2 + Math.random() * 4);
+    setShippingInfo(`Chegará em até ${days} dia${days > 1 ? 's' : ''} • Frete grátis`);
+  };
+
   const handleQuantityChange = (delta: number) => {
     if (product) {
       const newQuantity = Math.max(1, Math.min(quantity + delta, product.stock || 1));
@@ -295,10 +320,10 @@ export default function ProductDetailPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* Conteúdo Principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+        {/* Conteúdo Principal - estilo marketplace */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
           {/* Galeria de Imagens */}
-          <div className="space-y-4">
+          <div className="lg:col-span-7 space-y-4">
             {/* Imagem Principal */}
             <div className="relative aspect-square bg-white rounded-2xl overflow-hidden border-2 border-brand-100 shadow-lg group">
               {productImages[selectedImageIndex] ? (
@@ -360,8 +385,7 @@ export default function ProductDetailPage() {
                   <button
                     key={index}
                     onClick={() => setSelectedImageIndex(index)}
-                    className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                      selectedImageIndex === index
+                    className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${selectedImageIndex === index
                         ? 'border-brand-700 ring-2 ring-brand-700/20'
                         : 'border-gray-200 hover:border-brand-300'
                     }`}
@@ -377,70 +401,27 @@ export default function ProductDetailPage() {
                 ))}
               </div>
             )}
-          </div>
 
-          {/* Informações do Produto */}
-          <div className="space-y-6">
-            {/* Categoria e Marca */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {product.category && (
-                <Badge variant="outline" className="border-brand-200 text-brand-700">
-                  {categoryNames[product.category.toUpperCase()] || product.category}
-                </Badge>
-              )}
-              {product.brand && (
-                <Badge variant="outline" className="border-brand-200 text-brand-700">
-                  {product.brand}
-                </Badge>
-              )}
-            </div>
-
-            {/* Nome do Produto */}
+            {/* Descrição e Avaliações (lado esquerdo) */}
+            <div className="space-y-5 pt-4 border-t border-gray-200">
+              {product.description && (
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 leading-tight">
-                {product.name}
-              </h1>
-              
-              {/* Rating */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex items-center gap-1">
-                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  <span className="text-lg font-semibold text-gray-900">{rating.toFixed(1)}</span>
-                </div>
-                <span className="text-sm text-gray-500">
-                  ({reviews} avaliações)
-                </span>
-              </div>
-            </div>
-
-            {/* Preço */}
-            <div className="bg-gradient-to-br from-brand-50 to-brand-100 rounded-2xl p-6 border-2 border-brand-200">
-              <div className="flex items-baseline gap-3 flex-wrap">
-                <span className="text-sm font-medium text-gray-600">Por apenas</span>
-                <span className="text-4xl md:text-5xl font-black text-brand-700">
-                  R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <p className="text-sm text-green-600 font-semibold mt-2 flex items-center gap-1">
-                <Sparkles className="h-4 w-4" />
-                Parcelamento em até 18x sem juros
-              </p>
-            </div>
-
-            {/* Descrição */}
-            {product.description && (
-              <div className="prose max-w-none">
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">Descrição</h2>
                 <p className="text-gray-700 leading-relaxed">{product.description}</p>
               </div>
             )}
 
-            {/* Especificações */}
-            <div className="grid grid-cols-2 gap-4">
+
+
+              <section className="mb-12">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                  <div className="lg:col-span-7">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-3">Características</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {product.dimensions && (
                 <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
-                  <div className="bg-brand-100 rounded-lg p-2">
-                    <Ruler className="h-5 w-5 text-brand-700" />
-                  </div>
+                            <div className="bg-brand-100 rounded-lg p-2"><Ruler className="h-5 w-5 text-brand-700" /></div>
                   <div>
                     <p className="text-xs text-gray-500">Dimensões</p>
                     <p className="text-sm font-semibold text-gray-900">{product.dimensions}</p>
@@ -449,9 +430,7 @@ export default function ProductDetailPage() {
               )}
               {product.weight && (
                 <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
-                  <div className="bg-brand-100 rounded-lg p-2">
-                    <Weight className="h-5 w-5 text-brand-700" />
-                  </div>
+                            <div className="bg-brand-100 rounded-lg p-2"><Weight className="h-5 w-5 text-brand-700" /></div>
                   <div>
                     <p className="text-xs text-gray-500">Peso</p>
                     <p className="text-sm font-semibold text-gray-900">{product.weight}</p>
@@ -460,9 +439,7 @@ export default function ProductDetailPage() {
               )}
               {product.material && (
                 <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
-                  <div className="bg-brand-100 rounded-lg p-2">
-                    <Package className="h-5 w-5 text-brand-700" />
-                  </div>
+                            <div className="bg-brand-100 rounded-lg p-2"><Package className="h-5 w-5 text-brand-700" /></div>
                   <div>
                     <p className="text-xs text-gray-500">Material</p>
                     <p className="text-sm font-semibold text-gray-900">{product.material}</p>
@@ -471,9 +448,7 @@ export default function ProductDetailPage() {
               )}
               {product.color && (
                 <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
-                  <div className="bg-brand-100 rounded-lg p-2">
-                    <Palette className="h-5 w-5 text-brand-700" />
-                  </div>
+                            <div className="bg-brand-100 rounded-lg p-2"><Palette className="h-5 w-5 text-brand-700" /></div>
                   <div>
                     <p className="text-xs text-gray-500">Cor</p>
                     <p className="text-sm font-semibold text-gray-900">{product.color}</p>
@@ -481,143 +456,276 @@ export default function ProductDetailPage() {
                 </div>
               )}
             </div>
-
-            {/* Estoque */}
-            <div className="p-4 bg-white rounded-xl border-2 border-brand-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Estoque disponível</p>
-                  <p className={`text-lg font-bold ${(product.stock || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {(product.stock || 0) > 0 ? `${product.stock} unidades` : 'Esgotado'}
-                  </p>
+                    </div>
+                  </div>
                 </div>
-                {(product.stock || 0) > 0 && (
-                  <CheckCircle2 className="h-8 w-8 text-green-600" />
-                )}
+              </section>
+                <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Opiniões do produto</h3>
+                <div className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
+                    <span className="text-2xl font-bold text-gray-900">{rating.toFixed(1)}</span>
+                  </div>
+                  <span className="text-gray-600">{reviews} avaliações</span>
+                </div>
+                </div>
               </div>
             </div>
 
-            {/* Quantidade e Ações */}
-            <div className="space-y-4">
-              {/* Seletor de Quantidade */}
+          {/* Sidebar de compra (fixa) */}
+          <div className="lg:col-span-5 space-y-4">
+            {/* Categoria / Marca / Título e rating */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 flex-wrap">
+                {product.category && (
+                  <Badge variant="outline" className="border-brand-200 text-brand-700">
+                    {categoryNames[product.category.toUpperCase()] || product.category}
+                  </Badge>
+                )}
+                {product.brand && (
+                  <Badge variant="outline" className="border-brand-200 text-brand-700">{product.brand}</Badge>
+                )}
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">{product.name}</h1>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                  <span className="text-base font-semibold text-gray-900">{rating.toFixed(1)}</span>
+                </div>
+                <span className="text-sm text-gray-500">({reviews} avaliações)</span>
+              </div>
+            </div>
+
+            <div className="lg:top-24">
+              <Card className="border-2 border-brand-100 shadow-sm">
+                <CardContent className="p-6 space-y-6">
+                  {/* Preço */}
+                  <div className="bg-gradient-to-br from-brand-50 to-brand-100 rounded-2xl p-5 border-2 border-brand-200">
+                    <div className="flex items-baseline gap-3 flex-wrap">
+                      <span className="text-sm font-medium text-gray-600">Por apenas</span>
+                      <span className="text-4xl font-black text-brand-700">R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <p className="text-sm text-green-600 font-semibold mt-2 flex items-center gap-1">
+                      <Sparkles className="h-4 w-4" />
+                      Parcelamento em até 18x sem juros
+                    </p>
+                  </div>
+
+                  {/* Quantidade */}
               <div className="flex items-center gap-4">
                 <span className="text-sm font-medium text-gray-700">Quantidade:</span>
                 <div className="flex items-center gap-2 border-2 border-brand-200 rounded-xl">
-                  <button
-                    onClick={() => handleQuantityChange(-1)}
-                    disabled={quantity <= 1}
-                    className="p-2 hover:bg-brand-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                      <button onClick={() => handleQuantityChange(-1)} disabled={quantity <= 1} className="p-2 hover:bg-brand-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                     <Minus className="h-4 w-4 text-brand-700" />
                   </button>
-                  <span className="px-4 py-2 text-lg font-semibold text-gray-900 min-w-[3rem] text-center">
-                    {quantity}
-                  </span>
-                  <button
-                    onClick={() => handleQuantityChange(1)}
-                    disabled={quantity >= (product.stock || 1)}
-                    className="p-2 hover:bg-brand-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                      <span className="px-4 py-2 text-lg font-semibold text-gray-900 min-w-[3rem] text-center">{quantity}</span>
+                      <button onClick={() => handleQuantityChange(1)} disabled={quantity >= (product.stock || 1)} className="p-2 hover:bg-brand-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                     <Plus className="h-4 w-4 text-brand-700" />
                   </button>
                 </div>
               </div>
 
-              {/* Botões de Ação */}
+                  {/* Ações */}
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  id="add-to-cart-btn"
-                  onClick={handleAddToCart}
-                  disabled={(product.stock || 0) === 0}
-                  className="flex-1 bg-brand-700 hover:bg-brand-800 text-black cursor-pointer h-14 text-lg font-semibold shadow-lg hover:shadow-xl transition-all"
-                >
+                    <Button id="add-to-cart-btn" onClick={handleAddToCart} disabled={(product.stock || 0) === 0} className="flex-1 bg-brand-700 hover:bg-brand-800 text-black cursor-pointer h-12 text-base font-semibold shadow-md">
                   <ShoppingCart className="h-5 w-5 mr-2" />
                   {(product.stock || 0) === 0 ? 'Produto Esgotado' : 'Adicionar ao Carrinho'}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsFavorite(!isFavorite)}
-                  className="h-14 px-6 border-2 border-brand-200 hover:border-brand-300 hover:bg-brand-50"
-                >
-                  <Heart className={`h-5 w-5 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-brand-700'}`} />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleShare}
-                  className="h-14 px-6 border-2 border-brand-200 hover:border-brand-300 hover:bg-brand-50"
-                >
-                  <Share2 className="h-5 w-5 text-brand-700" />
+                    <Button onClick={handleBuyNow} variant="outline" className="h-12 px-6 border-2 border-brand-300 hover:border-brand-400 hover:bg-brand-50">Comprar agora</Button>
+                    <Button variant="outline" onClick={() => setIsFavorite(!isFavorite)} className="h-12 px-4 border-2 border-brand-200 hover:border-brand-300 hover:bg-brand-50">
+                      <Heart className={`${isFavorite ? 'fill-red-500 text-red-500' : 'text-brand-700'} h-5 w-5`} />
                 </Button>
               </div>
+
+                  <Separator />
+
+                  {/* Frete / CEP */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <MapPin className="h-4 w-4 text-brand-700" />
+                      <span>Informe seu CEP para calcular o frete</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input value={cep} onChange={(e) => setCep(e.target.value)} placeholder="00000-000" className="h-10" />
+                      <Button onClick={handleCalcShipping} variant="outline" className="h-10 px-4">Calcular</Button>
+                    </div>
+                    {shippingInfo && (
+                      <p className="text-sm text-gray-700 flex items-center gap-2"><Truck className="h-4 w-4 text-brand-700" /> {shippingInfo}</p>
+                    )}
             </div>
 
-            {/* Garantias e Benefícios */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-gray-200">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Truck className="h-4 w-4 text-brand-700" />
-                <span>Frete grátis</span>
+                  {/* Disponibilidade */}
+                  <div className="flex items-center justify-between p-3 rounded-xl border-2 border-brand-100 bg-white">
+                    <div>
+                      <p className="text-sm text-gray-600">Estoque disponível</p>
+                      <p className={`${(product.stock || 0) > 0 ? 'text-green-600' : 'text-red-600'} text-base font-bold`}>
+                        {(product.stock || 0) > 0 ? `${product.stock} unidades` : 'Esgotado'}
+                      </p>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Shield className="h-4 w-4 text-brand-700" />
-                <span>Compra garantida</span>
+                    {(product.stock || 0) > 0 && <CheckCircle2 className="h-6 w-6 text-green-600" />}
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <CreditCard className="h-4 w-4 text-brand-700" />
-                <span>Parcelamento</span>
+
+                  {/* Pagamentos e Garantias */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-600"><CreditCard className="h-4 w-4 text-brand-700" /><span>Cartão em até 18x</span></div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600"><Zap className="h-4 w-4 text-brand-700" /><span>Pix com desconto</span></div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600"><Shield className="h-4 w-4 text-brand-700" /><span>Compra garantida</span></div>
               </div>
-            </div>
-          </div>
+                </CardContent>
+              </Card>
         </div>
 
-        {/* Produtos Relacionados */}
+            {/* Produtos Relacionados (coluna direita em lista) */}
         {relatedProducts.length > 0 && (
-          <section className="mb-12">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Produtos Relacionados</h2>
-              <Button
-                variant="ghost"
-                onClick={() => router.push(`/products?cat=${product.category}`)}
-                className="text-brand-700 hover:text-brand-800"
-              >
-                Ver todos
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {relatedProducts.map((relatedProduct) => (
-                <div
+              <div className="space-y-4 mt-6">
+                <h3 className="text-xl font-semibold text-gray-900">Produtos Relacionados</h3>
+                <div className="flex flex-col gap-4">
+                  {relatedProducts.map((relatedProduct) => {
+                    // Calcular preço antigo e desconto (simulado)
+                    const originalPrice = relatedProduct.price * 1.5;
+                    const discountPercent = Math.floor(((originalPrice - relatedProduct.price) / originalPrice) * 100);
+                    const installmentValue = (relatedProduct.price / 18).toFixed(2);
+
+                    return (
+                      <button
                   key={relatedProduct.id}
                   onClick={() => router.push(`/products/${relatedProduct.id}`)}
-                  className="bg-white rounded-xl border-2 border-brand-100 hover:border-brand-300 hover:shadow-xl transition-all duration-200 overflow-hidden cursor-pointer group"
+                        className="w-full text-left bg-white border border-gray-200 hover:border-brand-300 hover:shadow-md rounded-lg p-2.5 transition-all"
                 >
-                  <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                        <div className="flex gap-2.5">
+                          {/* Imagem do produto - maior para ocupar mais espaço */}
+                          <div className="relative w-56 h-56 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-200 group">
                     {relatedProduct.imageUrl ? (
                       <Image
                         src={relatedProduct.imageUrl}
                         alt={relatedProduct.name}
                         fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                className="object-cover"
                         unoptimized
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Package className="h-12 w-12 text-gray-300" />
+                                <Package className="h-8 w-8 text-gray-300" />
                       </div>
                     )}
+                    {/* Favorite Tooltip */}
+                    <FavoriteTooltip productId={relatedProduct.id} />
                   </div>
-                  <div className="p-4">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2 line-clamp-2">
+
+                          {/* Informações do produto - layout otimizado */}
+                          <div className="flex-1 min-w-0 flex flex-col gap-4">
+                            {/* Título */}
+                            <h4 className="text-xl font-medium text-gray-900 line-clamp-2 leading-snug ">
                       {relatedProduct.name}
-                    </h3>
-                    <p className="text-lg font-bold text-brand-700">
+                            </h4>
+
+                            {/* Preços em linha */}
+                            <div className="flex items-baseline gap-2">
+                              <p className="text-md text-gray-400 line-through">
+                                R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              <p className="text-2xl font-bold text-gray-900">
                       R$ {relatedProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
+
+                            {/* Desconto e Parcelamento em linha */}
+                            <div className="flex items-center gap-2 flex-wrap ">
+                              <p className="text-md font-semibold text-green-600">
+                                {discountPercent}% OFF no Pix
+                              </p>
+                              <span className="text-gray-300">•</span>
+                              <p className="text-md text-gray-700">
+                                18x R$ {installmentValue} sem juros
+                              </p>
+                            </div>
+
+                            {/* Frete grátis */}
+                            <p className="text-sm font-medium text-green-600">
+                              Frete grátis
+                            </p>
+                  </div>
                 </div>
-              ))}
+                      </button>
+                    );
+                  })}
+                </div>
             </div>
-          </section>
         )}
+
+            {/* Meios de Pagamento */}
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Meios de pagamento</h3>
+              
+              {/* Botão de destaque */}
+              <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 mb-4 rounded-lg flex items-center justify-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Pague em até 21x sem juros!
+              </Button>
+
+              <div className="space-y-4">
+                {/* Linha de Crédito */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Linha de Crédito</h4>
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <CreditCard className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <span className="text-sm text-gray-700">Crédito disponível</span>
+                  </div>
+                </div>
+
+                {/* Cartões de crédito */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Cartões de crédito</h4>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="px-3 py-2 bg-red-100 rounded text-xs font-semibold text-red-700">Hipercard</div>
+                    <div className="px-3 py-2 bg-green-100 rounded text-xs font-semibold text-green-700">ELO</div>
+                    <div className="px-3 py-2 bg-blue-100 rounded text-xs font-semibold text-blue-700">VISA</div>
+                    <div className="px-3 py-2 bg-orange-100 rounded text-xs font-semibold text-orange-700">Mastercard</div>
+                  </div>
+                </div>
+
+                {/* Pix */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Pix</h4>
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <div className="w-8 h-8 bg-teal-100 rounded flex items-center justify-center">
+                      <Zap className="h-4 w-4 text-teal-600" />
+                    </div>
+                    <span className="text-sm text-gray-700 lowercase">pix</span>
+                  </div>
+                </div>
+
+                {/* Boleto bancário */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Boleto bancário</h4>
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">
+                      <div className="w-6 h-4 flex items-center gap-px">
+                        <div className="w-0.5 h-3 bg-gray-700"></div>
+                        <div className="w-0.5 h-2 bg-gray-700"></div>
+                        <div className="w-0.5 h-4 bg-gray-700"></div>
+                        <div className="w-0.5 h-2 bg-gray-700"></div>
+                        <div className="w-0.5 h-3 bg-gray-700"></div>
+                        <div className="w-0.5 h-4 bg-gray-700"></div>
+                        <div className="w-0.5 h-2 bg-gray-700"></div>
+                        <div className="w-0.5 h-3 bg-gray-700"></div>
+                      </div>
+                    </div>
+                    <span className="text-sm text-gray-700">Boleto</span>
+                  </div>
+                </div>
+
+          
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Características */}
+
       </main>
 
       <Footer />
