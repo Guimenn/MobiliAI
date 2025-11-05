@@ -31,6 +31,21 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Silenciar erros 500 em endpoints opcionais (como checkFavorite)
+    const isOptionalEndpoint = error.config?.url?.includes('/favorites/check');
+    
+    if (error.response?.status === 500 && isOptionalEndpoint) {
+      // Para endpoints opcionais, criar uma resposta fake em vez de rejeitar
+      // Isso evita que o erro apareça no console do navegador
+      return Promise.resolve({
+        data: { isFavorite: false },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: error.config
+      });
+    }
+    
     // Não fazer logout automático em rotas de auth
     if (error.response?.status === 401 && 
         !error.config?.url?.includes('/auth/')) {
@@ -40,14 +55,6 @@ api.interceptors.response.use(
         useAppStore.getState().logout();
         window.location.href = '/login';
       }
-    }
-    
-    // Não logar erros 500 em endpoints opcionais (como checkFavorite)
-    // para evitar poluir o console com erros de conexão temporários
-    if (error.response?.status === 500 && 
-        error.config?.url?.includes('/favorites/check')) {
-      // Silenciar esse erro específico, pois é opcional e pode falhar
-      // quando há problemas temporários de conexão com o banco
     }
     
     return Promise.reject(error);
@@ -842,6 +849,7 @@ export const customerAPI = {
   },
 
   checkFavorite: async (productId: string) => {
+    // O interceptor já trata erros 500 e retorna { isFavorite: false }
     const response = await api.get(`/customer/favorites/check/${productId}`);
     return response.data;
   },

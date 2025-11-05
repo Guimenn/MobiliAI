@@ -19,15 +19,10 @@ export default function Footer() {
         <div className="py-16">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 items-start">
             {/* Brand Section */}
-            <div className="md:col-span-1">
-              <div className="mb-6">
-                <img
-                  src="/logotipos/11.svg"
-                  alt="MobiliAI"
-                  width={100}
-                  height={40}
-                  className="h-16 md:h-20 w-auto max-w-none"
-                />
+            <div className="md:col-span-1 flex flex-col">
+              <div className="w-full h-20 bg-cover bg-center bg-no-repeat mb-6 pb-6"
+          style={{ backgroundImage: 'url(/logotipos/11.svg)' }}>
+               
               </div>
               <p className="text-white/80 text-sm leading-relaxed mb-6 max-w-xs">
                 Transforme sua casa com móveis inteligentes e tecnologia de IA. 
@@ -211,13 +206,6 @@ export default function Footer() {
                 className="text-white/60 hover:text-white text-sm transition-colors duration-200 font-medium"
               >
                 Termos de Uso
-              </Link>
-              <span className="text-white/30">•</span>
-              <Link 
-                href="/cookies" 
-                className="text-white/60 hover:text-white text-sm transition-colors duration-200 font-medium"
-              >
-                Política de Cookies
               </Link>
             </nav>
           </div>
