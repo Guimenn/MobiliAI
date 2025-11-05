@@ -174,11 +174,11 @@
 
 /* Classe para páginas com header fixo - adiciona padding-top para evitar sobreposição */
 .page-with-fixed-header {
-  padding-top: 160px; /* Compensa altura do header (fita de benefícios ~40px + header ~120px) */
+  padding-top: 140px; /* Compensa altura do header (fita de benefícios ~40px + header ~100px) */
 }
 
 @media (max-width: 768px) {
   .page-with-fixed-header {
-    padding-top: 140px; /* Ajuste para mobile */
+    padding-top: 130px; /* Ajuste para mobile */
   }
 }

@@ -16,7 +16,7 @@ export default function PrivacyPage() {
   const lastUpdateDate = '15 de Janeiro de 2025';
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white page-with-fixed-header">
       <Header />
       
       {/* Professional Header */}
