@@ -25,10 +25,15 @@ export class PublicController {
       );
     } catch (error) {
       console.error('❌ Erro ao buscar produtos:', error);
+      // Retornar estrutura consistente mesmo em caso de erro
       return {
-        success: false,
-        error: 'Erro ao buscar produtos',
-        message: error.message
+        products: [],
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: 0,
+          pages: 0
+        }
       };
     }
   }
@@ -36,5 +41,14 @@ export class PublicController {
   @Get('products/:id')
   async getProductById(@Param('id') productId: string) {
     return this.publicProductsService.getProductById(productId);
+  }
+
+  @Get('products/:id/reviews')
+  async getProductReviews(
+    @Param('id') productId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10'
+  ) {
+    return this.publicProductsService.getProductReviews(productId, parseInt(page), parseInt(limit));
   }
 }

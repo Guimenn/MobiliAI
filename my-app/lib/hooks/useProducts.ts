@@ -63,17 +63,37 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
       });
       
       if (!response.ok) {
+        // Se for erro 500, tentar usar dados mock
+        if (response.status === 500) {
+          console.warn('Servidor retornou erro 500, usando dados mock');
+          setError('Servidor temporariamente indisponível. Usando dados de exemplo.');
+          setProducts(getMockProducts());
+          return;
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        // Se não conseguir parsear JSON, usar dados mock
+        console.warn('Resposta inválida da API, usando dados mock');
+        setError('Formato de resposta inválido. Usando dados de exemplo.');
+        setProducts(getMockProducts());
+        return;
+      }
       
       // Se a resposta tem uma estrutura de paginação, pegar os produtos
       const productsData = data.products || data.data || data;
       
       // Verificar se productsData é um array válido
       if (!Array.isArray(productsData)) {
-        throw new Error('Formato de resposta inválido da API');
+        // Se não for array, usar dados mock
+        console.warn('Resposta não contém array de produtos, usando dados mock');
+        setError('Formato de resposta inválido. Usando dados de exemplo.');
+        setProducts(getMockProducts());
+        return;
       }
       
       // Mapear os dados da API para o formato do Product
@@ -94,6 +114,8 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
         style: product.style,
         imageUrl: product.imageUrls?.[0] || product.imageUrl,
         storeId: product.store?.id || product.storeId || '',
+        rating: product.rating ? Number(product.rating) : undefined,
+        reviewCount: product.reviewCount ? Number(product.reviewCount) : undefined,
       }));
 
       setProducts(mappedProducts);
