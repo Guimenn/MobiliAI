@@ -94,6 +94,8 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
         style: product.style,
         imageUrl: product.imageUrls?.[0] || product.imageUrl,
         storeId: product.store?.id || product.storeId || '',
+        storeName: product.store?.name,
+        storeAddress: product.store?.address,
       }));
 
       setProducts(mappedProducts);

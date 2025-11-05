@@ -36,6 +36,8 @@ export interface Product {
   style?: string;
   imageUrl?: string;
   storeId: string;
+  storeName?: string;
+  storeAddress?: string;
 }
 
 export interface CartItem {

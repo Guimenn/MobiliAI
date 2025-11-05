@@ -41,6 +41,7 @@ import {
   ArrowLeft,
   Share2,
   Eye,
+  Store,
 } from 'lucide-react';
 import Image from 'next/image';
 import { env } from '@/lib/env';
@@ -114,6 +115,8 @@ export default function ProductDetailPage() {
                 ? data.imageUrls[0] 
                 : data.imageUrl,
               storeId: data.store?.id || data.storeId || '',
+              storeName: data.store?.name,
+              storeAddress: data.store?.address,
             };
             setProduct(mappedProduct);
             
@@ -154,6 +157,8 @@ export default function ProductDetailPage() {
                       ? p.imageUrls[0] 
                       : p.imageUrl,
                     storeId: p.store?.id || p.storeId || '',
+                    storeName: p.store?.name,
+                    storeAddress: p.store?.address,
                   }));
                 setRelatedProducts(related);
               }
@@ -527,6 +532,18 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
               )}
+              {product.storeName && (
+                <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
+                  <div className="bg-brand-100 rounded-lg p-2"><Store className="h-5 w-5 text-brand-700" /></div>
+                  <div>
+                    <p className="text-xs text-gray-500">Loja/Filial</p>
+                    <p className="text-sm font-semibold text-gray-900">{product.storeName}</p>
+                    {product.storeAddress && (
+                      <p className="text-xs text-gray-500 mt-1">{product.storeAddress}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
                     </div>
                   </div>
@@ -567,6 +584,18 @@ export default function ProductDetailPage() {
                 </div>
                 <span className="text-sm text-gray-500">({reviews} avaliações)</span>
               </div>
+              {/* Informação da Loja */}
+              {product.storeName && (
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                  <Store className="h-4 w-4 text-brand-700" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-900">Loja: {product.storeName}</span>
+                    {product.storeAddress && (
+                      <span className="text-xs text-gray-500">{product.storeAddress}</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="lg:top-24">

@@ -33,7 +33,8 @@ import {
   Shield,
   CreditCard,
   Clock,
-  Zap
+  Zap,
+  Store
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -891,13 +892,22 @@ export default function ProductsPage() {
                             {product.name}
                           </h3>
 
-                          {/* Marca e categoria */}
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                          {/* Marca, categoria e loja */}
+                          <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
                             {product.brand && <span>{product.brand}</span>}
                             {product.category && (
                               <>
                                 <span>•</span>
                                 <span>{product.category}</span>
+                              </>
+                            )}
+                            {product.storeName && (
+                              <>
+                                <span>•</span>
+                                <div className="flex items-center gap-1 text-brand-700">
+                                  <Store className="h-3 w-3" />
+                                  <span>{product.storeName}</span>
+                                </div>
                               </>
                             )}
                           </div>
