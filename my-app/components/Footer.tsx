@@ -1,15 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { 
-  Mail,
-  Phone,
-  MapPin,
   Building2,
   HelpCircle,
   Shield,
-  FileText
+  FileText,
+  CreditCard
 } from "lucide-react";
 
 export default function Footer() {
@@ -20,25 +17,19 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
         <div className="py-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 items-start">
             {/* Brand Section */}
-            <div className="lg:col-span-1">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="relative w-12 h-12 flex items-center justify-center">
-                  <Image
-                    src="/logo.png"
-                    alt="MobiliAI Logo"
-                    width={48}
-                    height={48}
-                    className="object-contain"
-                  />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white tracking-tight">MobiliAI</h2>
-                  <p className="text-xs text-white/60 font-medium uppercase tracking-wider">Transformando espaços</p>
-                </div>
+            <div className="md:col-span-1">
+              <div className="mb-6">
+                <img
+                  src="/logotipos/11.svg"
+                  alt="MobiliAI"
+                  width={100}
+                  height={40}
+                  className="h-16 md:h-20 w-auto max-w-none"
+                />
               </div>
-              <p className="text-white/80 text-sm leading-relaxed max-w-xs mb-6">
+              <p className="text-white/80 text-sm leading-relaxed mb-6 max-w-xs">
                 Transforme sua casa com móveis inteligentes e tecnologia de IA. 
                 Visualize móveis reais antes de comprar.
               </p>
@@ -49,12 +40,12 @@ export default function Footer() {
             </div>
 
             {/* Empresa Section */}
-            <div>
-              <div className="flex items-center space-x-2 mb-6">
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2 mb-6 h-6">
                 <Building2 className="h-4 w-4 text-white/60" />
                 <h3 className="text-white font-semibold text-base uppercase tracking-wide">Empresa</h3>
               </div>
-              <nav className="space-y-3">
+              <nav className="space-y-3 flex-1">
                 <Link 
                   href="/about" 
                   className="block text-white/70 hover:text-white text-sm transition-colors duration-200 hover:translate-x-1 transform"
@@ -89,12 +80,12 @@ export default function Footer() {
             </div>
 
             {/* Suporte Section */}
-            <div>
-              <div className="flex items-center space-x-2 mb-6">
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2 mb-6 h-6">
                 <HelpCircle className="h-4 w-4 text-white/60" />
                 <h3 className="text-white font-semibold text-base uppercase tracking-wide">Suporte</h3>
               </div>
-              <nav className="space-y-3">
+              <nav className="space-y-3 flex-1">
                 <Link 
                   href="/help" 
                   className="block text-white/70 hover:text-white text-sm transition-colors duration-200 hover:translate-x-1 transform"
@@ -128,41 +119,65 @@ export default function Footer() {
               </nav>
             </div>
 
-            {/* Contato Section */}
-            <div>
-              <div className="flex items-center space-x-2 mb-6">
-                <Phone className="h-4 w-4 text-white/60" />
-                <h3 className="text-white font-semibold text-base uppercase tracking-wide">Contato</h3>
+            {/* Pagamento Section */}
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2 mb-6 h-6">
+                <CreditCard className="h-4 w-4 text-white/60" />
+                <h3 className="text-white font-semibold text-base uppercase tracking-wide">Pagamento</h3>
               </div>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Phone className="h-4 w-4 text-white/70" />
-                  </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">(11) 4000-0000</p>
-                    <p className="text-white/60 text-xs mt-0.5">Segunda a Sexta: 8h às 18h</p>
-                  </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                {/* VISA - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/a65c5d1c5e556c6197f8fbd607482372" 
+                    alt="Visa" 
+                    className="h-6 w-auto object-contain"
+                  />
                 </div>
                 
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Mail className="h-4 w-4 text-white/70" />
-                  </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">contato@mobiliai.com.br</p>
-                    <p className="text-white/60 text-xs mt-0.5">Resposta em até 24h</p>
-                  </div>
+                {/* Mastercard - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/95d849253f75d5e6e6b867af4f7c65aa" 
+                    alt="Mastercard" 
+                    className="h-6 w-auto object-contain"
+                  />
                 </div>
-
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <MapPin className="h-4 w-4 text-white/70" />
-                  </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">São Paulo, SP</p>
-                    <p className="text-white/60 text-xs mt-0.5">Múltiplas lojas físicas</p>
-                  </div>
+                
+                {/* Elo - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/br-11134258-7r98o-lxsovyseln7jc5" 
+                    alt="Elo" 
+                    className="h-6 w-auto object-contain"
+                  />
+                </div>
+                
+                {/* American Express - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/285e5ab6207eb562a9e893a42ff7ee46 " 
+                    alt="American Express" 
+                    className="h-6 w-auto object-contain"
+                  />
+                </div>
+                
+                {/* Boleto - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/44734b7fc343eb46237c2d90c6c9ca60" 
+                    alt="Boleto" 
+                    className="h-6 w-auto object-contain"
+                  />
+                </div>
+                
+                {/* PIX - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/2a2cfeb34b00ef7b3be23ea516dcd1c5" 
+                    alt="PIX" 
+                    className="h-6 w-auto object-contain"
+                  />
                 </div>
               </div>
             </div>

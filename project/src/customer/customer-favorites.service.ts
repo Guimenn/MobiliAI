@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CustomerFavoritesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
+  ) {}
 
   // ==================== FAVORITOS ====================
 
@@ -29,7 +34,7 @@ export class CustomerFavoritesService {
       throw new BadRequestException('Produto já está nos favoritos');
     }
 
-    return this.prisma.favorite.create({
+    const favorite = await this.prisma.favorite.create({
       data: {
         customerId,
         productId
@@ -56,6 +61,20 @@ export class CustomerFavoritesService {
         }
       }
     });
+
+    // Criar notificação de favorito adicionado
+    try {
+      await this.notificationsService.notifyFavoriteAdded(
+        customerId,
+        product.id,
+        product.name,
+      );
+    } catch (error) {
+      console.error('Erro ao criar notificação de favorito:', error);
+      // Não falhar a operação se a notificação falhar
+    }
+
+    return favorite;
   }
 
   async removeFromFavorites(customerId: string, productId: string) {

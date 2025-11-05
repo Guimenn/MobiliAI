@@ -60,6 +60,8 @@ export default function FavoriteTooltip({ productId, className = '' }: FavoriteT
         // Verificar novamente para garantir que foi adicionado
         const checkResponse = await customerAPI.checkFavorite(productId);
         setIsFavorite(checkResponse.isFavorite || false);
+        // Disparar evento para atualizar notificações imediatamente
+        window.dispatchEvent(new CustomEvent('notification:favorite-added'));
         toast.success('Produto adicionado aos favoritos');
       }
     } catch (error: any) {

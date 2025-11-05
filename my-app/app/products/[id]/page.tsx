@@ -202,6 +202,8 @@ export default function ProductDetailPage() {
         if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
           try {
             await customerAPI.addToCart(product.id, quantity);
+            // Disparar evento para atualizar notificações imediatamente
+            window.dispatchEvent(new CustomEvent('notification:cart-added'));
           } catch (apiError) {
             console.error('Erro ao adicionar ao carrinho no backend:', apiError);
             // Mesmo com erro na API, o item já está no store local
@@ -310,6 +312,8 @@ export default function ProductDetailPage() {
       } else {
         await customerAPI.addToFavorites(productId);
         setIsFavorite(true);
+        // Disparar evento para atualizar notificações imediatamente
+        window.dispatchEvent(new CustomEvent('notification:favorite-added'));
         toast.success('Produto adicionado aos favoritos');
       }
     } catch (error: any) {

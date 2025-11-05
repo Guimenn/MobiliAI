@@ -36,13 +36,14 @@ model User {
   favorites         Favorite[]
   furnitureAnalyses FurnitureAnalysis[]
   moodboards        Moodboard[]
+  notifications     Notification[]
+  passwordResets    PasswordReset[]
   reviews           ProductReview[]
+  reports           Report[]
   purchases         Sale[]              @relation("CustomerSales")
   sales             Sale[]              @relation("EmployeeSales")
   systemLogs        SystemLog[]
   timeClockRecords  TimeClock[]
-  reports           Report[]
-  passwordResets    PasswordReset[]
   store             Store?              @relation(fields: [storeId], references: [id])
 
   @@map("users")
@@ -72,10 +73,10 @@ model Store {
   cashFlows    CashFlow[]
   dailyCash    DailyCash[]
   products     Product[]
-  sales        Sale[]
-  employees    User[]
   reports      Report[]
+  sales        Sale[]
   inventory    StoreInventory[]
+  employees    User[]
 
   @@map("stores")
 }
@@ -106,7 +107,6 @@ model Product {
   imageUrl           String?
   imageUrls          String[]
   videoUrl           String?
-  model3DUrl         String?
   tags               String[]
   keywords           String[]
   isFeatured         Boolean                @default(false)
@@ -121,6 +121,7 @@ model Product {
   storeId            String
   collectionId       String?
   supplierId         String?
+  model3DUrl         String?
   cartItems          CartItem[]
   comparisons        Comparison[]
   favorites          Favorite[]
@@ -139,26 +140,27 @@ model Product {
 }
 
 model Sale {
-  id               String        @id @default(uuid())
-  saleNumber       String        @unique
-  totalAmount      Decimal       @db.Decimal(10, 2)
-  discount         Decimal       @default(0) @db.Decimal(10, 2)
-  tax              Decimal       @default(0) @db.Decimal(10, 2)
-  status           SaleStatus    @default(PENDING)
-  paymentMethod    PaymentMethod @default(CASH)
+  id               String          @id @default(uuid())
+  saleNumber       String          @unique
+  totalAmount      Decimal         @db.Decimal(10, 2)
+  discount         Decimal         @default(0) @db.Decimal(10, 2)
+  tax              Decimal         @default(0) @db.Decimal(10, 2)
+  status           SaleStatus      @default(PENDING)
+  paymentMethod    PaymentMethod   @default(CASH)
   paymentReference String?
   notes            String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   customerId       String?
   employeeId       String
   storeId          String
   dailyCashId      String?
+  product_reviews  ProductReview[]
   items            SaleItem[]
-  customer         User?         @relation("CustomerSales", fields: [customerId], references: [id])
-  dailyCash        DailyCash?    @relation(fields: [dailyCashId], references: [id])
-  employee         User          @relation("EmployeeSales", fields: [employeeId], references: [id])
-  store            Store         @relation(fields: [storeId], references: [id])
+  customer         User?           @relation("CustomerSales", fields: [customerId], references: [id])
+  dailyCash        DailyCash?      @relation(fields: [dailyCashId], references: [id])
+  employee         User            @relation("EmployeeSales", fields: [employeeId], references: [id])
+  store            Store           @relation(fields: [storeId], references: [id])
 
   @@map("sales")
 }
@@ -249,7 +251,9 @@ model ProductReview {
   updatedAt  DateTime @updatedAt
   productId  String
   userId     String
+  saleId     String?
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sales      Sale?    @relation(fields: [saleId], references: [id])
   user       User     @relation(fields: [userId], references: [id])
 
   @@map("product_reviews")
@@ -478,6 +482,71 @@ model TimeClock {
   @@map("time_clock")
 }
 
+model Report {
+  id        String   @id @default(uuid())
+  name      String
+  type      String
+  period    String
+  status    String
+  data      Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String?
+  storeId   String?
+  store     Store?   @relation(fields: [storeId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@map("reports")
+}
+
+model StoreInventory {
+  id        String   @id @default(uuid())
+  quantity  Int      @default(0)
+  minStock  Int      @default(0)
+  maxStock  Int?
+  location  String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  storeId   String
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId])
+  @@map("store_inventory")
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([email, code])
+  @@map("password_resets")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  actionUrl String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
 enum UserRole {
   ADMIN
   STORE_MANAGER
@@ -532,51 +601,14 @@ enum MaterialType {
   TECIDO
 }
 
-model Report {
-  id        String   @id @default(uuid())
-  name      String
-  type      String
-  period    String
-  status    String
-  data      Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  userId    String?
-  storeId   String?
-  user      User?    @relation(fields: [userId], references: [id])
-  store     Store?   @relation(fields: [storeId], references: [id])
-
-  @@map("reports")
-}
-
-model StoreInventory {
-  id        String   @id @default(uuid())
-  quantity  Int      @default(0)
-  minStock  Int      @default(0)
-  maxStock  Int?
-  location  String? // Localização física do produto na loja (ex: "Prateleira A-3")
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  storeId   String
-  productId String
-  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([storeId, productId])
-  @@map("store_inventory")
-}
-
-model PasswordReset {
-  id        String   @id @default(uuid())
-  email     String
-  code      String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([email, code])
-  @@map("password_resets")
+enum NotificationType {
+  CART_ADDED
+  FAVORITE_ADDED
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+  PRODUCT_PROMOTION
+  COUPON_EXPIRING
+  ORDER_PREPARING
+  ORDER_SHIPPED
+  ORDER_DELIVERED
 }
