@@ -290,8 +290,8 @@ export default function ProductDetailPage() {
       try {
         const response = await customerAPI.checkFavorite(productId);
         setIsFavorite(response.isFavorite || false);
-      } catch (error) {
-        console.error('Erro ao verificar favorito:', error);
+      } catch (error: any) {
+        // Silenciar erros - apenas mostrar false (0)
         setIsFavorite(false);
       }
     };

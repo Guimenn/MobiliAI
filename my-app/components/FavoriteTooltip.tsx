@@ -28,15 +28,17 @@ export default function FavoriteTooltip({ productId, className = '' }: FavoriteT
         const response = await customerAPI.checkFavorite(productId);
         setIsFavorite(response.isFavorite || false);
       } catch (error: any) {
-        // Ignorar erros 401 (não autenticado) e 403 (sem permissão) silenciosamente
-        if (error?.response?.status === 401 || error?.response?.status === 403) {
+        // Silenciar todos os erros - apenas mostrar 0 (false)
+        // Não logar erros silenciados ou erros 500/401/403
+        if (error?.silent || 
+            error?.response?.status === 500 || 
+            error?.response?.status === 401 || 
+            error?.response?.status === 403) {
           setIsFavorite(false);
           return;
         }
-        // Logar apenas outros erros (500, etc) mas não mostrar ao usuário
-        if (error?.response?.status !== 500) {
-          console.error('Erro ao verificar favorito:', error);
-        }
+        // Logar apenas outros erros inesperados
+        console.error('Erro ao verificar favorito:', error);
         setIsFavorite(false);
       }
     };
