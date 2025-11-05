@@ -171,3 +171,14 @@
 .animate-scroll-banner:hover {
   animation-play-state: paused;
 }
+
+/* Classe para páginas com header fixo - adiciona padding-top para evitar sobreposição */
+.page-with-fixed-header {
+  padding-top: 140px; /* Compensa altura do header (fita de benefícios ~40px + header ~100px) */
+}
+
+@media (max-width: 768px) {
+  .page-with-fixed-header {
+    padding-top: 130px; /* Ajuste para mobile */
+  }
+}

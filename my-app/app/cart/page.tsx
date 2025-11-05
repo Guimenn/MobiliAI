@@ -516,10 +516,10 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white page-with-fixed-header">
       <Header />
       
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-30">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 ">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
           <div className="flex items-center space-x-4">

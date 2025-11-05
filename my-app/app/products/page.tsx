@@ -326,10 +326,10 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 page-with-fixed-header">
     
     
-
+    
       <Header />
 
       <main className="container mx-auto px-4 py-6">

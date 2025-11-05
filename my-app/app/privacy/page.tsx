@@ -16,7 +16,7 @@ export default function PrivacyPage() {
   const lastUpdateDate = '15 de Janeiro de 2025';
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white page-with-fixed-header">
       <Header />
       
       {/* Professional Header */}
@@ -553,28 +553,6 @@ export default function PrivacyPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Contact CTA */}
-      <section className="py-12 bg-gray-50 border-t border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white px-8 py-6 rounded-lg font-medium"
-              onClick={() => window.location.href = 'mailto:privacidade@mobiliai.com.br'}
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              Contatar DPO
-            </Button>
-            <Button
-              variant="outline"
-              className="border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white px-8 py-6 rounded-lg font-medium"
-              onClick={() => window.location.href = '/contact'}
-            >
-              Página de Contato
-            </Button>
           </div>
         </div>
       </section>
