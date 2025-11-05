@@ -212,13 +212,6 @@ export default function Footer() {
               >
                 Termos de Uso
               </Link>
-              <span className="text-white/30">•</span>
-              <Link 
-                href="/cookies" 
-                className="text-white/60 hover:text-white text-sm transition-colors duration-200 font-medium"
-              >
-                Política de Cookies
-              </Link>
             </nav>
           </div>
 
