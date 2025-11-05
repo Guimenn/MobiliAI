@@ -1,12 +1,15 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Sale, SaleStatus, SaleItem, Product, User, UserRole } from '@prisma/client';
 import { CreateSaleDto, UpdateSaleDto } from '../dto/sale.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SalesService {
   constructor(
     private prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(createSaleDto: CreateSaleDto, currentUser: User): Promise<Sale> {
@@ -180,11 +183,53 @@ export class SalesService {
       throw new ForbiddenException('Acesso negado');
     }
 
+    const oldStatus = String(sale.status).toUpperCase();
     await this.prisma.sale.update({
       where: { id },
       data: updateSaleDto as any,
     });
-    return this.findOne(id, currentUser);
+
+    const updatedSale = await this.findOne(id, currentUser);
+
+    // Criar notificação se o status mudou e houver cliente
+    // Converter o status do DTO (que pode ser do TypeORM) para o formato do Prisma
+    if (updatedSale.customerId && updateSaleDto.status) {
+      // Converter ambos os status para uppercase para comparação
+      const newStatusString = String(updateSaleDto.status).toUpperCase();
+      const oldStatusString = oldStatus;
+      
+      if (newStatusString !== oldStatusString) {
+        try {
+          // Notificações específicas por status
+          if (newStatusString === 'COMPLETED') {
+            await this.notificationsService.notifyOrderStatusChanged(
+              updatedSale.customerId,
+              updatedSale.id,
+              updatedSale.saleNumber,
+              'COMPLETED',
+            );
+          } else if (newStatusString === 'DELIVERED') {
+            await this.notificationsService.notifyOrderDelivered(
+              updatedSale.customerId,
+              updatedSale.id,
+              updatedSale.saleNumber,
+            );
+          } else {
+            await this.notificationsService.notifyOrderStatusChanged(
+              updatedSale.customerId,
+              updatedSale.id,
+              updatedSale.saleNumber,
+              newStatusString,
+            );
+          }
+        } catch (error) {
+          console.error('Erro ao criar notificação de status:', error);
+          // Não falhar a operação se a notificação falhar
+        }
+      }
+    }
+
+    return updatedSale;
   }
 
   async remove(id: string, currentUser: User): Promise<void> {

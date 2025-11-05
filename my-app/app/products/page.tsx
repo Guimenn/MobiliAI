@@ -227,6 +227,8 @@ export default function ProductsPage() {
       if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
         try {
           await customerAPI.addToCart(product.id, 1);
+          // Disparar evento para atualizar notificações imediatamente
+          window.dispatchEvent(new CustomEvent('notification:cart-added'));
         } catch (apiError) {
           console.error('Erro ao adicionar ao carrinho no backend:', apiError);
           // Mesmo com erro na API, o item já está no store local

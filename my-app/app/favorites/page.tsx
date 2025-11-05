@@ -184,6 +184,8 @@ export default function FavoritesPage() {
   const addToCart = async (productId: string) => {
     try {
       await customerAPI.addToCart(productId, 1);
+      // Disparar evento para atualizar notificações imediatamente
+      window.dispatchEvent(new CustomEvent('notification:cart-added'));
       toast.success('Produto adicionado ao carrinho!');
     } catch (error) {
       console.error('Erro ao adicionar ao carrinho:', error);

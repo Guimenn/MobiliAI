@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
-import { customerAPI } from "@/lib/api";
+import { customerAPI, notificationsAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -103,32 +103,9 @@ export default function Header() {
     const [lastScrollY, setLastScrollY] = useState(0);
     
     // Estados para notificações
-    const [notifications, setNotifications] = useState([
-        {
-            id: '1',
-            title: 'Novo produto disponível',
-            message: 'Sofá moderno acabou de chegar na loja!',
-            time: '2 minutos atrás',
-            read: false,
-            type: 'product'
-        },
-        {
-            id: '2',
-            title: 'Promoção especial',
-            message: 'Desconto de 20% em todos os móveis de madeira',
-            time: '1 hora atrás',
-            read: false,
-            type: 'promotion'
-        },
-        {
-            id: '3',
-            title: 'Pedido confirmado',
-            message: 'Seu pedido #1234 foi confirmado e está em preparação',
-            time: '3 horas atrás',
-            read: true,
-            type: 'order'
-        }
-    ]);
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [loadingNotifications, setLoadingNotifications] = useState(false);
     
     // Refs para os dropdowns
     const userDropdownRef = useRef<HTMLDivElement>(null);
@@ -159,21 +136,43 @@ export default function Header() {
         setUserDropdownOpen(false); // Fechar dropdown do usuário se estiver aberto
     };
 
-    const markNotificationAsRead = (id: string) => {
-        setNotifications(prev => 
-            prev.map(notif => 
-                notif.id === id ? { ...notif, read: true } : notif
-            )
-        );
+    const markNotificationAsRead = async (id: string) => {
+        try {
+            await notificationsAPI.markAsRead(id);
+            setNotifications(prev => 
+                prev.map(notif => 
+                    notif.id === id ? { ...notif, isRead: true } : notif
+                )
+            );
+            setUnreadCount(prev => Math.max(0, prev - 1));
+        } catch (error) {
+            console.error('Erro ao marcar notificação como lida:', error);
+        }
     };
 
-    const markAllAsRead = () => {
-        setNotifications(prev => 
-            prev.map(notif => ({ ...notif, read: true }))
-        );
+    const markAllAsRead = async () => {
+        try {
+            await notificationsAPI.markAllAsRead();
+            setNotifications(prev => 
+                prev.map(notif => ({ ...notif, isRead: true }))
+            );
+            setUnreadCount(0);
+        } catch (error) {
+            console.error('Erro ao marcar todas como lidas:', error);
+        }
     };
 
-    const unreadCount = notifications.filter(n => !n.read).length;
+    // Função para formatar tempo relativo
+    const formatTimeAgo = (date: Date | string) => {
+        const now = new Date();
+        const notificationDate = new Date(date);
+        const diffInSeconds = Math.floor((now.getTime() - notificationDate.getTime()) / 1000);
+        
+        if (diffInSeconds < 60) return 'Agora';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutos atrás`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} horas atrás`;
+        return `${Math.floor(diffInSeconds / 86400)} dias atrás`;
+    };
 
     const handleLogout = async () => {
         try {
@@ -268,6 +267,68 @@ export default function Header() {
 
         return () => clearInterval(interval);
     }, [isAuthenticated, user, pathname]);
+
+    // Função para buscar notificações (pode ser chamada externamente)
+    const fetchNotifications = async (silent = false) => {
+        if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
+            if (!silent) setLoadingNotifications(true);
+            try {
+                const [notificationsResponse, unreadCountResponse] = await Promise.all([
+                    notificationsAPI.getAll(1, 20),
+                    notificationsAPI.getUnreadCount(),
+                ]);
+                
+                setNotifications(notificationsResponse.notifications || []);
+                setUnreadCount(unreadCountResponse.count || 0);
+            } catch (error: any) {
+                console.error('❌ Erro ao buscar notificações:', error);
+                setNotifications([]);
+                setUnreadCount(0);
+            } finally {
+                if (!silent) setLoadingNotifications(false);
+            }
+        } else {
+            setNotifications([]);
+            setUnreadCount(0);
+        }
+    };
+
+    // Buscar notificações quando usuário estiver autenticado
+    useEffect(() => {
+        fetchNotifications();
+        
+        // Atualizar notificações a cada 1 segundo para ser mais instantâneo
+        const interval = setInterval(() => {
+            if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
+                fetchNotifications(true); // Silent mode para não mostrar loading
+            }
+        }, 1000); // Atualiza a cada 1 segundo
+
+        return () => clearInterval(interval);
+    }, [isAuthenticated, user, pathname]);
+
+    // Escutar eventos customizados para atualizar notificações imediatamente
+    useEffect(() => {
+        const handleNotificationUpdate = () => {
+            // Pequeno delay para garantir que a notificação foi criada no backend
+            setTimeout(() => {
+                fetchNotifications(true);
+            }, 300);
+        };
+
+        // Escutar eventos de ações que geram notificações
+        window.addEventListener('notification:cart-added', handleNotificationUpdate);
+        window.addEventListener('notification:favorite-added', handleNotificationUpdate);
+        window.addEventListener('notification:order-created', handleNotificationUpdate);
+        window.addEventListener('notification:order-status-changed', handleNotificationUpdate);
+
+        return () => {
+            window.removeEventListener('notification:cart-added', handleNotificationUpdate);
+            window.removeEventListener('notification:favorite-added', handleNotificationUpdate);
+            window.removeEventListener('notification:order-created', handleNotificationUpdate);
+            window.removeEventListener('notification:order-status-changed', handleNotificationUpdate);
+        };
+    }, [isAuthenticated, user]);
 
     // Fechar dropdowns quando clicar fora
     useEffect(() => {
@@ -588,7 +649,12 @@ export default function Header() {
                      
                      {/* Notifications List */}
                      <div className="overflow-y-auto flex-1">
-                       {notifications.length === 0 ? (
+                       {loadingNotifications ? (
+                         <div className="px-4 py-8 text-center">
+                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626] mx-auto"></div>
+                           <p className="text-sm text-gray-500 mt-2">Carregando notificações...</p>
+                         </div>
+                       ) : notifications.length === 0 ? (
                          <div className="px-4 py-8 text-center">
                            <Bell className="h-12 w-12 text-gray-300 mx-auto mb-2" />
                            <p className="text-sm text-gray-500">Nenhuma notificação</p>
@@ -600,16 +666,16 @@ export default function Header() {
                                key={notification.id}
                                onClick={() => markNotificationAsRead(notification.id)}
                                className={`px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer ${
-                                 !notification.read ? 'bg-blue-50/50' : ''
+                                 !notification.isRead ? 'bg-blue-50/50' : ''
                                }`}
                              >
                                <div className="flex items-start space-x-3">
                                  <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
-                                   !notification.read ? 'bg-blue-500' : 'bg-transparent'
+                                   !notification.isRead ? 'bg-blue-500' : 'bg-transparent'
                                  }`} />
                                  <div className="flex-1 min-w-0">
                                    <p className={`text-sm font-semibold ${
-                                     !notification.read ? 'text-gray-900' : 'text-gray-700'
+                                     !notification.isRead ? 'text-gray-900' : 'text-gray-700'
                                    }`}>
                                      {notification.title}
                                    </p>
@@ -617,10 +683,10 @@ export default function Header() {
                                      {notification.message}
                                    </p>
                                    <p className="text-xs text-gray-400 mt-1">
-                                     {notification.time}
+                                     {formatTimeAgo(notification.createdAt)}
                                    </p>
                                  </div>
-                                 {notification.read && (
+                                 {notification.isRead && (
                                    <Check className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" />
                                  )}
                                </div>

@@ -1000,4 +1000,34 @@ export const timeClockAPI = {
   },
 };
 
+// Notifications API
+export const notificationsAPI = {
+  getAll: async (page = 1, limit = 20) => {
+    const response = await api.get('/notifications', {
+      params: { page, limit }
+    });
+    return response.data;
+  },
+
+  getUnreadCount: async () => {
+    const response = await api.get('/notifications/unread-count');
+    return response.data;
+  },
+
+  markAsRead: async (notificationId: string) => {
+    const response = await api.patch(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+
+  markAllAsRead: async () => {
+    const response = await api.patch('/notifications/mark-all-read');
+    return response.data;
+  },
+
+  delete: async (notificationId: string) => {
+    const response = await api.delete(`/notifications/${notificationId}`);
+    return response.data;
+  },
+};
+
 export default api;
