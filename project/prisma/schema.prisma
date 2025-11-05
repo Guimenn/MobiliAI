@@ -36,7 +36,7 @@ model User {
   favorites         Favorite[]
   furnitureAnalyses FurnitureAnalysis[]
   moodboards        Moodboard[]
-  notifications     notifications[]
+  notifications     Notification[]
   passwordResets    PasswordReset[]
   reviews           ProductReview[]
   reports           Report[]
@@ -155,7 +155,7 @@ model Sale {
   employeeId       String
   storeId          String
   dailyCashId      String?
-  product_reviews  ProductReview[]
+  reviews          ProductReview[]
   items            SaleItem[]
   customer         User?           @relation("CustomerSales", fields: [customerId], references: [id])
   dailyCash        DailyCash?      @relation(fields: [dailyCashId], references: [id])
@@ -253,7 +253,7 @@ model ProductReview {
   userId     String
   saleId     String?
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sales      Sale?    @relation(fields: [saleId], references: [id])
+  sale       Sale?    @relation(fields: [saleId], references: [id])
   user       User     @relation(fields: [userId], references: [id])
 
   @@map("product_reviews")
@@ -531,8 +531,8 @@ model PasswordReset {
   @@map("password_resets")
 }
 
-model notifications {
-  id        String           @id
+model Notification {
+  id        String           @id @default(uuid())
   type      NotificationType
   title     String
   message   String
@@ -540,9 +540,11 @@ model notifications {
   metadata  Json?
   actionUrl String?
   createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
   userId    String
-  updatedAt DateTime
-  users     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
 enum UserRole {

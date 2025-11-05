@@ -154,7 +154,7 @@ export class CustomerOrdersService {
 
   // ==================== AVALIAÇÕES ====================
 
-  async addReview(customerId: string, productId: string, rating: number, comment?: string) {
+  async addReview(customerId: string, productId: string, rating: number, title?: string, comment?: string, saleId?: string) {
     // Verificar se o produto existe
     const product = await this.prisma.product.findUnique({
       where: { id: productId }
@@ -164,25 +164,69 @@ export class CustomerOrdersService {
       throw new NotFoundException('Produto não encontrado');
     }
 
-    // Verificar se o cliente comprou o produto
+    // Verificar se o cliente comprou o produto e se foi entregue
     const purchase = await this.prisma.sale.findFirst({
       where: {
+        id: saleId || undefined,
         customerId,
+        status: 'DELIVERED', // Apenas pedidos entregues podem ser avaliados
         items: {
           some: { productId }
         }
+      },
+      include: {
+        items: true
       }
     });
 
     if (!purchase) {
-      throw new BadRequestException('Você só pode avaliar produtos que comprou');
+      // Se não encontrou com saleId, buscar sem ele
+      const purchaseWithoutSaleId = await this.prisma.sale.findFirst({
+        where: {
+          customerId,
+          status: 'DELIVERED',
+          items: {
+            some: { productId }
+          }
+        },
+        include: {
+          items: true
+        }
+      });
+
+      if (!purchaseWithoutSaleId) {
+        // Verificar se existe compra mas não foi entregue
+        const purchaseNotDelivered = await this.prisma.sale.findFirst({
+          where: {
+            customerId,
+            items: {
+              some: { productId }
+            }
+          }
+        });
+
+        if (purchaseNotDelivered && purchaseNotDelivered.status !== 'DELIVERED') {
+          throw new BadRequestException('Você só pode avaliar produtos após receber o pedido. Aguarde a entrega.');
+        }
+
+        throw new BadRequestException('Você só pode avaliar produtos que comprou e recebeu');
+      }
+
+      // Usar a venda encontrada
+      if (!saleId) {
+        saleId = purchaseWithoutSaleId.id;
+      }
+    } else {
+      saleId = purchase.id;
     }
 
-    // Verificar se já avaliou
+    // Verificar se já avaliou este produto nesta venda específica (se saleId fornecido)
+    // ou se já avaliou o produto em geral
     const existingReview = await this.prisma.productReview.findFirst({
       where: {
         userId: customerId,
-        productId
+        productId,
+        ...(saleId ? { saleId } : {})
       }
     });
 
@@ -195,11 +239,15 @@ export class CustomerOrdersService {
       data: {
         userId: customerId,
         productId,
+        saleId: saleId || null,
         rating,
-        comment
+        title,
+        comment,
+        isVerified: true // Marcar como verificado se veio de uma compra
       },
       include: {
-        user: { select: { name: true } }
+        user: { select: { name: true, avatarUrl: true } },
+        product: { select: { name: true } }
       }
     });
 
@@ -209,7 +257,7 @@ export class CustomerOrdersService {
     return review;
   }
 
-  async updateReview(customerId: string, reviewId: string, rating: number, comment?: string) {
+  async updateReview(customerId: string, reviewId: string, rating: number, title?: string, comment?: string) {
     const review = await this.prisma.productReview.findFirst({
       where: {
         id: reviewId,
@@ -223,9 +271,9 @@ export class CustomerOrdersService {
 
     const updatedReview = await this.prisma.productReview.update({
       where: { id: reviewId },
-      data: { rating, comment },
+      data: { rating, title, comment },
       include: {
-        user: { select: { name: true } }
+        user: { select: { name: true, avatarUrl: true } }
       }
     });
 
@@ -289,6 +337,105 @@ export class CustomerOrdersService {
         pages: Math.ceil(total / limit)
       }
     };
+  }
+
+  async getProductReviews(productId: string, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+
+    const [reviews, total] = await Promise.all([
+      this.prisma.productReview.findMany({
+        where: { productId },
+        skip,
+        take: limit,
+        include: {
+          user: { 
+            select: { 
+              name: true,
+              avatarUrl: true
+            } 
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.prisma.productReview.count({ where: { productId } })
+    ]);
+
+    return {
+      reviews,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  async getReviewableProducts(customerId: string) {
+    // Buscar pedidos entregues do cliente
+    const deliveredOrders = await this.prisma.sale.findMany({
+      where: {
+        customerId,
+        status: 'DELIVERED'
+      },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                imageUrls: true,
+                category: true,
+                brand: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Buscar avaliações existentes do cliente
+    const existingReviews = await this.prisma.productReview.findMany({
+      where: { userId: customerId },
+      select: { productId: true, saleId: true }
+    });
+
+    // Criar um mapa de produtos já avaliados por venda
+    const reviewedMap = new Map<string, Set<string>>();
+    existingReviews.forEach(review => {
+      if (review.saleId) {
+        if (!reviewedMap.has(review.saleId)) {
+          reviewedMap.set(review.saleId, new Set());
+        }
+        reviewedMap.get(review.saleId)!.add(review.productId);
+      }
+    });
+
+    // Filtrar produtos que ainda não foram avaliados
+    const reviewableProducts: Array<{
+      product: any;
+      saleId: string;
+      saleNumber: string;
+      orderDate: Date;
+    }> = [];
+
+    deliveredOrders.forEach(order => {
+      const reviewedProducts = reviewedMap.get(order.id) || new Set();
+      
+      order.items.forEach(item => {
+        if (!reviewedProducts.has(item.productId)) {
+          reviewableProducts.push({
+            product: item.product,
+            saleId: order.id,
+            saleNumber: order.saleNumber,
+            orderDate: order.createdAt
+          });
+        }
+      });
+    });
+
+    return reviewableProducts;
   }
 
   // ==================== MÉTODOS PRIVADOS ====================

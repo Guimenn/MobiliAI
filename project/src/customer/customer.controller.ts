@@ -240,18 +240,18 @@ export class CustomerController {
   @Post('reviews')
   async addReview(
     @Request() req,
-    @Body() data: { productId: string; rating: number; comment?: string }
+    @Body() data: { productId: string; rating: number; title?: string; comment?: string; saleId?: string }
   ) {
-    return this.customerOrdersService.addReview(req.user.id, data.productId, data.rating, data.comment);
+    return this.customerOrdersService.addReview(req.user.id, data.productId, data.rating, data.title, data.comment, data.saleId);
   }
 
   @Put('reviews/:id')
   async updateReview(
     @Request() req,
     @Param('id') reviewId: string,
-    @Body() data: { rating: number; comment?: string }
+    @Body() data: { rating: number; title?: string; comment?: string }
   ) {
-    return this.customerOrdersService.updateReview(req.user.id, reviewId, data.rating, data.comment);
+    return this.customerOrdersService.updateReview(req.user.id, reviewId, data.rating, data.title, data.comment);
   }
 
   @Delete('reviews/:id')
@@ -266,5 +266,19 @@ export class CustomerController {
     @Query('limit') limit: string = '10'
   ) {
     return this.customerOrdersService.getMyReviews(req.user.id, parseInt(page), parseInt(limit));
+  }
+
+  @Get('reviews/product/:productId')
+  async getProductReviews(
+    @Param('productId') productId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10'
+  ) {
+    return this.customerOrdersService.getProductReviews(productId, parseInt(page), parseInt(limit));
+  }
+
+  @Get('reviews/reviewable')
+  async getReviewableProducts(@Request() req) {
+    return this.customerOrdersService.getReviewableProducts(req.user.id);
   }
 }

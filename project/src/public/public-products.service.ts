@@ -7,96 +7,111 @@ export class PublicProductsService {
   constructor(private prisma: PrismaService) {}
 
   async getProducts(page = 1, limit = 50, search = '', category?: string, minPrice?: number, maxPrice?: number) {
-    const skip = (page - 1) * limit;
-    
-    const where: any = {
-      isActive: true,
-      // Permitir produtos mesmo com estoque 0 para visualização
-    };
-    
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' as any } },
-        { description: { contains: search, mode: 'insensitive' as any } },
-        { brand: { contains: search, mode: 'insensitive' as any } },
-        { tags: { has: search } },
-        { keywords: { has: search } }
-      ];
-    }
-    
-    if (category) {
-      // Converter categoria para formato do enum (uppercase)
-      const categoryUpper = category.toUpperCase();
-      // Verificar se é um valor válido do enum
-      if (Object.values(ProductCategory).includes(categoryUpper as ProductCategory)) {
-        where.category = categoryUpper;
+    try {
+      const skip = (page - 1) * limit;
+      
+      const where: any = {
+        isActive: true,
+        // Permitir produtos mesmo com estoque 0 para visualização
+      };
+      
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' as any } },
+          { description: { contains: search, mode: 'insensitive' as any } },
+          { brand: { contains: search, mode: 'insensitive' as any } },
+          { tags: { has: search } },
+          { keywords: { has: search } }
+        ];
       }
-    }
-    
-    if (minPrice !== undefined || maxPrice !== undefined) {
-      where.price = {};
-      if (minPrice !== undefined) where.price.gte = minPrice;
-      if (maxPrice !== undefined) where.price.lte = maxPrice;
-    }
-
-    const [products, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          category: true,
-          price: true,
-          stock: true,
-          colorName: true,
-          colorHex: true,
-          brand: true,
-          style: true,
-          material: true,
-          width: true,
-          height: true,
-          depth: true,
-          weight: true,
-          imageUrls: true,
-          videoUrl: true,
-          tags: true,
-          keywords: true,
-          isFeatured: true,
-          isNew: true,
-          isBestSeller: true,
-          rating: true,
-          reviewCount: true,
-          store: { 
-            select: { 
-              id: true,
-              name: true, 
-              address: true 
-            } 
-          }
-        },
-        orderBy: [
-          { isFeatured: 'desc' },
-          { isNew: 'desc' },
-          { isBestSeller: 'desc' },
-          { rating: 'desc' },
-          { createdAt: 'desc' }
-        ]
-      }),
-      this.prisma.product.count({ where })
-    ]);
-
-    return {
-      products,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
+      
+      if (category) {
+        // Converter categoria para formato do enum (uppercase)
+        const categoryUpper = category.toUpperCase();
+        // Verificar se é um valor válido do enum
+        if (Object.values(ProductCategory).includes(categoryUpper as ProductCategory)) {
+          where.category = categoryUpper;
+        }
       }
-    };
+      
+      if (minPrice !== undefined || maxPrice !== undefined) {
+        where.price = {};
+        if (minPrice !== undefined) where.price.gte = minPrice;
+        if (maxPrice !== undefined) where.price.lte = maxPrice;
+      }
+
+      const [products, total] = await Promise.all([
+        this.prisma.product.findMany({
+          where,
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            category: true,
+            price: true,
+            stock: true,
+            colorName: true,
+            colorHex: true,
+            brand: true,
+            style: true,
+            material: true,
+            width: true,
+            height: true,
+            depth: true,
+            weight: true,
+            imageUrls: true,
+            videoUrl: true,
+            tags: true,
+            keywords: true,
+            isFeatured: true,
+            isNew: true,
+            isBestSeller: true,
+            rating: true,
+            reviewCount: true,
+            store: { 
+              select: { 
+                id: true,
+                name: true, 
+                address: true 
+              } 
+            }
+          },
+          orderBy: [
+            { isFeatured: 'desc' },
+            { isNew: 'desc' },
+            { isBestSeller: 'desc' },
+            { rating: 'desc' },
+            { createdAt: 'desc' }
+          ]
+        }),
+        this.prisma.product.count({ where })
+      ]);
+
+      return {
+        products,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      // Em caso de erro de conexão com o banco, retornar estrutura vazia
+      // para evitar quebrar o frontend
+      console.error('Erro ao buscar produtos:', error);
+      return {
+        products: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          pages: 0
+        }
+      };
+    }
   }
 
   async getProductById(productId: string) {
@@ -145,6 +160,38 @@ export class PublicProductsService {
     }
 
     return product;
+  }
+
+  async getProductReviews(productId: string, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+
+    const [reviews, total] = await Promise.all([
+      this.prisma.productReview.findMany({
+        where: { productId },
+        skip,
+        take: limit,
+        include: {
+          user: { 
+            select: { 
+              name: true,
+              avatarUrl: true
+            } 
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.prisma.productReview.count({ where: { productId } })
+    ]);
+
+    return {
+      reviews,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
   }
 }
 

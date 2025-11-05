@@ -125,14 +125,21 @@ export class CustomerFavoritesService {
   }
 
   async isFavorite(customerId: string, productId: string) {
-    const favorite = await this.prisma.favorite.findFirst({
-      where: {
-        customerId,
-        productId
-      }
-    });
+    try {
+      const favorite = await this.prisma.favorite.findFirst({
+        where: {
+          customerId,
+          productId
+        }
+      });
 
-    return { isFavorite: !!favorite };
+      return { isFavorite: !!favorite };
+    } catch (error) {
+      // Em caso de erro de conexão, retornar false em vez de lançar erro
+      // Isso evita erros 500 quando há problemas temporários com o banco
+      console.error('Erro ao verificar favorito:', error);
+      return { isFavorite: false };
+    }
   }
 
   async getFavoriteCount(customerId: string) {
