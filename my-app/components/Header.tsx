@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
-import { customerAPI } from "@/lib/api";
+import { customerAPI, notificationsAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +70,9 @@ import {
     MessageCircle,
     Bell,
     Check,
+    RotateCw,
+    Store,
+    Undo2,
 } from "lucide-react";
 
 
@@ -95,33 +98,14 @@ export default function Header() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     
+    // Estados para controle de scroll do header
+    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+    const [lastScrollY, setLastScrollY] = useState(0);
+    
     // Estados para notificações
-    const [notifications, setNotifications] = useState([
-        {
-            id: '1',
-            title: 'Novo produto disponível',
-            message: 'Sofá moderno acabou de chegar na loja!',
-            time: '2 minutos atrás',
-            read: false,
-            type: 'product'
-        },
-        {
-            id: '2',
-            title: 'Promoção especial',
-            message: 'Desconto de 20% em todos os móveis de madeira',
-            time: '1 hora atrás',
-            read: false,
-            type: 'promotion'
-        },
-        {
-            id: '3',
-            title: 'Pedido confirmado',
-            message: 'Seu pedido #1234 foi confirmado e está em preparação',
-            time: '3 horas atrás',
-            read: true,
-            type: 'order'
-        }
-    ]);
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [loadingNotifications, setLoadingNotifications] = useState(false);
     
     // Refs para os dropdowns
     const userDropdownRef = useRef<HTMLDivElement>(null);
@@ -152,21 +136,43 @@ export default function Header() {
         setUserDropdownOpen(false); // Fechar dropdown do usuário se estiver aberto
     };
 
-    const markNotificationAsRead = (id: string) => {
-        setNotifications(prev => 
-            prev.map(notif => 
-                notif.id === id ? { ...notif, read: true } : notif
-            )
-        );
+    const markNotificationAsRead = async (id: string) => {
+        try {
+            await notificationsAPI.markAsRead(id);
+            setNotifications(prev => 
+                prev.map(notif => 
+                    notif.id === id ? { ...notif, isRead: true } : notif
+                )
+            );
+            setUnreadCount(prev => Math.max(0, prev - 1));
+        } catch (error) {
+            console.error('Erro ao marcar notificação como lida:', error);
+        }
     };
 
-    const markAllAsRead = () => {
-        setNotifications(prev => 
-            prev.map(notif => ({ ...notif, read: true }))
-        );
+    const markAllAsRead = async () => {
+        try {
+            await notificationsAPI.markAllAsRead();
+            setNotifications(prev => 
+                prev.map(notif => ({ ...notif, isRead: true }))
+            );
+            setUnreadCount(0);
+        } catch (error) {
+            console.error('Erro ao marcar todas como lidas:', error);
+        }
     };
 
-    const unreadCount = notifications.filter(n => !n.read).length;
+    // Função para formatar tempo relativo
+    const formatTimeAgo = (date: Date | string) => {
+        const now = new Date();
+        const notificationDate = new Date(date);
+        const diffInSeconds = Math.floor((now.getTime() - notificationDate.getTime()) / 1000);
+        
+        if (diffInSeconds < 60) return 'Agora';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutos atrás`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} horas atrás`;
+        return `${Math.floor(diffInSeconds / 86400)} dias atrás`;
+    };
 
     const handleLogout = async () => {
         try {
@@ -262,6 +268,68 @@ export default function Header() {
         return () => clearInterval(interval);
     }, [isAuthenticated, user, pathname]);
 
+    // Função para buscar notificações (pode ser chamada externamente)
+    const fetchNotifications = async (silent = false) => {
+        if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
+            if (!silent) setLoadingNotifications(true);
+            try {
+                const [notificationsResponse, unreadCountResponse] = await Promise.all([
+                    notificationsAPI.getAll(1, 20),
+                    notificationsAPI.getUnreadCount(),
+                ]);
+                
+                setNotifications(notificationsResponse.notifications || []);
+                setUnreadCount(unreadCountResponse.count || 0);
+            } catch (error: any) {
+                console.error('❌ Erro ao buscar notificações:', error);
+                setNotifications([]);
+                setUnreadCount(0);
+            } finally {
+                if (!silent) setLoadingNotifications(false);
+            }
+        } else {
+            setNotifications([]);
+            setUnreadCount(0);
+        }
+    };
+
+    // Buscar notificações quando usuário estiver autenticado
+    useEffect(() => {
+        fetchNotifications();
+        
+        // Atualizar notificações a cada 1 segundo para ser mais instantâneo
+        const interval = setInterval(() => {
+            if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
+                fetchNotifications(true); // Silent mode para não mostrar loading
+            }
+        }, 1000); // Atualiza a cada 1 segundo
+
+        return () => clearInterval(interval);
+    }, [isAuthenticated, user, pathname]);
+
+    // Escutar eventos customizados para atualizar notificações imediatamente
+    useEffect(() => {
+        const handleNotificationUpdate = () => {
+            // Pequeno delay para garantir que a notificação foi criada no backend
+            setTimeout(() => {
+                fetchNotifications(true);
+            }, 300);
+        };
+
+        // Escutar eventos de ações que geram notificações
+        window.addEventListener('notification:cart-added', handleNotificationUpdate);
+        window.addEventListener('notification:favorite-added', handleNotificationUpdate);
+        window.addEventListener('notification:order-created', handleNotificationUpdate);
+        window.addEventListener('notification:order-status-changed', handleNotificationUpdate);
+
+        return () => {
+            window.removeEventListener('notification:cart-added', handleNotificationUpdate);
+            window.removeEventListener('notification:favorite-added', handleNotificationUpdate);
+            window.removeEventListener('notification:order-created', handleNotificationUpdate);
+            window.removeEventListener('notification:order-status-changed', handleNotificationUpdate);
+        };
+    }, [isAuthenticated, user]);
+
     // Fechar dropdowns quando clicar fora
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -282,12 +350,168 @@ export default function Header() {
         };
     }, [userDropdownOpen, notificationsOpen]);
 
+    // Detectar scroll e mostrar/ocultar header
+    useEffect(() => {
+        let ticking = false;
+        
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const currentScrollY = window.scrollY;
+                    
+                    // Se estiver no topo da página, sempre mostrar o header
+                    if (currentScrollY < 10) {
+                        setIsHeaderVisible(true);
+                    } else {
+                        // Se rolar para cima (scrollY diminui), mostrar header
+                        // Se rolar para baixo (scrollY aumenta), ocultar header
+                        if (currentScrollY < lastScrollY) {
+                            // Rolando para cima
+                            setIsHeaderVisible(true);
+                        } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+                            // Rolando para baixo (apenas se já passou 100px)
+                            setIsHeaderVisible(false);
+                        }
+                    }
+                    
+                    setLastScrollY(currentScrollY);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, [lastScrollY]);
+
     return (
-        <header className={`w-full transition-all duration-300 relative z-50 ${
+     
+        <header className={`w-full fixed top-0 left-0 right-0 transition-all duration-500 ease-in-out z-50 transform ${
+            isHeaderVisible 
+                ? 'translate-y-0 opacity-100 visible' 
+                : '-translate-y-full opacity-0 invisible pointer-events-none'
+        } ${
             isHomePage 
                 ? 'bg-black/20 backdrop-blur-sm' 
                 : 'bg-[#3e2626] border-b border-[#2a1f1f] shadow-md'
         }`}>
+          {/* Fita de Benefícios estilo SHEIN com Animação */}
+          <div className="bg-[#f5f5f0] border-b border-gray-200 py-1.5 overflow-hidden relative w-full">
+            <div className="flex items-center animate-scroll-banner" style={{ width: '200%' }}>
+              {/* Primeira cópia (visível inicialmente) */}
+              <div className="flex items-center space-x-8 px-8 sm:px-12 lg:px-16 flex-shrink-0" style={{ width: '50%' }}>
+                {/* Seção 1: Venda na MobiliAI */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Store className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      VENDA NA MOBILIAI
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      CADASTRE-SE AGORA
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 2: Frete Grátis */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Truck className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      FRETE GRÁTIS
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      VEJA CONDIÇÕES
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 3: Devolução Grátis */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <RotateCw className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      DEVOLUÇÃO GRÁTIS
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      CONFIRA POLÍTICA DE DEVOLUÇÃO
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Segunda cópia (para loop infinito) */}
+              <div className="flex items-center space-x-8 px-8 sm:px-12 lg:px-16 flex-shrink-0" style={{ width: '50%' }}>
+                {/* Seção 1: Venda na MobiliAI */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Store className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      VENDA NA MOBILIAI
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      CADASTRE-SE AGORA
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 2: Frete Grátis */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Truck className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      FRETE GRÁTIS
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      VEJA CONDIÇÕES
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 3: Devolução Grátis */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <RotateCw className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      DEVOLUÇÃO GRÁTIS
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      CONFIRA POLÍTICA DE DEVOLUÇÃO
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div className="container mx-auto px-4 h-30 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
@@ -361,14 +585,19 @@ export default function Header() {
                  }`}
                >
                  <Heart className="h-6 w-6" />
-                {favoritesCount > 0 ? (
-                  <span 
-                    className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-lg z-50 pointer-events-none"
-                    style={{ lineHeight: '1' }}
-                  >
-                    {favoritesCount > 99 ? '99+' : favoritesCount}
-                  </span>
-                ) : null}
+                 {favoritesCount > 0 && (
+                   <span 
+                     className="absolute top-0 right-0 text-white text-xs font-bold pointer-events-none"
+                     style={{ 
+                       fontSize: favoritesCount > 99 ? '10px' : '13px',
+                       fontWeight: '800',
+                       textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7)',
+                       transform: 'translate(25%, -25%)'
+                     }}
+                   >
+                     {favoritesCount > 99 ? '99+' : favoritesCount}
+                   </span>
+                 )}
               </button>
               
                {/* Notifications Icon */}
@@ -384,8 +613,13 @@ export default function Header() {
                    <Bell className="h-6 w-6" />
                    {unreadCount > 0 && (
                      <span 
-                       className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-lg z-50 pointer-events-none"
-                       style={{ lineHeight: '1' }}
+                       className="absolute top-0 right-0 text-white text-xs font-bold pointer-events-none"
+                       style={{ 
+                         fontSize: unreadCount > 99 ? '10px' : '13px',
+                         fontWeight: '800',
+                         textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7)',
+                         transform: 'translate(25%, -25%)'
+                       }}
                      >
                        {unreadCount > 99 ? '99+' : unreadCount}
                      </span>
@@ -415,7 +649,12 @@ export default function Header() {
                      
                      {/* Notifications List */}
                      <div className="overflow-y-auto flex-1">
-                       {notifications.length === 0 ? (
+                       {loadingNotifications ? (
+                         <div className="px-4 py-8 text-center">
+                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626] mx-auto"></div>
+                           <p className="text-sm text-gray-500 mt-2">Carregando notificações...</p>
+                         </div>
+                       ) : notifications.length === 0 ? (
                          <div className="px-4 py-8 text-center">
                            <Bell className="h-12 w-12 text-gray-300 mx-auto mb-2" />
                            <p className="text-sm text-gray-500">Nenhuma notificação</p>
@@ -427,16 +666,16 @@ export default function Header() {
                                key={notification.id}
                                onClick={() => markNotificationAsRead(notification.id)}
                                className={`px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer ${
-                                 !notification.read ? 'bg-blue-50/50' : ''
+                                 !notification.isRead ? 'bg-blue-50/50' : ''
                                }`}
                              >
                                <div className="flex items-start space-x-3">
                                  <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
-                                   !notification.read ? 'bg-blue-500' : 'bg-transparent'
+                                   !notification.isRead ? 'bg-blue-500' : 'bg-transparent'
                                  }`} />
                                  <div className="flex-1 min-w-0">
                                    <p className={`text-sm font-semibold ${
-                                     !notification.read ? 'text-gray-900' : 'text-gray-700'
+                                     !notification.isRead ? 'text-gray-900' : 'text-gray-700'
                                    }`}>
                                      {notification.title}
                                    </p>
@@ -444,10 +683,10 @@ export default function Header() {
                                      {notification.message}
                                    </p>
                                    <p className="text-xs text-gray-400 mt-1">
-                                     {notification.time}
+                                     {formatTimeAgo(notification.createdAt)}
                                    </p>
                                  </div>
-                                 {notification.read && (
+                                 {notification.isRead && (
                                    <Check className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" />
                                  )}
                                </div>
@@ -605,14 +844,19 @@ export default function Header() {
                  }`}
                >
                  <ShoppingCart className="h-6 w-6" />
-                {cartItemsCount > 0 && (
-                  <span 
-                    className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-lg z-50 pointer-events-none"
-                    style={{ lineHeight: '1' }}
-                  >
-                    {cartItemsCount > 99 ? '99+' : cartItemsCount}
-                  </span>
-                )}
+                 {cartItemsCount > 0 && (
+                   <span 
+                     className="absolute top-0 right-0 text-white text-xs font-bold pointer-events-none"
+                     style={{ 
+                       fontSize: cartItemsCount > 99 ? '10px' : '13px',
+                       fontWeight: '800',
+                       textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7)',
+                       transform: 'translate(25%, -25%)'
+                     }}
+                   >
+                     {cartItemsCount > 99 ? '99+' : cartItemsCount}
+                   </span>
+                 )}
               </button>
             </div>
           </div>

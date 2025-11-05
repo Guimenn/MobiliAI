@@ -38,6 +38,8 @@ export interface Product {
   storeId: string;
   rating?: number;
   reviewCount?: number;
+  storeName?: string;
+  storeAddress?: string;
 }
 
 export interface CartItem {

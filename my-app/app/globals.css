@@ -152,3 +152,22 @@
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* Animação de scroll infinito para fita de benefícios - move para direita */
+@keyframes scroll-banner-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll-banner {
+  animation: scroll-banner-right 15s linear infinite;
+  will-change: transform;
+}
+
+.animate-scroll-banner:hover {
+  animation-play-state: paused;
+}

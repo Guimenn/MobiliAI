@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CustomerCartService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
+  ) {}
 
   // ==================== CARRINHO DE COMPRAS ====================
 
@@ -29,11 +34,12 @@ export class CustomerCartService {
       }
     });
 
+    let cartItem;
     if (existingCartItem) {
       // Atualizar quantidade (sem verificação de estoque)
       const newQuantity = existingCartItem.quantity + quantity;
 
-      return this.prisma.cartItem.update({
+      cartItem = await this.prisma.cartItem.update({
         where: { id: existingCartItem.id },
         data: { quantity: newQuantity },
         include: {
@@ -50,7 +56,7 @@ export class CustomerCartService {
       });
     } else {
       // Adicionar novo item ao carrinho
-      return this.prisma.cartItem.create({
+      cartItem = await this.prisma.cartItem.create({
         data: {
           customerId,
           productId,
@@ -69,6 +75,22 @@ export class CustomerCartService {
         }
       });
     }
+
+    // Criar notificação apenas quando for um novo item (não quando atualizar quantidade)
+    if (!existingCartItem) {
+      try {
+        await this.notificationsService.notifyCartAdded(
+          customerId,
+          product.id,
+          product.name,
+        );
+      } catch (error) {
+        console.error('Erro ao criar notificação de carrinho:', error);
+        // Não falhar a operação se a notificação falhar
+      }
+    }
+
+    return cartItem;
   }
 
   async getCart(customerId: string) {
@@ -262,6 +284,19 @@ export class CustomerCartService {
 
     // Limpar carrinho
     await this.clearCart(customerId);
+
+    // Criar notificação de pedido criado
+    try {
+      await this.notificationsService.notifyOrderCreated(
+        customerId,
+        sale.id,
+        sale.saleNumber,
+        Number(sale.totalAmount),
+      );
+    } catch (error) {
+      console.error('Erro ao criar notificação de pedido:', error);
+      // Não falhar a operação se a notificação falhar
+    }
 
     return sale;
   }

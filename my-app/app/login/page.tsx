@@ -554,8 +554,10 @@ export default function LoginPage() {
              src="/fundo-login.png"
              alt="Background"
              fill
-             className="object-cover"
+             className=""
              priority
+             quality={100}
+             unoptimized={false}
            />
          </div>
 
@@ -576,7 +578,7 @@ export default function LoginPage() {
            </div>
              
             {/* MobiliAI Text Overlay - Centralizado e Proporcional */}
-            <div className="absolute inset-0 flex items-center justify-center pr-30">
+            <div className="absolute inset-0 flex items-center justify-center pr-50">
               <div className="text-center px-8">
                {/* Logo da Loja */}
                <div className="mb-6 flex justify-center">
@@ -591,7 +593,7 @@ export default function LoginPage() {
                </div>
                
                <div className="space-y-3">
-                 <p className="text-3xl font-bold text-white drop-shadow-lg">
+                 <p className="text-3xl font-bold text-[#3e2626] drop-shadow-lg">
                    Transforme seus espaços
                  </p>
                  <p className="text-xl text-[#3e2626] font-semibold drop-shadow-md">

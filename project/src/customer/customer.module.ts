@@ -9,12 +9,14 @@ import { CustomerOrdersService } from './customer-orders.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ProductsModule } from '../products/products.module';
 import { SalesModule } from '../sales/sales.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     PrismaModule,
     ProductsModule,
     SalesModule,
+    NotificationsModule,
   ],
   controllers: [CustomerController, CustomerPublicController],
   providers: [
