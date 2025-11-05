@@ -23,16 +23,30 @@ export default function FavoriteTooltip({ productId, className = '' }: FavoriteT
         setIsFavorite(false);
         return;
       }
+      
       try {
         const response = await customerAPI.checkFavorite(productId);
         setIsFavorite(response.isFavorite || false);
-      } catch (error) {
-        console.error('Erro ao verificar favorito:', error);
+      } catch (error: any) {
+        // Ignorar erros 401 (não autenticado) e 403 (sem permissão) silenciosamente
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          setIsFavorite(false);
+          return;
+        }
+        // Logar apenas outros erros (500, etc) mas não mostrar ao usuário
+        if (error?.response?.status !== 500) {
+          console.error('Erro ao verificar favorito:', error);
+        }
         setIsFavorite(false);
       }
     };
 
-    checkFavorite();
+    // Só verificar se estiver autenticado
+    if (isAuthenticated) {
+      checkFavorite();
+    } else {
+      setIsFavorite(false);
+    }
   }, [productId, isAuthenticated]);
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {

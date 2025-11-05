@@ -41,11 +41,14 @@ import {
   ArrowLeft,
   Share2,
   Eye,
+  Store,
 } from 'lucide-react';
 import Image from 'next/image';
 import { env } from '@/lib/env';
 import { customerAPI } from '@/lib/api';
 import { toast } from 'sonner';
+import ProductReviews from '@/components/ProductReviews';
+import ReviewForm from '@/components/ReviewForm';
 
 // Mapeamento de categorias para ícones
 const categoryNames: Record<string, string> = {
@@ -75,6 +78,8 @@ export default function ProductDetailPage() {
   const [productImages, setProductImages] = useState<string[]>([]);
   const [cep, setCep] = useState('');
   const [shippingInfo, setShippingInfo] = useState<string | null>(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewKey, setReviewKey] = useState(0);
 
   const productId = params.id as string;
 
@@ -114,6 +119,8 @@ export default function ProductDetailPage() {
                 ? data.imageUrls[0] 
                 : data.imageUrl,
               storeId: data.store?.id || data.storeId || '',
+              rating: data.rating ? Number(data.rating) : undefined,
+              reviewCount: data.reviewCount ? Number(data.reviewCount) : undefined,
             };
             setProduct(mappedProduct);
             
@@ -154,6 +161,8 @@ export default function ProductDetailPage() {
                       ? p.imageUrls[0] 
                       : p.imageUrl,
                     storeId: p.store?.id || p.storeId || '',
+                    storeName: p.store?.name,
+                    storeAddress: p.store?.address,
                   }));
                 setRelatedProducts(related);
               }
@@ -324,9 +333,29 @@ export default function ProductDetailPage() {
     }
   };
 
-  // Rating simulado (pode ser substituído por dados reais)
-  const rating = 4.5 + Math.random() * 0.5;
-  const reviews = Math.floor(Math.random() * 500) + 50;
+  // Buscar rating real do produto (se disponível)
+  const rating = product?.rating || 0;
+  const reviews = product?.reviewCount || 0;
+
+  const handleReviewAdded = () => {
+    setReviewKey(prev => prev + 1);
+    setShowReviewForm(false);
+    // Recarregar dados do produto para atualizar rating
+    if (productId) {
+      const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+      fetch(`${apiBaseUrl}/public/products/${productId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.rating !== undefined) {
+            setProduct(prev => prev ? { ...prev, rating: data.rating, reviewCount: data.reviewCount } : null);
+          }
+        })
+        .catch(err => console.error('Erro ao atualizar rating:', err));
+    }
+  };
 
   if (loading) {
     return (
@@ -531,21 +560,64 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
               )}
+              {product.storeName && (
+                <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
+                  <div className="bg-brand-100 rounded-lg p-2"><Store className="h-5 w-5 text-brand-700" /></div>
+                  <div>
+                    <p className="text-xs text-gray-500">Loja/Filial</p>
+                    <p className="text-sm font-semibold text-gray-900">{product.storeName}</p>
+                    {product.storeAddress && (
+                      <p className="text-xs text-gray-500 mt-1">{product.storeAddress}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
                     </div>
                   </div>
                 </div>
               </section>
-                <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Opiniões do produto</h3>
+
+              {/* Seção de Avaliações */}
+              <div className="mt-8 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold text-gray-900">Avaliações e Comentários</h3>
+                  {isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER' && (
+                    <Button
+                      onClick={() => setShowReviewForm(!showReviewForm)}
+                      variant={showReviewForm ? 'outline' : 'default'}
+                      className="bg-brand-700 hover:bg-brand-800 text-white"
+                    >
+                      {showReviewForm ? 'Cancelar Avaliação' : 'Avaliar Produto'}
+                    </Button>
+                  )}
+                </div>
+
+                {/* Resumo de Avaliações */}
                 <div className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-200">
                   <div className="flex items-center gap-2">
                     <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
-                    <span className="text-2xl font-bold text-gray-900">{rating.toFixed(1)}</span>
+                    <span className="text-2xl font-bold text-gray-900">
+                      {rating > 0 ? rating.toFixed(1) : 'N/A'}
+                    </span>
                   </div>
-                  <span className="text-gray-600">{reviews} avaliações</span>
+                  <span className="text-gray-600">
+                    {reviews} {reviews === 1 ? 'avaliação' : 'avaliações'}
+                  </span>
                 </div>
-                </div>
+
+                {/* Formulário de Avaliação */}
+                {showReviewForm && (
+                  <ReviewForm
+                    productId={productId}
+                    onSuccess={handleReviewAdded}
+                    onCancel={() => setShowReviewForm(false)}
+                  />
+                )}
+
+                {/* Lista de Avaliações */}
+                <ProductReviews key={reviewKey} productId={productId} onReviewAdded={handleReviewAdded} />
+              </div>
               </div>
             </div>
 
@@ -571,6 +643,18 @@ export default function ProductDetailPage() {
                 </div>
                 <span className="text-sm text-gray-500">({reviews} avaliações)</span>
               </div>
+              {/* Informação da Loja */}
+              {product.storeName && (
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                  <Store className="h-4 w-4 text-brand-700" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-900">Loja: {product.storeName}</span>
+                    {product.storeAddress && (
+                      <span className="text-xs text-gray-500">{product.storeAddress}</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="lg:top-24">

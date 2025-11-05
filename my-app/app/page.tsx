@@ -328,10 +328,10 @@ export default function HomePage() {
   const enhancedProducts = allProducts.map(product => ({
     ...product,
     displayCategory: getDisplayCategory(product.category),
-    rating: 4.5 + Math.random() * 0.5, // Rating simulado
-    reviews: Math.floor(Math.random() * 200) + 50, // Reviews simuladas
-    badge: Math.random() > 0.7 ? (Math.random() > 0.5 ? 'Novo' : 'Oferta') : null,
-    originalPrice: Math.random() > 0.5 ? product.price * 1.2 : undefined
+    rating: product.rating || 0, // Usar rating real do banco
+    reviews: product.reviewCount || 0, // Usar reviewCount real do banco
+    badge: product.isNew ? 'Novo' : product.isBestSeller ? 'Mais Vendido' : product.isFeatured ? 'Destaque' : null,
+    originalPrice: undefined // Remover preços originais simulados
   }));
 
   // Filtrar produtos baseado na categoria selecionada
@@ -1310,10 +1310,19 @@ export default function HomePage() {
                   <div className="bg-white p-4 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-base font-semibold text-[#3e2626] leading-tight">{product.name}</h3>
-                      <div className="flex items-center space-x-1 text-yellow-500">
-                        <Star className="h-4 w-4 fill-current" />
-                        <span className="text-xs font-medium text-gray-600">{product.rating}</span>
-                      </div>
+                      {(product.rating || 0) > 0 && (
+                        <div className="flex items-center space-x-1 text-yellow-500">
+                          <Star className="h-4 w-4 fill-current" />
+                          <span className="text-xs font-medium text-gray-600">
+                            {product.rating?.toFixed(1) || '0.0'}
+                          </span>
+                          {product.reviews && product.reviews > 0 && (
+                            <span className="text-xs text-gray-500 ml-1">
+                              ({product.reviews})
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">

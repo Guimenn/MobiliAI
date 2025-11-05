@@ -41,6 +41,15 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+    
+    // Não logar erros 500 em endpoints opcionais (como checkFavorite)
+    // para evitar poluir o console com erros de conexão temporários
+    if (error.response?.status === 500 && 
+        error.config?.url?.includes('/favorites/check')) {
+      // Silenciar esse erro específico, pois é opcional e pode falhar
+      // quando há problemas temporários de conexão com o banco
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -899,18 +908,21 @@ export const customerAPI = {
   },
 
   // Avaliações
-  createReview: async (productId: string, rating: number, comment: string) => {
+  createReview: async (productId: string, rating: number, title?: string, comment?: string, saleId?: string) => {
     const response = await api.post('/customer/reviews', {
       productId,
       rating,
-      comment
+      title,
+      comment,
+      saleId
     });
     return response.data;
   },
 
-  updateReview: async (reviewId: string, rating: number, comment: string) => {
+  updateReview: async (reviewId: string, rating: number, title?: string, comment?: string) => {
     const response = await api.put(`/customer/reviews/${reviewId}`, {
       rating,
+      title,
       comment
     });
     return response.data;
@@ -925,6 +937,18 @@ export const customerAPI = {
     const response = await api.get('/customer/reviews/my', {
       params: { page, limit }
     });
+    return response.data;
+  },
+
+  getProductReviews: async (productId: string, page = 1, limit = 10) => {
+    const response = await api.get(`/customer/reviews/product/${productId}`, {
+      params: { page, limit }
+    });
+    return response.data;
+  },
+
+  getReviewableProducts: async () => {
+    const response = await api.get('/customer/reviews/reviewable');
     return response.data;
   }
 };

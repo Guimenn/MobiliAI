@@ -36,6 +36,10 @@ export interface Product {
   style?: string;
   imageUrl?: string;
   storeId: string;
+  rating?: number;
+  reviewCount?: number;
+  storeName?: string;
+  storeAddress?: string;
 }
 
 export interface CartItem {

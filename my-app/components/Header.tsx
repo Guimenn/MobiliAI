@@ -70,6 +70,9 @@ import {
     MessageCircle,
     Bell,
     Check,
+    RotateCw,
+    Store,
+    Undo2,
 } from "lucide-react";
 
 
@@ -94,6 +97,10 @@ export default function Header() {
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
+    
+    // Estados para controle de scroll do header
+    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+    const [lastScrollY, setLastScrollY] = useState(0);
     
     // Estados para notificações
     const [notifications, setNotifications] = useState<any[]>([]);
@@ -343,12 +350,168 @@ export default function Header() {
         };
     }, [userDropdownOpen, notificationsOpen]);
 
+    // Detectar scroll e mostrar/ocultar header
+    useEffect(() => {
+        let ticking = false;
+        
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const currentScrollY = window.scrollY;
+                    
+                    // Se estiver no topo da página, sempre mostrar o header
+                    if (currentScrollY < 10) {
+                        setIsHeaderVisible(true);
+                    } else {
+                        // Se rolar para cima (scrollY diminui), mostrar header
+                        // Se rolar para baixo (scrollY aumenta), ocultar header
+                        if (currentScrollY < lastScrollY) {
+                            // Rolando para cima
+                            setIsHeaderVisible(true);
+                        } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+                            // Rolando para baixo (apenas se já passou 100px)
+                            setIsHeaderVisible(false);
+                        }
+                    }
+                    
+                    setLastScrollY(currentScrollY);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, [lastScrollY]);
+
     return (
-        <header className={`w-full transition-all duration-300 relative z-50 ${
+     
+        <header className={`w-full fixed top-0 left-0 right-0 transition-all duration-500 ease-in-out z-50 transform ${
+            isHeaderVisible 
+                ? 'translate-y-0 opacity-100 visible' 
+                : '-translate-y-full opacity-0 invisible pointer-events-none'
+        } ${
             isHomePage 
                 ? 'bg-black/20 backdrop-blur-sm' 
                 : 'bg-[#3e2626] border-b border-[#2a1f1f] shadow-md'
         }`}>
+          {/* Fita de Benefícios estilo SHEIN com Animação */}
+          <div className="bg-[#f5f5f0] border-b border-gray-200 py-1.5 overflow-hidden relative w-full">
+            <div className="flex items-center animate-scroll-banner" style={{ width: '200%' }}>
+              {/* Primeira cópia (visível inicialmente) */}
+              <div className="flex items-center space-x-8 px-8 sm:px-12 lg:px-16 flex-shrink-0" style={{ width: '50%' }}>
+                {/* Seção 1: Venda na MobiliAI */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Store className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      VENDA NA MOBILIAI
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      CADASTRE-SE AGORA
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 2: Frete Grátis */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Truck className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      FRETE GRÁTIS
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      VEJA CONDIÇÕES
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 3: Devolução Grátis */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <RotateCw className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      DEVOLUÇÃO GRÁTIS
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      CONFIRA POLÍTICA DE DEVOLUÇÃO
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Segunda cópia (para loop infinito) */}
+              <div className="flex items-center space-x-8 px-8 sm:px-12 lg:px-16 flex-shrink-0" style={{ width: '50%' }}>
+                {/* Seção 1: Venda na MobiliAI */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Store className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      VENDA NA MOBILIAI
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      CADASTRE-SE AGORA
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 2: Frete Grátis */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Truck className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      FRETE GRÁTIS
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      VEJA CONDIÇÕES
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 3: Devolução Grátis */}
+                <div className="flex items-center space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <RotateCw className="h-3.5 w-3.5 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                      DEVOLUÇÃO GRÁTIS
+                    </p>
+                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                      CONFIRA POLÍTICA DE DEVOLUÇÃO
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div className="container mx-auto px-4 h-30 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
@@ -422,14 +585,19 @@ export default function Header() {
                  }`}
                >
                  <Heart className="h-6 w-6" />
-                {favoritesCount > 0 ? (
-                  <span 
-                    className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-lg z-50 pointer-events-none"
-                    style={{ lineHeight: '1' }}
-                  >
-                    {favoritesCount > 99 ? '99+' : favoritesCount}
-                  </span>
-                ) : null}
+                 {favoritesCount > 0 && (
+                   <span 
+                     className="absolute top-0 right-0 text-white text-xs font-bold pointer-events-none"
+                     style={{ 
+                       fontSize: favoritesCount > 99 ? '10px' : '13px',
+                       fontWeight: '800',
+                       textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7)',
+                       transform: 'translate(25%, -25%)'
+                     }}
+                   >
+                     {favoritesCount > 99 ? '99+' : favoritesCount}
+                   </span>
+                 )}
               </button>
               
                {/* Notifications Icon */}
@@ -445,8 +613,13 @@ export default function Header() {
                    <Bell className="h-6 w-6" />
                    {unreadCount > 0 && (
                      <span 
-                       className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-lg z-50 pointer-events-none"
-                       style={{ lineHeight: '1' }}
+                       className="absolute top-0 right-0 text-white text-xs font-bold pointer-events-none"
+                       style={{ 
+                         fontSize: unreadCount > 99 ? '10px' : '13px',
+                         fontWeight: '800',
+                         textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7)',
+                         transform: 'translate(25%, -25%)'
+                       }}
                      >
                        {unreadCount > 99 ? '99+' : unreadCount}
                      </span>
@@ -671,14 +844,19 @@ export default function Header() {
                  }`}
                >
                  <ShoppingCart className="h-6 w-6" />
-                {cartItemsCount > 0 && (
-                  <span 
-                    className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-lg z-50 pointer-events-none"
-                    style={{ lineHeight: '1' }}
-                  >
-                    {cartItemsCount > 99 ? '99+' : cartItemsCount}
-                  </span>
-                )}
+                 {cartItemsCount > 0 && (
+                   <span 
+                     className="absolute top-0 right-0 text-white text-xs font-bold pointer-events-none"
+                     style={{ 
+                       fontSize: cartItemsCount > 99 ? '10px' : '13px',
+                       fontWeight: '800',
+                       textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7)',
+                       transform: 'translate(25%, -25%)'
+                     }}
+                   >
+                     {cartItemsCount > 99 ? '99+' : cartItemsCount}
+                   </span>
+                 )}
               </button>
             </div>
           </div>

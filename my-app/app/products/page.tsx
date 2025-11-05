@@ -33,7 +33,8 @@ import {
   Shield,
   CreditCard,
   Clock,
-  Zap
+  Zap,
+  Store
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -855,8 +856,8 @@ export default function ProductsPage() {
                 <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
                   {paginatedProducts.map((product) => {
                     const hasDiscount = false; // Pode adicionar lógica de desconto
-                    const rating = 4.5 + Math.random() * 0.5; // Rating aleatório entre 4.5 e 5
-                    const reviews = Math.floor(Math.random() * 5000) + 100; // Reviews aleatórias
+                    const rating = product.rating || 0; // Rating real do banco
+                    const reviews = product.reviewCount || 0; // Reviews reais do banco
                     
                     return (
                       <div
@@ -893,8 +894,8 @@ export default function ProductsPage() {
                             {product.name}
                           </h3>
 
-                          {/* Marca e categoria */}
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                          {/* Marca, categoria e loja */}
+                          <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
                             {product.brand && <span>{product.brand}</span>}
                             {product.category && (
                               <>
@@ -902,20 +903,33 @@ export default function ProductsPage() {
                                 <span>{product.category}</span>
                               </>
                             )}
+                            {product.storeName && (
+                              <>
+                                <span>•</span>
+                                <div className="flex items-center gap-1 text-brand-700">
+                                  <Store className="h-3 w-3" />
+                                  <span>{product.storeName}</span>
+                                </div>
+                              </>
+                            )}
                           </div>
 
                           {/* Rating */}
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center">
-                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              <span className="text-sm font-medium text-gray-900 ml-1">
-                                {rating.toFixed(1)}
-                              </span>
+                          {rating > 0 && (
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center">
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                <span className="text-sm font-medium text-gray-900 ml-1">
+                                  {rating.toFixed(1)}
+                                </span>
+                              </div>
+                              {reviews > 0 && (
+                                <span className="text-xs text-gray-500">
+                                  ({reviews > 1000 ? `${(reviews / 1000).toFixed(1)}k` : reviews} {reviews === 1 ? 'avaliação' : 'avaliações'})
+                                </span>
+                              )}
                             </div>
-                            <span className="text-xs text-gray-500">
-                              | {reviews > 1000 ? `${(reviews / 1000).toFixed(1)}k` : reviews} vendidos
-                            </span>
-                          </div>
+                          )}
 
                           {/* Preço */}
                           <div className="space-y-1">
