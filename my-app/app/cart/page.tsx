@@ -312,19 +312,20 @@ export default function CartPage() {
   };
 
   // Função para checkout apenas com produtos selecionados
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (selectedCartItems.length === 0) {
       alert('Selecione pelo menos um produto para finalizar a compra');
       return;
     }
     
-    setIsCheckingOut(true);
-    // Simular processo de checkout
-    setTimeout(() => {
-      setIsCheckingOut(false);
-      alert(`Redirecionando para o pagamento de ${selectedCartItems.length} item(ns)...`);
-      // Aqui você integraria com o sistema de pagamento
-    }, 2000);
+    // Salvar produtos selecionados no sessionStorage para a página de checkout
+    if (typeof window !== 'undefined') {
+      const selectedIds = Array.from(selectedProducts);
+      sessionStorage.setItem('checkout-selected-products', JSON.stringify(selectedIds));
+    }
+    
+    // Redirecionar para página de checkout
+    router.push('/checkout');
   };
 
   // Função para continuar comprando
@@ -822,7 +823,7 @@ export default function CartPage() {
                   ) : (
                     <>
                       <CreditCard className="h-5 w-5" />
-                      <span>Finalizar Compra</span>
+                      <span>Continuar</span>
                     </>
                   )}
                 </Button>

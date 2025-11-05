@@ -899,7 +899,8 @@ export const customerAPI = {
 
   // Checkout
   checkout: async (checkoutData: {
-    paymentMethod: string;
+    storeId: string;
+    paymentMethod?: string;
     shippingAddress?: any;
     notes?: string;
   }) => {
