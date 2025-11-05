@@ -43,6 +43,8 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { customerAPI } from '@/lib/api';
+import { toast } from 'sonner';
 
 // Mapeamento de categorias para ícones
 const categoryIcons: Record<string, any> = {
@@ -215,8 +217,30 @@ export default function ProductsPage() {
     setPage(1);
   };
 
-  const handleAddToCart = (product: Product) => {
-    addToCart(product);
+  const handleAddToCart = async (product: Product) => {
+    try {
+      // Adicionar ao store local (sempre funciona)
+      addToCart(product, 1);
+      
+      // Se estiver autenticado, também adicionar ao backend
+      if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
+        try {
+          await customerAPI.addToCart(product.id, 1);
+        } catch (apiError) {
+          console.error('Erro ao adicionar ao carrinho no backend:', apiError);
+          // Mesmo com erro na API, o item já está no store local
+        }
+      }
+      
+      // Mostrar mensagem de sucesso
+      toast.success('Produto adicionado ao carrinho!', {
+        description: product.name,
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Erro ao adicionar ao carrinho:', error);
+      toast.error('Erro ao adicionar ao carrinho. Tente novamente.');
+    }
   };
 
   // Funções para o carrossel de categorias

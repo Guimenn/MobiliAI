@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
+import { customerAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,20 +67,25 @@ import {
     Archive,
     Frame,
     Link as LinkIcon,
+    MessageCircle,
+    Bell,
+    Check,
 } from "lucide-react";
 
 
 export default function Header() {
     const router = useRouter();
     const pathname = usePathname();
-    const { user, isAuthenticated, logout } = useAppStore();
+    const { user, isAuthenticated, logout, cart } = useAppStore();
     
     // Verifica se está na home page
     const isHomePage = pathname === '/';
     
-    // Estados locais para favoritos e carrinho (simulados por enquanto)
-    const favorites = [];
-    const cartItems = [];
+    // Estados locais para favoritos e carrinho
+    const [favoritesCount, setFavoritesCount] = useState(0);
+    
+    // Calcular total de itens no carrinho (soma das quantidades)
+    const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
     
     // Estados locais
     const [searchOpen, setSearchOpen] = useState(false);
@@ -87,9 +93,39 @@ export default function Header() {
     const [searchClosing, setSearchClosing] = useState(false);
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [notificationsOpen, setNotificationsOpen] = useState(false);
     
-    // Ref para o dropdown do usuário
+    // Estados para notificações
+    const [notifications, setNotifications] = useState([
+        {
+            id: '1',
+            title: 'Novo produto disponível',
+            message: 'Sofá moderno acabou de chegar na loja!',
+            time: '2 minutos atrás',
+            read: false,
+            type: 'product'
+        },
+        {
+            id: '2',
+            title: 'Promoção especial',
+            message: 'Desconto de 20% em todos os móveis de madeira',
+            time: '1 hora atrás',
+            read: false,
+            type: 'promotion'
+        },
+        {
+            id: '3',
+            title: 'Pedido confirmado',
+            message: 'Seu pedido #1234 foi confirmado e está em preparação',
+            time: '3 horas atrás',
+            read: true,
+            type: 'order'
+        }
+    ]);
+    
+    // Refs para os dropdowns
     const userDropdownRef = useRef<HTMLDivElement>(null);
+    const notificationsDropdownRef = useRef<HTMLDivElement>(null);
 
     // Handlers
     const handleOpenSearch = () => {
@@ -108,7 +144,29 @@ export default function Header() {
 
     const handleUserClick = () => {
         setUserDropdownOpen(!userDropdownOpen);
+        setNotificationsOpen(false); // Fechar notificações se estiver aberto
     };
+
+    const handleNotificationsClick = () => {
+        setNotificationsOpen(!notificationsOpen);
+        setUserDropdownOpen(false); // Fechar dropdown do usuário se estiver aberto
+    };
+
+    const markNotificationAsRead = (id: string) => {
+        setNotifications(prev => 
+            prev.map(notif => 
+                notif.id === id ? { ...notif, read: true } : notif
+            )
+        );
+    };
+
+    const markAllAsRead = () => {
+        setNotifications(prev => 
+            prev.map(notif => ({ ...notif, read: true }))
+        );
+    };
+
+    const unreadCount = notifications.filter(n => !n.read).length;
 
     const handleLogout = async () => {
         try {
@@ -150,39 +208,98 @@ export default function Header() {
         router.push('/favorites');
     };
 
-    // Fechar dropdown quando clicar fora
+    const goToFAQ = () => {
+        router.push('/faq');
+    };
+
+    // Buscar total de favoritos quando usuário estiver autenticado
+    useEffect(() => {
+        const fetchFavoritesCount = async () => {
+            if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
+                try {
+                    const response = await customerAPI.getFavoritesCount();
+                    console.log('🔍 Response completa da API:', response);
+                    
+                    // A API retorna um número direto do Prisma
+                    let count = 0;
+                    if (typeof response === 'number') {
+                        count = response;
+                    } else if (response?.data !== undefined && typeof response.data === 'number') {
+                        count = response.data;
+                    } else if (response?.count !== undefined && typeof response.count === 'number') {
+                        count = response.count;
+                    } else if (typeof response === 'object' && response !== null) {
+                        // Tenta pegar o primeiro valor numérico que encontrar
+                        const values = Object.values(response);
+                        const numValue = values.find(v => typeof v === 'number');
+                        if (numValue !== undefined) {
+                            count = numValue as number;
+                        }
+                    }
+                    
+                    console.log('✅ Favoritos count processado:', count, '| User:', user?.name, '| Role:', user?.role);
+                    setFavoritesCount(count);
+                } catch (error: any) {
+                    console.error('❌ Erro ao buscar contador de favoritos:', error);
+                    console.error('Erro detalhes:', error?.response?.data || error?.message);
+                    setFavoritesCount(0);
+                }
+            } else {
+                console.log('⚠️ Usuário não autenticado como CUSTOMER. Auth:', isAuthenticated, 'Role:', user?.role);
+                setFavoritesCount(0);
+            }
+        };
+
+        fetchFavoritesCount();
+        
+        // Atualizar contador quando a rota mudar (caso o usuário adicione/remova favoritos)
+        const interval = setInterval(() => {
+            if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
+                fetchFavoritesCount();
+            }
+        }, 5000); // Atualiza a cada 5 segundos
+
+        return () => clearInterval(interval);
+    }, [isAuthenticated, user, pathname]);
+
+    // Fechar dropdowns quando clicar fora
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
                 setUserDropdownOpen(false);
             }
+            if (notificationsDropdownRef.current && !notificationsDropdownRef.current.contains(event.target as Node)) {
+                setNotificationsOpen(false);
+            }
         };
 
-        if (userDropdownOpen) {
+        if (userDropdownOpen || notificationsOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [userDropdownOpen]);
+    }, [userDropdownOpen, notificationsOpen]);
 
     return (
         <header className={`w-full transition-all duration-300 relative z-50 ${
             isHomePage 
                 ? 'bg-black/20 backdrop-blur-sm' 
-                : 'bg-white/95 backdrop-blur-md border-b border-gray-200/50 shadow-sm'
+                : 'bg-[#3e2626] border-b border-[#2a1f1f] shadow-md'
         }`}>
           <div className="container mx-auto px-4 h-30 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
             <Link href="/" className="flex items-center">
               <img
-                src="/logoCompleta.svg"
+                src="/logotipos/11.svg"
                 alt="MobiliAI"
                 width={100}
                 height={40}
-                className="h-16 md:h-24 w-auto max-w-none"
+                className={`h-16 md:h-24 w-auto max-w-none transition-all duration-300 ${
+                  isHomePage ? '' : 'brightness-0 invert drop-shadow-lg'
+                }`}
               />
             </Link>
 
@@ -196,7 +313,7 @@ export default function Header() {
                      className={`p-2 transition-colors ${
                        isHomePage 
                          ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
-                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full'
+                         : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
                      }`}
                    >
                      <Search className="h-6 w-6" />
@@ -206,16 +323,16 @@ export default function Header() {
                     <div className={`${
                       isHomePage 
                         ? 'bg-white/10 backdrop-blur-sm border-2 border-white/30' 
-                        : 'bg-white border-2 border-gray-200 shadow-lg'
+                        : 'bg-white/95 backdrop-blur-md border-2 border-white/30 shadow-lg'
                     } rounded-xl px-4 py-2 flex items-center space-x-3 transition-all duration-300 ${searchClosing ? 'opacity-0 scale-95 translate-x-4' : searchOpening ? 'opacity-100 scale-100 translate-x-0 animate-in slide-in-from-right' : 'opacity-100 scale-100 translate-x-0'}`}>
-                      <Search className={`h-5 w-5 ${isHomePage ? 'text-white/60' : 'text-gray-400'}`} />
+                      <Search className={`h-5 w-5 ${isHomePage ? 'text-white/60' : 'text-[#3e2626]'}`} />
                       <input
                         type="text"
                         placeholder="Buscar móveis..."
                         className={`bg-transparent focus:outline-none w-64 ${
                           isHomePage 
                             ? 'text-white placeholder:text-white/60' 
-                            : 'text-gray-900 placeholder:text-gray-500'
+                            : 'text-[#3e2626] placeholder:text-gray-500'
                         }`}
                         autoFocus
                       />
@@ -224,7 +341,7 @@ export default function Header() {
                         className={`transition-colors ${
                           isHomePage 
                             ? 'text-white/60 hover:text-white' 
-                            : 'text-gray-400 hover:text-gray-600'
+                            : 'text-gray-400 hover:text-[#3e2626]'
                         }`}
                       >
                         <X className="h-5 w-5" />
@@ -240,16 +357,121 @@ export default function Header() {
                  className={`p-2 transition-colors relative ${
                    isHomePage 
                      ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
-                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full'
+                     : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
                  }`}
                >
                  <Heart className="h-6 w-6" />
-                {favorites.length > 0 && (
-                  <Badge className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                    {favorites.length}
-                  </Badge>
-                )}
+                {favoritesCount > 0 ? (
+                  <span 
+                    className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-lg z-50 pointer-events-none"
+                    style={{ lineHeight: '1' }}
+                  >
+                    {favoritesCount > 99 ? '99+' : favoritesCount}
+                  </span>
+                ) : null}
               </button>
+              
+               {/* Notifications Icon */}
+               <div className="relative" ref={notificationsDropdownRef}>
+                 <button 
+                   onClick={handleNotificationsClick}
+                   className={`p-2 transition-colors relative ${
+                     isHomePage 
+                       ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
+                       : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
+                   }`}
+                 >
+                   <Bell className="h-6 w-6" />
+                   {unreadCount > 0 && (
+                     <span 
+                       className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-lg z-50 pointer-events-none"
+                       style={{ lineHeight: '1' }}
+                     >
+                       {unreadCount > 99 ? '99+' : unreadCount}
+                     </span>
+                   )}
+                 </button>
+                 
+                 {/* Notifications Dropdown */}
+                 {notificationsOpen && (
+                   <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 z-[999] animate-in slide-in-from-top-2 duration-200 max-h-[500px] flex flex-col">
+                                           {/* Header */}
+                      <div className="px-4 py-3 bg-[#3e2626] rounded-t-2xl flex items-center justify-between">
+                       <div>
+                         <h3 className="text-sm font-bold text-white">Notificações</h3>
+                         {unreadCount > 0 && (
+                           <p className="text-xs text-white/80">{unreadCount} não lidas</p>
+                         )}
+                       </div>
+                       {unreadCount > 0 && (
+                         <button
+                           onClick={markAllAsRead}
+                           className="text-xs text-white/90 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/10"
+                         >
+                           Marcar todas como lidas
+                         </button>
+                       )}
+                     </div>
+                     
+                     {/* Notifications List */}
+                     <div className="overflow-y-auto flex-1">
+                       {notifications.length === 0 ? (
+                         <div className="px-4 py-8 text-center">
+                           <Bell className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                           <p className="text-sm text-gray-500">Nenhuma notificação</p>
+                         </div>
+                       ) : (
+                         <div className="divide-y divide-gray-100">
+                           {notifications.map((notification) => (
+                             <div
+                               key={notification.id}
+                               onClick={() => markNotificationAsRead(notification.id)}
+                               className={`px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer ${
+                                 !notification.read ? 'bg-blue-50/50' : ''
+                               }`}
+                             >
+                               <div className="flex items-start space-x-3">
+                                 <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
+                                   !notification.read ? 'bg-blue-500' : 'bg-transparent'
+                                 }`} />
+                                 <div className="flex-1 min-w-0">
+                                   <p className={`text-sm font-semibold ${
+                                     !notification.read ? 'text-gray-900' : 'text-gray-700'
+                                   }`}>
+                                     {notification.title}
+                                   </p>
+                                   <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                     {notification.message}
+                                   </p>
+                                   <p className="text-xs text-gray-400 mt-1">
+                                     {notification.time}
+                                   </p>
+                                 </div>
+                                 {notification.read && (
+                                   <Check className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" />
+                                 )}
+                               </div>
+                             </div>
+                           ))}
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 )}
+               </div>
+              
+               {/* FAQ Icon */}
+               <button 
+                 onClick={goToFAQ}
+                 className={`p-2 transition-colors ${
+                   isHomePage 
+                     ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
+                     : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
+                 }`}
+                 title="Perguntas Frequentes"
+               >
+                 <MessageCircle className="h-6 w-6" />
+               </button>
               
                {/* Account Icon - Sempre visível */}
                <div className="relative user-dropdown-container" ref={userDropdownRef}>
@@ -258,7 +480,7 @@ export default function Header() {
                    className={`p-2 transition-colors ${
                      isHomePage 
                        ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
-                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full'
+                       : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
                    }`}
                  >
                    <User className="h-6 w-6" />
@@ -311,7 +533,7 @@ export default function Header() {
                             </div>
                             <div className="flex-1">
                               <p className="font-semibold text-sm">Meus Favoritos</p>
-                              <p className="text-xs text-gray-500">{favorites.length} produtos salvos</p>
+                              <p className="text-xs text-gray-500">{favoritesCount} produtos salvos</p>
                             </div>
                             <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-[#3e2626] transition-colors" />
                           </Link>
@@ -379,17 +601,16 @@ export default function Header() {
                  className={`p-2 transition-colors relative ${
                    isHomePage 
                      ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
-                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full'
+                     : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
                  }`}
                >
                  <ShoppingCart className="h-6 w-6" />
-                {cartItems.length > 0 && (
-                  <span className={`absolute -top-1 -right-1 text-xs rounded-full h-5 w-5 flex items-center justify-center ${
-                    isHomePage 
-                      ? 'bg-white text-[#3e2626]' 
-                      : 'bg-[#3e2626] text-white'
-                  }`}>
-                    {cartItems.length}
+                {cartItemsCount > 0 && (
+                  <span 
+                    className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-lg z-50 pointer-events-none"
+                    style={{ lineHeight: '1' }}
+                  >
+                    {cartItemsCount > 99 ? '99+' : cartItemsCount}
                   </span>
                 )}
               </button>
@@ -399,20 +620,28 @@ export default function Header() {
 
           {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <div className="md:hidden border-t border-white/20 py-4 bg-black/20 backdrop-blur-sm rounded-lg mt-2">
+            <div className={`md:hidden border-t py-4 rounded-lg mt-2 ${
+              isHomePage 
+                ? 'border-white/20 bg-black/20 backdrop-blur-sm' 
+                : 'border-white/20 bg-white/10 backdrop-blur-sm'
+            }`}>
               <nav className="flex flex-col space-y-4">
-                <Link href="/" className="text-white font-medium">Início</Link>
-                <Link href="/products" className="text-white/80 hover:text-white">Produtos</Link>
-                <Link href="/furniture-visualizer" className="text-white/80 hover:text-white">Visualizador IA</Link>
-                <Link href="/about" className="text-white/80 hover:text-white">Sobre</Link>
-                <Link href="/contact" className="text-white/80 hover:text-white">Contato</Link>
+                <Link href="/" className={`font-medium ${isHomePage ? 'text-white' : 'text-white'}`}>Início</Link>
+                <Link href="/products" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Produtos</Link>
+                <Link href="/furniture-visualizer" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Visualizador IA</Link>
+                <Link href="/about" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Sobre</Link>
+                <Link href="/contact" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Contato</Link>
               </nav>
-              <div className="mt-4 pt-4 border-t border-white/20">
+              <div className={`mt-4 pt-4 border-t ${isHomePage ? 'border-white/20' : 'border-white/20'}`}>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 h-4 w-4" />
+                  <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${isHomePage ? 'text-white/60' : 'text-white/60'}`} />
                   <Input
                     placeholder="Buscar móveis..."
-                    className="pl-10 bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/60"
+                    className={`pl-10 backdrop-blur-sm border text-white placeholder:text-white/60 ${
+                      isHomePage 
+                        ? 'bg-white/10 border-white/20' 
+                        : 'bg-white/10 border-white/20'
+                    }`}
                   />
                 </div>
               </div>

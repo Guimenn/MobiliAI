@@ -128,11 +128,36 @@ export default function HomePage() {
   };
 
   // Função para adicionar ao carrinho
-  const addToCart = (productId: string) => {
+  const addToCart = async (productId: string) => {
     const product = allProducts.find(p => p.id === productId);
     if (product) {
-      useAppStore.getState().addToCart(product);
-      setCartItems(prev => [...prev, productId]);
+      try {
+        // Adicionar ao store local (sempre funciona)
+        useAppStore.getState().addToCart(product, 1);
+        setCartItems(prev => [...prev, productId]);
+        
+        // Se estiver autenticado, também adicionar ao backend
+        if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
+          try {
+            const { customerAPI } = await import('@/lib/api');
+            await customerAPI.addToCart(product.id, 1);
+          } catch (apiError) {
+            console.error('Erro ao adicionar ao carrinho no backend:', apiError);
+            // Mesmo com erro na API, o item já está no store local
+          }
+        }
+        
+        // Mostrar mensagem de sucesso
+        const { toast } = await import('sonner');
+        toast.success('Produto adicionado ao carrinho!', {
+          description: product.name,
+          duration: 3000,
+        });
+      } catch (error) {
+        console.error('Erro ao adicionar ao carrinho:', error);
+        const { toast } = await import('sonner');
+        toast.error('Erro ao adicionar ao carrinho. Tente novamente.');
+      }
     }
   };
 

@@ -547,19 +547,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-screen bg-[#fafafa] flex">
+    <div className="h-screen flex relative overflow-hidden">
+         {/* Background Image - Covering entire page */}
+         <div className="absolute inset-0 z-0">
+           <Image
+             src="/fundo-login.png"
+             alt="Background"
+             fill
+             className="object-cover"
+             priority
+           />
+         </div>
+
          {/* Left Side - Background Image with MobiliAI Text */}
-         <div className="w-1/2 relative overflow-hidden">
-           {/* Background Image */}
-           <div className="absolute inset-0">
-             <Image
-               src="/fudno.jpeg"
-               alt="Background"
-               fill
-               className="object-cover"
-               priority
-             />
-           </div>
+         <div className="w-full relative z-10">
 
            {/* Botão Voltar para Home */}
            <div className="absolute top-8 left-8 z-10">
@@ -575,12 +576,20 @@ export default function LoginPage() {
            </div>
              
             {/* MobiliAI Text Overlay - Centralizado e Proporcional */}
-            <div className="absolute inset-0 flex items-center justify-center pt-90 pr-10">
+            <div className="absolute inset-0 flex items-center justify-center pr-30">
               <div className="text-center px-8">
-               <h1 className="text-7xl font-black drop-shadow-2xl leading-tight mb-8">
-                 <span className="text-[#3E2626]">Mobili</span>
-                 <span className="text-white">AI</span>
-             </h1>
+               {/* Logo da Loja */}
+               <div className="mb-6 flex justify-center">
+                 <Image
+                   src="/logotipos/7.svg"
+                   alt="Logo da Loja"
+                   width={800}
+                   height={500}
+                   className="drop-shadow-2xl"
+                   priority
+                 />
+               </div>
+               
                <div className="space-y-3">
                  <p className="text-3xl font-bold text-white drop-shadow-lg">
                    Transforme seus espaços
@@ -594,9 +603,9 @@ export default function LoginPage() {
          </div>
 
         {/* Right Side - Chat Interface */}
-        <div className="w-1/2 flex flex-col translate-x-[-50px] bg-[#fafafa]">
+        <div className="w-2/3 flex flex-col translate-x-[-50px] relative z-10 ">
           {/* Chat Header */}
-          <div className="bg-[#fafafa] p-8 flex items-center space-x-4">
+          <div className="p-8 flex items-center space-x-4">
             <div className="w-16 h-16 rounded-lg overflow-hidden flex items-center justify-center bg-gray-50">
               <Image
                 src="/bot.jpeg"
@@ -613,7 +622,7 @@ export default function LoginPage() {
           </div>
 
           {/* Chat Messages */}
-          <div className="flex-1 p-8 overflow-y-auto bg-[#fafafa]">
+          <div className="flex-1 p-8 overflow-y-auto">
             <div className="space-y-6">
               {messages.map((message) => (
                 <div key={message.id}>
@@ -677,7 +686,7 @@ export default function LoginPage() {
           </div>
 
           {/* Chat Input */}
-          <div className="p-8 bg-[#fafafa]">
+          <div className="p-8">
             <form onSubmit={handleSubmit} className="flex space-x-3">
               <div className="flex-1 relative">
                 {loginStep === 'password' || loginStep === 'resetPassword' ? (
@@ -749,33 +758,23 @@ export default function LoginPage() {
                       setCurrentInput(value);
                     }}
                       placeholder={
-                        loginStep === 'email' 
-                          ? 'Digite seu e-mail' 
-                          : loginStep === 'forgotPassword'
-                          ? 'Digite seu email para recuperação'
-                          : loginStep === 'resetCode'
-                          ? 'Digite o código de 6 dígitos'
-                          : loginStep === 'resetPassword'
-                          ? 'Digite sua nova senha'
-                          : loginStep === 'userInfo'
-                          ? currentField === 'name' 
-                            ? 'Digite seu nome completo'
-                            : currentField === 'phone'
-                            ? 'Digite seu telefone (ou pular)'
-                            : currentField === 'cpf'
-                            ? 'Digite seu CPF (ex: 123.456.789-00)'
-                            : currentField === 'zipCode'
-                            ? 'Digite seu CEP (ex: 12345-678) ou "não sei o CEP"'
-                            : currentField === 'confirmAddress'
-                            ? 'Digite "sim" ou "não"'
-                            : currentField === 'address'
-                            ? 'Digite seu endereço completo'
-                            : currentField === 'city'
-                            ? 'Digite sua cidade'
-                            : currentField === 'state'
-                            ? 'Digite seu estado'
-                            : 'Digite sua senha'
-                          : 'Digite sua mensagem'
+                        (() => {
+                          if (loginStep === 'email') return 'Digite seu e-mail';
+                          if (loginStep === 'forgotPassword') return 'Digite seu email para recuperação';
+                          if (loginStep === 'resetCode') return 'Digite o código de 6 dígitos';
+                          if (loginStep === 'userInfo') {
+                            if (currentField === 'name') return 'Digite seu nome completo';
+                            if (currentField === 'phone') return 'Digite seu telefone (ou pular)';
+                            if (currentField === 'cpf') return 'Digite seu CPF (ex: 123.456.789-00)';
+                            if (currentField === 'zipCode') return 'Digite seu CEP (ex: 12345-678) ou "não sei o CEP"';
+                            if (currentField === 'confirmAddress') return 'Digite "sim" ou "não"';
+                            if (currentField === 'address') return 'Digite seu endereço completo';
+                            if (currentField === 'city') return 'Digite sua cidade';
+                            if (currentField === 'state') return 'Digite seu estado';
+                            return 'Digite sua senha';
+                          }
+                          return 'Digite sua mensagem';
+                        })()
                       }
                     className="h-14 border-0 bg-gray-100 focus:bg-white focus:ring-0 text-base rounded-2xl"
                     disabled={isLoading}

@@ -21,10 +21,6 @@ export class CustomerCartService {
       throw new BadRequestException('Produto não está disponível');
     }
 
-    if (product.stock < quantity) {
-      throw new BadRequestException('Quantidade solicitada maior que o estoque disponível');
-    }
-
     // Verificar se o produto já está no carrinho
     const existingCartItem = await this.prisma.cartItem.findFirst({
       where: {
@@ -34,12 +30,8 @@ export class CustomerCartService {
     });
 
     if (existingCartItem) {
-      // Atualizar quantidade
+      // Atualizar quantidade (sem verificação de estoque)
       const newQuantity = existingCartItem.quantity + quantity;
-      
-      if (product.stock < newQuantity) {
-        throw new BadRequestException('Quantidade total maior que o estoque disponível');
-      }
 
       return this.prisma.cartItem.update({
         where: { id: existingCartItem.id },
@@ -135,10 +127,7 @@ export class CustomerCartService {
       return { message: 'Item removido do carrinho' };
     }
 
-    if (cartItem.product.stock < quantity) {
-      throw new BadRequestException('Quantidade solicitada maior que o estoque disponível');
-    }
-
+    // Permitir qualquer quantidade sem verificar estoque
     return this.prisma.cartItem.update({
       where: { id: cartItemId },
       data: { quantity },
@@ -201,13 +190,8 @@ export class CustomerCartService {
           productName: item.product.name,
           issue: 'Produto não está mais disponível'
         });
-      } else if (item.product.stock < item.quantity) {
-        issues.push({
-          itemId: item.id,
-          productName: item.product.name,
-          issue: `Estoque insuficiente. Disponível: ${item.product.stock}`
-        });
       } else {
+        // Não verificar estoque - permitir qualquer quantidade
         validItems.push(item);
       }
     }

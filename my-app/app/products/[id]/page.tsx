@@ -44,6 +44,8 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { env } from '@/lib/env';
+import { customerAPI } from '@/lib/api';
+import { toast } from 'sonner';
 
 // Mapeamento de categorias para ícones
 const categoryNames: Record<string, string> = {
@@ -190,16 +192,40 @@ export default function ProductDetailPage() {
     }
   }, [productId, products]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (product) {
-      for (let i = 0; i < quantity; i++) {
-        addToCart(product);
-      }
-      // Feedback visual
-      const button = document.getElementById('add-to-cart-btn');
-      if (button) {
-        button.classList.add('animate-pulse');
-        setTimeout(() => button.classList.remove('animate-pulse'), 500);
+      try {
+        // Adicionar ao store local (sempre funciona)
+        addToCart(product, quantity);
+        
+        // Se estiver autenticado, também adicionar ao backend
+        if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
+          try {
+            await customerAPI.addToCart(product.id, quantity);
+          } catch (apiError) {
+            console.error('Erro ao adicionar ao carrinho no backend:', apiError);
+            // Mesmo com erro na API, o item já está no store local
+          }
+        }
+        
+        // Mostrar mensagem de sucesso
+        toast.success(
+          `${quantity === 1 ? 'Produto adicionado' : `${quantity} produtos adicionados`} ao carrinho!`,
+          {
+            description: product.name,
+            duration: 3000,
+          }
+        );
+        
+        // Feedback visual
+        const button = document.getElementById('add-to-cart-btn');
+        if (button) {
+          button.classList.add('animate-pulse');
+          setTimeout(() => button.classList.remove('animate-pulse'), 500);
+        }
+      } catch (error) {
+        console.error('Erro ao adicionar ao carrinho:', error);
+        toast.error('Erro ao adicionar ao carrinho. Tente novamente.');
       }
     }
   };
@@ -225,7 +251,7 @@ export default function ProductDetailPage() {
 
   const handleQuantityChange = (delta: number) => {
     if (product) {
-      const newQuantity = Math.max(1, Math.min(quantity + delta, product.stock || 1));
+      const newQuantity = Math.max(1, quantity + delta);
       setQuantity(newQuantity);
     }
   };
@@ -245,6 +271,52 @@ export default function ProductDetailPage() {
       // Fallback: copiar para clipboard
       navigator.clipboard.writeText(window.location.href);
       alert('Link copiado para a área de transferência!');
+    }
+  };
+
+  // Verificar se produto está nos favoritos
+  useEffect(() => {
+    const checkFavorite = async () => {
+      if (!productId || !isAuthenticated) {
+        setIsFavorite(false);
+        return;
+      }
+      try {
+        const response = await customerAPI.checkFavorite(productId);
+        setIsFavorite(response.isFavorite || false);
+      } catch (error) {
+        console.error('Erro ao verificar favorito:', error);
+        setIsFavorite(false);
+      }
+    };
+
+    checkFavorite();
+  }, [productId, isAuthenticated]);
+
+  // Função para alternar favorito
+  const handleToggleFavorite = async () => {
+    if (!isAuthenticated) {
+      toast.error('Faça login para adicionar aos favoritos');
+      return;
+    }
+
+    if (!productId) return;
+
+    try {
+      if (isFavorite) {
+        await customerAPI.removeFromFavorites(productId);
+        setIsFavorite(false);
+        toast.success('Produto removido dos favoritos');
+      } else {
+        await customerAPI.addToFavorites(productId);
+        setIsFavorite(true);
+        toast.success('Produto adicionado aos favoritos');
+      }
+    } catch (error: any) {
+      console.error('Erro ao alternar favorito:', error);
+      toast.error(error?.response?.data?.message || 'Erro ao atualizar favoritos');
+      // Reverter estado em caso de erro
+      setIsFavorite(!isFavorite);
     }
   };
 
@@ -520,7 +592,7 @@ export default function ProductDetailPage() {
                     <Minus className="h-4 w-4 text-brand-700" />
                   </button>
                       <span className="px-4 py-2 text-lg font-semibold text-gray-900 min-w-[3rem] text-center">{quantity}</span>
-                      <button onClick={() => handleQuantityChange(1)} disabled={quantity >= (product.stock || 1)} className="p-2 hover:bg-brand-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                      <button onClick={() => handleQuantityChange(1)} className="p-2 hover:bg-brand-50 transition-colors">
                     <Plus className="h-4 w-4 text-brand-700" />
                   </button>
                 </div>
@@ -528,12 +600,12 @@ export default function ProductDetailPage() {
 
                   {/* Ações */}
               <div className="flex flex-col sm:flex-row gap-3">
-                    <Button id="add-to-cart-btn" onClick={handleAddToCart} disabled={(product.stock || 0) === 0} className="flex-1 bg-brand-700 hover:bg-brand-800 text-black cursor-pointer h-12 text-base font-semibold shadow-md">
+                    <Button id="add-to-cart-btn" onClick={handleAddToCart} className="flex-1 bg-brand-700 hover:bg-brand-800 text-black cursor-pointer h-12 text-base font-semibold shadow-md">
                   <ShoppingCart className="h-5 w-5 mr-2" />
-                  {(product.stock || 0) === 0 ? 'Produto Esgotado' : 'Adicionar ao Carrinho'}
+                  Adicionar ao Carrinho
                 </Button>
                     <Button onClick={handleBuyNow} variant="outline" className="h-12 px-6 border-2 border-brand-300 hover:border-brand-400 hover:bg-brand-50">Comprar agora</Button>
-                    <Button variant="outline" onClick={() => setIsFavorite(!isFavorite)} className="h-12 px-4 border-2 border-brand-200 hover:border-brand-300 hover:bg-brand-50">
+                    <Button variant="outline" onClick={handleToggleFavorite} className="h-12 px-4 border-2 border-brand-200 hover:border-brand-300 hover:bg-brand-50">
                       <Heart className={`${isFavorite ? 'fill-red-500 text-red-500' : 'text-brand-700'} h-5 w-5`} />
                 </Button>
               </div>
@@ -588,36 +660,36 @@ export default function ProductDetailPage() {
                     const installmentValue = (relatedProduct.price / 18).toFixed(2);
 
                     return (
-                      <button
-                  key={relatedProduct.id}
-                  onClick={() => router.push(`/products/${relatedProduct.id}`)}
-                        className="w-full text-left bg-white border border-gray-200 hover:border-brand-300 hover:shadow-md rounded-lg p-2.5 transition-all"
-                >
+                      <div
+                        key={relatedProduct.id}
+                        onClick={() => router.push(`/products/${relatedProduct.id}`)}
+                        className="w-full text-left bg-white border border-gray-200 hover:border-brand-300 hover:shadow-md rounded-lg p-2.5 transition-all cursor-pointer"
+                      >
                         <div className="flex gap-2.5">
                           {/* Imagem do produto - maior para ocupar mais espaço */}
                           <div className="relative w-56 h-56 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-200 group">
-                    {relatedProduct.imageUrl ? (
-                      <Image
-                        src={relatedProduct.imageUrl}
-                        alt={relatedProduct.name}
-                        fill
+                            {relatedProduct.imageUrl ? (
+                              <Image
+                                src={relatedProduct.imageUrl}
+                                alt={relatedProduct.name}
+                                fill
                                 className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
                                 <Package className="h-8 w-8 text-gray-300" />
-                      </div>
-                    )}
-                    {/* Favorite Tooltip */}
-                    <FavoriteTooltip productId={relatedProduct.id} />
-                  </div>
+                              </div>
+                            )}
+                            {/* Favorite Tooltip */}
+                            <FavoriteTooltip productId={relatedProduct.id} />
+                          </div>
 
                           {/* Informações do produto - layout otimizado */}
                           <div className="flex-1 min-w-0 flex flex-col gap-4">
                             {/* Título */}
-                            <h4 className="text-xl font-medium text-gray-900 line-clamp-2 leading-snug ">
-                      {relatedProduct.name}
+                            <h4 className="text-xl font-medium text-gray-900 line-clamp-2 leading-snug">
+                              {relatedProduct.name}
                             </h4>
 
                             {/* Preços em linha */}
@@ -626,12 +698,12 @@ export default function ProductDetailPage() {
                                 R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                               </p>
                               <p className="text-2xl font-bold text-gray-900">
-                      R$ {relatedProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
+                                R$ {relatedProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
 
                             {/* Desconto e Parcelamento em linha */}
-                            <div className="flex items-center gap-2 flex-wrap ">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-md font-semibold text-green-600">
                                 {discountPercent}% OFF no Pix
                               </p>
@@ -645,9 +717,9 @@ export default function ProductDetailPage() {
                             <p className="text-sm font-medium text-green-600">
                               Frete grátis
                             </p>
-                  </div>
-                </div>
-                      </button>
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
