@@ -615,10 +615,10 @@ export default function HomePage() {
         <Header />
 
         {/* Hero Section */}
-        <section className="relative flex items-center justify-center overflow-visible h-full">
+        <section className="relative flex items-center justify-center overflow-visible h-full mt-10">
           {/* Content */}
           <div className="relative z-10 w-full max-w-5xl px-4 sm:px-6 lg:px-8 text-center mt-30">
-            <div className="max-w-5xl mx-auto">
+            <div className="max-w-5xl mx-auto pt-10">
               {/* Main Heading */}
               <h1 className="text-3xl md:text-5xl lg:text-7xl font-thin leading-tight tracking-wider">
                 <span className="block font-thin" style={{ 

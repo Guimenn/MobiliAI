@@ -329,7 +329,7 @@ export default function Header() {
 
     return (
      
-        <header className={`w-full fixed top-0 left-0 right-0 transition-all duration-500 ease-in-out z-50 transform ${
+        <header className={`w-full fixed top-0 left-0 right-0 transition-all duration-500 ease-in-out z-40 transform mb-10  ${
             isHeaderVisible 
                 ? 'translate-y-0 opacity-100 visible' 
                 : '-translate-y-full opacity-0 invisible pointer-events-none'
