@@ -12,7 +12,8 @@ export class PublicController {
     @Query('search') search: string = '',
     @Query('category') category?: string,
     @Query('minPrice') minPrice?: string,
-    @Query('maxPrice') maxPrice?: string
+    @Query('maxPrice') maxPrice?: string,
+    @Query('storeId') storeId?: string
   ) {
     try {
       return await this.publicProductsService.getProducts(
@@ -21,7 +22,8 @@ export class PublicController {
         search,
         category,
         minPrice ? parseFloat(minPrice) : undefined,
-        maxPrice ? parseFloat(maxPrice) : undefined
+        maxPrice ? parseFloat(maxPrice) : undefined,
+        storeId
       );
     } catch (error) {
       console.error('❌ Erro ao buscar produtos:', error);

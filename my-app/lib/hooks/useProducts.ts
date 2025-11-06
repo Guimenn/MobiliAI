@@ -55,7 +55,10 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
       if (options.category) {
         params.append('category', options.category);
       }
-      params.append('limit', '50'); // Limite maior para pegar mais produtos
+      if (options.storeId) {
+        params.append('storeId', options.storeId);
+      }
+      params.append('limit', '500'); // Limite alto para pegar todos os produtos
       
       const response = await fetch(`${env.API_URL}/public/products?${params.toString()}`, {
         method: 'GET',
@@ -84,11 +87,51 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
         return;
       }
       
-      // Se a resposta tem uma estrutura de paginação, pegar os produtos
-      const productsData = data.products || data.data || data;
+      // Se a resposta tem uma estrutura de paginação, pegar os produtos e verificar se há mais páginas
+      let allProducts: any[] = [];
+      let totalPages = 1;
       
-      // Verificar se productsData é um array válido
-      if (!Array.isArray(productsData)) {
+      // Se a resposta tem paginação, buscar todas as páginas
+      if (data.pagination) {
+        totalPages = data.pagination.pages || 1;
+        allProducts = data.products || [];
+        
+        // Se há mais páginas, buscar todas
+        if (totalPages > 1) {
+          const allPagesPromises = [];
+          for (let page = 2; page <= totalPages; page++) {
+            const pageParams = new URLSearchParams();
+            if (options.category) {
+              pageParams.append('category', options.category);
+            }
+            if (options.storeId) {
+              pageParams.append('storeId', options.storeId);
+            }
+            pageParams.append('limit', '500');
+            pageParams.append('page', String(page));
+            
+            allPagesPromises.push(
+              fetch(`${env.API_URL}/public/products?${pageParams.toString()}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+              }).then(res => res.json())
+            );
+          }
+          
+          const otherPages = await Promise.all(allPagesPromises);
+          otherPages.forEach(pageData => {
+            if (pageData.products && Array.isArray(pageData.products)) {
+              allProducts = [...allProducts, ...pageData.products];
+            }
+          });
+        }
+      } else {
+        // Se não tem paginação, usar a resposta direta
+        allProducts = data.products || data.data || data;
+      }
+      
+      // Verificar se allProducts é um array válido
+      if (!Array.isArray(allProducts)) {
         // Se não for array, usar dados mock
         console.warn('Resposta não contém array de produtos, usando dados mock');
         setError('Formato de resposta inválido. Usando dados de exemplo.');
@@ -97,7 +140,7 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
       }
       
       // Mapear os dados da API para o formato do Product
-      const mappedProducts: Product[] = productsData.map((product: any) => ({
+      const mappedProducts: Product[] = allProducts.map((product: any) => ({
         id: product.id,
         name: product.name,
         description: product.description,

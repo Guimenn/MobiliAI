@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { useProducts } from '@/lib/hooks/useProducts';
@@ -310,24 +310,31 @@ export default function HomePage() {
   ];
 
   // Mapear categorias do banco para categorias de exibição
-  const getDisplayCategory = (category: string) => {
+  // Mapeamento de categorias para nomes amigáveis
+  const getCategoryDisplayName = (category: string) => {
     const categoryMap: { [key: string]: string } = {
-      'sofa': 'Sala de Estar',
-      'mesa': 'Sala de Jantar',
-      'cadeira': 'Sala de Jantar',
-      'armario': 'Quarto',
-      'cama': 'Quarto',
-      'decoracao': 'Sala de Estar',
-      'iluminacao': 'Sala de Estar',
-      'outros': 'Sala de Estar'
+      'sofa': 'Sofá',
+      'mesa': 'Mesa',
+      'cadeira': 'Cadeira',
+      'estante': 'Estante',
+      'poltrona': 'Poltrona',
+      'quadro': 'Quadro',
+      'luminaria': 'Luminária',
+      'outros': 'Outros'
     };
-    return categoryMap[category] || 'Sala de Estar';
+    return categoryMap[category?.toLowerCase()] || category;
   };
+
+  // Categorias disponíveis baseadas nos produtos
+  const availableCategories = useMemo(() => {
+    const categories = new Set(allProducts.map(p => p.category?.toLowerCase()).filter(Boolean));
+    return Array.from(categories).sort();
+  }, [allProducts]);
 
   // Adicionar propriedades extras para exibição
   const enhancedProducts = allProducts.map(product => ({
     ...product,
-    displayCategory: getDisplayCategory(product.category),
+    categoryDisplayName: getCategoryDisplayName(product.category),
     rating: product.rating || 0, // Usar rating real do banco
     reviews: product.reviewCount || 0, // Usar reviewCount real do banco
     badge: product.isNew ? 'Novo' : product.isBestSeller ? 'Mais Vendido' : product.isFeatured ? 'Destaque' : null,
@@ -337,10 +344,10 @@ export default function HomePage() {
   // Filtrar produtos baseado na categoria selecionada
   const filteredProducts = selectedCategory === 'Todos' 
     ? enhancedProducts 
-    : enhancedProducts.filter(product => product.displayCategory === selectedCategory);
+    : enhancedProducts.filter(product => product.category?.toLowerCase() === selectedCategory.toLowerCase());
 
   // Configurações de paginação
-  const productsPerPage = 6;
+  const productsPerPage = 8;
   const maxPages = 3;
   const totalFilteredProducts = filteredProducts.length;
   const totalPages = Math.min(Math.ceil(totalFilteredProducts / productsPerPage), maxPages);
@@ -1173,18 +1180,29 @@ export default function HomePage() {
               
               {/* Category Navigation - Modern Pills */}
               <div className="flex flex-wrap gap-3 items-center">
-                {['Sala de Jantar', 'Sala de Estar', 'Quarto', 'Cozinha', 'Exterior'].map((category) => (
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleCategoryChange('Todos')}
+                  className={`px-6 py-3 font-medium transition-all duration-300 text-base rounded-full relative group ${
+                    selectedCategory === 'Todos' 
+                      ? 'bg-[#3e2626] text-white shadow-lg' 
+                      : 'text-[#3e2626] hover:bg-[#3e2626]/10 hover:text-[#3e2626]'
+                  }`}
+                >
+                  Todos
+                </Button>
+                {availableCategories.map((category) => (
                   <Button 
                     key={category}
                     variant="ghost" 
                     onClick={() => handleCategoryChange(category)}
                     className={`px-6 py-3 font-medium transition-all duration-300 text-base rounded-full relative group ${
-                      selectedCategory === category 
+                      selectedCategory.toLowerCase() === category.toLowerCase() 
                         ? 'bg-[#3e2626] text-white shadow-lg' 
                         : 'text-[#3e2626] hover:bg-[#3e2626]/10 hover:text-[#3e2626]'
                     }`}
                   >
-                    {category}
+                    {getCategoryDisplayName(category)}
                   </Button>
                 ))}
 
