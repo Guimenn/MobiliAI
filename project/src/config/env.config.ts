@@ -30,4 +30,7 @@ export const envConfig = {
 
   // Hugging Face (para Trellis/ZeroGPU)
   HF_TOKEN: process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN || process.env.HUGGING_FACE_HUB_TOKEN || '',
+
+  // Replicate
+  REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN || 'r8_WwmiM2PiqGiJsyW0oVQ5LJDDHZqLQid1AzXRU',
 };

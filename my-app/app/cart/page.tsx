@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import FavoriteTooltip from '@/components/FavoriteTooltip';
+import AITestModal from '@/components/AITestModal';
 import { 
   ShoppingCart,
   Plus,
@@ -71,6 +72,7 @@ export default function CartPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [showEmptyCart, setShowEmptyCart] = useState(false);
   const [storeInfoCache, setStoreInfoCache] = useState<{ [storeId: string]: { name: string; address?: string } }>({});
+  const [showAIModal, setShowAIModal] = useState(false);
   
   // Estado para controlar produtos selecionados
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(
@@ -324,7 +326,13 @@ export default function CartPage() {
       sessionStorage.setItem('checkout-selected-products', JSON.stringify(selectedIds));
     }
     
-    // Redirecionar para página de checkout
+    // Mostrar modal de teste de IA antes de ir para checkout
+    setShowAIModal(true);
+  };
+
+  // Função para continuar para checkout (chamada após o modal)
+  const handleContinueToCheckout = () => {
+    setShowAIModal(false);
     router.push('/checkout');
   };
 
@@ -1014,6 +1022,20 @@ export default function CartPage() {
       </div>
       
       <Footer />
+
+      {/* Modal de Teste de IA */}
+      <AITestModal
+        isOpen={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        onContinue={handleContinueToCheckout}
+        products={selectedCartItems.map(item => ({
+          id: item.product.id,
+          name: item.product.name,
+          imageUrl: item.product.imageUrl,
+          color: item.product.color,
+          category: item.product.category,
+        }))}
+      />
     </div>
   );
 }
