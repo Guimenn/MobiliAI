@@ -975,9 +975,60 @@ export const customerAPI = {
     shippingState?: string;
     shippingZipCode?: string;
     shippingPhone?: string;
+    shippingCost?: number;
+    insuranceCost?: number;
+    tax?: number;
+    discount?: number;
     notes?: string;
   }) => {
     const response = await api.post('/customer/cart/checkout', checkoutData);
+    return response.data;
+  },
+
+  // Pagamento PIX
+  createPixPayment: async (saleId: string, customerInfo?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    cpf?: string;
+  }) => {
+    const response = await api.post('/payment/pix/create', {
+      saleId,
+      customerInfo,
+    });
+    return response.data;
+  },
+
+  checkPixPaymentStatus: async (saleId: string) => {
+    const response = await api.get(`/payment/pix/status/${saleId}`);
+    return response.data;
+  },
+
+  // Pagamento Cartão (Checkout AbacatePay)
+  createCardPayment: async (saleId: string, customerInfo?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    cpf?: string;
+  }) => {
+    const response = await api.post('/payment/card/create', {
+      saleId,
+      customerInfo,
+    });
+    return response.data;
+  },
+
+  // Pagamento Boleto (Checkout AbacatePay)
+  createBoletoPayment: async (saleId: string, customerInfo?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    cpf?: string;
+  }) => {
+    const response = await api.post('/payment/boleto/create', {
+      saleId,
+      customerInfo,
+    });
     return response.data;
   },
 

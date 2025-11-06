@@ -238,32 +238,85 @@ export class CustomerCartService {
       state: string;
       zipCode: string;
       phone?: string;
+    },
+    additionalCosts?: {
+      shippingCost?: number;
+      insuranceCost?: number;
+      tax?: number;
+      discount?: number;
+      notes?: string;
     }
   ) {
+    // Verificar se há itens no carrinho antes de validar
+    const cartCount = await this.prisma.cartItem.count({
+      where: { customerId }
+    });
+
+    if (cartCount === 0) {
+      throw new BadRequestException('Carrinho está vazio. Adicione produtos ao carrinho antes de finalizar o pedido.');
+    }
+
     // Validar carrinho
     const validation = await this.validateCart(customerId);
     
     if (!validation.valid) {
-      throw new BadRequestException('Carrinho contém itens inválidos');
+      const issuesText = validation.issues.map(i => `${i.productName}: ${i.issue}`).join(', ');
+      throw new BadRequestException(`Carrinho contém itens inválidos: ${issuesText}`);
     }
 
     if (validation.validItems.length === 0) {
-      throw new BadRequestException('Carrinho está vazio');
+      throw new BadRequestException('Carrinho está vazio. Adicione produtos ao carrinho antes de finalizar o pedido.');
     }
 
-    // Criar venda
-    const totalAmount = validation.totalPrice;
+    // Validar se a loja existe
+    let validStoreId = storeId;
+    if (!storeId || storeId === 'default') {
+      // Buscar a primeira loja ativa
+      const firstStore = await this.prisma.store.findFirst({
+        where: { isActive: true },
+        select: { id: true }
+      });
+      
+      if (!firstStore) {
+        throw new BadRequestException('Nenhuma loja disponível. Entre em contato com o suporte.');
+      }
+      
+      validStoreId = firstStore.id;
+    } else {
+      // Verificar se a loja existe e está ativa
+      const store = await this.prisma.store.findUnique({
+        where: { id: storeId },
+        select: { id: true, isActive: true }
+      });
+      
+      if (!store) {
+        throw new BadRequestException(`Loja com ID ${storeId} não encontrada`);
+      }
+      
+      if (!store.isActive) {
+        throw new BadRequestException(`Loja com ID ${storeId} está inativa`);
+      }
+    }
+
+    // Calcular total incluindo custos adicionais
+    const subtotal = validation.totalPrice;
+    const shippingCost = additionalCosts?.shippingCost || 0;
+    const insuranceCost = additionalCosts?.insuranceCost || 0;
+    const tax = additionalCosts?.tax || 0;
+    const discount = additionalCosts?.discount || 0;
+    const totalAmount = subtotal + shippingCost + insuranceCost + tax - discount;
+    
     const isOnlineOrder = !!shippingInfo;
     
     const sale = await this.prisma.sale.create({
       data: {
-        store: { connect: { id: storeId } },
+        store: { connect: { id: validStoreId } },
         customer: { connect: { id: customerId } },
         employee: { connect: { id: customerId } }, // Cliente é o próprio vendedor
         saleNumber: `SALE-${Date.now()}`,
         totalAmount,
-        discount: 0,
-        tax: 0,
+        discount: discount,
+        tax: tax,
         status: isOnlineOrder ? 'PENDING' : 'PENDING',
         paymentMethod: 'PIX',
         isOnlineOrder,
@@ -272,6 +325,7 @@ export class CustomerCartService {
         shippingState: shippingInfo?.state,
         shippingZipCode: shippingInfo?.zipCode,
         shippingPhone: shippingInfo?.phone,
+        notes: additionalCosts?.notes,
         items: {
           create: validation.validItems.map(item => ({
             product: { connect: { id: item.productId } },

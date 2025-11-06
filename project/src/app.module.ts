@@ -25,6 +25,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { TrellisModule } from './trellis/trellis.module';
 import { PublicModule } from './public/public.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PaymentModule } from './payment/payment.module';
 
 
 @Module({
@@ -60,6 +61,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     TrellisModule,
     PublicModule,
     NotificationsModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService, TimeClockService],

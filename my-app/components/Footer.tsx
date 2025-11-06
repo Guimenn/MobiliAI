@@ -20,7 +20,7 @@ export default function Footer() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 items-start">
             {/* Brand Section */}
             <div className="md:col-span-1 flex flex-col">
-              <div className="w-full h-20 bg-cover bg-center bg-no-repeat mb-6 pb-6"
+              <div className="w-full h-20 bg-cover bg-center bg-no-repeat mb-12 translate-x-[-30px]"
           style={{ backgroundImage: 'url(/logotipos/11.svg)' }}>
                
               </div>
@@ -28,10 +28,7 @@ export default function Footer() {
                 Transforme sua casa com móveis inteligentes e tecnologia de IA. 
                 Visualize móveis reais antes de comprar.
               </p>
-              <div className="flex items-center space-x-2 text-xs text-white/50">
-                <Shield className="h-4 w-4" />
-                <span>Site seguro e protegido</span>
-              </div>
+              
             </div>
 
             {/* Empresa Section */}
@@ -214,12 +211,9 @@ export default function Footer() {
           <div className="mt-6 pt-6 border-t border-white/5">
             <div className="flex flex-col md:flex-row items-center justify-center md:justify-between space-y-2 md:space-y-0 text-xs text-white/50">
               <p className="text-center md:text-left">
-                CNPJ: 00.000.000/0001-00 | MobiliAI Comércio de Móveis LTDA
+                 MobiliAI Comércio de Móveis LTDA
               </p>
-              <div className="flex items-center space-x-2">
-                <FileText className="h-3 w-3" />
-                <span>Certificado SSL</span>
-              </div>
+              
             </div>
           </div>
         </div>

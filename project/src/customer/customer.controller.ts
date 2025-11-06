@@ -165,17 +165,43 @@ export class CustomerController {
       shippingState?: string;
       shippingZipCode?: string;
       shippingPhone?: string;
+      shippingCost?: number;
+      insuranceCost?: number;
+      tax?: number;
+      discount?: number;
+      notes?: string;
     }
   ) {
-    const shippingInfo = data.shippingAddress ? {
-      address: data.shippingAddress,
-      city: data.shippingCity || '',
-      state: data.shippingState || '',
-      zipCode: data.shippingZipCode || '',
-      phone: data.shippingPhone
-    } : undefined;
-    
-    return this.customerCartService.checkout(req.user.id, data.storeId, shippingInfo);
+    try {
+      const shippingInfo = data.shippingAddress ? {
+        address: data.shippingAddress,
+        city: data.shippingCity || '',
+        state: data.shippingState || '',
+        zipCode: data.shippingZipCode || '',
+        phone: data.shippingPhone
+      } : undefined;
+      
+      return await this.customerCartService.checkout(
+        req.user.id, 
+        data.storeId, 
+        shippingInfo,
+        {
+          shippingCost: data.shippingCost || 0,
+          insuranceCost: data.insuranceCost || 0,
+          tax: data.tax || 0,
+          discount: data.discount || 0,
+          notes: data.notes,
+        }
+      );
+    } catch (error: any) {
+      console.error('Erro no checkout:', {
+        userId: req.user.id,
+        storeId: data.storeId,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
   // ==================== FAVORITOS ====================

@@ -853,10 +853,8 @@ export default function HomePage() {
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-4 h-4 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
-                      <span className="text-white font-bold text-xl">
-                        {categories[0].count} produtos
-                      </span>
+                     
+                      
                     </div>
                     <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                       <ArrowRight className="h-6 w-6 text-white group-hover:translate-x-1 transition-transform" />

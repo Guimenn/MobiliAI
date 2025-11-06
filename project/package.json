@@ -39,6 +39,7 @@
     "@nestjs/typeorm": "^10.0.2",
     "@prisma/client": "^6.16.3",
     "@supabase/supabase-js": "^2.75.0",
+    "abacatepay-nodejs-sdk": "^1.6.0",
     "axios": "^1.6.7",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",

@@ -489,6 +489,8 @@ export default function CheckoutPage() {
         price: product.price,
         imageUrl: product.imageUrls?.[0] || product.imageUrl,
         storeId: product.storeId,
+        category: product.category || '',
+        stock: product.stock || 0,
       };
       
       // Adicionar ao carrinho
@@ -802,11 +804,54 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Validar se há itens no carrinho
+    if (!checkoutItems || checkoutItems.length === 0) {
+      alert('Seu carrinho está vazio. Adicione produtos antes de finalizar o pedido.');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
+      // Sincronizar carrinho do frontend com o backend antes do checkout
+      console.log('Sincronizando carrinho com o backend...', checkoutItems.length, 'itens');
+      
+      // Adicionar todos os itens do carrinho do frontend ao backend
+      for (const item of checkoutItems) {
+        try {
+          await customerAPI.addToCart(item.product.id, item.quantity);
+          console.log(`Produto ${item.product.id} adicionado ao backend`);
+        } catch (error: any) {
+          console.warn(`Erro ao adicionar produto ${item.product.id} ao backend:`, error.message);
+          // Continuar mesmo se houver erro em um produto
+        }
+      }
+
+      // Verificar se o carrinho no backend tem itens após sincronização
+      const backendCart = await customerAPI.getCart();
+      if (!backendCart || !backendCart.items || backendCart.items.length === 0) {
+        alert('Não foi possível sincronizar seu carrinho com o servidor. Por favor, adicione os produtos novamente.');
+        setIsProcessing(false);
+        router.push('/cart');
+        return;
+      }
+
+      console.log('Carrinho sincronizado:', backendCart.items.length, 'itens no backend');
+
       // Agrupar por loja (assumindo que todos os produtos são da mesma loja ou primeiro)
-      const storeId = checkoutItems[0]?.product.storeId || 'default';
+      const storeId = checkoutItems[0]?.product?.storeId || 'default';
+      
+      console.log('Dados do checkout:', {
+        storeId,
+        itemsCount: checkoutItems.length,
+        backendCartItemsCount: backendCart.items?.length || 0,
+        shippingAddress,
+        paymentMethod,
+        shippingCost,
+        insuranceCost,
+        tax,
+        discount,
+      });
       
       // Criar a venda no backend (usuário já está autenticado neste ponto)
       const saleResponse = await customerAPI.checkout({
@@ -816,14 +861,84 @@ export default function CheckoutPage() {
         shippingState: shippingAddress.state,
         shippingZipCode: shippingAddress.zipCode,
         shippingPhone: shippingAddress.phone,
+        shippingCost: shippingCost,
+        insuranceCost: insuranceCost,
+        tax: tax,
+        discount: discount,
         notes: `Pedido via checkout web. Frete: ${selectedShipping === 'express' ? 'Expresso' : 'Padrão'}. ${shippingInsurance ? 'Com seguro de envio' : 'Sem seguro'}.${appliedCoupon ? ` Cupom aplicado: ${appliedCoupon.code}` : ''}`,
       });
 
-      // Redirecionar para página de confirmação
-      router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+      // Se o método de pagamento for PIX, redirecionar para página de pagamento PIX
+      if (paymentMethod.type === 'pix') {
+        router.push(`/payment/pix?saleId=${saleResponse.id}`);
+      } else if (paymentMethod.type === 'credit_card') {
+        // Criar pagamento de cartão via checkout AbacatePay e redirecionar
+        try {
+          const res = await customerAPI.createCardPayment(saleResponse.id, {
+            name: user?.name,
+            email: user?.email,
+            phone: user?.phone,
+            cpf: shippingAddress?.cpf,
+          });
+          const redirectUrl = res?.checkoutUrl || res?.paymentUrl || res?.url;
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+            return;
+          }
+          // Fallback: se não veio URL, ir para sucesso
+          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+        } catch (err: any) {
+          console.error('Erro ao criar pagamento de cartão:', err);
+          const msg = err?.response?.data?.message || err?.message || 'Erro ao iniciar pagamento com cartão';
+          alert(msg);
+          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+        }
+      } else if (paymentMethod.type === 'boleto') {
+        // Criar pagamento de boleto via checkout AbacatePay e redirecionar
+        try {
+          const res = await customerAPI.createBoletoPayment(saleResponse.id, {
+            name: user?.name,
+            email: user?.email,
+            phone: user?.phone,
+            cpf: shippingAddress?.cpf,
+          });
+          const redirectUrl = res?.checkoutUrl || res?.paymentUrl || res?.url;
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+            return;
+          }
+          // Fallback: se não veio URL, ir para sucesso
+          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+        } catch (err: any) {
+          console.error('Erro ao criar pagamento por boleto:', err);
+          const msg = err?.response?.data?.message || err?.message || 'Erro ao iniciar pagamento por boleto';
+          alert(msg);
+          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+        }
+      } else {
+        // Para outros métodos, redirecionar para página de confirmação
+        router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+      }
     } catch (error: any) {
       console.error('Erro ao finalizar pedido:', error);
-      alert(error.response?.data?.message || 'Erro ao processar pedido. Tente novamente.');
+      console.error('Detalhes do erro:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      
+      // Extrair mensagem de erro mais detalhada
+      let errorMessage = 'Erro ao processar pedido. Tente novamente.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`Erro: ${errorMessage}`);
       setIsProcessing(false);
     } finally {
       setIsProcessing(false);
@@ -919,12 +1034,12 @@ export default function CheckoutPage() {
                       >
                         Mudar &gt;
                       </button>
-                      </div>
+                    </div>
 
                     {isLoadingUserData ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
-                    </div>
+                      </div>
                     ) : (
                       <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
                         <div className="flex items-start justify-between">
@@ -934,7 +1049,7 @@ export default function CheckoutPage() {
                               {shippingAddress.phone && (
                                 <span className="text-gray-600">{shippingAddress.phone}</span>
                               )}
-                  </div>
+                            </div>
                             <p className="text-sm text-gray-700 mb-1">
                               {shippingAddress.address ? (
                                 <>
@@ -956,79 +1071,23 @@ export default function CheckoutPage() {
                               Brazil
                               {shippingAddress.zipCode && ` ${shippingAddress.zipCode.replace(/(\d{5})(\d{3})/, '$1-$2')}`}
                             </p>
-                    </div>
+                          </div>
+                        </div>
 
-                    <div>
-                      <Label htmlFor="phone">Telefone *</Label>
-                      <Input
-                        id="phone"
-                        value={shippingAddress.phone}
-                        onChange={(e) => {
-                          const formatted = formatPhone(e.target.value);
-                          setShippingAddress({ ...shippingAddress, phone: formatted });
-                          setPhoneError('');
-                          
-                          // Validar ao perder o foco ou quando tiver 14 ou 15 caracteres (com formatação)
-                          if (formatted.replace(/\D/g, '').length >= 10) {
-                            if (!validatePhone(formatted)) {
-                              setPhoneError('Telefone inválido. Use o formato (11) 99999-9999');
-                            }
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const phone = e.target.value;
-                          if (phone && phone.replace(/\D/g, '').length >= 10) {
-                            if (!validatePhone(phone)) {
-                              setPhoneError('Telefone inválido. Use o formato (11) 99999-9999');
-                            } else {
-                              setPhoneError('');
-                            }
-                          }
-                        }}
-                        placeholder="(11) 99999-9999"
-                        className={`mt-1 ${phoneError ? 'border-red-500' : ''}`}
-                        maxLength={15}
-                      />
-                      {phoneError && (
-                        <p className="text-sm text-red-600 mt-1">{phoneError}</p>
-                      )}
-                    </div>
+                        {shippingAddress.phone && (
+                          <div>
+                            <Label className="text-sm font-semibold text-gray-700">Telefone</Label>
+                            <p className="text-sm text-gray-900 mt-1">{shippingAddress.phone}</p>
+                          </div>
+                        )}
 
-                    <div>
-                      <Label htmlFor="cpf">CPF *</Label>
-                      <Input
-                        id="cpf"
-                        value={shippingAddress.cpf}
-                        onChange={(e) => {
-                          const formatted = formatCPF(e.target.value);
-                          setShippingAddress({ ...shippingAddress, cpf: formatted });
-                          setCpfError('');
-                          
-                          // Validar quando tiver 14 caracteres (com formatação)
-                          if (formatted.replace(/\D/g, '').length === 11) {
-                            if (!validateCPF(formatted)) {
-                              setCpfError('CPF inválido. Verifique os dígitos');
-                            }
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const cpf = e.target.value;
-                          if (cpf && cpf.replace(/\D/g, '').length === 11) {
-                            if (!validateCPF(cpf)) {
-                              setCpfError('CPF inválido. Verifique os dígitos');
-                            } else {
-                              setCpfError('');
-                            }
-                          }
-                        }}
-                        placeholder="000.000.000-00"
-                        className={`mt-1 ${cpfError ? 'border-red-500' : ''}`}
-                        maxLength={14}
-                      />
-                      {cpfError && (
-                        <p className="text-sm text-red-600 mt-1">{cpfError}</p>
-                      )}
-                    </div>
+                        {shippingAddress.cpf && (
+                          <div>
+                            <Label className="text-sm font-semibold text-gray-700">CPF</Label>
+                            <p className="text-sm text-gray-900 mt-1">{shippingAddress.cpf}</p>
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     {/* Mensagem Informativa */}
@@ -1037,7 +1096,7 @@ export default function CheckoutPage() {
                         Para assegurar a entrada de seu pedido no Brasil, confirme a validade e regularidade do CPF registrado na plataforma e certifique-se de que o nome do destinatário informado é igual ao do CPF, sem abreviações. Seu endereço deve estar completo.
                       </p>
                     </div>
-                    </div>
+                  </div>
 
                   <div className="flex justify-end pt-4">
                     <Button
@@ -1469,7 +1528,7 @@ export default function CheckoutPage() {
                       <Checkbox
                         id="insurance"
                         checked={shippingInsurance}
-                        onChange={(e) => setShippingInsurance(e.target.checked)}
+                        onCheckedChange={(checked) => setShippingInsurance(checked === true)}
                       />
                       <Label htmlFor="insurance" className="cursor-pointer">
                         <span className="font-semibold">Seguro de envio</span>
