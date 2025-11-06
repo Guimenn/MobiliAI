@@ -52,12 +52,42 @@ export class NotificationsService {
   }
 
   async getUnreadCount(userId: string) {
-    return this.prisma.notification.count({
-      where: {
-        userId,
-        isRead: false,
-      },
-    });
+    try {
+      // Tentar garantir conexão antes de fazer query
+      await this.prisma.$connect();
+      
+      return await this.prisma.notification.count({
+        where: {
+          userId,
+          isRead: false,
+        },
+      });
+    } catch (error: any) {
+      // Em caso de erro de conexão, tentar reconectar e tentar novamente
+      if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
+        try {
+          console.warn('Erro de conexão ao buscar notificações, tentando reconectar...');
+          await this.prisma.$disconnect();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await this.prisma.$connect();
+          
+          return await this.prisma.notification.count({
+            where: {
+              userId,
+              isRead: false,
+            },
+          });
+        } catch (retryError) {
+          console.error('Erro ao reconectar:', retryError);
+          // Retornar 0 em vez de lançar erro para evitar quebrar o frontend
+          return 0;
+        }
+      }
+      
+      // Em caso de outros erros, retornar 0 em vez de lançar erro
+      console.error('Erro ao buscar contagem de notificações:', error);
+      return 0;
+    }
   }
 
   async markAsRead(notificationId: string, userId: string) {

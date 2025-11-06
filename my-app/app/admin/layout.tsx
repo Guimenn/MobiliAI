@@ -17,7 +17,8 @@ import {
   LogOut, 
   Menu,
   Bell,
-  Search
+  Search,
+  Truck
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -79,6 +80,7 @@ export default function AdminLayout({
     { name: 'Usuários', href: '/admin/users', icon: Users, current: pathname.startsWith('/admin/users') },
     { name: 'Produtos', href: '/admin/products', icon: Package, current: pathname.startsWith('/admin/products') },
     { name: 'Vendas', href: '/admin/sales', icon: ShoppingCart, current: pathname.startsWith('/admin/sales') },
+    { name: 'Pedidos Online', href: '/admin/orders-online', icon: Truck, current: pathname.startsWith('/admin/orders-online') },
     { name: 'Clientes', href: '/admin/customers', icon: User, current: pathname.startsWith('/admin/customers') },
     { name: 'Relatórios', href: '/admin/reports', icon: BarChart3, current: pathname.startsWith('/admin/reports') },
     { name: 'Configurações', href: '/admin/settings', icon: Settings, current: pathname.startsWith('/admin/settings') },

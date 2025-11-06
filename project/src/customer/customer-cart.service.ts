@@ -229,7 +229,17 @@ export class CustomerCartService {
 
   // ==================== FINALIZAÇÃO DO CARRINHO ====================
 
-  async checkout(customerId: string, storeId: string) {
+  async checkout(
+    customerId: string, 
+    storeId: string,
+    shippingInfo?: {
+      address: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      phone?: string;
+    }
+  ) {
     // Validar carrinho
     const validation = await this.validateCart(customerId);
     
@@ -243,6 +253,7 @@ export class CustomerCartService {
 
     // Criar venda
     const totalAmount = validation.totalPrice;
+    const isOnlineOrder = !!shippingInfo;
     
     const sale = await this.prisma.sale.create({
       data: {
@@ -253,8 +264,14 @@ export class CustomerCartService {
         totalAmount,
         discount: 0,
         tax: 0,
-        status: 'PENDING',
+        status: isOnlineOrder ? 'PENDING' : 'PENDING',
         paymentMethod: 'PIX',
+        isOnlineOrder,
+        shippingAddress: shippingInfo?.address,
+        shippingCity: shippingInfo?.city,
+        shippingState: shippingInfo?.state,
+        shippingZipCode: shippingInfo?.zipCode,
+        shippingPhone: shippingInfo?.phone,
         items: {
           create: validation.validItems.map(item => ({
             product: { connect: { id: item.productId } },

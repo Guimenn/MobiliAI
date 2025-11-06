@@ -131,12 +131,40 @@ export class AuthService {
   }
 
   async findUserById(id: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ 
-      where: { id },
-      include: {
-        store: true,
-      },
-    });
+    try {
+      // Tentar garantir conexão antes de fazer query
+      await this.prisma.$connect();
+      
+      return await this.prisma.user.findUnique({ 
+        where: { id },
+        include: {
+          store: true,
+        },
+      });
+    } catch (error: any) {
+      // Em caso de erro de conexão, tentar reconectar e tentar novamente
+      if (error.code === 'P1017' || error.message?.includes('Server has closed the connection') || error.message?.includes('db_termination')) {
+        try {
+          console.warn('Erro de conexão ao buscar usuário, tentando reconectar...');
+          await this.prisma.$disconnect();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await this.prisma.$connect();
+          
+          return await this.prisma.user.findUnique({ 
+            where: { id },
+            include: {
+              store: true,
+            },
+          });
+        } catch (retryError) {
+          console.error('Erro ao reconectar:', retryError);
+          // Retornar null em vez de lançar erro para evitar quebrar a autenticação
+          return null;
+        }
+      }
+      // Re-lançar outros erros
+      throw error;
+    }
   }
 
   async checkEmailExists(email: string): Promise<{ exists: boolean }> {

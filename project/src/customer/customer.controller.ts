@@ -11,7 +11,7 @@ import { UserRole } from '@prisma/client';
 
 @Controller('customer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.CUSTOMER)
+@Roles(UserRole.CUSTOMER, UserRole.ADMIN)
 export class CustomerController {
   constructor(
     private readonly customerService: CustomerService,
@@ -156,8 +156,26 @@ export class CustomerController {
   }
 
   @Post('cart/checkout')
-  async checkout(@Request() req, @Body() data: { storeId: string }) {
-    return this.customerCartService.checkout(req.user.id, data.storeId);
+  async checkout(
+    @Request() req, 
+    @Body() data: { 
+      storeId: string;
+      shippingAddress?: string;
+      shippingCity?: string;
+      shippingState?: string;
+      shippingZipCode?: string;
+      shippingPhone?: string;
+    }
+  ) {
+    const shippingInfo = data.shippingAddress ? {
+      address: data.shippingAddress,
+      city: data.shippingCity || '',
+      state: data.shippingState || '',
+      zipCode: data.shippingZipCode || '',
+      phone: data.shippingPhone
+    } : undefined;
+    
+    return this.customerCartService.checkout(req.user.id, data.storeId, shippingInfo);
   }
 
   // ==================== FAVORITOS ====================

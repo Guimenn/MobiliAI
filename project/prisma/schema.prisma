@@ -156,6 +156,16 @@ model Sale {
   employeeId       String
   storeId          String
   dailyCashId      String?
+  // Campos para pedidos online
+  isOnlineOrder    Boolean         @default(false)
+  shippingAddress  String?
+  shippingCity     String?
+  shippingState    String?
+  shippingZipCode  String?
+  shippingPhone    String?
+  trackingCode     String?
+  shippedAt        DateTime?
+  deliveredAt      DateTime?
   reviews          ProductReview[]
   items            SaleItem[]
   customer         User?           @relation("CustomerSales", fields: [customerId], references: [id])
@@ -572,6 +582,8 @@ enum SaleStatus {
   COMPLETED
   CANCELLED
   REFUNDED
+  PREPARING
+  SHIPPED
   DELIVERED
 }
 

@@ -528,9 +528,17 @@ export default function EmployeeDashboard() {
                       </p>
                       <Button
                         onClick={() => router.push('/employee/sales')}
-                        className="bg-white text-[#3e2626] hover:bg-white/90 w-full font-semibold"
+                        className="bg-white text-[#3e2626] hover:bg-white/90 w-full font-semibold mb-2"
                       >
                         Criar Venda
+                      </Button>
+                      <Button
+                        onClick={() => router.push('/employee/orders-online')}
+                        variant="outline"
+                        className="bg-white/10 text-white border-white/30 hover:bg-white/20 w-full font-semibold"
+                      >
+                        <Truck className="h-4 w-4 mr-2" />
+                        Pedidos Online
                       </Button>
                     </div>
                   </div>

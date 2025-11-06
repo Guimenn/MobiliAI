@@ -535,8 +535,14 @@ export const adminAPI = {
   },
 
   // Products
-  getProducts: async () => {
-    const response = await api.get('/admin/products');
+  getProducts: async (page: number = 1, limit: number = 50, search?: string, category?: string) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(search && { search }),
+      ...(category && { category })
+    });
+    const response = await api.get(`/admin/products?${params.toString()}`);
     return response.data;
   },
 
@@ -803,6 +809,27 @@ export const managerAPI = {
     return response.data;
   },
 
+  // Online Orders (apenas da loja do gerente)
+  getStoreOnlineOrders: async (page: number = 1, limit: number = 50, status?: string) => {
+    const params: any = { page, limit };
+    if (status) params.status = status;
+    const response = await api.get('/manager/orders-online', { params });
+    return response.data;
+  },
+
+  getStoreOnlineOrderById: async (orderId: string) => {
+    const response = await api.get(`/manager/orders-online/${orderId}`);
+    return response.data;
+  },
+
+  updateStoreOnlineOrderStatus: async (orderId: string, status: string, trackingCode?: string) => {
+    const response = await api.put(`/manager/orders-online/${orderId}/status`, {
+      status,
+      trackingCode
+    });
+    return response.data;
+  },
+
   // Inventory
   getInventoryStatus: async () => {
     const response = await api.get('/manager/inventory/status');
@@ -919,9 +946,13 @@ export const customerAPI = {
   },
 
   // Pedidos
-  getOrders: async (page = 1, limit = 10) => {
+  getOrders: async (page = 1, limit = 10, status?: string) => {
+    const params: any = { page, limit };
+    if (status) {
+      params.status = status;
+    }
     const response = await api.get('/customer/orders', {
-      params: { page, limit }
+      params
     });
     return response.data;
   },
@@ -939,8 +970,11 @@ export const customerAPI = {
   // Checkout
   checkout: async (checkoutData: {
     storeId: string;
-    paymentMethod?: string;
-    shippingAddress?: any;
+    shippingAddress?: string;
+    shippingCity?: string;
+    shippingState?: string;
+    shippingZipCode?: string;
+    shippingPhone?: string;
     notes?: string;
   }) => {
     const response = await api.post('/customer/cart/checkout', checkoutData);
@@ -1137,6 +1171,30 @@ export const notificationsAPI = {
 
   delete: async (notificationId: string) => {
     const response = await api.delete(`/notifications/${notificationId}`);
+    return response.data;
+  },
+};
+
+// Employee API
+export const employeeAPI = {
+  // Online Orders (apenas da loja do funcionário)
+  getStoreOnlineOrders: async (page: number = 1, limit: number = 50, status?: string) => {
+    const params: any = { page, limit };
+    if (status) params.status = status;
+    const response = await api.get('/employee/orders-online', { params });
+    return response.data;
+  },
+
+  getStoreOnlineOrderById: async (orderId: string) => {
+    const response = await api.get(`/employee/orders-online/${orderId}`);
+    return response.data;
+  },
+
+  updateStoreOnlineOrderStatus: async (orderId: string, status: string, trackingCode?: string) => {
+    const response = await api.put(`/employee/orders-online/${orderId}/status`, {
+      status,
+      trackingCode
+    });
     return response.data;
   },
 };

@@ -40,54 +40,124 @@ export class PublicProductsService {
         if (maxPrice !== undefined) where.price.lte = maxPrice;
       }
 
-      const [products, total] = await Promise.all([
-        this.prisma.product.findMany({
-          where,
-          skip,
-          take: limit,
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            category: true,
-            price: true,
-            stock: true,
-            colorName: true,
-            colorHex: true,
-            brand: true,
-            style: true,
-            material: true,
-            width: true,
-            height: true,
-            depth: true,
-            weight: true,
-            imageUrls: true,
-            videoUrl: true,
-            tags: true,
-            keywords: true,
-            isFeatured: true,
-            isNew: true,
-            isBestSeller: true,
-            rating: true,
-            reviewCount: true,
-            store: { 
-              select: { 
-                id: true,
-                name: true, 
-                address: true 
-              } 
-            }
-          },
-          orderBy: [
-            { isFeatured: 'desc' },
-            { isNew: 'desc' },
-            { isBestSeller: 'desc' },
-            { rating: 'desc' },
-            { createdAt: 'desc' }
-          ]
-        }),
-        this.prisma.product.count({ where })
-      ]);
+      // Tentar executar com retry em caso de erro de conexão
+      let products, total;
+      
+      try {
+        [products, total] = await Promise.all([
+          this.prisma.product.findMany({
+            where,
+            skip,
+            take: limit,
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              category: true,
+              price: true,
+              stock: true,
+              colorName: true,
+              colorHex: true,
+              brand: true,
+              style: true,
+              material: true,
+              width: true,
+              height: true,
+              depth: true,
+              weight: true,
+              imageUrls: true,
+              videoUrl: true,
+              tags: true,
+              keywords: true,
+              isFeatured: true,
+              isNew: true,
+              isBestSeller: true,
+              rating: true,
+              reviewCount: true,
+              store: { 
+                select: { 
+                  id: true,
+                  name: true, 
+                  address: true 
+                } 
+              }
+            },
+            orderBy: [
+              { isFeatured: 'desc' },
+              { isNew: 'desc' },
+              { isBestSeller: 'desc' },
+              { rating: 'desc' },
+              { createdAt: 'desc' }
+            ]
+          }),
+          this.prisma.product.count({ where })
+        ]);
+      } catch (dbError: any) {
+        // Se for erro de conexão, tentar reconectar e tentar novamente
+        if (dbError.code === 'P1017' || dbError.message?.includes('Server has closed the connection') || dbError.message?.includes('db_termination')) {
+          console.warn('Erro de conexão detectado, tentando reconectar...');
+          try {
+            await this.prisma.$disconnect();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await this.prisma.$connect();
+            
+            // Tentar novamente após reconectar
+            [products, total] = await Promise.all([
+              this.prisma.product.findMany({
+                where,
+                skip,
+                take: limit,
+                select: {
+                  id: true,
+                  name: true,
+                  description: true,
+                  category: true,
+                  price: true,
+                  stock: true,
+                  colorName: true,
+                  colorHex: true,
+                  brand: true,
+                  style: true,
+                  material: true,
+                  width: true,
+                  height: true,
+                  depth: true,
+                  weight: true,
+                  imageUrls: true,
+                  videoUrl: true,
+                  tags: true,
+                  keywords: true,
+                  isFeatured: true,
+                  isNew: true,
+                  isBestSeller: true,
+                  rating: true,
+                  reviewCount: true,
+                  store: { 
+                    select: { 
+                      id: true,
+                      name: true, 
+                      address: true 
+                    } 
+                  }
+                },
+                orderBy: [
+                  { isFeatured: 'desc' },
+                  { isNew: 'desc' },
+                  { isBestSeller: 'desc' },
+                  { rating: 'desc' },
+                  { createdAt: 'desc' }
+                ]
+              }),
+              this.prisma.product.count({ where })
+            ]);
+          } catch (retryError) {
+            console.error('Erro ao reconectar:', retryError);
+            throw dbError; // Lançar o erro original
+          }
+        } else {
+          throw dbError;
+        }
+      }
 
       return {
         products,
@@ -98,7 +168,7 @@ export class PublicProductsService {
           pages: Math.ceil(total / limit)
         }
       };
-    } catch (error) {
+    } catch (error: any) {
       // Em caso de erro de conexão com o banco, retornar estrutura vazia
       // para evitar quebrar o frontend
       console.error('Erro ao buscar produtos:', error);
@@ -115,83 +185,219 @@ export class PublicProductsService {
   }
 
   async getProductById(productId: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { 
-        id: productId,
-        isActive: true 
-      },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        category: true,
-        price: true,
-        stock: true,
-        colorName: true,
-        colorHex: true,
-        brand: true,
-        style: true,
-        material: true,
-        width: true,
-        height: true,
-        depth: true,
-        weight: true,
-        imageUrls: true,
-        videoUrl: true,
-        tags: true,
-        keywords: true,
-        isFeatured: true,
-        isNew: true,
-        isBestSeller: true,
-        rating: true,
-        reviewCount: true,
-        store: { 
-          select: { 
-            id: true,
-            name: true, 
-            address: true 
-          } 
+    try {
+      // Tentar garantir conexão antes de fazer query
+      await this.prisma.$connect();
+      
+      const product = await this.prisma.product.findUnique({
+        where: { 
+          id: productId,
+          isActive: true 
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          category: true,
+          price: true,
+          stock: true,
+          colorName: true,
+          colorHex: true,
+          brand: true,
+          style: true,
+          material: true,
+          width: true,
+          height: true,
+          depth: true,
+          weight: true,
+          imageUrls: true,
+          videoUrl: true,
+          tags: true,
+          keywords: true,
+          isFeatured: true,
+          isNew: true,
+          isBestSeller: true,
+          rating: true,
+          reviewCount: true,
+          store: { 
+            select: { 
+              id: true,
+              name: true, 
+              address: true 
+            } 
+          }
+        }
+      });
+
+      if (!product) {
+        throw new Error('Produto não encontrado');
+      }
+
+      return product;
+    } catch (error: any) {
+      // Em caso de erro de conexão, tentar reconectar e tentar novamente
+      if (error.code === 'P1017' || error.message?.includes('Server has closed the connection') || error.message?.includes('db_termination')) {
+        try {
+          console.warn('Erro de conexão ao buscar produto, tentando reconectar...');
+          await this.prisma.$disconnect();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await this.prisma.$connect();
+          
+          const product = await this.prisma.product.findUnique({
+            where: { 
+              id: productId,
+              isActive: true 
+            },
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              category: true,
+              price: true,
+              stock: true,
+              colorName: true,
+              colorHex: true,
+              brand: true,
+              style: true,
+              material: true,
+              width: true,
+              height: true,
+              depth: true,
+              weight: true,
+              imageUrls: true,
+              videoUrl: true,
+              tags: true,
+              keywords: true,
+              isFeatured: true,
+              isNew: true,
+              isBestSeller: true,
+              rating: true,
+              reviewCount: true,
+              store: { 
+                select: { 
+                  id: true,
+                  name: true, 
+                  address: true 
+                } 
+              }
+            }
+          });
+
+          if (!product) {
+            throw new Error('Produto não encontrado');
+          }
+
+          return product;
+        } catch (retryError) {
+          console.error('Erro ao reconectar:', retryError);
+          throw new Error('Erro ao buscar produto. Tente novamente mais tarde.');
         }
       }
-    });
-
-    if (!product) {
-      throw new Error('Produto não encontrado');
+      
+      // Re-lançar outros erros
+      throw error;
     }
-
-    return product;
   }
 
   async getProductReviews(productId: string, page = 1, limit = 10) {
-    const skip = (page - 1) * limit;
+    try {
+      const skip = (page - 1) * limit;
 
-    const [reviews, total] = await Promise.all([
-      this.prisma.productReview.findMany({
-        where: { productId },
-        skip,
-        take: limit,
-        include: {
-          user: { 
-            select: { 
-              name: true,
-              avatarUrl: true
-            } 
-          }
-        },
-        orderBy: { createdAt: 'desc' }
-      }),
-      this.prisma.productReview.count({ where: { productId } })
-    ]);
+      // Tentar garantir conexão antes de fazer query
+      await this.prisma.$connect();
 
-    return {
-      reviews,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
+      const [reviews, total] = await Promise.all([
+        this.prisma.productReview.findMany({
+          where: { productId },
+          skip,
+          take: limit,
+          include: {
+            user: { 
+              select: { 
+                name: true,
+                avatarUrl: true
+              } 
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        }),
+        this.prisma.productReview.count({ where: { productId } })
+      ]);
+
+      return {
+        reviews,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error: any) {
+      // Em caso de erro de conexão, tentar reconectar e tentar novamente
+      if (error.code === 'P1017' || error.message?.includes('Server has closed the connection') || error.message?.includes('db_termination')) {
+        try {
+          console.warn('Erro de conexão ao buscar reviews, tentando reconectar...');
+          await this.prisma.$disconnect();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await this.prisma.$connect();
+          
+          const skip = (page - 1) * limit;
+          
+          const [reviews, total] = await Promise.all([
+            this.prisma.productReview.findMany({
+              where: { productId },
+              skip,
+              take: limit,
+              include: {
+                user: { 
+                  select: { 
+                    name: true,
+                    avatarUrl: true
+                  } 
+                }
+              },
+              orderBy: { createdAt: 'desc' }
+            }),
+            this.prisma.productReview.count({ where: { productId } })
+          ]);
+
+          return {
+            reviews,
+            pagination: {
+              page,
+              limit,
+              total,
+              pages: Math.ceil(total / limit)
+            }
+          };
+        } catch (retryError) {
+          console.error('Erro ao reconectar:', retryError);
+          // Retornar estrutura vazia em vez de lançar erro para evitar quebrar o frontend
+          return {
+            reviews: [],
+            pagination: {
+              page,
+              limit,
+              total: 0,
+              pages: 0
+            }
+          };
+        }
       }
-    };
+      
+      // Em caso de outros erros, retornar estrutura vazia
+      console.error('Erro ao buscar reviews:', error);
+      return {
+        reviews: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          pages: 0
+        }
+      };
+    }
   }
 }
 

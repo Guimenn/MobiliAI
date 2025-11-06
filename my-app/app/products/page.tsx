@@ -915,18 +915,31 @@ export default function ProductsPage() {
                           </div>
 
                           {/* Rating */}
-                          {rating > 0 && (
+                          {(rating > 0 || reviews > 0) && (
                             <div className="flex items-center gap-2">
-                              <div className="flex items-center">
-                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                <span className="text-sm font-medium text-gray-900 ml-1">
-                                  {rating.toFixed(1)}
-                                </span>
-                              </div>
-                              {reviews > 0 && (
-                                <span className="text-xs text-gray-500">
-                                  ({reviews > 1000 ? `${(reviews / 1000).toFixed(1)}k` : reviews} {reviews === 1 ? 'avaliação' : 'avaliações'})
-                                </span>
+                              {rating > 0 ? (
+                                <>
+                                  <div className="flex items-center">
+                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                    <span className="text-sm font-medium text-gray-900 ml-1">
+                                      {rating.toFixed(1)}
+                                    </span>
+                                  </div>
+                                  {reviews > 0 && (
+                                    <span className="text-xs text-gray-500">
+                                      ({reviews > 1000 ? `${(reviews / 1000).toFixed(1)}k` : reviews} {reviews === 1 ? 'avaliação' : 'avaliações'})
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                reviews > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    <Star className="h-4 w-4 text-gray-300" />
+                                    <span className="text-xs text-gray-500">
+                                      {reviews > 1000 ? `${(reviews / 1000).toFixed(1)}k` : reviews} {reviews === 1 ? 'avaliação' : 'avaliações'}
+                                    </span>
+                                  </div>
+                                )
                               )}
                             </div>
                           )}
