@@ -42,6 +42,7 @@ model User {
   reports           Report[]
   purchases         Sale[]              @relation("CustomerSales")
   sales             Sale[]              @relation("EmployeeSales")
+  shippingAddresses ShippingAddress[]
   systemLogs        SystemLog[]
   timeClockRecords  TimeClock[]
   store             Store?              @relation(fields: [storeId], references: [id])
@@ -611,6 +612,28 @@ enum MaterialType {
   METAL
   COURO
   TECIDO
+}
+
+model ShippingAddress {
+  id           String   @id @default(uuid())
+  name         String   // Nome do endereço (ex: "Casa", "Trabalho", "Casa da Mãe")
+  recipientName String   // Nome do destinatário
+  phone        String
+  cpf          String?
+  address      String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String
+  zipCode      String
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("shipping_addresses")
 }
 
 enum NotificationType {

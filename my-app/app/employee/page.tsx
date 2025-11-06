@@ -19,6 +19,7 @@ import {
   Loader2,
   User,
   AlertTriangle,
+  Truck,
 } from 'lucide-react';
 
 interface TimeClockEntry {
@@ -335,7 +336,7 @@ export default function EmployeeDashboard() {
                 <div className="mt-8">
                   <Button
                     onClick={handleBaterPonto}
-                    className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white px-12 py-6 text-xl font-bold rounded-2xl shadow-xl flex items-center space-x-3 mx-auto transform hover:scale-105 transition-all duration-300"
+                    className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white px-12 py-6 text-xl font-bold rounded-2xl shadow-xl flex items-center space-x-3 mx-auto transform hover:scale-105 transition-all duration-300"
                     size="lg"
                   >
                     <Clock className="h-6 w-6" />
@@ -386,7 +387,7 @@ export default function EmployeeDashboard() {
       {/* Seção de Vendas */}
       <div className="space-y-6">
         <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white">
+          <CardHeader className="bg-[#3e2626] text-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
@@ -481,7 +482,7 @@ export default function EmployeeDashboard() {
                     salesHistory.map((sale, index) => (
                       <div key={index} className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl hover:shadow-md transition-all">
                         <div className="flex items-center space-x-3 flex-1">
-                          <div className="w-10 h-10 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-lg flex items-center justify-center">
+                          <div className="w-10 h-10 bg-[#3e2626] rounded-lg flex items-center justify-center">
                             <ShoppingCart className="h-5 w-5 text-white" />
                           </div>
                           <div className="flex-1">
@@ -515,7 +516,7 @@ export default function EmployeeDashboard() {
               </Card>
 
               {/* Ação Rápida - Nova Venda */}
-              <Card className="bg-gradient-to-br from-[#3e2626] to-[#8B4513] text-white border-0 shadow-xl">
+              <Card className="bg-[#3e2626] text-white border-0 shadow-xl">
                 <CardContent className="p-6">
                   <div className="text-center space-y-4">
                     <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto">

@@ -2,10 +2,22 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 export interface CheckboxProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {}
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'onChange'> {
+  onCheckedChange?: (checked: boolean) => void
+}
 
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, ...props }, ref) => {
+  ({ className, onCheckedChange, ...props }, ref) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (onCheckedChange) {
+        onCheckedChange(e.target.checked)
+      }
+      // Também chamar onChange original se existir
+      if (props.onChange) {
+        props.onChange(e)
+      }
+    }
+
     return (
       <input
         type="checkbox"
@@ -15,6 +27,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         )}
         ref={ref}
         {...props}
+        onChange={handleChange}
       />
     )
   }

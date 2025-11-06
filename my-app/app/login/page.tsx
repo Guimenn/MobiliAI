@@ -305,6 +305,7 @@ export default function LoginPage() {
             password: userInput,
             name: credentials.name,
             phone: credentials.phone || undefined,
+            cpf: credentials.cpf || undefined,
             address: credentials.address || undefined,
             city: credentials.city || undefined,
             state: credentials.state || undefined,

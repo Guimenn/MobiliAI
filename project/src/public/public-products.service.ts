@@ -6,7 +6,7 @@ import { ProductCategory } from '@prisma/client';
 export class PublicProductsService {
   constructor(private prisma: PrismaService) {}
 
-  async getProducts(page = 1, limit = 50, search = '', category?: string, minPrice?: number, maxPrice?: number) {
+  async getProducts(page = 1, limit = 50, search = '', category?: string, minPrice?: number, maxPrice?: number, storeId?: string) {
     try {
       const skip = (page - 1) * limit;
       
@@ -14,6 +14,11 @@ export class PublicProductsService {
         isActive: true,
         // Permitir produtos mesmo com estoque 0 para visualização
       };
+      
+      // Filtrar por loja se storeId for fornecido
+      if (storeId) {
+        where.storeId = storeId;
+      }
       
       if (search) {
         where.OR = [
