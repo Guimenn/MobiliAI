@@ -224,9 +224,8 @@ export default function Header() {
             if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
                 try {
                     const response = await customerAPI.getFavoritesCount();
-                    console.log('🔍 Response completa da API:', response);
                     
-                    // A API retorna um número direto do Prisma
+                    // A API retorna um número direto do Prisma ou 0 em caso de erro de rede
                     let count = 0;
                     if (typeof response === 'number') {
                         count = response;
@@ -243,15 +242,16 @@ export default function Header() {
                         }
                     }
                     
-                    console.log('✅ Favoritos count processado:', count, '| User:', user?.name, '| Role:', user?.role);
                     setFavoritesCount(count);
                 } catch (error: any) {
-                    console.error('❌ Erro ao buscar contador de favoritos:', error);
-                    console.error('Erro detalhes:', error?.response?.data || error?.message);
+                    // Erro já tratado na função getFavoritesCount, apenas definir como 0
+                    // Não logar erro de rede para não poluir o console
+                    if (error?.message !== 'Network Error') {
+                        console.error('❌ Erro ao buscar contador de favoritos:', error);
+                    }
                     setFavoritesCount(0);
                 }
             } else {
-                console.log('⚠️ Usuário não autenticado como CUSTOMER. Auth:', isAuthenticated, 'Role:', user?.role);
                 setFavoritesCount(0);
             }
         };

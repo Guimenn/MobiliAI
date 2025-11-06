@@ -46,6 +46,21 @@ api.interceptors.response.use(
       });
     }
     
+    // Tratar erros de rede (Network Error) em endpoints opcionais de favoritos
+    const isNetworkError = !error.response && error.message === 'Network Error';
+    const isFavoritesCountEndpoint = error.config?.url?.includes('/favorites/count');
+    
+    if (isNetworkError && isFavoritesCountEndpoint) {
+      // Retornar 0 quando houver erro de rede no endpoint de contagem
+      return Promise.resolve({
+        data: 0,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: error.config
+      });
+    }
+    
     // Não fazer logout automático em rotas de auth
     if (error.response?.status === 401 && 
         !error.config?.url?.includes('/auth/')) {
@@ -828,6 +843,12 @@ export const managerAPI = {
 
 // Customer API - Favoritos
 export const customerAPI = {
+  // Perfil
+  getProfile: async () => {
+    const response = await api.get('/customer/profile');
+    return response.data;
+  },
+
   // Favoritos
   getFavorites: async (page = 1, limit = 12) => {
     const response = await api.get('/customer/favorites', {
@@ -855,8 +876,18 @@ export const customerAPI = {
   },
 
   getFavoritesCount: async () => {
-    const response = await api.get('/customer/favorites/count');
-    return response.data;
+    try {
+      const response = await api.get('/customer/favorites/count');
+      return response.data;
+    } catch (error: any) {
+      // Se for erro de rede ou o backend não estiver disponível, retornar 0
+      if (!error.response || error.message === 'Network Error') {
+        console.warn('⚠️ Backend indisponível para contagem de favoritos, retornando 0');
+        return 0;
+      }
+      // Para outros erros, relançar o erro
+      throw error;
+    }
   },
 
   // Carrinho
@@ -958,6 +989,77 @@ export const customerAPI = {
 
   getReviewableProducts: async () => {
     const response = await api.get('/customer/reviews/reviewable');
+    return response.data;
+  },
+
+  // Perfil
+  updateProfile: async (updateData: {
+    name?: string;
+    phone?: string;
+    cpf?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+  }) => {
+    const response = await api.put('/customer/profile', updateData);
+    return response.data;
+  },
+
+  // Endereços de Entrega
+  getShippingAddresses: async () => {
+    const response = await api.get('/customer/shipping-addresses');
+    return response.data;
+  },
+
+  getShippingAddressById: async (addressId: string) => {
+    const response = await api.get(`/customer/shipping-addresses/${addressId}`);
+    return response.data;
+  },
+
+  createShippingAddress: async (addressData: {
+    name: string;
+    recipientName: string;
+    phone: string;
+    cpf?: string;
+    address: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    isDefault?: boolean;
+  }) => {
+    const response = await api.post('/customer/shipping-addresses', addressData);
+    return response.data;
+  },
+
+  updateShippingAddress: async (addressId: string, updateData: {
+    name?: string;
+    recipientName?: string;
+    phone?: string;
+    cpf?: string;
+    address?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    isDefault?: boolean;
+  }) => {
+    const response = await api.put(`/customer/shipping-addresses/${addressId}`, updateData);
+    return response.data;
+  },
+
+  deleteShippingAddress: async (addressId: string) => {
+    const response = await api.delete(`/customer/shipping-addresses/${addressId}`);
+    return response.data;
+  },
+
+  setDefaultShippingAddress: async (addressId: string) => {
+    const response = await api.put(`/customer/shipping-addresses/${addressId}/default`);
     return response.data;
   }
 };

@@ -35,6 +35,7 @@ export class AuthService {
         password: hashedPassword,
         name: userData.name,
         phone: userData.phone,
+        cpf: userData.cpf,
         address: userData.address,
         city: userData.city,
         state: userData.state,

@@ -61,6 +61,10 @@ export class CustomerService {
         email: true,
         phone: true,
         address: true,
+        city: true,
+        state: true,
+        zipCode: true,
+        cpf: true,
         role: true,
         isActive: true,
         createdAt: true
@@ -78,6 +82,10 @@ export class CustomerService {
     name?: string;
     phone?: string;
     address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    cpf?: string;
   }) {
     const customer = await this.prisma.user.findUnique({
       where: { id: customerId }
@@ -96,6 +104,10 @@ export class CustomerService {
         email: true,
         phone: true,
         address: true,
+        city: true,
+        state: true,
+        zipCode: true,
+        cpf: true,
         role: true,
         isActive: true,
         updatedAt: true
@@ -308,5 +320,157 @@ export class CustomerService {
     }
 
     return order;
+  }
+
+  // ==================== ENDEREÇOS DE ENTREGA ====================
+
+  async getShippingAddresses(customerId: string) {
+    return this.prisma.shippingAddress.findMany({
+      where: { userId: customerId },
+      orderBy: [
+        { isDefault: 'desc' },
+        { createdAt: 'desc' }
+      ]
+    });
+  }
+
+  async getShippingAddressById(customerId: string, addressId: string) {
+    const address = await this.prisma.shippingAddress.findUnique({
+      where: { id: addressId }
+    });
+
+    if (!address) {
+      throw new NotFoundException('Endereço não encontrado');
+    }
+
+    if (address.userId !== customerId) {
+      throw new ForbiddenException('Você só pode acessar seus próprios endereços');
+    }
+
+    return address;
+  }
+
+  async createShippingAddress(customerId: string, addressData: {
+    name: string;
+    recipientName: string;
+    phone: string;
+    cpf?: string;
+    address: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    isDefault?: boolean;
+  }) {
+    // Se for o primeiro endereço ou se marcar como padrão, definir como padrão
+    const existingAddresses = await this.prisma.shippingAddress.findMany({
+      where: { userId: customerId }
+    });
+
+    const shouldBeDefault = addressData.isDefault || existingAddresses.length === 0;
+
+    // Se marcar como padrão, remover padrão dos outros
+    if (shouldBeDefault) {
+      await this.prisma.shippingAddress.updateMany({
+        where: { userId: customerId, isDefault: true },
+        data: { isDefault: false }
+      });
+    }
+
+    return this.prisma.shippingAddress.create({
+      data: {
+        ...addressData,
+        userId: customerId,
+        isDefault: shouldBeDefault
+      }
+    });
+  }
+
+  async updateShippingAddress(customerId: string, addressId: string, updateData: {
+    name?: string;
+    recipientName?: string;
+    phone?: string;
+    cpf?: string;
+    address?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    isDefault?: boolean;
+  }) {
+    const address = await this.prisma.shippingAddress.findUnique({
+      where: { id: addressId }
+    });
+
+    if (!address) {
+      throw new NotFoundException('Endereço não encontrado');
+    }
+
+    if (address.userId !== customerId) {
+      throw new ForbiddenException('Você só pode editar seus próprios endereços');
+    }
+
+    // Se marcar como padrão, remover padrão dos outros
+    if (updateData.isDefault) {
+      await this.prisma.shippingAddress.updateMany({
+        where: { userId: customerId, isDefault: true, id: { not: addressId } },
+        data: { isDefault: false }
+      });
+    }
+
+    return this.prisma.shippingAddress.update({
+      where: { id: addressId },
+      data: updateData
+    });
+  }
+
+  async deleteShippingAddress(customerId: string, addressId: string) {
+    const address = await this.prisma.shippingAddress.findUnique({
+      where: { id: addressId }
+    });
+
+    if (!address) {
+      throw new NotFoundException('Endereço não encontrado');
+    }
+
+    if (address.userId !== customerId) {
+      throw new ForbiddenException('Você só pode deletar seus próprios endereços');
+    }
+
+    await this.prisma.shippingAddress.delete({
+      where: { id: addressId }
+    });
+
+    return { message: 'Endereço deletado com sucesso' };
+  }
+
+  async setDefaultShippingAddress(customerId: string, addressId: string) {
+    const address = await this.prisma.shippingAddress.findUnique({
+      where: { id: addressId }
+    });
+
+    if (!address) {
+      throw new NotFoundException('Endereço não encontrado');
+    }
+
+    if (address.userId !== customerId) {
+      throw new ForbiddenException('Você só pode definir seus próprios endereços como padrão');
+    }
+
+    // Remover padrão dos outros
+    await this.prisma.shippingAddress.updateMany({
+      where: { userId: customerId, isDefault: true },
+      data: { isDefault: false }
+    });
+
+    // Definir este como padrão
+    return this.prisma.shippingAddress.update({
+      where: { id: addressId },
+      data: { isDefault: true }
+    });
   }
 }

@@ -281,4 +281,36 @@ export class CustomerController {
   async getReviewableProducts(@Request() req) {
     return this.customerOrdersService.getReviewableProducts(req.user.id);
   }
+
+  // ==================== ENDEREÇOS DE ENTREGA ====================
+
+  @Get('shipping-addresses')
+  async getShippingAddresses(@Request() req) {
+    return this.customerService.getShippingAddresses(req.user.id);
+  }
+
+  @Get('shipping-addresses/:id')
+  async getShippingAddressById(@Request() req, @Param('id') addressId: string) {
+    return this.customerService.getShippingAddressById(req.user.id, addressId);
+  }
+
+  @Post('shipping-addresses')
+  async createShippingAddress(@Request() req, @Body() addressData: any) {
+    return this.customerService.createShippingAddress(req.user.id, addressData);
+  }
+
+  @Put('shipping-addresses/:id')
+  async updateShippingAddress(@Request() req, @Param('id') addressId: string, @Body() updateData: any) {
+    return this.customerService.updateShippingAddress(req.user.id, addressId, updateData);
+  }
+
+  @Delete('shipping-addresses/:id')
+  async deleteShippingAddress(@Request() req, @Param('id') addressId: string) {
+    return this.customerService.deleteShippingAddress(req.user.id, addressId);
+  }
+
+  @Put('shipping-addresses/:id/default')
+  async setDefaultShippingAddress(@Request() req, @Param('id') addressId: string) {
+    return this.customerService.setDefaultShippingAddress(req.user.id, addressId);
+  }
 }
