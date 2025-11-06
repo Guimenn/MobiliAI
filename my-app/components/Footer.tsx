@@ -20,7 +20,7 @@ export default function Footer() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 items-start">
             {/* Brand Section */}
             <div className="md:col-span-1 flex flex-col">
-              <div className="w-full h-20 bg-cover bg-center bg-no-repeat mb-12 translate-x-[-30px]"
+              <div className="w-full h-25 bg-cover bg-center bg-no-repeat mb-6 translate-x-[-30px]"
           style={{ backgroundImage: 'url(/logotipos/11.svg)' }}>
                
               </div>
