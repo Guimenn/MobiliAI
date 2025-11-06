@@ -357,6 +357,36 @@ export class AdminController {
     return this.adminService.getAllSales(req.user.id);
   }
 
+  // ==================== PEDIDOS ONLINE ====================
+
+  @Get('orders-online')
+  async getOnlineOrders(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '50',
+    @Query('status') status?: string,
+    @Query('storeId') storeId?: string
+  ) {
+    return this.adminService.getOnlineOrders(
+      parseInt(page),
+      parseInt(limit),
+      status,
+      storeId
+    );
+  }
+
+  @Get('orders-online/:id')
+  async getOnlineOrderById(@Param('id') orderId: string) {
+    return this.adminService.getOnlineOrderById(orderId);
+  }
+
+  @Put('orders-online/:id/status')
+  async updateOrderStatus(
+    @Param('id') orderId: string,
+    @Body() data: { status: string; trackingCode?: string }
+  ) {
+    return this.adminService.updateOrderStatus(orderId, data.status, data.trackingCode);
+  }
+
   // ==================== RELATÓRIOS ====================
 
   @Get('reports/sales')

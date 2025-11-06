@@ -1,4 +1,5 @@
 import { env } from './env';
+import { useAppStore } from './store';
 
 const API_BASE_URL = env.API_URL;
 
@@ -6,7 +7,10 @@ const API_BASE_URL = env.API_URL;
 export const adminAPI = {
   // Stores
   getStores: async () => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token;
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -22,7 +26,10 @@ export const adminAPI = {
   },
 
   getStoreById: async (storeId: string) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores/${storeId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -38,7 +45,10 @@ export const adminAPI = {
   },
 
   createStore: async (data: any) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores`, {
       method: 'POST',
       headers: {
@@ -56,7 +66,10 @@ export const adminAPI = {
   },
 
   updateStore: async (storeId: string, data: any) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores/${storeId}`, {
       method: 'PATCH',
       headers: {
@@ -74,7 +87,10 @@ export const adminAPI = {
   },
 
   deleteStore: async (storeId: string) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores/${storeId}`, {
       method: 'DELETE',
       headers: {
@@ -102,7 +118,10 @@ export const adminAPI = {
 
   // Store Employees
   getStoreEmployees: async (storeId: string) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores/${storeId}/employees`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -118,7 +137,10 @@ export const adminAPI = {
   },
 
   createEmployee: async (data: any) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/employees`, {
       method: 'POST',
       headers: {
@@ -136,7 +158,10 @@ export const adminAPI = {
   },
 
   updateEmployee: async (employeeId: string, data: any) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/employees/${employeeId}`, {
       method: 'PUT',
       headers: {
@@ -154,7 +179,10 @@ export const adminAPI = {
   },
 
   deleteEmployee: async (employeeId: string) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/employees/${employeeId}`, {
       method: 'DELETE',
       headers: {
@@ -172,7 +200,10 @@ export const adminAPI = {
 
   // Store Sales
   getStoreSales: async (storeId: string) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores/${storeId}/sales`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -188,7 +219,10 @@ export const adminAPI = {
   },
 
   getStoreSalesStats: async (storeId: string) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores/${storeId}/sales/stats`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -205,7 +239,10 @@ export const adminAPI = {
 
   // Store Analytics
   getStoreAnalytics: async (storeId: string, period: string) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores/${storeId}/analytics?period=${period}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -222,7 +259,10 @@ export const adminAPI = {
 
   // Store Reports
   getStoreReport: async (storeId: string, options: any) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const queryParams = new URLSearchParams(options).toString();
     const response = await fetch(`${API_BASE_URL}/admin/stores/${storeId}/reports?${queryParams}`, {
       headers: {
@@ -239,7 +279,10 @@ export const adminAPI = {
   },
 
   exportStoreReport: async (storeId: string, options: any) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/stores/${storeId}/reports/export`, {
       method: 'POST',
       headers: {
@@ -290,14 +333,27 @@ export const adminAPI = {
   },
 
   // Products
-  getProducts: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/admin/products`, {
+  getProducts: async (token?: string, page: number = 1, limit: number = 10, search?: string, category?: string) => {
+    const tokenValue = token || localStorage.getItem('token');
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(search && { search }),
+      ...(category && { category })
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/admin/products?${queryParams.toString()}`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${tokenValue}`,
         'Content-Type': 'application/json'
       }
     });
-    return response;
+    
+    if (!response.ok) {
+      throw new Error(`Erro ao carregar produtos: ${response.statusText}`);
+    }
+    
+    return response.json();
   },
 
   createProduct: async (token: string, data: any) => {
@@ -313,7 +369,10 @@ export const adminAPI = {
   },
 
   updateProduct: async (id: string, data: any) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/products/${id}`, {
       method: 'PATCH',
       headers: {
@@ -331,7 +390,10 @@ export const adminAPI = {
   },
 
   deleteProduct: async (id: string) => {
-    const token = localStorage.getItem('token');
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
     const response = await fetch(`${API_BASE_URL}/admin/products/${id}`, {
       method: 'DELETE',
       headers: {
@@ -433,5 +495,72 @@ export const adminAPI = {
       }
     });
     return response;
+  },
+
+  // Online Orders
+  getOnlineOrders: async (page: number = 1, limit: number = 50, status?: string, storeId?: string) => {
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(status && { status }),
+      ...(storeId && { storeId })
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/admin/orders-online?${params.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erro ao carregar pedidos online: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  getOnlineOrderById: async (orderId: string) => {
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
+    const response = await fetch(`${API_BASE_URL}/admin/orders-online/${orderId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erro ao carregar pedido: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  updateOrderStatus: async (orderId: string, status: string, trackingCode?: string) => {
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
+    const response = await fetch(`${API_BASE_URL}/admin/orders-online/${orderId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status, trackingCode })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erro ao atualizar status: ${response.statusText}`);
+    }
+    
+    return response.json();
   }
 };

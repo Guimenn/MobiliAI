@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { authAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -22,12 +22,15 @@ interface ChatMessage {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated, setUser, setToken, setAuthenticated, setError } = useAppStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentInput, setCurrentInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [loginStep, setLoginStep] = useState<'email' | 'password' | 'userInfo' | 'processing' | 'complete' | 'forgotPassword' | 'resetCode' | 'resetPassword'>('email');
+  const redirectPath = searchParams.get('redirect') || null;
+  const messageParam = searchParams.get('message') || null;
   const [credentials, setCredentials] = useState({ 
     email: '', 
     password: '', 
@@ -61,33 +64,39 @@ export default function LoginPage() {
   // Redirecionar usuários já logados - mais eficiente
   useEffect(() => {
     if (isAuthenticated && user) {
-      // Redirecionamento imediato sem delay
-      const redirectPath = user.role === 'ADMIN' || user.role === 'admin'
-        ? '/admin' 
-        : user.role === 'STORE_MANAGER' || user.role === 'store_manager'
-        ? '/manager' 
-        : user.role === 'EMPLOYEE' || user.role === 'employee' || user.role === 'CASHIER' || user.role === 'cashier'
-        ? '/employee'
-        : '/';
+      // Se há um redirectPath nos parâmetros, usar ele, senão redirecionar baseado no role
+      const finalRedirectPath = redirectPath || (
+        user.role === 'ADMIN' || user.role === 'admin'
+          ? '/admin' 
+          : user.role === 'STORE_MANAGER' || user.role === 'store_manager'
+          ? '/manager' 
+          : user.role === 'EMPLOYEE' || user.role === 'employee' || user.role === 'CASHIER' || user.role === 'cashier'
+          ? '/employee'
+          : '/'
+      );
       
-      router.replace(redirectPath);
+      router.replace(finalRedirectPath);
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, redirectPath]);
 
   useEffect(() => {
     // Só inicializar conversa se não estiver logado
     if (!isAuthenticated || !user) {
-    const initialMessages: ChatMessage[] = [
-      {
-        id: '1',
-        type: 'assistant',
-          message: 'Olá! 👋 Digite seu e-mail para entrar ou criar uma conta:',
-        timestamp: new Date()
-      }
-    ];
-    setMessages(initialMessages);
+      const initialMessage = messageParam 
+        ? messageParam 
+        : 'Olá! 👋 Digite seu e-mail para entrar ou criar uma conta:';
+      
+      const initialMessages: ChatMessage[] = [
+        {
+          id: '1',
+          type: 'assistant',
+          message: initialMessage,
+          timestamp: new Date()
+        }
+      ];
+      setMessages(initialMessages);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, messageParam]);
 
   const generateUniqueId = () => {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -316,16 +325,18 @@ export default function LoginPage() {
 
           // Aguardar um pouco para mostrar a mensagem e depois redirecionar
           setTimeout(() => {
-            // Redirecionamento baseado no role do usuário
-            const redirectPath = response.user.role === 'ADMIN' || response.user.role === 'admin'
-              ? '/admin/dashboard' 
-              : response.user.role === 'STORE_MANAGER' || response.user.role === 'store_manager'
-              ? '/manager' 
-              : response.user.role === 'EMPLOYEE' || response.user.role === 'employee' || response.user.role === 'CASHIER' || response.user.role === 'cashier'
-              ? '/employee'
-              : '/';
+            // Redirecionamento baseado no role do usuário ou redirectPath
+            const finalRedirectPath = redirectPath || (
+              response.user.role === 'ADMIN' || response.user.role === 'admin'
+                ? '/admin/dashboard' 
+                : response.user.role === 'STORE_MANAGER' || response.user.role === 'store_manager'
+                ? '/manager' 
+                : response.user.role === 'EMPLOYEE' || response.user.role === 'employee' || response.user.role === 'CASHIER' || response.user.role === 'cashier'
+                ? '/employee'
+                : '/'
+            );
             
-            router.replace(redirectPath);
+            router.replace(finalRedirectPath);
           }, 4500);
         } catch (error: any) {
           let errorMessage = 'Erro inesperado ao criar conta';
@@ -470,15 +481,17 @@ export default function LoginPage() {
         // Aguardar um pouco para mostrar a mensagem e depois redirecionar
         setTimeout(() => {
           // Redirecionamento baseado no role do usuário
-          const redirectPath = response.user.role === 'ADMIN' || response.user.role === 'admin'
-            ? '/admin' 
-            : response.user.role === 'STORE_MANAGER' || response.user.role === 'store_manager'
-            ? '/manager' 
-            : response.user.role === 'EMPLOYEE' || response.user.role === 'employee' || response.user.role === 'CASHIER' || response.user.role === 'cashier'
-            ? '/employee'
-            : '/';
+          const finalRedirectPath = redirectPath || (
+            response.user.role === 'ADMIN' || response.user.role === 'admin'
+              ? '/admin' 
+              : response.user.role === 'STORE_MANAGER' || response.user.role === 'store_manager'
+              ? '/manager' 
+              : response.user.role === 'EMPLOYEE' || response.user.role === 'employee' || response.user.role === 'CASHIER' || response.user.role === 'cashier'
+              ? '/employee'
+              : '/'
+          );
           
-          router.replace(redirectPath);
+          router.replace(finalRedirectPath);
         }, 2500);
       } catch (error: unknown) {
         console.error('Erro no login:', error);

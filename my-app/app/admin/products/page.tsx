@@ -69,7 +69,11 @@ import {
   BarChart,
   TrendingDown,
   Box,
-  Upload
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 import AdminProductModal from '@/components/AdminProductModal';
 import ProductViewer3D from '@/components/ProductViewer3D';
@@ -82,6 +86,12 @@ export default function ProductsPage() {
   const { token } = useAppStore();
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Estados de paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [pageLimit, setPageLimit] = useState(50); // Aumentar limite padrão para 50
 
   // Filtros para produtos
   const [productFilters, setProductFilters] = useState({
@@ -114,7 +124,12 @@ export default function ProductsPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        await loadProductsData();
+        // Quando filtros mudam, resetar para página 1
+        if (currentPage === 1) {
+          await loadProductsData(1, pageLimit);
+        } else {
+          setCurrentPage(1);
+        }
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
       }
@@ -123,127 +138,61 @@ export default function ProductsPage() {
     // Usar setTimeout para evitar problemas de hidratação
     const timer = setTimeout(checkAuth, 0);
     return () => clearTimeout(timer);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productFilters.search, productFilters.category]);
+
+  useEffect(() => {
+    loadProductsData(currentPage, pageLimit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, pageLimit]);
 
   // Atualizar dados a cada 30 segundos
   useEffect(() => {
     const interval = setInterval(() => {
-      loadProductsData();
+      loadProductsData(currentPage, pageLimit);
     }, 30000); // 30 segundos
 
     return () => clearInterval(interval);
-  }, []);
+  }, [currentPage, pageLimit]);
 
-  const loadProductsData = async () => {
+  const loadProductsData = async (page: number = currentPage, limit: number = pageLimit) => {
     try {
       setIsLoading(true);
       
-      console.log('Carregando dados de produtos do banco...');
+      console.log('Carregando dados de produtos do banco...', { page, limit });
       
       // Carregar dados reais da API
       try {
         console.log('📦 Chamando adminAPI.getProducts()...');
-        const productsData = await adminAPI.getProducts();
+        const productsData = await adminAPI.getProducts(
+          page,
+          limit,
+          productFilters.search || undefined,
+          productFilters.category !== 'all' ? productFilters.category : undefined
+        );
         console.log('📦 Dados recebidos:', productsData);
-        console.log('📦 Tipo:', typeof productsData);
-        console.log('📦 É array?', Array.isArray(productsData));
         
         // A API retorna { products: [...], pagination: {...} }
         const productsArray = Array.isArray(productsData) 
           ? productsData 
           : (productsData?.products || []);
         
-        console.log('📦 Produtos extraídos:', productsArray.length, 'produtos');
+        // Atualizar informações de paginação
+        if (productsData?.pagination) {
+          setTotalPages(productsData.pagination.pages || 1);
+          setTotalProducts(productsData.pagination.total || 0);
+          setCurrentPage(productsData.pagination.page || 1);
+        }
+        
+        console.log('📦 Produtos extraídos:', productsArray.length, 'produtos de', productsData?.pagination?.total || 0, 'total');
         setProducts(productsArray);
       } catch (apiError) {
         console.error('❌ Erro ao chamar API de produtos:', apiError);
-        
-        // Fallback para dados mock em caso de erro da API
-        console.log('Usando dados mock como fallback...');
-        const mockProducts = [
-          {
-            id: 1,
-            name: 'Tinta Branca Premium',
-            description: 'Tinta de alta qualidade para interiores',
-            price: 89.90,
-            stock: 50,
-            category: 'Tintas',
-            sku: 'TINTA-001',
-            isActive: true,
-            rating: 4.5,
-            reviews: 12
-          },
-          {
-            id: 2,
-            name: 'Pincel Chato 2"',
-            description: 'Pincel profissional para pintura',
-            price: 15.50,
-            stock: 25,
-            category: 'Pincéis',
-            sku: 'PIN-002',
-            isActive: true,
-            rating: 4.2,
-            reviews: 8
-          },
-          {
-            id: 3,
-            name: 'Rolo de Pintura',
-            description: 'Rolo para aplicação de tinta',
-            price: 22.90,
-            stock: 15,
-            category: 'Rolos',
-            sku: 'ROL-003',
-            isActive: true,
-            rating: 4.0,
-            reviews: 5
-          }
-        ];
-        setProducts(mockProducts);
+        setProducts([]);
       }
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
-      // Dados mock para desenvolvimento incluindo uma cadeira
-      setProducts([
-        {
-          id: '1',
-          name: 'Cadeira de Escritório Premium',
-          category: 'cadeira',
-          price: 599.90,
-          color: 'Marrom',
-          colorCode: '#8B4513',
-          description: 'Cadeira ergonômica com apoio lombar e ajuste de altura',
-          brand: 'OfficePro',
-          stock: 15,
-          isActive: true,
-          imageUrl: '/images/cadeira-premium.jpg'
-        },
-        {
-          id: '2',
-          name: 'Galão de Tinta Branca',
-          category: 'tinta',
-          price: 89.90,
-          color: 'Branco',
-          colorCode: '#FFFFFF',
-          description: 'Tinta látex PVA 18L para uso interno',
-          brand: 'Coral',
-          stock: 50,
-          isActive: true,
-          imageUrl: '/images/tinta-branca.jpg'
-        },
-        {
-          id: '3',
-          name: 'Pincel Premium',
-          category: 'pincel',
-          price: 25.90,
-          color: 'Natural',
-          colorCode: '#D2B48C',
-          description: 'Pincel beiçola 2 polegadas cerdas naturais',
-          brand: 'Suvinil',
-          stock: 100,
-          isActive: true,
-          imageUrl: '/images/pincel-premium.jpg'
-        }
-      ]);
+      setProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -341,8 +290,21 @@ export default function ProductsPage() {
         products={products}
         isLoading={isLoading}
         token={token}
-        onProductsChange={loadProductsData}
+        onProductsChange={() => loadProductsData(currentPage, pageLimit)}
         onDeleteProduct={handleDeleteProduct}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalProducts={totalProducts}
+        pageLimit={pageLimit}
+        onPageChange={(page: number) => {
+          setCurrentPage(page);
+          loadProductsData(page, pageLimit);
+        }}
+        onLimitChange={(limit: number) => {
+          setPageLimit(limit);
+          setCurrentPage(1);
+          loadProductsData(1, limit);
+        }}
       />
 
       {/* Modal de Confirmação de Exclusão */}
@@ -359,7 +321,19 @@ export default function ProductsPage() {
 }
 
 // Componente da seção de produtos
-function ProductsSection({ products, isLoading, token, onProductsChange, onDeleteProduct }: any) {
+function ProductsSection({ 
+  products, 
+  isLoading, 
+  token, 
+  onProductsChange, 
+  onDeleteProduct,
+  currentPage = 1,
+  totalPages = 1,
+  totalProducts = 0,
+  pageLimit = 50,
+  onPageChange,
+  onLimitChange
+}: any) {
   // Estados para filtros
   const [productFilters, setProductFilters] = useState({
     category: 'all',
@@ -643,7 +617,7 @@ function ProductsSection({ products, isLoading, token, onProductsChange, onDelet
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total</p>
                 <p className="text-3xl font-bold text-[#3e2626]">
-                  {products.length}
+                  {totalProducts > 0 ? totalProducts : products.length}
                 </p>
                 <p className="text-xs text-[#3e2626]/70">Produtos cadastrados</p>
               </div>
@@ -1022,6 +996,85 @@ function ProductsSection({ products, isLoading, token, onProductsChange, onDelet
           </Card>
         )}
       </div>
+
+      {/* Controles de Paginação */}
+      {totalPages > 1 && (
+        <Card className="mt-8">
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Label htmlFor="page-limit" className="text-sm font-medium text-gray-700">
+                  Itens por página:
+                </Label>
+                <select
+                  id="page-limit"
+                  value={pageLimit}
+                  onChange={(e) => onLimitChange && onLimitChange(Number(e.target.value))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3e2626]/20 focus:border-[#3e2626]"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-sm text-gray-600">
+                  Mostrando {((currentPage - 1) * pageLimit) + 1} - {Math.min(currentPage * pageLimit, totalProducts)} de {totalProducts} produtos
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange && onPageChange(1)}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                  <span className="hidden sm:inline">Primeira</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange && onPageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="hidden sm:inline">Anterior</span>
+                </Button>
+                
+                <div className="flex items-center gap-1 px-4">
+                  <span className="text-sm text-gray-700">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange && onPageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1"
+                >
+                  <span className="hidden sm:inline">Próxima</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange && onPageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1"
+                >
+                  <span className="hidden sm:inline">Última</span>
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modal de Produto */}
       <AdminProductModal

@@ -98,6 +98,43 @@ export class EmployeeController {
     return this.employeeInventoryService.getStockMovement(req.user.id, productId, parseInt(days));
   }
 
+  // ==================== PEDIDOS ONLINE DA LOJA ====================
+
+  @Get('orders-online')
+  async getStoreOnlineOrders(
+    @Request() req,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '50',
+    @Query('status') status?: string
+  ) {
+    // Funcionários usam os mesmos métodos do manager (apenas da loja)
+    return this.employeeService.getStoreOnlineOrders(
+      req.user.id,
+      parseInt(page),
+      parseInt(limit),
+      status
+    );
+  }
+
+  @Get('orders-online/:id')
+  async getStoreOnlineOrderById(@Request() req, @Param('id') orderId: string) {
+    return this.employeeService.getStoreOnlineOrderById(req.user.id, orderId);
+  }
+
+  @Put('orders-online/:id/status')
+  async updateStoreOnlineOrderStatus(
+    @Request() req,
+    @Param('id') orderId: string,
+    @Body() data: { status: string; trackingCode?: string }
+  ) {
+    return this.employeeService.updateStoreOnlineOrderStatus(
+      req.user.id,
+      orderId,
+      data.status,
+      data.trackingCode
+    );
+  }
+
   // ==================== INFORMAÇÕES BÁSICAS ====================
 
   @Get('profile')

@@ -733,9 +733,222 @@ export class ManagerService {
         totalSales: sales.length,
         totalRevenue,
         totalItems,
-        averageTicket: sales.length > 0 ? totalRevenue / sales.length : 0
+        averageOrderValue: sales.length > 0 ? totalRevenue / sales.length : 0
       }
     };
+  }
+
+  // ==================== PEDIDOS ONLINE DA LOJA ====================
+
+  async getStoreOnlineOrders(managerId: string, page: number = 1, limit: number = 50, status?: string) {
+    // Verificar se o gerente tem uma loja atribuída
+    const manager = await this.prisma.user.findUnique({
+      where: { id: managerId },
+      include: { store: true }
+    });
+
+    if (!manager || !manager.store) {
+      throw new NotFoundException('Gerente não encontrado ou sem loja atribuída');
+    }
+
+    const storeId = manager.store.id;
+    const skip = (page - 1) * limit;
+    
+    const where: any = {
+      isOnlineOrder: true,
+      storeId
+    };
+    
+    if (status) {
+      where.status = status;
+    }
+    
+    const [orders, total] = await Promise.all([
+      this.prisma.sale.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true
+            }
+          },
+          store: {
+            select: {
+              id: true,
+              name: true,
+              address: true
+            }
+          },
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  imageUrl: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      }),
+      this.prisma.sale.count({ where })
+    ]);
+    
+    return {
+      orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  async getStoreOnlineOrderById(managerId: string, orderId: string) {
+    // Verificar se o gerente tem uma loja atribuída
+    const manager = await this.prisma.user.findUnique({
+      where: { id: managerId },
+      include: { store: true }
+    });
+
+    if (!manager || !manager.store) {
+      throw new NotFoundException('Gerente não encontrado ou sem loja atribuída');
+    }
+
+    const order = await this.prisma.sale.findFirst({
+      where: {
+        id: orderId,
+        isOnlineOrder: true,
+        storeId: manager.store.id
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            city: true,
+            state: true,
+            zipCode: true
+          }
+        },
+        store: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            state: true,
+            zipCode: true,
+            phone: true
+          }
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+                imageUrl: true,
+                imageUrls: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!order) {
+      throw new NotFoundException('Pedido online não encontrado');
+    }
+    
+    return order;
+  }
+
+  async updateStoreOnlineOrderStatus(managerId: string, orderId: string, status: string, trackingCode?: string) {
+    // Verificar se o gerente tem uma loja atribuída
+    const manager = await this.prisma.user.findUnique({
+      where: { id: managerId },
+      include: { store: true }
+    });
+
+    if (!manager || !manager.store) {
+      throw new NotFoundException('Gerente não encontrado ou sem loja atribuída');
+    }
+
+    const order = await this.prisma.sale.findFirst({
+      where: {
+        id: orderId,
+        isOnlineOrder: true,
+        storeId: manager.store.id
+      }
+    });
+    
+    if (!order) {
+      throw new NotFoundException('Pedido online não encontrado');
+    }
+    
+    const updateData: any = {
+      status: status as any
+    };
+    
+    // Se for marcado como enviado, atualizar shippedAt e trackingCode
+    if (status === 'SHIPPED') {
+      updateData.shippedAt = new Date();
+      if (trackingCode) {
+        updateData.trackingCode = trackingCode;
+      }
+    }
+    
+    // Se for marcado como entregue, atualizar deliveredAt
+    if (status === 'DELIVERED') {
+      updateData.deliveredAt = new Date();
+    }
+    
+    return this.prisma.sale.update({
+      where: { id: orderId },
+      data: updateData,
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        store: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                price: true
+              }
+            }
+          }
+        }
+      }
+    });
   }
 
   async getStoreInventoryReport(managerId: string) {

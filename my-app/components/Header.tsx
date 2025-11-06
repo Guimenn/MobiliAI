@@ -94,6 +94,7 @@ export default function Header() {
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchOpening, setSearchOpening] = useState(false);
     const [searchClosing, setSearchClosing] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -123,7 +124,25 @@ export default function Header() {
         setTimeout(() => {
             setSearchOpen(false);
             setSearchClosing(false);
+            setSearchTerm('');
         }, 300);
+    };
+
+    const handleSearch = (e?: React.FormEvent) => {
+        if (e) {
+            e.preventDefault();
+        }
+        if (searchTerm.trim()) {
+            router.push(`/products?q=${encodeURIComponent(searchTerm.trim())}`);
+            handleCloseSearch();
+        }
+    };
+
+    const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSearch();
+        }
     };
 
     const handleUserClick = () => {
@@ -550,16 +569,21 @@ export default function Header() {
                         : 'bg-white/95 backdrop-blur-md border-2 border-white/30 shadow-lg'
                     } rounded-xl px-4 py-2 flex items-center space-x-3 transition-all duration-300 ${searchClosing ? 'opacity-0 scale-95 translate-x-4' : searchOpening ? 'opacity-100 scale-100 translate-x-0 animate-in slide-in-from-right' : 'opacity-100 scale-100 translate-x-0'}`}>
                       <Search className={`h-5 w-5 ${isHomePage ? 'text-white/60' : 'text-[#3e2626]'}`} />
-                      <input
-                        type="text"
-                        placeholder="Buscar móveis..."
-                        className={`bg-transparent focus:outline-none w-64 ${
-                          isHomePage 
-                            ? 'text-white placeholder:text-white/60' 
-                            : 'text-[#3e2626] placeholder:text-gray-500'
-                        }`}
-                        autoFocus
-                      />
+                      <form onSubmit={handleSearch} className="flex-1 flex items-center">
+                        <input
+                          type="text"
+                          placeholder="Buscar móveis..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          onKeyDown={handleSearchKeyDown}
+                          className={`bg-transparent focus:outline-none flex-1 ${
+                            isHomePage 
+                              ? 'text-white placeholder:text-white/60' 
+                              : 'text-[#3e2626] placeholder:text-gray-500'
+                          }`}
+                          autoFocus
+                        />
+                      </form>
                       <button 
                         onClick={handleCloseSearch}
                         className={`transition-colors ${
@@ -776,6 +800,21 @@ export default function Header() {
                             </div>
                             <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-[#3e2626] transition-colors" />
                           </Link>
+
+                          <Link 
+                            href="/customer/orders"
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="flex items-center space-x-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-[#3e2626]/5 hover:to-[#5a3a3a]/5 rounded-lg transition-all duration-200 group"
+                          >
+                            <div className="w-7 h-7 bg-[#3e2626]/10 rounded-lg flex items-center justify-center group-hover:bg-[#3e2626]/20 transition-colors">
+                              <Package className="h-4 w-4 text-[#3e2626]" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-sm">Meus Pedidos</p>
+                              <p className="text-xs text-gray-500">Histórico e acompanhamento</p>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-[#3e2626] transition-colors" />
+                          </Link>
                           
                           <div className="my-1.5 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
                           
@@ -877,17 +916,20 @@ export default function Header() {
                 <Link href="/contact" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Contato</Link>
               </nav>
               <div className={`mt-4 pt-4 border-t ${isHomePage ? 'border-white/20' : 'border-white/20'}`}>
-                <div className="relative">
+                <form onSubmit={handleSearch} className="relative">
                   <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${isHomePage ? 'text-white/60' : 'text-white/60'}`} />
                   <Input
                     placeholder="Buscar móveis..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
                     className={`pl-10 backdrop-blur-sm border text-white placeholder:text-white/60 ${
                       isHomePage 
                         ? 'bg-white/10 border-white/20' 
                         : 'bg-white/10 border-white/20'
                     }`}
                   />
-                </div>
+                </form>
               </div>
             </div>
           )}

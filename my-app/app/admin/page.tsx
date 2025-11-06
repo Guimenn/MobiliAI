@@ -10,7 +10,8 @@ import {
   DollarSign, 
   TrendingUp, 
   Activity,
-  ArrowRight
+  ArrowRight,
+  Truck
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -46,6 +47,7 @@ export default function AdminDashboard() {
     { name: 'Gerenciar Lojas', href: '/admin/stores', icon: Store, color: 'bg-blue-500' },
     { name: 'Gerenciar Usuários', href: '/admin/users', icon: Users, color: 'bg-green-500' },
     { name: 'Gerenciar Produtos', href: '/admin/products', icon: Package, color: 'bg-purple-500' },
+    { name: 'Pedidos Online', href: '/admin/orders-online', icon: Truck, color: 'bg-indigo-500' },
     { name: 'Ver Relatórios', href: '/admin/reports', icon: TrendingUp, color: 'bg-orange-500' },
   ];
 

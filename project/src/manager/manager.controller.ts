@@ -136,8 +136,46 @@ export class ManagerController {
 
   @Get('reports/inventory')
   async getStoreInventoryReport(@Request() req) {
-    return this.managerService.getStoreInventoryReport(req.user.id);
+    return this.managerInventoryService.getInventoryReport(req.user.id);
   }
+
+  // ==================== PEDIDOS ONLINE DA LOJA ====================
+
+  @Get('orders-online')
+  async getStoreOnlineOrders(
+    @Request() req,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '50',
+    @Query('status') status?: string
+  ) {
+    return this.managerService.getStoreOnlineOrders(
+      req.user.id,
+      parseInt(page),
+      parseInt(limit),
+      status
+    );
+  }
+
+  @Get('orders-online/:id')
+  async getStoreOnlineOrderById(@Request() req, @Param('id') orderId: string) {
+    return this.managerService.getStoreOnlineOrderById(req.user.id, orderId);
+  }
+
+  @Put('orders-online/:id/status')
+  async updateStoreOnlineOrderStatus(
+    @Request() req,
+    @Param('id') orderId: string,
+    @Body() data: { status: string; trackingCode?: string }
+  ) {
+    return this.managerService.updateStoreOnlineOrderStatus(
+      req.user.id,
+      orderId,
+      data.status,
+      data.trackingCode
+    );
+  }
+
+  // ==================== RELATÓRIOS DA FILIAL ====================
 
   @Get('reports/user-activity')
   async getStoreUserActivityReport(

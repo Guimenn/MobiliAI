@@ -27,4 +27,7 @@ export const envConfig = {
   EMAILJS_TEMPLATE_ID: process.env.EMAILJS_TEMPLATE_ID || '',
   EMAILJS_PUBLIC_KEY: process.env.EMAILJS_PUBLIC_KEY || '',
   EMAILJS_USER_ID: process.env.EMAILJS_USER_ID || '',
+
+  // Hugging Face (para Trellis/ZeroGPU)
+  HF_TOKEN: process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN || process.env.HUGGING_FACE_HUB_TOKEN || '',
 };

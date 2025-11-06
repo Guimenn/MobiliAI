@@ -114,8 +114,10 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
         style: product.style,
         imageUrl: product.imageUrls?.[0] || product.imageUrl,
         storeId: product.store?.id || product.storeId || '',
-        rating: product.rating ? Number(product.rating) : undefined,
-        reviewCount: product.reviewCount ? Number(product.reviewCount) : undefined,
+        rating: product.rating ? Number(product.rating) : 0,
+        reviewCount: product.reviewCount ? Number(product.reviewCount) : 0,
+        storeName: product.store?.name,
+        storeAddress: product.store?.address,
       }));
 
       setProducts(mappedProducts);

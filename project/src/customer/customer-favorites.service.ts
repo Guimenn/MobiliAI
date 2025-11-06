@@ -145,6 +145,9 @@ export class CustomerFavoritesService {
 
   async isFavorite(customerId: string, productId: string) {
     try {
+      // Tentar garantir conexão antes de fazer query
+      await this.prisma.$connect();
+      
       const favorite = await this.prisma.favorite.findFirst({
         where: {
           customerId,
@@ -153,8 +156,31 @@ export class CustomerFavoritesService {
       });
 
       return { isFavorite: !!favorite };
-    } catch (error) {
-      // Em caso de erro de conexão, retornar false em vez de lançar erro
+    } catch (error: any) {
+      // Em caso de erro de conexão, tentar reconectar e tentar novamente
+      if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
+        try {
+          console.warn('Erro de conexão ao verificar favorito, tentando reconectar...');
+          await this.prisma.$disconnect();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await this.prisma.$connect();
+          
+          const favorite = await this.prisma.favorite.findFirst({
+            where: {
+              customerId,
+              productId
+            }
+          });
+          
+          return { isFavorite: !!favorite };
+        } catch (retryError) {
+          console.error('Erro ao reconectar:', retryError);
+          // Retornar false em vez de lançar erro para evitar quebrar o frontend
+          return { isFavorite: false };
+        }
+      }
+      
+      // Em caso de outros erros, retornar false em vez de lançar erro
       // Isso evita erros 500 quando há problemas temporários com o banco
       console.error('Erro ao verificar favorito:', error);
       return { isFavorite: false };
@@ -162,9 +188,30 @@ export class CustomerFavoritesService {
   }
 
   async getFavoriteCount(customerId: string) {
-    return this.prisma.favorite.count({
-      where: { customerId }
-    });
+    try {
+      await this.prisma.$connect();
+      
+      return await this.prisma.favorite.count({
+        where: { customerId }
+      });
+    } catch (error: any) {
+      if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
+        try {
+          await this.prisma.$disconnect();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await this.prisma.$connect();
+          
+          return await this.prisma.favorite.count({
+            where: { customerId }
+          });
+        } catch (retryError) {
+          console.error('Erro ao reconectar:', retryError);
+          return 0;
+        }
+      }
+      console.error('Erro ao buscar contagem de favoritos:', error);
+      return 0;
+    }
   }
 
   // ==================== COMPARAÇÃO DE PRODUTOS ====================

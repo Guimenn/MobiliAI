@@ -53,14 +53,85 @@ interface PaymentMethod {
   cvv?: string;
 }
 
+// Funções de validação
+const validateCPF = (cpf: string): boolean => {
+  const cleanCPF = cpf.replace(/\D/g, '');
+  
+  if (cleanCPF.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cleanCPF)) return false; // Todos os dígitos iguais
+  
+  let sum = 0;
+  let remainder;
+  
+  // Validação do primeiro dígito verificador
+  for (let i = 1; i <= 9; i++) {
+    sum += parseInt(cleanCPF.substring(i - 1, i)) * (11 - i);
+  }
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cleanCPF.substring(9, 10))) return false;
+  
+  // Validação do segundo dígito verificador
+  sum = 0;
+  for (let i = 1; i <= 10; i++) {
+    sum += parseInt(cleanCPF.substring(i - 1, i)) * (12 - i);
+  }
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cleanCPF.substring(10, 11))) return false;
+  
+  return true;
+};
+
+const validatePhone = (phone: string): boolean => {
+  const cleanPhone = phone.replace(/\D/g, '');
+  // Aceita telefone com 10 ou 11 dígitos (com ou sem DDD)
+  return cleanPhone.length === 10 || cleanPhone.length === 11;
+};
+
+const formatCPF = (value: string): string => {
+  const numbers = value.replace(/\D/g, '');
+  if (numbers.length <= 3) return numbers;
+  if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+  if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+  return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+};
+
+const formatPhone = (value: string): string => {
+  const numbers = value.replace(/\D/g, '');
+  if (numbers.length <= 2) return numbers.length > 0 ? `(${numbers}` : numbers;
+  if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+  return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+};
+
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { cart, user } = useAppStore();
+  const { cart, user, isAuthenticated, token } = useAppStore();
+  
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  
+  // Verificar autenticação ao carregar a página
+  useEffect(() => {
+    // Dar um pequeno delay para o store carregar
+    const timer = setTimeout(() => {
+      if (!isAuthenticated || !user || !token) {
+        router.push('/login?redirect=/checkout&message=Por favor, faça login para finalizar sua compra');
+        return;
+      }
+      setIsCheckingAuth(false);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, user, token, router]);
   
   // Produtos selecionados (vem do sessionStorage ou todos do carrinho)
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  
+  // Estados de erro de validação
+  const [phoneError, setPhoneError] = useState('');
+  const [cpfError, setCpfError] = useState('');
 
   // Carregar produtos selecionados do sessionStorage
   useEffect(() => {
@@ -204,10 +275,24 @@ export default function CheckoutPage() {
       return false;
     }
 
-    // Validar CPF básico
+    // Validar telefone
+    if (!validatePhone(shippingAddress.phone)) {
+      setPhoneError('Telefone inválido. Use o formato (11) 99999-9999');
+      alert('Por favor, digite um telefone válido');
+      return false;
+    }
+
+    // Validar CPF
     const cpf = shippingAddress.cpf.replace(/\D/g, '');
     if (cpf.length !== 11) {
-      alert('CPF inválido. Digite um CPF válido com 11 dígitos');
+      setCpfError('CPF inválido. Digite um CPF válido com 11 dígitos');
+      alert('Por favor, digite um CPF válido');
+      return false;
+    }
+
+    if (!validateCPF(shippingAddress.cpf)) {
+      setCpfError('CPF inválido. Verifique os dígitos');
+      alert('CPF inválido. Verifique os dígitos');
       return false;
     }
 
@@ -233,63 +318,26 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
-      // Aqui você integraria com a API real
-      // Por enquanto, vamos simular o processo
+      // Agrupar por loja (assumindo que todos os produtos são da mesma loja ou primeiro)
+      const storeId = checkoutItems[0]?.product.storeId || 'default';
       
-      // Preparar dados do pedido
-      const orderData = {
-        items: checkoutItems.map(item => ({
-          productId: item.product.id,
-          quantity: item.quantity,
-          unitPrice: item.product.price,
-        })),
-        shippingAddress,
-        paymentMethod: paymentMethod.type,
-        subtotal,
-        shipping: shippingCost,
-        insurance: insuranceCost,
-        tax,
-        discount,
-        total,
-        couponCode: appliedCoupon?.code,
-      };
+      // Criar a venda no backend (usuário já está autenticado neste ponto)
+      const saleResponse = await customerAPI.checkout({
+        storeId,
+        shippingAddress: `${shippingAddress.address}, ${shippingAddress.number}${shippingAddress.complement ? ` - ${shippingAddress.complement}` : ''}`,
+        shippingCity: shippingAddress.city,
+        shippingState: shippingAddress.state,
+        shippingZipCode: shippingAddress.zipCode,
+        shippingPhone: shippingAddress.phone,
+        notes: `Pedido via checkout web. Frete: ${selectedShipping === 'express' ? 'Expresso' : 'Padrão'}. ${shippingInsurance ? 'Com seguro de envio' : 'Sem seguro'}.${appliedCoupon ? ` Cupom aplicado: ${appliedCoupon.code}` : ''}`,
+      });
 
-      // Simular chamada à API
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Se o usuário estiver autenticado, usar a API real
-      if (user) {
-        try {
-          // Agrupar por loja (assumindo que todos os produtos são da mesma loja ou primeiro)
-          const storeId = checkoutItems[0]?.product.storeId || 'default';
-          
-          // Criar a venda no backend
-          const saleResponse = await customerAPI.checkout({
-            storeId,
-            paymentMethod: paymentMethod.type,
-            shippingAddress: {
-              ...shippingAddress,
-              fullAddress: `${shippingAddress.address}, ${shippingAddress.number}${shippingAddress.complement ? ` - ${shippingAddress.complement}` : ''}`,
-            },
-            notes: `Pedido via checkout web. Frete: ${selectedShipping === 'express' ? 'Expresso' : 'Padrão'}. ${shippingInsurance ? 'Com seguro de envio' : 'Sem seguro'}.${appliedCoupon ? ` Cupom aplicado: ${appliedCoupon.code}` : ''}`,
-          });
-
-          // Redirecionar para página de confirmação
-          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-          return;
-        } catch (error: any) {
-          console.error('Erro ao finalizar pedido:', error);
-          alert(error.response?.data?.message || 'Erro ao processar pedido. Tente novamente.');
-          setIsProcessing(false);
-          return;
-        }
-      }
-
-      // Se não estiver autenticado, redirecionar para login
-      router.push('/login?redirect=/checkout');
-    } catch (error) {
+      // Redirecionar para página de confirmação
+      router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+    } catch (error: any) {
       console.error('Erro ao finalizar pedido:', error);
-      alert('Erro ao processar pedido. Tente novamente.');
+      alert(error.response?.data?.message || 'Erro ao processar pedido. Tente novamente.');
+      setIsProcessing(false);
     } finally {
       setIsProcessing(false);
     }
@@ -316,8 +364,8 @@ export default function CheckoutPage() {
     }
   };
 
-  // Mostrar loading enquanto carrega os produtos
-  if (isLoadingProducts) {
+  // Mostrar loading enquanto verifica autenticação ou carrega os produtos
+  if (isCheckingAuth || isLoadingProducts) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white page-with-fixed-header">
         <Header />
@@ -331,6 +379,11 @@ export default function CheckoutPage() {
         </div>
       </div>
     );
+  }
+  
+  // Se não estiver autenticado, não renderizar nada (o useEffect vai redirecionar)
+  if (!isAuthenticated || !user || !token) {
+    return null;
   }
 
   return (
@@ -396,10 +449,35 @@ export default function CheckoutPage() {
                       <Input
                         id="phone"
                         value={shippingAddress.phone}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
+                        onChange={(e) => {
+                          const formatted = formatPhone(e.target.value);
+                          setShippingAddress({ ...shippingAddress, phone: formatted });
+                          setPhoneError('');
+                          
+                          // Validar ao perder o foco ou quando tiver 14 ou 15 caracteres (com formatação)
+                          if (formatted.replace(/\D/g, '').length >= 10) {
+                            if (!validatePhone(formatted)) {
+                              setPhoneError('Telefone inválido. Use o formato (11) 99999-9999');
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const phone = e.target.value;
+                          if (phone && phone.replace(/\D/g, '').length >= 10) {
+                            if (!validatePhone(phone)) {
+                              setPhoneError('Telefone inválido. Use o formato (11) 99999-9999');
+                            } else {
+                              setPhoneError('');
+                            }
+                          }
+                        }}
                         placeholder="(11) 99999-9999"
-                        className="mt-1"
+                        className={`mt-1 ${phoneError ? 'border-red-500' : ''}`}
+                        maxLength={15}
                       />
+                      {phoneError && (
+                        <p className="text-sm text-red-600 mt-1">{phoneError}</p>
+                      )}
                     </div>
 
                     <div>
@@ -407,10 +485,35 @@ export default function CheckoutPage() {
                       <Input
                         id="cpf"
                         value={shippingAddress.cpf}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, cpf: e.target.value })}
+                        onChange={(e) => {
+                          const formatted = formatCPF(e.target.value);
+                          setShippingAddress({ ...shippingAddress, cpf: formatted });
+                          setCpfError('');
+                          
+                          // Validar quando tiver 14 caracteres (com formatação)
+                          if (formatted.replace(/\D/g, '').length === 11) {
+                            if (!validateCPF(formatted)) {
+                              setCpfError('CPF inválido. Verifique os dígitos');
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const cpf = e.target.value;
+                          if (cpf && cpf.replace(/\D/g, '').length === 11) {
+                            if (!validateCPF(cpf)) {
+                              setCpfError('CPF inválido. Verifique os dígitos');
+                            } else {
+                              setCpfError('');
+                            }
+                          }
+                        }}
                         placeholder="000.000.000-00"
-                        className="mt-1"
+                        className={`mt-1 ${cpfError ? 'border-red-500' : ''}`}
+                        maxLength={14}
                       />
+                      {cpfError && (
+                        <p className="text-sm text-red-600 mt-1">{cpfError}</p>
+                      )}
                     </div>
 
                     <div className="md:col-span-2">
@@ -754,7 +857,7 @@ export default function CheckoutPage() {
                       <Checkbox
                         id="insurance"
                         checked={shippingInsurance}
-                        onCheckedChange={(checked) => setShippingInsurance(checked as boolean)}
+                        onChange={(e) => setShippingInsurance(e.target.checked)}
                       />
                       <Label htmlFor="insurance" className="cursor-pointer">
                         <span className="font-semibold">Seguro de envio</span>

@@ -35,7 +35,8 @@ import {
   Wallet,
   Clock,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Truck
 } from 'lucide-react';
 
 export default function ManagerDashboard() {
@@ -197,13 +198,23 @@ export default function ManagerDashboard() {
           onValueChange={setActiveTab} 
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="users">Funcionários</TabsTrigger>
-            <TabsTrigger value="products">Estoque</TabsTrigger>
-            <TabsTrigger value="cashflow">Fluxo de Caixa</TabsTrigger>
-            <TabsTrigger value="reports">Relatórios</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-4">
+            <TabsList className="grid w-full max-w-2xl grid-cols-5">
+              <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+              <TabsTrigger value="users">Funcionários</TabsTrigger>
+              <TabsTrigger value="products">Estoque</TabsTrigger>
+              <TabsTrigger value="cashflow">Fluxo de Caixa</TabsTrigger>
+              <TabsTrigger value="reports">Relatórios</TabsTrigger>
+            </TabsList>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/manager/orders-online')}
+              className="flex items-center gap-2 ml-4"
+            >
+              <Truck className="h-4 w-4" />
+              Pedidos Online
+            </Button>
+          </div>
 
           <TabsContent value="overview" className="space-y-6">
             {/* Stats Cards */}
@@ -272,6 +283,34 @@ export default function ManagerDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Quick Actions */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Settings className="h-5 w-5 mr-2 text-[#3e2626]" />
+                  Ações Rápidas
+                </CardTitle>
+                <CardDescription>Acesse rapidamente as principais funcionalidades</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button
+                    variant="outline"
+                    className="h-auto p-6 flex flex-col items-center space-y-3 hover:shadow-lg transition-shadow"
+                    onClick={() => router.push('/manager/orders-online')}
+                  >
+                    <div className="w-12 h-12 bg-indigo-500 rounded-lg flex items-center justify-center">
+                      <Truck className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium text-gray-900">Pedidos Online</p>
+                      <p className="text-xs text-gray-500">Gerenciar pedidos online</p>
+                    </div>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Recent Activity */}
             <Card className="border-0 shadow-lg">
