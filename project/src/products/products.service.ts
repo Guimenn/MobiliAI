@@ -55,12 +55,16 @@ export class ProductsService {
   async findAll(currentUser: User, storeId?: string): Promise<Product[]> {
     const whereCondition: any = { isActive: true };
 
-    // Se não for admin, filtrar por loja
+    // Se não for admin, filtrar por loja (apenas se tiver storeId)
     if (currentUser.role !== UserRole.ADMIN) {
-      whereCondition.storeId = currentUser.storeId;
+      if (currentUser.storeId) {
+        whereCondition.storeId = currentUser.storeId;
+      }
     } else if (storeId) {
+      // Admin pode filtrar por loja específica se passar storeId
       whereCondition.storeId = storeId;
     }
+    // Se for admin e não passar storeId, mostra todos os produtos (não adiciona storeId ao where)
 
     return this.prisma.product.findMany({
       where: whereCondition,
@@ -139,9 +143,11 @@ export class ProductsService {
   async findByCategory(category: ProductCategory, currentUser: User, storeId?: string): Promise<Product[]> {
     const whereCondition: any = { category, isActive: true };
 
-    // Se não for admin, filtrar por loja
+    // Se não for admin, filtrar por loja (apenas se tiver storeId)
     if (currentUser.role !== UserRole.ADMIN) {
-      whereCondition.storeId = currentUser.storeId;
+      if (currentUser.storeId) {
+        whereCondition.storeId = currentUser.storeId;
+      }
     } else if (storeId) {
       whereCondition.storeId = storeId;
     }
@@ -158,9 +164,11 @@ export class ProductsService {
   async findByColor(color: string, currentUser: User, storeId?: string): Promise<Product[]> {
     const whereCondition: any = { color, isActive: true };
 
-    // Se não for admin, filtrar por loja
+    // Se não for admin, filtrar por loja (apenas se tiver storeId)
     if (currentUser.role !== UserRole.ADMIN) {
-      whereCondition.storeId = currentUser.storeId;
+      if (currentUser.storeId) {
+        whereCondition.storeId = currentUser.storeId;
+      }
     } else if (storeId) {
       whereCondition.storeId = storeId;
     }
@@ -205,9 +213,11 @@ export class ProductsService {
   async getLowStockProducts(currentUser: User, storeId?: string): Promise<Product[]> {
     const whereCondition: any = { isActive: true };
 
-    // Se não for admin, filtrar por loja
+    // Se não for admin, filtrar por loja (apenas se tiver storeId)
     if (currentUser.role !== UserRole.ADMIN) {
-      whereCondition.storeId = currentUser.storeId;
+      if (currentUser.storeId) {
+        whereCondition.storeId = currentUser.storeId;
+      }
     } else if (storeId) {
       whereCondition.storeId = storeId;
     }

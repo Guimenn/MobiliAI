@@ -1,5 +1,5 @@
-import { Controller, Post, Get, Param, UseGuards, Request, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Post, Get, Param, UseGuards, Request, UseInterceptors, UploadedFile, UploadedFiles, Body } from '@nestjs/common';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { AIService } from './ai.service';
 import { ReplicateService } from './replicate.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -269,46 +269,71 @@ export class AIController {
   }
 
   @Post('process-upload')
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FilesInterceptor('images', 10)) // Aceita até 10 imagens
   async processImageWithUpload(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
     @Body() body: { prompt: string; outputFormat?: string },
     @Request() req
   ) {
-    console.log('🚀 AIController: Processando upload de imagem');
-    console.log('📁 Arquivo:', file ? {
-      originalname: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size
-    } : 'NENHUM');
+    console.log('🚀 AIController: Processando upload de imagens');
+    console.log('📁 Arquivos recebidos:', files ? files.length : 0);
     console.log('📝 Prompt:', body.prompt);
     console.log('👤 Usuário:', req.user.id);
 
-    if (!file) {
+    if (!files || files.length === 0) {
       throw new Error('Nenhuma imagem foi enviada');
     }
 
-    if (!body.prompt) {
-      throw new Error('Prompt é obrigatório');
-    }
-
-    // Validar formato da imagem
+    // Validar formato das imagens
     const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
-    if (!allowedMimeTypes.includes(file.mimetype)) {
-      throw new Error(`Formato de imagem não suportado. Formatos aceitos: ${allowedMimeTypes.join(', ')}`);
+    for (const file of files) {
+      if (!allowedMimeTypes.includes(file.mimetype)) {
+        throw new Error(`Formato de imagem não suportado: ${file.originalname}. Formatos aceitos: ${allowedMimeTypes.join(', ')}`);
+      }
+      
+      // Validar tamanho do arquivo (máximo 10MB)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        throw new Error(`Arquivo muito grande: ${file.originalname}. Tamanho máximo: 10MB`);
+      }
     }
 
-    // Validar tamanho do arquivo (máximo 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      throw new Error('Arquivo muito grande. Tamanho máximo: 10MB');
+    // Primeira imagem é o ambiente, as demais são produtos
+    const environmentImage = files[0];
+    const productImages = files.slice(1);
+
+    console.log(`🖼️  Imagem do ambiente: ${environmentImage.originalname}`);
+    console.log(`📦 Imagens de produtos: ${productImages.length}`);
+
+    // Se não houver produtos, usar o método antigo
+    if (productImages.length === 0) {
+      const result = await this.replicateService.processImageWithPrompt(
+        body.prompt || 'Adicione os produtos na imagem de forma realista',
+        environmentImage.buffer,
+        body.outputFormat || 'jpg',
+        environmentImage.originalname
+      );
+
+      if (result.success) {
+        return {
+          success: true,
+          imageUrl: result.imageUrl,
+          localFile: result.localFile,
+          message: 'Imagem processada com sucesso!'
+        };
+      } else {
+        throw new Error(result.error || 'Erro ao processar imagem');
+      }
     }
 
-    const result = await this.replicateService.processImageWithPrompt(
-      body.prompt,
-      file.buffer,
+    // Usar método com múltiplas imagens
+    const productBuffers = productImages.map(img => img.buffer);
+    const result = await this.replicateService.processImageWithMultipleImages(
+      body.prompt || 'Adicione os produtos mostrados nas imagens na foto do ambiente de forma realista e natural, mantendo o ambiente original intacto',
+      environmentImage.buffer,
+      productBuffers,
       body.outputFormat || 'jpg',
-      file.originalname
+      environmentImage.originalname
     );
 
     if (result.success) {

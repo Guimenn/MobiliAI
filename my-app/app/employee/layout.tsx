@@ -41,7 +41,7 @@ function ProductsHeaderComponent({
 
   if (!isProductsPage) {
     return (
-      <header className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] border-b border-[#3e2626]/20 sticky top-0 z-30 shadow-lg">
+      <header className="bg-[#3e2626] border-b border-[#3e2626]/20 sticky top-0 z-30 shadow-lg">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center">
             <Button
@@ -323,7 +323,7 @@ export default function EmployeeLayout({
                     }}
                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
                       item.current 
-                        ? 'bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white shadow-md' 
+                        ? 'bg-[#3e2626] text-white shadow-md' 
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
@@ -353,7 +353,7 @@ export default function EmployeeLayout({
       <div className="lg:ml-64">
         {/* Top Header */}
         {pathname === '/employee' ? (
-          <div className="bg-gradient-to-r from-[#3e2626] via-[#8B4513] to-[#A0522D] relative overflow-hidden">
+          <div className="bg-[#3e2626] relative overflow-hidden">
             {/* Pattern overlay */}
             <div className="absolute inset-0 opacity-10">
               <div className="absolute inset-0" style={{

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
-import { customerAPI, notificationsAPI } from "@/lib/api";
+import { customerAPI, notificationsAPI, productsAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +99,13 @@ export default function Header() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     
+    // Estados para autocomplete
+    const [showAutocomplete, setShowAutocomplete] = useState(false);
+    const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<Array<{ id: string; text: string }>>([]);
+    const [allProducts, setAllProducts] = useState<any[]>([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const searchRef = useRef<HTMLDivElement>(null);
+    
     // Estados para controle de scroll do header
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [lastScrollY, setLastScrollY] = useState(0);
@@ -111,6 +118,7 @@ export default function Header() {
     // Refs para os dropdowns
     const userDropdownRef = useRef<HTMLDivElement>(null);
     const notificationsDropdownRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     // Handlers
     const handleOpenSearch = () => {
@@ -121,11 +129,13 @@ export default function Header() {
 
     const handleCloseSearch = () => {
         setSearchClosing(true);
+        setShowAutocomplete(false);
+        setAutocompleteSuggestions([]);
         setTimeout(() => {
             setSearchOpen(false);
             setSearchClosing(false);
             setSearchTerm('');
-        }, 300);
+        }, 500); // Ajustado para corresponder à duração da animação (500ms)
     };
 
     const handleSearch = (e?: React.FormEvent) => {
@@ -142,7 +152,118 @@ export default function Header() {
         if (e.key === 'Enter') {
             e.preventDefault();
             handleSearch();
+        } else if (e.key === 'Escape') {
+            setShowAutocomplete(false);
         }
+    };
+
+    // Carregar produtos para autocomplete
+    useEffect(() => {
+        const loadProducts = async () => {
+            if (searchOpen && allProducts.length === 0) {
+                try {
+                    setLoadingProducts(true);
+                    const products = await productsAPI.getAll();
+                    setAllProducts(products || []);
+                } catch (error) {
+                    console.error('Erro ao carregar produtos para autocomplete:', error);
+                } finally {
+                    setLoadingProducts(false);
+                }
+            }
+        };
+
+        if (searchOpen) {
+            loadProducts();
+        }
+    }, [searchOpen, allProducts.length]);
+
+    // Gerar sugestões de palavras (estilo Mercado Livre)
+    useEffect(() => {
+        if (searchTerm.trim().length > 0 && allProducts.length > 0) {
+            const term = searchTerm.toLowerCase().trim();
+            const wordSet = new Set<string>();
+            
+            // Extrair palavras dos produtos que começam com o termo digitado
+            allProducts.forEach(product => {
+                // Palavras do nome
+                if (product.name) {
+                    const words = product.name.toLowerCase().split(/\s+/);
+                    words.forEach(word => {
+                        if (word.startsWith(term) && word.length > term.length) {
+                            wordSet.add(word);
+                        }
+                    });
+                }
+                
+                // Palavras da descrição
+                if (product.description) {
+                    const words = product.description.toLowerCase().split(/\s+/);
+                    words.forEach(word => {
+                        if (word.startsWith(term) && word.length > term.length) {
+                            wordSet.add(word);
+                        }
+                    });
+                }
+                
+                // Marca
+                if (product.brand && product.brand.toLowerCase().startsWith(term)) {
+                    wordSet.add(product.brand.toLowerCase());
+                }
+                
+                // Categoria
+                if (product.category && product.category.toLowerCase().startsWith(term)) {
+                    wordSet.add(product.category.toLowerCase());
+                }
+            });
+            
+            // Converter para array, ordenar e limitar
+            const suggestions = Array.from(wordSet)
+                .sort()
+                .slice(0, 8)
+                .map(word => ({
+                    id: word,
+                    text: word.charAt(0).toUpperCase() + word.slice(1) // Capitalizar primeira letra
+                }));
+            
+            setAutocompleteSuggestions(suggestions);
+            setShowAutocomplete(suggestions.length > 0);
+        } else {
+            setAutocompleteSuggestions([]);
+            setShowAutocomplete(false);
+        }
+    }, [searchTerm, allProducts]);
+
+    // Fechar autocomplete ao clicar fora
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setShowAutocomplete(false);
+            }
+        };
+
+        if (searchOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+            };
+        }
+    }, [searchOpen]);
+
+    // Selecionar sugestão do autocomplete
+    const selectSuggestion = (suggestion: { id: string; text: string }) => {
+        setSearchTerm(suggestion.text);
+        setShowAutocomplete(false);
+        router.push(`/products?q=${encodeURIComponent(suggestion.text)}`);
+        handleCloseSearch();
+    };
+
+    // Formatar preço
+    const formatPrice = (price: number) => {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }).format(price);
     };
 
     const handleUserClick = () => {
@@ -532,73 +653,118 @@ export default function Header() {
           </div>
           
           <div className="container mx-auto px-4 h-30 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex justify-between items-center py-4 relative">
             {/* Logo */}
-            <Link href="/" className="flex items-center">
-              <img
-                src="/logotipos/11.svg"
-                alt="MobiliAI"
-                width={100}
-                height={40}
-                className={`h-16 md:h-24 w-auto max-w-none transition-all duration-300 ${
-                  isHomePage ? '' : 'brightness-0 invert drop-shadow-lg'
-                }`}
-              />
-            </Link>
+            <div className="flex items-center">
+              <Link href="/" className="flex items-center flex-shrink-0">
+                <img
+                  src="/logotipos/11.svg"
+                  alt="MobiliAI"
+                  width={100}
+                  height={40}
+                  className={`h-16 md:h-24 w-auto max-w-none transition-all duration-300 ${
+                    isHomePage ? '' : 'brightness-0 invert drop-shadow-lg'
+                  }`}
+                />
+              </Link>
+            </div>
+
+            {/* Barra de Pesquisa quando aberta - expande da direita até perto do logo */}
+            {searchOpen && (
+              <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex items-center justify-between px-4 z-50" ref={searchRef}>
+                <div className="w-48 flex-shrink-0"></div> {/* Espaço para o logo */}
+                <div className={`flex-1 max-w-3xl ${
+                  isHomePage 
+                    ? 'bg-white/10 backdrop-blur-sm border-2 border-white/30' 
+                    : 'bg-white/95 backdrop-blur-md border-2 border-white/30 shadow-lg'
+                } rounded-xl px-4 py-3 flex items-center gap-3 transition-all duration-500 ease-in-out relative ${searchClosing ? 'opacity-0 scale-x-0 origin-right' : searchOpening ? 'opacity-100 scale-x-100 origin-right animate-in slide-in-from-right' : 'opacity-100 scale-x-100'}`}>
+                  <Search className={`h-5 w-5 flex-shrink-0 ${isHomePage ? 'text-white/60' : 'text-gray-400'}`} />
+                  <form onSubmit={handleSearch} className="flex-1 flex items-center relative">
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Buscar móveis, decoração, acessórios..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={handleSearchKeyDown}
+                      onFocus={() => {
+                        if (autocompleteSuggestions.length > 0 && searchTerm.trim().length > 0) {
+                          setShowAutocomplete(true);
+                        }
+                      }}
+                      className={`bg-transparent focus:outline-none flex-1 text-base ${
+                        isHomePage 
+                          ? 'text-white placeholder:text-white/60' 
+                          : 'text-gray-900 placeholder:text-gray-400'
+                      }`}
+                      autoFocus
+                    />
+                  </form>
+                  
+                  {/* Dropdown de Autocomplete - Estilo Mercado Livre */}
+                  {showAutocomplete && autocompleteSuggestions.length > 0 && (
+                    <div className={`absolute top-full left-0 right-0 mt-1 ${
+                      isHomePage 
+                        ? 'bg-white/95 backdrop-blur-md border border-white/30' 
+                        : 'bg-white border border-gray-200'
+                    } rounded-lg shadow-xl z-50 max-h-[400px] overflow-y-auto`}>
+                      <div className="py-2">
+                        {autocompleteSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion.id}
+                            onClick={() => selectSuggestion(suggestion)}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left group"
+                          >
+                            <Search className={`h-4 w-4 flex-shrink-0 ${
+                              isHomePage ? 'text-gray-400' : 'text-gray-400'
+                            }`} />
+                            <span className={`flex-1 text-base ${
+                              isHomePage 
+                                ? 'text-gray-900 group-hover:text-[#3e2626]' 
+                                : 'text-gray-900 group-hover:text-[#3e2626]'
+                            }`}>
+                              {suggestion.text}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <button 
+                    onClick={handleCloseSearch}
+                    className={`transition-colors flex-shrink-0 ${
+                      isHomePage 
+                        ? 'text-white/60 hover:text-white' 
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="w-64 flex-shrink-0"></div> {/* Espaço para os ícones da direita */}
+              </div>
+            )}
 
             {/* Right Side Icons */}
             <div className="flex items-center space-x-6">
                {/* Search Icon with Animation */}
                <div className="relative search-icon-container">
-                 {!searchOpen ? (
-                   <button 
-                     onClick={handleOpenSearch}
-                     className={`p-2 transition-colors ${
-                       isHomePage 
-                         ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
-                         : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
-                     }`}
-                   >
-                     <Search className="h-6 w-6" />
-                   </button>
-                ) : (
-                  <div className="flex items-center">
-                    <div className={`${
-                      isHomePage 
-                        ? 'bg-white/10 backdrop-blur-sm border-2 border-white/30' 
-                        : 'bg-white/95 backdrop-blur-md border-2 border-white/30 shadow-lg'
-                    } rounded-xl px-4 py-2 flex items-center space-x-3 transition-all duration-300 ${searchClosing ? 'opacity-0 scale-95 translate-x-4' : searchOpening ? 'opacity-100 scale-100 translate-x-0 animate-in slide-in-from-right' : 'opacity-100 scale-100 translate-x-0'}`}>
-                      <Search className={`h-5 w-5 ${isHomePage ? 'text-white/60' : 'text-[#3e2626]'}`} />
-                      <form onSubmit={handleSearch} className="flex-1 flex items-center">
-                        <input
-                          type="text"
-                          placeholder="Buscar móveis..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          onKeyDown={handleSearchKeyDown}
-                          className={`bg-transparent focus:outline-none flex-1 ${
-                            isHomePage 
-                              ? 'text-white placeholder:text-white/60' 
-                              : 'text-[#3e2626] placeholder:text-gray-500'
-                          }`}
-                          autoFocus
-                        />
-                      </form>
-                      <button 
-                        onClick={handleCloseSearch}
-                        className={`transition-colors ${
-                          isHomePage 
-                            ? 'text-white/60 hover:text-white' 
-                            : 'text-gray-400 hover:text-[#3e2626]'
-                        }`}
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
+                 <button 
+                   onClick={handleOpenSearch}
+                   className={`p-2 transition-all duration-500 ${
+                     searchOpen 
+                       ? 'opacity-0 scale-0 pointer-events-none' 
+                       : 'opacity-100 scale-100 pointer-events-auto'
+                   } ${
+                     isHomePage 
+                       ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
+                       : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
+                   }`}
+                 >
+                   <Search className="h-6 w-6" />
+                 </button>
+               </div>
                {/* Favorites Icon */}
                <button 
                  onClick={goToFavorites}

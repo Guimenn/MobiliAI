@@ -373,11 +373,19 @@ export const aiAPI = {
 
   processImageWithUpload: async (data: {
     file: File;
+    productFiles?: File[];
     prompt: string;
     outputFormat?: string;
   }) => {
     const formData = new FormData();
-    formData.append('image', data.file);
+    // Primeira imagem é sempre o ambiente
+    formData.append('images', data.file);
+    // Adicionar imagens dos produtos se houver
+    if (data.productFiles && data.productFiles.length > 0) {
+      data.productFiles.forEach((productFile) => {
+        formData.append('images', productFile);
+      });
+    }
     formData.append('prompt', data.prompt);
     formData.append('outputFormat', data.outputFormat || 'jpg');
     

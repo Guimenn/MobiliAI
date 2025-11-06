@@ -377,7 +377,7 @@ export default function EmployeeProductsPage() {
       <div className="flex justify-start mb-6">
         <Button 
           onClick={handleCreateProduct}
-          className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white shadow-lg font-semibold px-6 py-2"
+          className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white shadow-lg font-semibold px-6 py-2"
         >
           <Plus className="h-4 w-4 mr-2" />
           Novo Produto
@@ -612,7 +612,7 @@ export default function EmployeeProductsPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden animate-in zoom-in-95 duration-300">
             {/* Header */}
-            <div className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white p-6">
+            <div className="bg-[#3e2626] text-white p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
@@ -773,7 +773,7 @@ export default function EmployeeProductsPage() {
                   <Card className="border border-gray-200 shadow-md rounded-xl overflow-hidden">
                     <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 pb-4">
                       <CardTitle className="text-base font-bold flex items-center text-gray-900">
-                        <div className="w-8 h-8 bg-gradient-to-br from-[#3e2626] to-[#8B4513] rounded-lg flex items-center justify-center mr-3">
+                        <div className="w-8 h-8 bg-[#3e2626] rounded-lg flex items-center justify-center mr-3">
                           <Tag className="h-4 w-4 text-white" />
                         </div>
                         Informações Básicas

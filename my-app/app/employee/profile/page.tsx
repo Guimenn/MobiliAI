@@ -83,7 +83,7 @@ export default function EmployeeProfilePage() {
         {/* Informações Pessoais */}
         <div className="space-y-6">
           <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden h-full">
-            <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] text-white">
+            <CardHeader className="bg-[#3e2626] text-white">
               <CardTitle className="text-2xl flex items-center">
                 <User className="h-6 w-6 mr-3" />
                 Informações Pessoais
@@ -241,7 +241,7 @@ export default function EmployeeProfilePage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="px-8 h-11 bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#8B4513] hover:to-[#3e2626] rounded-xl shadow-lg"
+                    className="px-8 h-11 bg-[#3e2626] hover:bg-[#2a1f1f] rounded-xl shadow-lg"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     {loading ? 'Salvando...' : 'Salvar Alterações'}
@@ -257,7 +257,7 @@ export default function EmployeeProfilePage() {
         {/* Sidebar - Informações da Empresa */}
         <div className="space-y-6">
           <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden h-full">
-            <CardHeader className="bg-gradient-to-r from-[#A0522D] to-[#D2691E] text-white">
+            <CardHeader className="bg-[#3e2626] text-white">
               <CardTitle className="text-2xl flex items-center">
                 <Building className="h-6 w-6 mr-3" />
                 Empresa
@@ -276,7 +276,7 @@ export default function EmployeeProfilePage() {
                       alt={user?.name || 'Usuário'}
                       className="object-cover"
                     />
-                    <AvatarFallback className="bg-gradient-to-br from-[#3e2626] to-[#8B4513] text-white text-4xl font-bold">
+                    <AvatarFallback className="bg-[#3e2626] text-white text-4xl font-bold">
                       {user?.name?.charAt(0) || 'F'}
                     </AvatarFallback>
                   </Avatar>
