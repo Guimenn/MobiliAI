@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,56 @@ export default function PixPaymentPage() {
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [error, setError] = useState<string>('');
+
+  // ===== Utilitários para gerar BR Code PIX estático com valor dinâmico (fallback) =====
+  type EmvFieldId = string;
+
+  function emv(id: EmvFieldId, value: string): string {
+    const len = value.length.toString().padStart(2, '0');
+    return `${id}${len}${value}`;
+  }
+
+  function crc16Ccitt(payload: string): string {
+    let crc = 0xffff;
+    for (let i = 0; i < payload.length; i++) {
+      crc ^= payload.charCodeAt(i) << 8;
+      for (let j = 0; j < 8; j++) {
+        if ((crc & 0x8000) !== 0) {
+          crc = (crc << 1) ^ 0x1021;
+        } else {
+          crc = crc << 1;
+        }
+        crc &= 0xffff;
+      }
+    }
+    return crc.toString(16).toUpperCase().padStart(4, '0');
+  }
+
+  function buildStaticPixBrCode(amount: number): string {
+    const amountStr = (Number(amount) || 0).toFixed(2).replace(',', '.');
+    const gui = emv('00', 'br.gov.bcb.pix');
+    const key = emv('01', '59370893830'); // chave fixa CPF
+    const mai = gui + key;
+    const maiField = emv('26', mai);
+
+    const payloadWithoutCrc =
+      emv('00', '01') +
+      emv('01', '11') +
+      maiField +
+      emv('52', '0000') +
+      emv('53', '986') +
+      emv('54', amountStr) +
+      emv('58', 'BR') +
+      emv('59', 'GUILHERME V MEN') +
+      emv('60', 'SAO BERNARDO') +
+      emv('62', emv('05', '***')) +
+      '6304';
+
+    const crc = crc16Ccitt(payloadWithoutCrc);
+    return payloadWithoutCrc + crc;
+  }
+
+  const fallbackPixCode = useMemo(() => buildStaticPixBrCode(Number(paymentData?.amount) || 0), [paymentData?.amount]);
 
   // Carregar dados do pagamento
   useEffect(() => {
@@ -136,7 +186,8 @@ export default function PixPaymentPage() {
     const code = paymentData?.qrCode 
       || paymentData?.providerResponse?.pix?.brCode 
       || paymentData?.providerResponse?.brCode 
-      || paymentData?.code;
+      || paymentData?.code
+      || fallbackPixCode;
     if (!code) return;
 
     try {
@@ -306,13 +357,15 @@ export default function PixPaymentPage() {
                   {(paymentData?.qrCode 
                     || paymentData?.providerResponse?.pix?.brCode 
                     || paymentData?.providerResponse?.brCode 
-                    || paymentData?.code) && (
+                    || paymentData?.code 
+                    || fallbackPixCode) && (
                     <div className="flex justify-center p-4 bg-white border-2 border-gray-200 rounded-lg">
                       <QRCodeSVG
                         value={paymentData?.qrCode 
                           || paymentData?.providerResponse?.pix?.brCode 
                           || paymentData?.providerResponse?.brCode 
-                          || paymentData?.code}
+                          || paymentData?.code 
+                          || fallbackPixCode}
                         size={256}
                         level="H"
                         includeMargin={true}
@@ -341,7 +394,7 @@ export default function PixPaymentPage() {
                         || paymentData?.providerResponse?.pix?.brCode 
                         || paymentData?.providerResponse?.brCode 
                         || paymentData?.code 
-                        || ''}
+                        || fallbackPixCode}
                       className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg text-sm font-mono bg-gray-50"
                     />
                     <Button

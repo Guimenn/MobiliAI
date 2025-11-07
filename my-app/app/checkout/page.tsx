@@ -122,6 +122,7 @@ const formatPhone = (value: string): string => {
   return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
 };
 
+
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -268,6 +269,7 @@ export default function CheckoutPage() {
   const tax = subtotal * 0.1; // 10% de impostos estimados
 
   const total = subtotal + shippingCost + insuranceCost + tax - discount;
+
 
   // Função para parsear endereço completo em partes
   const parseAddress = (fullAddress: string) => {
@@ -1317,6 +1319,8 @@ export default function CheckoutPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* QR Code do Pix não é exibido no checkout. Ele aparece apenas na tela de pagamento Pix. */}
 
                     {/* Cartão de Crédito */}
                     <div
