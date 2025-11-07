@@ -1,12 +1,29 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type CouponStatus = "active" | "used" | "expired";
+
+export interface Coupon {
+  id: string;
+  code: string;
+  description: string;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  minimumPurchase?: number;
+  expiresAt: string;
+  status: CouponStatus;
+  usageLimit?: number;
+  usedCount?: number;
+  category?: string;
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
   role: 'admin' | 'ADMIN' | 'store_manager' | 'STORE_MANAGER' | 'cashier' | 'CASHIER' | 'employee' | 'EMPLOYEE' | 'customer' | 'CUSTOMER';
   phone?: string;
+  cpf?: string;
   address?: string;
   city?: string;
   state?: string;
@@ -76,11 +93,59 @@ export interface FurnitureAnalysis {
   createdAt: string;
 }
 
+const defaultCoupons: Coupon[] = [
+  {
+    id: 'c1',
+    code: 'BEMVINDO10',
+    description: '10% de desconto na primeira compra',
+    discountType: 'percentage',
+    discountValue: 10,
+    minimumPurchase: 200,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 15).toISOString(),
+    status: 'active',
+    category: 'Boas-vindas',
+  },
+  {
+    id: 'c2',
+    code: 'FRETEGRATIS',
+    description: 'Frete grátis para compras acima de R$ 300',
+    discountType: 'fixed',
+    discountValue: 25,
+    minimumPurchase: 300,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
+    status: 'active',
+    category: 'Frete',
+  },
+  {
+    id: 'c3',
+    code: 'SUPER15',
+    description: '15% OFF em tintas premium selecionadas',
+    discountType: 'percentage',
+    discountValue: 15,
+    expiresAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+    status: 'expired',
+    category: 'Tintas Premium',
+  },
+  {
+    id: 'c4',
+    code: 'RENOVE5',
+    description: 'R$ 50 de desconto para pedidos acima de R$ 600',
+    discountType: 'fixed',
+    discountValue: 50,
+    minimumPurchase: 600,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45).toISOString(),
+    status: 'used',
+    usedCount: 1,
+    category: 'Renovação',
+  },
+];
+
 interface AppState {
   // Auth
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  coupons: Coupon[];
   
   // Cart
   cart: CartItem[];
@@ -102,6 +167,9 @@ interface AppState {
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   setAuthenticated: (isAuthenticated: boolean) => void;
+  setCoupons: (coupons: Coupon[]) => void;
+  addCoupon: (coupon: Coupon) => void;
+  updateCouponStatus: (couponId: string, status: CouponStatus) => void;
   
   addToCart: (product: Product, quantity?: number) => void;
   removeFromCart: (productId: string) => void;
@@ -130,6 +198,7 @@ export const useAppStore = create<AppState>()(
       user: null,
       token: null,
       isAuthenticated: false,
+      coupons: defaultCoupons,
       cart: [],
       cartTotal: 0,
       products: [],
@@ -151,6 +220,24 @@ export const useAppStore = create<AppState>()(
       setAuthenticated: (isAuthenticated) => {
         console.log('Store setAuthenticated called with:', isAuthenticated);
         set({ isAuthenticated });
+      },
+
+      setCoupons: (coupons) => {
+        set({ coupons });
+      },
+
+      addCoupon: (coupon) => {
+        set((state) => ({
+          coupons: [...state.coupons, coupon],
+        }));
+      },
+
+      updateCouponStatus: (couponId, status) => {
+        set((state) => ({
+          coupons: state.coupons.map((coupon) =>
+            coupon.id === couponId ? { ...coupon, status } : coupon
+          ),
+        }));
       },
 
       // Cart actions
