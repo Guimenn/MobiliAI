@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store";
 import Header from "@/components/Header";
@@ -9,19 +11,70 @@ import ProfileSidebar from "./_components/ProfileSidebar";
 import ProfileAvatar from "./_components/ProfileAvatar";
 import ProfileInfo from "./_components/ProfileInfo";
 import { uploadUserAvatar } from "@/lib/supabase";
+import { customerAPI } from "@/lib/api";
 
 export default function ProfilePage() {
-  const { user, setUser } = useAppStore();
+  const router = useRouter();
+  const { user, setUser, isAuthenticated } = useAppStore();
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const handleAvatarChange = (file: File | null) => {
     setAvatarFile(file);
   };
 
-  const handleSaveProfile = (data: any) => {
-    // Aqui você implementaria a lógica de salvamento
-    console.log('Salvando dados do perfil:', data);
+  const handleSaveProfile = async (data: any) => {
+    if (!user) {
+      toast.error("Não foi possível identificar o usuário. Faça login novamente.");
+      throw new Error("Usuário não encontrado");
+    }
+
+    const sanitize = (value?: string) => {
+      if (!value) return undefined;
+      const trimmed = value.trim();
+      return trimmed.length ? trimmed : undefined;
+    };
+
+    const payload: Record<string, any> = {
+      name: sanitize(data.name),
+      phone: sanitize(data.phone),
+      cpf: sanitize(data.cpf)?.replace(/\D/g, ""),
+    };
+
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === undefined || payload[key] === "") {
+        delete payload[key];
+      }
+    });
+
+    if (Object.keys(payload).length === 0) {
+      toast.info("Nenhuma alteração para salvar.");
+      return;
+    }
+
+    try {
+      setIsSavingProfile(true);
+
+      const updatedUser = await customerAPI.updateProfile(payload);
+
+      const mergedUser = updatedUser
+        ? { ...user, ...updatedUser }
+        : { ...user, ...payload };
+
+      setUser(mergedUser as typeof user);
+
+      toast.success("Perfil atualizado com sucesso!");
+    } catch (error) {
+      const message =
+        (error as any)?.response?.data?.message ||
+        (error as Error)?.message ||
+        "Erro ao atualizar perfil.";
+      toast.error(message);
+      throw error;
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const handleSaveAvatar = async () => {
@@ -59,8 +112,17 @@ export default function ProfilePage() {
     }
   };
 
-  // Gerar username do email se não existir
-  const username = user?.email?.split('@')[0] || 'usuario';
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, user, router]);
+
+  const username = useMemo(() => user?.email?.split('@')[0] || 'usuario', [user?.email]);
+
+  if (!isAuthenticated || !user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 page-with-fixed-header">
@@ -88,6 +150,7 @@ export default function ProfilePage() {
                     cpf: (user as { cpf?: string } | null)?.cpf,
                   }}
                   onSave={handleSaveProfile}
+                  isSaving={isSavingProfile}
                 />
               </div>
 

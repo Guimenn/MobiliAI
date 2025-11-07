@@ -1099,6 +1099,14 @@ export const customerAPI = {
     return response.data;
   },
 
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    const response = await api.put('/customer/password', {
+      currentPassword,
+      newPassword,
+    });
+    return response.data;
+  },
+
   // Endereços de Entrega
   getShippingAddresses: async () => {
     const response = await api.get('/customer/shipping-addresses');

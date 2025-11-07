@@ -17,10 +17,11 @@ interface ProfileInfoProps {
     birthDate?: string;
     username?: string;
   };
-  onSave?: (data: any) => void;
+  onSave?: (data: any) => Promise<void> | void;
+  isSaving?: boolean;
 }
 
-export default function ProfileInfo({ user, onSave }: ProfileInfoProps) {
+export default function ProfileInfo({ user, onSave, isSaving = false }: ProfileInfoProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || "",
@@ -41,9 +42,16 @@ export default function ProfileInfo({ user, onSave }: ProfileInfoProps) {
     });
   }, [user]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (onSave) {
-      onSave(formData);
+      try {
+        await onSave(formData);
+        setIsEditing(false);
+      } catch (error) {
+        // Erro tratado pelo componente pai
+        console.error("Erro ao salvar perfil:", error);
+      }
+      return;
     }
     setIsEditing(false);
   };
@@ -118,7 +126,7 @@ export default function ProfileInfo({ user, onSave }: ProfileInfoProps) {
             id="name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            disabled={!isEditing}
+            disabled={!isEditing || isSaving}
             placeholder="Digite seu nome"
           />
         </div>
@@ -133,7 +141,7 @@ export default function ProfileInfo({ user, onSave }: ProfileInfoProps) {
               id="email"
               value={isEditing ? formData.email : maskEmail(formData.email)}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              disabled={!isEditing}
+              disabled={!isEditing || isSaving}
               type={isEditing ? "email" : "text"}
               className="flex-1"
             />
@@ -159,7 +167,7 @@ export default function ProfileInfo({ user, onSave }: ProfileInfoProps) {
               id="phone"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              disabled={!isEditing}
+              disabled={!isEditing || isSaving}
               placeholder="(11) 99999-9999"
             />
           ) : (
@@ -180,7 +188,7 @@ export default function ProfileInfo({ user, onSave }: ProfileInfoProps) {
           <RadioGroup
             value={formData.gender}
             onValueChange={(value) => setFormData({ ...formData, gender: value })}
-            disabled={!isEditing}
+            disabled={!isEditing || isSaving}
             className="flex space-x-6"
           >
             <div className="flex items-center space-x-2">
@@ -213,7 +221,7 @@ export default function ProfileInfo({ user, onSave }: ProfileInfoProps) {
             id="cpf"
             value={formData.cpf}
             onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
-            disabled={!isEditing}
+            disabled={!isEditing || isSaving}
             placeholder="000.000.000-00"
             className="max-w-xs"
           />
@@ -226,6 +234,7 @@ export default function ProfileInfo({ user, onSave }: ProfileInfoProps) {
               onClick={handleCancel}
               variant="outline"
               className="border-gray-300"
+              disabled={isSaving}
             >
               <X className="h-4 w-4 mr-2" />
               Cancelar
@@ -233,9 +242,10 @@ export default function ProfileInfo({ user, onSave }: ProfileInfoProps) {
             <Button
               onClick={handleSave}
               className="bg-[#3e2626] hover:bg-[#5a3a3a] text-white"
+              disabled={isSaving}
             >
               <Save className="h-4 w-4 mr-2" />
-              Gravar
+              {isSaving ? "Salvando..." : "Gravar"}
             </Button>
           </div>
         )}
