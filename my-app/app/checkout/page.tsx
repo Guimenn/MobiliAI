@@ -173,146 +173,6 @@ export default function CheckoutPage() {
         } catch (e) {
           console.error('Erro ao parsear produtos do sessionStorage:', e);
         }
-      } catch (error) {
-        console.error('Erro ao carregar produtos recomendados:', error);
-        setRecommendedProducts([]);
-      } finally {
-        setIsLoadingRecommended(false);
-      }
-    };
-
-    if (currentStep === 'address') {
-      loadRecommendedProducts();
-    }
-  }, [checkoutItems, currentStep]);
-
-  // Adicionar produto recomendado ao carrinho
-  const handleAddRecommendedProduct = async (product: any) => {
-    try {
-      const store = useAppStore.getState();
-      
-      // Preparar produto no formato esperado
-      const productToAdd = {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        imageUrl: product.imageUrls?.[0] || product.imageUrl,
-        storeId: product.storeId,
-        category: product.category || '',
-        stock: product.stock || 0,
-      };
-      
-      // Adicionar ao carrinho
-      store.addToCart(productToAdd, 1);
-      
-      // Atualizar produtos selecionados
-      setSelectedProducts(prev => new Set([...prev, product.id]));
-      
-      alert('Produto adicionado ao carrinho!');
-    } catch (error) {
-      console.error('Erro ao adicionar produto:', error);
-      alert('Erro ao adicionar produto ao carrinho');
-    }
-  };
-
-  // Abrir Quick View
-  const openQuickView = async (product: any) => {
-    try {
-      setIsLoadingQuickView(true);
-      setQuickViewProduct(null);
-      setQuickViewImages([]);
-      setQuickViewImageIndex(0);
-      setQuickViewQty(1);
-
-      // Buscar detalhes do produto
-      try {
-        const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
-        const res = await fetch(`${apiBaseUrl}/public/products/${product.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setQuickViewProduct({
-            id: data.id,
-            name: data.name,
-            description: data.description,
-            price: Number(data.price),
-            stock: Number(data.stock) || 0,
-            brand: data.brand,
-            color: data.colorHex || data.colorName,
-            material: data.material,
-            dimensions: data.width && data.height && data.depth ? `${data.width}x${data.height}x${data.depth}cm` : data.dimensions,
-            imageUrl: (Array.isArray(data.imageUrls) && data.imageUrls[0]) || data.imageUrl,
-            storeId: data.store?.id || data.storeId || '',
-          });
-          if (Array.isArray(data.imageUrls) && data.imageUrls.length > 0) {
-            setQuickViewImages(data.imageUrls);
-          } else if (data.imageUrl) {
-            setQuickViewImages([data.imageUrl]);
-          }
-        } else {
-          // fallback: usar o produto do card
-          setQuickViewProduct({
-            id: product.id,
-            name: product.name,
-            price: Number(product.price),
-            imageUrl: product.imageUrls?.[0] || product.imageUrl,
-            storeId: product.storeId,
-            stock: product.stock || 0,
-          });
-          setQuickViewImages([product.imageUrls?.[0] || product.imageUrl].filter(Boolean));
-        }
-      } catch (e) {
-        setQuickViewProduct({
-          id: product.id,
-          name: product.name,
-          price: Number(product.price),
-          imageUrl: product.imageUrls?.[0] || product.imageUrl,
-          storeId: product.storeId,
-          stock: product.stock || 0,
-        });
-        setQuickViewImages([product.imageUrls?.[0] || product.imageUrl].filter(Boolean));
-      }
-
-      setIsQuickViewOpen(true);
-    } finally {
-      setIsLoadingQuickView(false);
-    }
-  };
-
-  const handleQuickAddToCart = () => {
-    if (!quickViewProduct) return;
-    const store = useAppStore.getState();
-    const productToAdd = {
-      id: quickViewProduct.id,
-      name: quickViewProduct.name,
-      price: quickViewProduct.price,
-      imageUrl: quickViewProduct.imageUrl || quickViewImages[0],
-      storeId: quickViewProduct.storeId,
-    } as any;
-    store.addToCart(productToAdd, quickViewQty);
-
-    // Incluir na compra atual (itens selecionados no checkout)
-    setSelectedProducts((prev) => {
-      const updated = new Set([...Array.from(prev), String(quickViewProduct.id)]);
-      try {
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem(
-            'checkout-selected-products',
-            JSON.stringify(Array.from(updated))
-          );
-        }
-      } catch {}
-      return updated;
-    });
-  };
-
-  // Selecionar/desselecionar produto individual
-  const toggleProductSelection = (productId: string) => {
-    setSelectedProducts(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(productId)) {
-        newSet.delete(productId);
-      } else {
-        newSet.add(productId);
       }
       
       // Se não houver no sessionStorage ou se falhar, usar todos do carrinho
@@ -629,6 +489,8 @@ export default function CheckoutPage() {
         price: product.price,
         imageUrl: product.imageUrls?.[0] || product.imageUrl,
         storeId: product.storeId,
+        category: product.category || '',
+        stock: product.stock || 0,
       };
       
       // Adicionar ao carrinho
@@ -792,149 +654,15 @@ export default function CheckoutPage() {
         zipCode: editAddress.zipCode,
       });
 
-  // Função para continuar comprando
-  const continueShopping = () => {
-    router.push('/products');
-  };
-
-    // Validar se há itens no carrinho
-    if (!checkoutItems || checkoutItems.length === 0) {
-      alert('Seu carrinho está vazio. Adicione produtos antes de finalizar o pedido.');
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      // Sincronizar carrinho do frontend com o backend antes do checkout
-      console.log('Sincronizando carrinho com o backend...', checkoutItems.length, 'itens');
-      
-      // Adicionar todos os itens do carrinho do frontend ao backend
-      for (const item of checkoutItems) {
-        try {
-          await customerAPI.addToCart(item.product.id, item.quantity);
-          console.log(`Produto ${item.product.id} adicionado ao backend`);
-        } catch (error: any) {
-          console.warn(`Erro ao adicionar produto ${item.product.id} ao backend:`, error.message);
-          // Continuar mesmo se houver erro em um produto
-        }
-      }
-
-      // Verificar se o carrinho no backend tem itens após sincronização
-      const backendCart = await customerAPI.getCart();
-      if (!backendCart || !backendCart.items || backendCart.items.length === 0) {
-        alert('Não foi possível sincronizar seu carrinho com o servidor. Por favor, adicione os produtos novamente.');
-        setIsProcessing(false);
-        router.push('/cart');
-        return;
-      }
-
-      console.log('Carrinho sincronizado:', backendCart.items.length, 'itens no backend');
-
-      // Agrupar por loja (assumindo que todos os produtos são da mesma loja ou primeiro)
-      const storeId = checkoutItems[0]?.product?.storeId || 'default';
-      
-      console.log('Dados do checkout:', {
-        storeId,
-        itemsCount: checkoutItems.length,
-        backendCartItemsCount: backendCart.items?.length || 0,
-        shippingAddress,
-        paymentMethod,
-        shippingCost,
-        insuranceCost,
-        tax,
-        discount,
-      });
-      
-      // Criar a venda no backend (usuário já está autenticado neste ponto)
-      const saleResponse = await customerAPI.checkout({
-        storeId,
-        shippingAddress: `${shippingAddress.address}, ${shippingAddress.number}${shippingAddress.complement ? ` - ${shippingAddress.complement}` : ''}`,
-        shippingCity: shippingAddress.city,
-        shippingState: shippingAddress.state,
-        shippingZipCode: shippingAddress.zipCode,
-        shippingPhone: shippingAddress.phone,
-        shippingCost: shippingCost,
-        insuranceCost: insuranceCost,
-        tax: tax,
-        discount: discount,
-        notes: `Pedido via checkout web. Frete: ${selectedShipping === 'express' ? 'Expresso' : 'Padrão'}. ${shippingInsurance ? 'Com seguro de envio' : 'Sem seguro'}.${appliedCoupon ? ` Cupom aplicado: ${appliedCoupon.code}` : ''}`,
-      });
-
-      // Se o método de pagamento for PIX, redirecionar para página de pagamento PIX
-      if (paymentMethod.type === 'pix') {
-        router.push(`/payment/pix?saleId=${saleResponse.id}`);
-      } else if (paymentMethod.type === 'credit_card') {
-        // Criar pagamento de cartão via checkout AbacatePay e redirecionar
-        try {
-          const res = await customerAPI.createCardPayment(saleResponse.id, {
-            name: user?.name,
-            email: user?.email,
-            phone: user?.phone,
-            cpf: shippingAddress?.cpf,
-          });
-          const redirectUrl = res?.checkoutUrl || res?.paymentUrl || res?.url;
-          if (redirectUrl) {
-            window.location.href = redirectUrl;
-            return;
-          }
-          // Fallback: se não veio URL, ir para sucesso
-          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-        } catch (err: any) {
-          console.error('Erro ao criar pagamento de cartão:', err);
-          const msg = err?.response?.data?.message || err?.message || 'Erro ao iniciar pagamento com cartão';
-          alert(msg);
-          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-        }
-      } else if (paymentMethod.type === 'boleto') {
-        // Criar pagamento de boleto via checkout AbacatePay e redirecionar
-        try {
-          const res = await customerAPI.createBoletoPayment(saleResponse.id, {
-            name: user?.name,
-            email: user?.email,
-            phone: user?.phone,
-            cpf: shippingAddress?.cpf,
-          });
-          const redirectUrl = res?.checkoutUrl || res?.paymentUrl || res?.url;
-          if (redirectUrl) {
-            window.location.href = redirectUrl;
-            return;
-          }
-          // Fallback: se não veio URL, ir para sucesso
-          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-        } catch (err: any) {
-          console.error('Erro ao criar pagamento por boleto:', err);
-          const msg = err?.response?.data?.message || err?.message || 'Erro ao iniciar pagamento por boleto';
-          alert(msg);
-          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-        }
-      } else {
-        // Para outros métodos, redirecionar para página de confirmação
-        router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-      }
+      // Atualizar estado local
+      setShippingAddress({ ...editAddress });
+      setIsEditModalOpen(false);
+      alert('Endereço atualizado com sucesso!');
     } catch (error: any) {
-      console.error('Erro ao finalizar pedido:', error);
-      console.error('Detalhes do erro:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      
-      // Extrair mensagem de erro mais detalhada
-      let errorMessage = 'Erro ao processar pedido. Tente novamente.';
-      
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      alert(`Erro: ${errorMessage}`);
-      setIsProcessing(false);
+      console.error('Erro ao salvar endereço:', error);
+      alert(error.response?.data?.message || 'Erro ao salvar endereço');
     } finally {
-      setIsProcessing(false);
+      setIsSaving(false);
     }
   };
 
@@ -1076,11 +804,54 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Validar se há itens no carrinho
+    if (!checkoutItems || checkoutItems.length === 0) {
+      alert('Seu carrinho está vazio. Adicione produtos antes de finalizar o pedido.');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
+      // Sincronizar carrinho do frontend com o backend antes do checkout
+      console.log('Sincronizando carrinho com o backend...', checkoutItems.length, 'itens');
+      
+      // Adicionar todos os itens do carrinho do frontend ao backend
+      for (const item of checkoutItems) {
+        try {
+          await customerAPI.addToCart(item.product.id, item.quantity);
+          console.log(`Produto ${item.product.id} adicionado ao backend`);
+        } catch (error: any) {
+          console.warn(`Erro ao adicionar produto ${item.product.id} ao backend:`, error.message);
+          // Continuar mesmo se houver erro em um produto
+        }
+      }
+
+      // Verificar se o carrinho no backend tem itens após sincronização
+      const backendCart = await customerAPI.getCart();
+      if (!backendCart || !backendCart.items || backendCart.items.length === 0) {
+        alert('Não foi possível sincronizar seu carrinho com o servidor. Por favor, adicione os produtos novamente.');
+        setIsProcessing(false);
+        router.push('/cart');
+        return;
+      }
+
+      console.log('Carrinho sincronizado:', backendCart.items.length, 'itens no backend');
+
       // Agrupar por loja (assumindo que todos os produtos são da mesma loja ou primeiro)
-      const storeId = checkoutItems[0]?.product.storeId || 'default';
+      const storeId = checkoutItems[0]?.product?.storeId || 'default';
+      
+      console.log('Dados do checkout:', {
+        storeId,
+        itemsCount: checkoutItems.length,
+        backendCartItemsCount: backendCart.items?.length || 0,
+        shippingAddress,
+        paymentMethod,
+        shippingCost,
+        insuranceCost,
+        tax,
+        discount,
+      });
       
       // Criar a venda no backend (usuário já está autenticado neste ponto)
       const saleResponse = await customerAPI.checkout({
@@ -1090,14 +861,84 @@ export default function CheckoutPage() {
         shippingState: shippingAddress.state,
         shippingZipCode: shippingAddress.zipCode,
         shippingPhone: shippingAddress.phone,
+        shippingCost: shippingCost,
+        insuranceCost: insuranceCost,
+        tax: tax,
+        discount: discount,
         notes: `Pedido via checkout web. Frete: ${selectedShipping === 'express' ? 'Expresso' : 'Padrão'}. ${shippingInsurance ? 'Com seguro de envio' : 'Sem seguro'}.${appliedCoupon ? ` Cupom aplicado: ${appliedCoupon.code}` : ''}`,
       });
 
-      // Redirecionar para página de confirmação
-      router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+      // Se o método de pagamento for PIX, redirecionar para página de pagamento PIX
+      if (paymentMethod.type === 'pix') {
+        router.push(`/payment/pix?saleId=${saleResponse.id}`);
+      } else if (paymentMethod.type === 'credit_card') {
+        // Criar pagamento de cartão via checkout AbacatePay e redirecionar
+        try {
+          const res = await customerAPI.createCardPayment(saleResponse.id, {
+            name: user?.name,
+            email: user?.email,
+            phone: user?.phone,
+            cpf: shippingAddress?.cpf,
+          });
+          const redirectUrl = res?.checkoutUrl || res?.paymentUrl || res?.url;
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+            return;
+          }
+          // Fallback: se não veio URL, ir para sucesso
+          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+        } catch (err: any) {
+          console.error('Erro ao criar pagamento de cartão:', err);
+          const msg = err?.response?.data?.message || err?.message || 'Erro ao iniciar pagamento com cartão';
+          alert(msg);
+          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+        }
+      } else if (paymentMethod.type === 'boleto') {
+        // Criar pagamento de boleto via checkout AbacatePay e redirecionar
+        try {
+          const res = await customerAPI.createBoletoPayment(saleResponse.id, {
+            name: user?.name,
+            email: user?.email,
+            phone: user?.phone,
+            cpf: shippingAddress?.cpf,
+          });
+          const redirectUrl = res?.checkoutUrl || res?.paymentUrl || res?.url;
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+            return;
+          }
+          // Fallback: se não veio URL, ir para sucesso
+          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+        } catch (err: any) {
+          console.error('Erro ao criar pagamento por boleto:', err);
+          const msg = err?.response?.data?.message || err?.message || 'Erro ao iniciar pagamento por boleto';
+          alert(msg);
+          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+        }
+      } else {
+        // Para outros métodos, redirecionar para página de confirmação
+        router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+      }
     } catch (error: any) {
       console.error('Erro ao finalizar pedido:', error);
-      alert(error.response?.data?.message || 'Erro ao processar pedido. Tente novamente.');
+      console.error('Detalhes do erro:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      
+      // Extrair mensagem de erro mais detalhada
+      let errorMessage = 'Erro ao processar pedido. Tente novamente.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`Erro: ${errorMessage}`);
       setIsProcessing(false);
     } finally {
       setIsProcessing(false);
@@ -1814,709 +1655,6 @@ export default function CheckoutPage() {
                   </CardContent>
                 </Card>
               </div>
-            </Card>
-
-            {/* Agrupar por loja */}
-            {Object.entries(productsByStore).map(([storeId, storeData]) => (
-              <Card key={storeId} className="overflow-hidden shadow-xl border-2 border-gray-200 hover:shadow-2xl hover:border-[#3e2626]/40 transition-all duration-300 bg-white">
-                {/* Header da Loja */}
-                <div className="bg-gradient-to-r from-[#3e2626] via-[#4a2f2f] to-[#3e2626] p-5 border-b-2 border-[#5a3a3a] shadow-md">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center space-x-2">
-                      <MapPin className="h-5 w-5" />
-                      <span>Endereço de Entrega</span>
-                    </CardTitle>
-                    <Badge className="bg-white text-[#3e2626]">1 de 3</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  {/* Exibição do Endereço */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xl font-bold text-gray-900">Endereço De Envio</h3>
-                      <button
-                        onClick={handleOpenEditModal}
-                        className="text-sm text-gray-600 hover:text-[#3e2626] font-medium"
-                      >
-                        Mudar &gt;
-                      </button>
-                      </div>
-
-                    {isLoadingUserData ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
-                    </div>
-                    ) : (
-                      <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <p className="font-bold text-gray-900">{shippingAddress.name || 'Nome não informado'}</p>
-                              {shippingAddress.phone && (
-                                <span className="text-gray-600">{shippingAddress.phone}</span>
-                              )}
-                  </div>
-                            <p className="text-sm text-gray-700 mb-1">
-                              {shippingAddress.address ? (
-                                <>
-                                  {shippingAddress.address}
-                                  {shippingAddress.number && ` ${shippingAddress.number}`}
-                                  {shippingAddress.complement && ` - ${shippingAddress.complement}`}
-                                  {shippingAddress.neighborhood && !shippingAddress.address.includes(shippingAddress.neighborhood) && ` (${shippingAddress.neighborhood})`}
-                                </>
-                              ) : (
-                                shippingAddress.neighborhood && `${shippingAddress.neighborhood}`
-                              )}
-                            </p>
-                            <p className="text-sm text-gray-700">
-                              {shippingAddress.neighborhood && shippingAddress.address && !shippingAddress.address.includes(shippingAddress.neighborhood) && (
-                                <>{shippingAddress.neighborhood}, </>
-                              )}
-                              {shippingAddress.city && <>{shippingAddress.city} </>}
-                              {shippingAddress.state && <>{shippingAddress.state} </>}
-                              Brazil
-                              {shippingAddress.zipCode && ` ${shippingAddress.zipCode.replace(/(\d{5})(\d{3})/, '$1-$2')}`}
-                            </p>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="phone">Telefone *</Label>
-                      <Input
-                        id="phone"
-                        value={shippingAddress.phone}
-                        onChange={(e) => {
-                          const formatted = formatPhone(e.target.value);
-                          setShippingAddress({ ...shippingAddress, phone: formatted });
-                          setPhoneError('');
-                          
-                          // Validar ao perder o foco ou quando tiver 14 ou 15 caracteres (com formatação)
-                          if (formatted.replace(/\D/g, '').length >= 10) {
-                            if (!validatePhone(formatted)) {
-                              setPhoneError('Telefone inválido. Use o formato (11) 99999-9999');
-                            }
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const phone = e.target.value;
-                          if (phone && phone.replace(/\D/g, '').length >= 10) {
-                            if (!validatePhone(phone)) {
-                              setPhoneError('Telefone inválido. Use o formato (11) 99999-9999');
-                            } else {
-                              setPhoneError('');
-                            }
-                          }
-                        }}
-                        placeholder="(11) 99999-9999"
-                        className={`mt-1 ${phoneError ? 'border-red-500' : ''}`}
-                        maxLength={15}
-                      />
-                      {phoneError && (
-                        <p className="text-sm text-red-600 mt-1">{phoneError}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="cpf">CPF *</Label>
-                      <Input
-                        id="cpf"
-                        value={shippingAddress.cpf}
-                        onChange={(e) => {
-                          const formatted = formatCPF(e.target.value);
-                          setShippingAddress({ ...shippingAddress, cpf: formatted });
-                          setCpfError('');
-                          
-                          // Validar quando tiver 14 caracteres (com formatação)
-                          if (formatted.replace(/\D/g, '').length === 11) {
-                            if (!validateCPF(formatted)) {
-                              setCpfError('CPF inválido. Verifique os dígitos');
-                            }
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const cpf = e.target.value;
-                          if (cpf && cpf.replace(/\D/g, '').length === 11) {
-                            if (!validateCPF(cpf)) {
-                              setCpfError('CPF inválido. Verifique os dígitos');
-                            } else {
-                              setCpfError('');
-                            }
-                          }
-                        }}
-                        placeholder="000.000.000-00"
-                        className={`mt-1 ${cpfError ? 'border-red-500' : ''}`}
-                        maxLength={14}
-                      />
-                      {cpfError && (
-                        <p className="text-sm text-red-600 mt-1">{cpfError}</p>
-                      )}
-                    </div>
-                    )}
-
-                    {/* Mensagem Informativa */}
-                    <div className="bg-gray-50 border-l-4 border-red-500 rounded p-4">
-                      <p className="text-sm text-gray-700">
-                        Para assegurar a entrada de seu pedido no Brasil, confirme a validade e regularidade do CPF registrado na plataforma e certifique-se de que o nome do destinatário informado é igual ao do CPF, sem abreviações. Seu endereço deve estar completo.
-                      </p>
-                    </div>
-                    </div>
-
-                  <div className="flex justify-end pt-4">
-                    <Button
-                      onClick={handleNextStep}
-                      disabled={isLoadingUserData || !shippingAddress.name || !shippingAddress.address}
-                      className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white hover:from-[#2a1f1f] hover:to-[#3e2626] px-8"
-                    >
-                      {isLoadingUserData ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Carregando...
-                        </>
-                      ) : (
-                        'Continuar para Pagamento'
-                      )}
-                    </Button>
-                    </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Itens da Compra (entre Endereço e Adicione Mais) */}
-            {currentStep === 'address' && checkoutItems.length > 0 && (
-              <Card className="shadow-xl border-2 border-gray-200">
-                <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white rounded-t-lg">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center space-x-2">
-                      <Package className="h-5 w-5" />
-                      <span>Itens da compra</span>
-                    </CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsItemsModalOpen(true)}
-                      className="text-white/90 hover:text-white"
-                    >
-                      Visualizar {totalCheckoutQuantity} {totalCheckoutQuantity === 1 ? 'item' : 'itens'}
-                      <ArrowLeft className="rotate-180 h-4 w-4 ml-1" />
-                    </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="overflow-x-auto">
-                    <div className="flex gap-4">
-                      {checkoutItems.map((item) => (
-                        <div
-                          key={item.product.id}
-                          className="w-44 min-w-44 border border-gray-200 rounded-lg p-2 bg-white"
-                        >
-                          <div className="w-full aspect-square rounded-md overflow-hidden bg-gray-100 mb-2">
-                            {item.product.imageUrl ? (
-                              <img
-                                src={item.product.imageUrl}
-                                alt={item.product.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
-                                <Package className="h-8 w-8 text-white" />
-                    </div>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-800 line-clamp-2 mb-1">{item.product.name}</div>
-                          <div className="text-sm font-bold text-[#3e2626] mb-1">
-                            R$ {Number(item.product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </div>
-                          <div className="text-xs text-gray-500">Qtd: {item.quantity}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Produtos Recomendados - Adicione mais itens */}
-            {currentStep === 'address' && showRecommendedProducts && (
-              <Card className="shadow-xl border-2 border-gray-200">
-                <CardContent className="p-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-semibold text-[#3e2626]">
-                      Adicione mais itens para enviar juntos
-                    </h3>
-                    <div className="flex items-center space-x-2">
-                     
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowRecommendedProducts(false)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    </div>
-
-                  {isLoadingRecommended ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
-                      <span className="ml-2 text-gray-600">Carregando produtos...</span>
-                    </div>
-                  ) : recommendedProducts.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">Nenhum produto recomendado disponível no momento.</p>
-                      <p className="text-sm text-gray-500 mt-2">Total de produtos no carrinho: {checkoutItems.length}</p>
-                    </div>
-                  ) : (
-                    <>
-                  <div className="relative">
-                    <div className="overflow-hidden">
-                      <div 
-                        className="flex transition-transform duration-300 ease-in-out"
-                        style={{ transform: `translateX(-${recommendedProductIndex * (100 / VISIBLE_RECOMMENDED)}%)` }}
-                      >
-                        {recommendedProducts.map((p) => (
-                          <div
-                            key={p.id}
-                            className="flex flex-col cursor-pointer group shrink-0 px-4"
-                            style={{ minWidth: `${100 / VISIBLE_RECOMMENDED}%`, maxWidth: `${100 / VISIBLE_RECOMMENDED}%` }}
-                            onClick={() => openQuickView(p)}
-                          >
-                            <div className="w-full h-60 bg-white rounded-lg overflow-hidden mb-3">
-                              {p.imageUrls?.[0] || p.imageUrl ? (
-                                <img
-                                  src={p.imageUrls?.[0] || p.imageUrl}
-                                  alt={p.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                                  <Package className="h-10 w-10 text-gray-400" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex flex-col items-center">
-                              <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-lg font-bold text-orange-500">
-                                  R${Number(p.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
-                              </div>
-                              {p.originalPrice && Number(p.originalPrice) > Number(p.price) && (
-                                <div className="mb-1">
-                                  <span className="inline-block bg-orange-100 text-orange-500 text-sm font-medium px-2 py-1 rounded">
-                                    -{Math.round(((Number(p.originalPrice) - Number(p.price)) / Number(p.originalPrice)) * 100)}%
-                                  </span>
-                                </div>
-                              )}
-                              <p className="text-sm text-gray-500">Estimado</p>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-
-                    {recommendedProductIndex > 0 && (
-                      <button
-                        type="button"
-                        className="absolute left-0 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white hover:bg-gray-100 flex items-center justify-center z-10 transition-colors shadow-md border border-gray-200"
-                        onClick={() => setRecommendedProductIndex(prev => Math.max(0, prev - 1))}
-                      >
-                        <ChevronLeft className="h-6 w-6 text-black" />
-                      </button>
-                    )}
-
-                    {recommendedProductIndex < Math.max(0, recommendedProducts.length - VISIBLE_RECOMMENDED) && (
-                      <button
-                        type="button"
-                        className="absolute right-0 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white hover:bg-gray-100 flex items-center justify-center z-10 transition-colors shadow-md border border-gray-200"
-                        onClick={() => setRecommendedProductIndex(prev => Math.min(Math.max(0, recommendedProducts.length - VISIBLE_RECOMMENDED), prev + 1))}
-                      >
-                        <ChevronRight className="h-6 w-6 text-black" />
-                      </button>
-                    )}
-                  </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Método de Pagamento */}
-            {currentStep === 'payment' && (
-              <Card className="shadow-xl border-2 border-gray-200">
-                <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white rounded-t-lg">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center space-x-2">
-                      <CreditCard className="h-5 w-5" />
-                      <span>Método de Pagamento</span>
-                    </CardTitle>
-                    <Badge className="bg-white text-[#3e2626]">2 de 3</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  {/* Opções de Pagamento */}
-                  <div className="space-y-3">
-                    {/* PIX */}
-                    <div
-                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        paymentMethod.type === 'pix'
-                          ? 'border-[#3e2626] bg-[#3e2626]/5'
-                          : 'border-gray-200 hover:border-[#3e2626]/50'
-                      }`}
-                      onClick={() => setPaymentMethod({ type: 'pix' })}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          paymentMethod.type === 'pix' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
-                        }`}>
-                          {paymentMethod.type === 'pix' && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-semibold text-[#3e2626]">PIX</span>
-                            <Badge className="bg-green-500 text-white text-xs">Instantâneo</Badge>
-                          </div>
-                          <p className="text-sm text-gray-600">Pagamento instantâneo via PIX</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Cartão de Crédito */}
-                    <div
-                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        paymentMethod.type === 'credit_card'
-                          ? 'border-[#3e2626] bg-[#3e2626]/5'
-                          : 'border-gray-200 hover:border-[#3e2626]/50'
-                      }`}
-                      onClick={() => setPaymentMethod({ type: 'credit_card', installments: 1 })}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          paymentMethod.type === 'credit_card' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
-                        }`}>
-                          {paymentMethod.type === 'credit_card' && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-semibold text-[#3e2626]">Cartão de Crédito</span>
-                            <div className="flex items-center space-x-1">
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">VISA</span>
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">MASTERCARD</span>
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">ELO</span>
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-600">Parcelamento em até 12x sem juros</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {paymentMethod.type === 'credit_card' && (
-                      <div className="ml-8 mt-4 p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
-                        <div>
-                          <Label htmlFor="cardNumber">Número do Cartão *</Label>
-                          <Input
-                            id="cardNumber"
-                            value={paymentMethod.cardNumber || ''}
-                            onChange={(e) => setPaymentMethod({ ...paymentMethod, cardNumber: e.target.value })}
-                            placeholder="0000 0000 0000 0000"
-                            className="mt-1"
-                            maxLength={19}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="cardName">Nome no Cartão *</Label>
-                          <Input
-                            id="cardName"
-                            value={paymentMethod.cardName || ''}
-                            onChange={(e) => setPaymentMethod({ ...paymentMethod, cardName: e.target.value })}
-                            placeholder="NOME COMO NO CARTÃO"
-                            className="mt-1"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="expiryDate">Validade *</Label>
-                            <Input
-                              id="expiryDate"
-                              value={paymentMethod.expiryDate || ''}
-                              onChange={(e) => setPaymentMethod({ ...paymentMethod, expiryDate: e.target.value })}
-                              placeholder="MM/AA"
-                              className="mt-1"
-                              maxLength={5}
-                            />
-                          </div>
-
-                          <div>
-                            <Label htmlFor="cvv">CVV *</Label>
-                            <Input
-                              id="cvv"
-                              type="password"
-                              value={paymentMethod.cvv || ''}
-                              onChange={(e) => setPaymentMethod({ ...paymentMethod, cvv: e.target.value })}
-                              placeholder="000"
-                              className="mt-1"
-                              maxLength={4}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="installments">Parcelas</Label>
-                          <select
-                            id="installments"
-                            value={paymentMethod.installments || 1}
-                            onChange={(e) => setPaymentMethod({ ...paymentMethod, installments: parseInt(e.target.value) })}
-                            className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          >
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => (
-                              <option key={num} value={num}>
-                                {num}x de R$ {(total / num).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} sem juros
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Cartão de Débito */}
-                    <div
-                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        paymentMethod.type === 'debit_card'
-                          ? 'border-[#3e2626] bg-[#3e2626]/5'
-                          : 'border-gray-200 hover:border-[#3e2626]/50'
-                      }`}
-                      onClick={() => setPaymentMethod({ type: 'debit_card' })}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          paymentMethod.type === 'debit_card' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
-                        }`}>
-                          {paymentMethod.type === 'debit_card' && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-semibold text-[#3e2626]">Cartão de Débito</span>
-                          <p className="text-sm text-gray-600">Débito online</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Boleto */}
-                    <div
-                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        paymentMethod.type === 'boleto'
-                          ? 'border-[#3e2626] bg-[#3e2626]/5'
-                          : 'border-gray-200 hover:border-[#3e2626]/50'
-                      }`}
-                      onClick={() => setPaymentMethod({ type: 'boleto' })}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          paymentMethod.type === 'boleto' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
-                        }`}>
-                          {paymentMethod.type === 'boleto' && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-semibold text-[#3e2626]">Boleto Bancário</span>
-                          <p className="text-sm text-gray-600">Vencimento em 3 dias úteis</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Opções de Entrega */}
-                  <div className="pt-6 border-t border-gray-200">
-                    <h3 className="font-semibold text-lg text-[#3e2626] mb-4">Opções de Entrega</h3>
-                    
-                    <div className="space-y-3">
-                      <div
-                        className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                          selectedShipping === 'standard'
-                            ? 'border-[#3e2626] bg-[#3e2626]/5'
-                            : 'border-gray-200 hover:border-[#3e2626]/50'
-                        }`}
-                        onClick={() => setSelectedShipping('standard')}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                              selectedShipping === 'standard' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
-                            }`}>
-                              {selectedShipping === 'standard' && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-[#3e2626]">Entrega Padrão</div>
-                              <div className="text-sm text-gray-600">
-                                {shippingCost === 0 ? (
-                                  <span className="text-green-600 font-semibold">Grátis</span>
-                                ) : (
-                                  `R$ ${shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-500 mt-1">Entrega em 7-10 dias úteis</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                          selectedShipping === 'express'
-                            ? 'border-[#3e2626] bg-[#3e2626]/5'
-                            : 'border-gray-200 hover:border-[#3e2626]/50'
-                        }`}
-                        onClick={() => setSelectedShipping('express')}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                              selectedShipping === 'express' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
-                            }`}>
-                              {selectedShipping === 'express' && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-[#3e2626]">Entrega Expressa</div>
-                              <div className="text-sm text-gray-600">
-                                R$ {shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </div>
-                              <div className="text-xs text-gray-500 mt-1">Entrega em 2-3 dias úteis</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center space-x-2">
-                      <Checkbox
-                        id="insurance"
-                        checked={shippingInsurance}
-                        onChange={(e) => setShippingInsurance(e.target.checked)}
-                      />
-                      <Label htmlFor="insurance" className="cursor-pointer">
-                        <span className="font-semibold">Seguro de envio</span>
-                        <span className="text-gray-600 ml-2">(R$ 5,00) - Reenvio gratuito se o item for perdido ou danificado</span>
-                      </Label>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between pt-6">
-                    <Button
-                      variant="outline"
-                      onClick={handlePreviousStep}
-                      className="border-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Voltar
-                    </Button>
-                    <Button
-                      onClick={handleNextStep}
-                      className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white hover:from-[#2a1f1f] hover:to-[#3e2626] px-8"
-                    >
-                      Revisar Pedido
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Revisão do Pedido */}
-            {currentStep === 'review' && (
-              <div className="space-y-6">
-                <Card className="shadow-xl border-2 border-gray-200">
-                  <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white rounded-t-lg">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center space-x-2">
-                        <Package className="h-5 w-5" />
-                        <span>Revisão do Pedido</span>
-                      </CardTitle>
-                      <Badge className="bg-white text-[#3e2626]">3 de 3</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-6 space-y-4">
-                    {/* Itens do Pedido */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-lg text-[#3e2626]">Itens do Pedido</h3>
-                      {checkoutItems.map((item) => (
-                        <div key={item.product.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                            {item.product.imageUrl ? (
-                              <img src={item.product.imageUrl} alt={item.product.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
-                                <Package className="h-8 w-8 text-white" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-[#3e2626]">{item.product.name}</h4>
-                            <p className="text-sm text-gray-600">Quantidade: {item.quantity}</p>
-                            <p className="text-lg font-bold text-[#3e2626] mt-1">
-                              R$ {(item.product.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Endereço de Entrega */}
-                    <div className="pt-4 border-t border-gray-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-lg text-[#3e2626]">Endereço de Entrega</h3>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setCurrentStep('address')}
-                          className="text-[#3e2626] hover:text-[#5a3a3a]"
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Editar
-                        </Button>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="font-semibold">{shippingAddress.name}</p>
-                        <p className="text-sm text-gray-600">
-                          {shippingAddress.address}, {shippingAddress.number}
-                          {shippingAddress.complement && ` - ${shippingAddress.complement}`}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {shippingAddress.neighborhood}, {shippingAddress.city} - {shippingAddress.state}
-                        </p>
-                        <p className="text-sm text-gray-600">CEP: {shippingAddress.zipCode}</p>
-                        <p className="text-sm text-gray-600">Telefone: {shippingAddress.phone}</p>
-                      </div>
-                    </div>
-
-                    {/* Método de Pagamento */}
-                    <div className="pt-4 border-t border-gray-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-lg text-[#3e2626]">Método de Pagamento</h3>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setCurrentStep('payment')}
-                          className="text-[#3e2626] hover:text-[#5a3a3a]"
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Editar
-                        </Button>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="font-semibold text-[#3e2626] capitalize">
-                          {paymentMethod.type === 'pix' && 'PIX'}
-                          {paymentMethod.type === 'credit_card' && `Cartão de Crédito${paymentMethod.installments ? ` - ${paymentMethod.installments}x` : ''}`}
-                          {paymentMethod.type === 'debit_card' && 'Cartão de Débito'}
-                          {paymentMethod.type === 'boleto' && 'Boleto Bancário'}
-                        </p>
-                        {paymentMethod.type === 'credit_card' && paymentMethod.cardNumber && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            •••• •••• •••• {paymentMethod.cardNumber.slice(-4)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             )}
           </div>
 
@@ -3097,4 +2235,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
