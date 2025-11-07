@@ -300,8 +300,8 @@ export default function HomePage() {
       gradient: 'from-[#FFD700] to-[#FFA500]'
     },
     { 
-      id: 'OUTROS', 
-      name: 'Outros', 
+      id: 'MESA_CENTRO', 
+      name: 'Mesa de centro', 
       icon: Package, 
       count: 12,
       description: 'Produtos especiais e exclusivos',
@@ -309,6 +309,19 @@ export default function HomePage() {
     },
   ];
 
+  // Imagens de fundo por categoria (pasta public/MobiliAI_MóveisCategoria)
+  const categoryBackgrounds: Record<string, string> = {
+    'SOFA': '/MobiliAI_MóveisCategoria/139.png',
+    'MESA': '/MobiliAI_MóveisCategoria/122.png',
+    'CADEIRA': '/MobiliAI_MóveisCategoria/103.png',
+    'ARMARIO': '/MobiliAI_MóveisCategoria/82.png',
+    'ESTANTE': '/MobiliAI_MóveisCategoria/69.png',
+    'POLTRONA': '/MobiliAI_MóveisCategoria/54.png',
+    'QUADRO': '/MobiliAI_MóveisCategoria/25.png',
+    'LUMINARIA': '/MobiliAI_MóveisCategoria/8.png',
+    // Fallback temporário para mesa de centro
+    'MESA_CENTRO': '/MobiliAI_MóveisCategoria/8.png',
+  };
   // Mapear categorias do banco para categorias de exibição
   // Mapeamento de categorias para nomes amigáveis
   const getCategoryDisplayName = (category: string) => {
@@ -320,7 +333,7 @@ export default function HomePage() {
       'poltrona': 'Poltrona',
       'quadro': 'Quadro',
       'luminaria': 'Luminária',
-      'outros': 'Outros'
+      'mesa_centro': 'Mesa de centro'
     };
     return categoryMap[category?.toLowerCase()] || category;
   };
@@ -338,7 +351,7 @@ export default function HomePage() {
     rating: product.rating || 0, // Usar rating real do banco
     reviews: product.reviewCount || 0, // Usar reviewCount real do banco
     badge: product.isNew ? 'Novo' : product.isBestSeller ? 'Mais Vendido' : product.isFeatured ? 'Destaque' : null,
-    originalPrice: undefined // Remover preços originais simulados
+    originalPrice: undefined as number | undefined // Remover preços originais simulados
   }));
 
   // Filtrar produtos baseado na categoria selecionada
@@ -650,7 +663,7 @@ export default function HomePage() {
             </div>
           </div>
       {/* Card de transição entre Hero e Categorias (metade sobre o hero, metade abaixo) */}
-      <div className="absolute inset-x-0 bottom-0 translate-y-[150%] sm:translate-y-[150%] md:translate-y-[150%] lg:translate-y-[210%] z-20">
+      <div className="absolute inset-x-0 bottom-0 translate-y-[150%] sm:translate-y-[150%] md:translate-y-[150%] lg:translate-y-[170%] z-20">
         <div className="w-[60%] mx-auto ">
           <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_rgba(0,0,0,0.18)] ring-1 ring-black/5">
               {/* Decor e fundo */}
@@ -835,6 +848,15 @@ export default function HomePage() {
             {/* Sofá - 3x2 (colunas 1-3, linhas 1-2) */}
             <Link href={`/products?category=${categories[0].id}`} className="md:col-span-3 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-[#3e2626] via-[#8B4513] to-[#A0522D] rounded-3xl overflow-hidden cursor-pointer shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.02]">
+                {/* Background Image */}
+                <Image
+                  src={categoryBackgrounds[categories[0].id]}
+                  alt={categories[0].name}
+                  fill
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  className="absolute inset-0 object-cover"
+                  priority
+                />
                 {/* Background Pattern */}
                 <div className="absolute inset-0 opacity-20">
                   <div className="absolute inset-0" style={{
@@ -847,15 +869,11 @@ export default function HomePage() {
                 {/* Conteúdo Principal */}
                 <div className="relative z-10 p-8 h-full flex flex-col justify-between">
                   <div>
-                    <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center mb-8 shadow-lg">
-                      <Sofa className="h-10 w-10 text-white" />
-                    </div>
+                   
                     <h3 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
                       {categories[0].name}
                     </h3>
-                    <p className="text-white/90 text-xl leading-relaxed max-w-md">
-                      {categories[0].description}
-                    </p>
+                   
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -881,28 +899,27 @@ export default function HomePage() {
             {/* Poltrona - 2x2 (colunas 4-5, linhas 1-2) */}
             <Link href={`/products?category=${categories[5].id}`} className="md:col-span-2 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                {/* Background Image */}
+                <Image
+                  src={categoryBackgrounds[categories[5].id]}
+                  alt={categories[5].name}
+                  fill
+                  sizes="(min-width: 1024px) 33vw, 100vw"
+                  className="absolute inset-0 object-cover"
+                />
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[5].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-6 h-full flex flex-col justify-between">
                   <div className="flex items-start justify-between">
-                    <div className={`w-16 h-16 bg-gradient-to-br ${categories[5].gradient} rounded-2xl flex items-center justify-center shadow-lg`}>
-                      {renderIcon(categories[5].icon, "h-8 w-8 text-white")}
-                    </div>
-                    <div className="text-right">
-                      <span className="text-3xl font-bold text-[#3e2626]">
-                        {categories[5].count}
-                      </span>
-                      <p className="text-sm text-gray-500 font-medium">produtos</p>
-                    </div>
+                    
+                   
                   </div>
                   
                   <div>
                     <h4 className="text-2xl font-bold text-[#3e2626] mb-2">
                       {categories[5].name}
                     </h4>
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      {categories[5].description}
-                    </p>
+                    
                   </div>
                 </div>
                 
@@ -913,28 +930,24 @@ export default function HomePage() {
             {/* Cadeiras - 1x2 (coluna 6, linhas 1-2) */}
             <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                {/* Background Image */}
+                <Image
+                  src={categoryBackgrounds[categories[2].id]}
+                  alt={categories[2].name}
+                  fill
+                  sizes="(min-width: 1024px) 16vw, 100vw"
+                  className="absolute inset-0 object-cover"
+                />
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-4 h-full flex flex-col justify-between">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[2].gradient} rounded-xl flex items-center justify-center shadow-md mb-4`}>
-                      {renderIcon(categories[2].icon, "h-6 w-6 text-white")}
-                    </div>
-                    <div className="text-center">
-                      <span className="text-2xl font-bold text-[#3e2626]">
-                        {categories[2].count}
-                      </span>
-                      <p className="text-xs text-gray-500">produtos</p>
-                    </div>
-                  </div>
+                  
                   
                   <div className="text-center">
                     <h4 className="text-lg font-bold text-[#3e2626] mb-1">
                       {categories[2].name}
                     </h4>
-                    <p className="text-xs text-gray-600 leading-relaxed">
-                      {categories[2].description}
-                    </p>
+                   
                   </div>
                 </div>
                 
@@ -945,28 +958,24 @@ export default function HomePage() {
             {/* Mesa - 2x2 (colunas 1-2, linhas 3-4) */}
             <Link href={`/products?category=${categories[1].id}`} className="md:col-span-2 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                {/* Background Image */}
+                <Image
+                  src={categoryBackgrounds[categories[1].id]}
+                  alt={categories[1].name}
+                  fill
+                  sizes="(min-width: 1024px) 33vw, 100vw"
+                  className="absolute inset-0 object-cover"
+                />
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[1].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-6 h-full flex flex-col justify-between">
-                  <div className="flex items-start justify-between">
-                    <div className={`w-16 h-16 bg-gradient-to-br ${categories[1].gradient} rounded-2xl flex items-center justify-center shadow-lg`}>
-                      {renderIcon(categories[1].icon, "h-8 w-8 text-white")}
-                    </div>
-                    <div className="text-right">
-                      <span className="text-3xl font-bold text-[#3e2626]">
-                        {categories[1].count}
-                      </span>
-                      <p className="text-sm text-gray-500 font-medium">produtos</p>
-                    </div>
-                  </div>
+                 
                   
                   <div>
                     <h4 className="text-2xl font-bold text-[#3e2626] mb-2">
                       {categories[1].name}
                     </h4>
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      {categories[1].description}
-                    </p>
+                   
                   </div>
                 </div>
                 
@@ -977,26 +986,27 @@ export default function HomePage() {
             {/* Estante - 2x1 (colunas 3-4, linha 3) */}
             <Link href={`/products?category=${categories[4].id}`} className="md:col-span-2 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                {/* Background Image */}
+                <Image
+                  src={categoryBackgrounds[categories[4].id]}
+                  alt={categories[4].name}
+                  fill
+                  sizes="(min-width: 1024px) 33vw, 100vw"
+                  className="absolute inset-0 object-cover"
+                />
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[4].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-4 h-full flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[4].gradient} rounded-xl flex items-center justify-center shadow-md`}>
-                      {renderIcon(categories[4].icon, "h-6 w-6 text-white")}
-                    </div>
+                   
                     <div>
                       <h4 className="text-lg font-bold text-[#3e2626] mb-1">
                         {categories[4].name}
                       </h4>
-                      <p className="text-sm text-gray-600">{categories[4].description}</p>
+                     
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-bold text-[#3e2626]">
-                      {categories[4].count}
-                    </span>
-                    <p className="text-xs text-gray-500">produtos</p>
-                  </div>
+                 
                 </div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
@@ -1006,17 +1016,23 @@ export default function HomePage() {
             {/* Quadro - 2x1 (coluna 6, linha 3) */}
             <Link href={`/products?category=${categories[6].id}`} className="md:col-span-2 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                {/* Background Image */}
+                <Image
+                  src={categoryBackgrounds[categories[6].id]}
+                  alt={categories[6].name}
+                  fill
+                  sizes="(min-width: 1024px) 16vw, 100vw"
+                  className="absolute inset-0 object-cover"
+                />
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
-                  <div className={`w-10 h-10 bg-gradient-to-br ${categories[6].gradient} rounded-lg flex items-center justify-center shadow-sm mb-2`}>
-                    {renderIcon(categories[6].icon, "h-5 w-5 text-white")}
-                  </div>
+                 
                   <div className="text-center">
                     <h4 className="text-sm font-bold text-[#3e2626] mb-1">
                       {categories[6].name}
                     </h4>
-                    <p className="text-xs text-gray-500">{categories[6].count} produtos</p>
+                    
                   </div>
                 </div>
                 
@@ -1029,46 +1045,53 @@ export default function HomePage() {
             {/* Luminária - 2x1 (colunas 3-4, linha 4) */}
             <Link href={`/products?category=${categories[7].id}`} className="md:col-span-2 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                {/* Background Image */}
+                <Image
+                  src={categoryBackgrounds[categories[7].id]}
+                  alt={categories[7].name}
+                  fill
+                  sizes="(min-width: 1024px) 33vw, 100vw"
+                  className="absolute inset-0 object-cover"
+                />
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[7].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-4 h-full flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${categories[7].gradient} rounded-xl flex items-center justify-center shadow-md`}>
-                      {renderIcon(categories[7].icon, "h-6 w-6 text-white")}
-                    </div>
+                   
                     <div>
                       <h4 className="text-lg font-bold text-[#3e2626] mb-1">
                         {categories[7].name}
                       </h4>
-                      <p className="text-sm text-gray-600">{categories[7].description}</p>
+                    
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-bold text-[#3e2626]">
-                      {categories[7].count}
-                    </span>
-                    <p className="text-xs text-gray-500">produtos</p>
-                  </div>
+                 
                 </div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
               </div>
             </Link>
 
-            {/* Outros - 1x1 (coluna 6, linha 4) */}
+            {/* Mesa de centro - 1x1 (coluna 6, linha 4) */}
             <Link href={`/products?category=${categories[8].id}`} className="md:col-span-1 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+                {/* Background Image */}
+                <Image
+                  src={categoryBackgrounds[categories[8].id]}
+                  alt={categories[8].name}
+                  fill
+                  sizes="(min-width: 1024px) 16vw, 100vw"
+                  className="absolute inset-0 object-cover"
+                />
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[8].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
-                  <div className={`w-10 h-10 bg-gradient-to-br ${categories[8].gradient} rounded-lg flex items-center justify-center shadow-sm mb-2`}>
-                    {renderIcon(categories[8].icon, "h-5 w-5 text-white")}
-                  </div>
+                  
                   <div className="text-center">
                     <h4 className="text-sm font-bold text-[#3e2626] mb-1">
                       {categories[8].name}
                     </h4>
-                    <p className="text-xs text-gray-500">{categories[8].count} produtos</p>
+                    
                   </div>
                 </div>
                 

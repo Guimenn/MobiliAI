@@ -25,7 +25,7 @@ export interface Product {
   id: string;
   name: string;
   description?: string;
-  category: 'sofa' | 'mesa' | 'cadeira' | 'armario' | 'cama' | 'decoracao' | 'iluminacao' | 'outros';
+  category: 'sofa' | 'mesa' | 'cadeira' | 'armario' | 'cama' | 'decoracao' | 'iluminacao' | 'mesa_centro';
   price: number;
   stock: number;
   color?: string;
@@ -40,6 +40,10 @@ export interface Product {
   reviewCount?: number;
   storeName?: string;
   storeAddress?: string;
+  isNew?: boolean;
+  isBestSeller?: boolean;
+  isFeatured?: boolean;
+  originalPrice?: number;
 }
 
 export interface CartItem {

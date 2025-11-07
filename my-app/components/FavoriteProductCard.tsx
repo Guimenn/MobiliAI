@@ -75,7 +75,7 @@ export default function FavoriteProductCard({
       CAMA: Bed,
       DECORACAO: Frame,
       ILUMINACAO: Lamp,
-      OUTROS: Package
+      MESA_CENTRO: Package
     };
     
     const IconComponent = icons[category as keyof typeof icons] || Package;

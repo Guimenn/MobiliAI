@@ -112,7 +112,7 @@ export default function FavoritesPage() {
   const handleAddToCart = async (product: FavoriteProduct['product']) => {
     try {
       // Mapear categoria para o formato esperado
-      const categoryMap: Record<string, 'sofa' | 'mesa' | 'cadeira' | 'armario' | 'cama' | 'decoracao' | 'iluminacao' | 'outros'> = {
+      const categoryMap: Record<string, 'sofa' | 'mesa' | 'cadeira' | 'armario' | 'cama' | 'decoracao' | 'iluminacao' | 'mesa_centro'> = {
         'SOFA': 'sofa',
         'MESA': 'mesa',
         'CADEIRA': 'cadeira',
@@ -123,10 +123,10 @@ export default function FavoritesPage() {
         'QUADRO': 'decoracao',
         'POLTRONA': 'cadeira',
         'ESTANTE': 'armario',
-        'OUTROS': 'outros'
+        'MESA_CENTRO': 'mesa_centro'
       };
       
-      const mappedCategory = categoryMap[product.category] || 'outros';
+      const mappedCategory = categoryMap[product.category] || 'mesa_centro';
       
       // Adicionar ao store local
       addToCartStore({

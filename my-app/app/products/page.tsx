@@ -56,7 +56,7 @@ const categoryIcons: Record<string, any> = {
   'POLTRONA': Layers,
   'QUADRO': ImageIcon,
   'LUMINARIA': Lightbulb,
-  'OUTROS': Package,
+  'MESA_CENTRO': Package,
 };
 
 // Nomes legíveis das categorias
@@ -68,7 +68,7 @@ const categoryNames: Record<string, string> = {
   'POLTRONA': 'Poltronas',
   'QUADRO': 'Quadros',
   'LUMINARIA': 'Luminárias',
-  'OUTROS': 'Outros',
+  'MESA_CENTRO': 'Mesa de centro',
 };
 
 export default function ProductsPage() {
@@ -132,7 +132,7 @@ export default function ProductsPage() {
 
   const categories = useMemo(() => {
     // Categorias do banco de dados (uppercase)
-    return ['SOFA', 'MESA', 'CADEIRA', 'ESTANTE', 'POLTRONA', 'QUADRO', 'LUMINARIA', 'OUTROS'];
+    return ['SOFA', 'MESA', 'CADEIRA', 'ESTANTE', 'POLTRONA', 'QUADRO', 'LUMINARIA', 'MESA_CENTRO'];
   }, []);
 
   const colors = useMemo(() => {

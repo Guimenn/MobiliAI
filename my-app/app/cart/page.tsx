@@ -194,7 +194,7 @@ export default function CartPage() {
       'cama': Package,
       'decoracao': Frame,
       'iluminacao': Lamp,
-      'outros': PackageIcon,
+      'mesa_centro': PackageIcon,
     };
     
     const IconComponent = iconMap[category] || PackageIcon;

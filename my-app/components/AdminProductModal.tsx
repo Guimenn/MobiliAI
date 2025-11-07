@@ -39,7 +39,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
         description: '',
         price: 0,
         stock: 0,
-        category: 'OUTROS',
+        category: 'MESA_CENTRO',
         sku: '',
         isActive: true,
         rating: 0,
@@ -68,7 +68,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
     { value: 'POLTRONA', label: 'Poltrona' },
     { value: 'QUADRO', label: 'Quadro' },
     { value: 'LUMINARIA', label: 'Luminária' },
-    { value: 'OUTROS', label: 'Outros' },
+    { value: 'MESA_CENTRO', label: 'Mesa de centro' },
   ];
 
   const handleSave = async () => {
@@ -93,7 +93,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
         }
 
         // Validar categoria
-        const validCategories = ['SOFA', 'MESA', 'CADEIRA', 'ARMARIO', 'ESTANTE', 'POLTRONA', 'QUADRO', 'LUMINARIA', 'OUTROS'];
+        const validCategories = ['SOFA', 'MESA', 'CADEIRA', 'ARMARIO', 'ESTANTE', 'POLTRONA', 'QUADRO', 'LUMINARIA', 'MESA_CENTRO'];
         if (!validCategories.includes(editedProduct.category)) {
           throw new Error(`Categoria inválida: ${editedProduct.category}. Use uma das seguintes: ${validCategories.join(', ')}`);
         }
@@ -214,7 +214,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
         });
         console.log('🎯 Categoria sendo enviada:', productData.category);
         console.log('🎯 Categoria é string?', typeof productData.category === 'string');
-        console.log('🎯 Categoria é válida?', ['SOFA', 'MESA', 'CADEIRA', 'ARMARIO', 'ESTANTE', 'POLTRONA', 'QUADRO', 'LUMINARIA', 'OUTROS'].includes(productData.category));
+        console.log('🎯 Categoria é válida?', ['SOFA', 'MESA', 'CADEIRA', 'ARMARIO', 'ESTANTE', 'POLTRONA', 'QUADRO', 'LUMINARIA', 'MESA_CENTRO'].includes(productData.category));
         console.log('🎯 StoreId é válido?', productData.storeId && typeof productData.storeId === 'string');
         console.log('🎯 Campos numéricos:', {
           price: productData.price,

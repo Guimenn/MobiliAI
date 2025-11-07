@@ -829,7 +829,7 @@ export default function EmployeeProductsPage() {
                             <option value="POLTRONA">Poltrona</option>
                             <option value="QUADRO">Quadro</option>
                             <option value="LUMINARIA">Luminária</option>
-                            <option value="OUTROS">Outros</option>
+                            <option value="MESA_CENTRO">Mesa de centro</option>
                           </select>
                         </div>
 

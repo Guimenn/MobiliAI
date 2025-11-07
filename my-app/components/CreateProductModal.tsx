@@ -56,7 +56,7 @@ export default function CreateProductModal({ isOpen, onClose, onProductCreated }
     { value: 'POLTRONA', label: 'Poltrona' },
     { value: 'QUADRO', label: 'Quadro' },
     { value: 'LUMINARIA', label: 'Luminária' },
-    { value: 'OUTROS', label: 'Outros' }
+    { value: 'MESA_CENTRO', label: 'Mesa de centro' }
   ];
 
   const styles = [

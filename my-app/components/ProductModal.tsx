@@ -18,7 +18,7 @@ interface ProductModalProps {
   onProductUpdated: (product: Product) => void;
 }
 
-type ProductCategory = 'SOFA' | 'MESA' | 'CADEIRA' | 'ARMARIO' | 'CAMA' | 'DECORACAO' | 'ILUMINACAO' | 'OUTROS';
+type ProductCategory = 'SOFA' | 'MESA' | 'CADEIRA' | 'ARMARIO' | 'CAMA' | 'DECORACAO' | 'ILUMINACAO' | 'MESA_CENTRO';
 
 export default function ProductModal({ product, isOpen, mode, onClose, onProductUpdated }: ProductModalProps) {
   const [isEditing, setIsEditing] = useState(mode === 'edit');
@@ -43,7 +43,7 @@ export default function ProductModal({ product, isOpen, mode, onClose, onProduct
     { value: 'CAMA', label: 'Camas' },
     { value: 'DECORACAO', label: 'Decoração' },
     { value: 'ILUMINACAO', label: 'Iluminação' },
-    { value: 'OUTROS', label: 'Outros' },
+    { value: 'MESA_CENTRO', label: 'Mesa de centro' },
   ];
 
   const handleSave = async () => {

@@ -59,7 +59,7 @@ const categoryNames: Record<string, string> = {
   'POLTRONA': 'Poltronas',
   'QUADRO': 'Quadros',
   'LUMINARIA': 'Luminárias',
-  'OUTROS': 'Outros',
+  'MESA_CENTRO': 'Mesa de centro',
 };
 
 export default function ProductDetailPage() {
@@ -104,7 +104,7 @@ export default function ProductDetailPage() {
               id: data.id,
               name: data.name,
               description: data.description,
-              category: (data.category?.toLowerCase() || 'outros') as any,
+              category: (data.category?.toLowerCase() || 'mesa_centro') as any,
               price: Number(data.price),
               stock: Number(data.stock) || 0,
               color: data.colorHex || data.colorName,
@@ -146,7 +146,7 @@ export default function ProductDetailPage() {
                     id: p.id,
                     name: p.name,
                     description: p.description,
-                    category: (p.category?.toLowerCase() || 'outros') as any,
+                    category: (p.category?.toLowerCase() || 'mesa_centro') as any,
                     price: Number(p.price),
                     stock: Number(p.stock) || 0,
                     color: p.colorHex || p.colorName,

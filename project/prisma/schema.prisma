@@ -574,7 +574,7 @@ enum ProductCategory {
   POLTRONA
   QUADRO
   LUMINARIA
-  OUTROS
+  MESA_CENTRO
 }
 
 enum SaleStatus {

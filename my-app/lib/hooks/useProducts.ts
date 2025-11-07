@@ -144,7 +144,7 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
         id: product.id,
         name: product.name,
         description: product.description,
-        category: product.category?.toLowerCase() || 'outros',
+        category: product.category?.toLowerCase() || 'mesa_centro',
         price: Number(product.price),
         stock: Number(product.stock) || 0,
         color: product.colorHex || product.colorName,

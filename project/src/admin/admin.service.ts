@@ -1914,7 +1914,7 @@ export class AdminService {
           acc[productId] = {
             productId,
             productName: product?.name || 'Desconhecido',
-            category: product?.category || 'OUTROS',
+            category: product?.category || 'MESA_CENTRO',
             quantity: 0,
             revenue: 0
           };
