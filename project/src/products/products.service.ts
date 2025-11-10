@@ -11,14 +11,57 @@ export class ProductsService {
     private uploadService: UploadService,
   ) {}
 
+  /**
+   * Valida se o usuário tem permissão para gerenciar ofertas
+   * Apenas ADMIN ou STORE_MANAGER da loja específica podem gerenciar ofertas
+   */
+  private validateSalePermission(currentUser: User, storeId: string): void {
+    const canManageSales = 
+      currentUser.role === UserRole.ADMIN || 
+      (currentUser.role === UserRole.STORE_MANAGER && currentUser.storeId === storeId);
+    
+    if (!canManageSales) {
+      throw new ForbiddenException('Apenas administradores ou gerentes da loja podem gerenciar ofertas');
+    }
+  }
+
+  /**
+   * Valida se há campos de oferta no DTO e verifica permissões
+   */
+  private validateSaleFields(dto: CreateProductDto | UpdateProductDto, currentUser: User, storeId: string): void {
+    const hasSaleFields = 
+      dto.isOnSale !== undefined || 
+      dto.salePrice !== undefined || 
+      dto.saleStartDate !== undefined || 
+      dto.saleEndDate !== undefined ||
+      dto.isFlashSale !== undefined || 
+      dto.flashSalePrice !== undefined || 
+      dto.flashSaleStartDate !== undefined || 
+      dto.flashSaleEndDate !== undefined;
+
+    if (hasSaleFields) {
+      this.validateSalePermission(currentUser, storeId);
+    }
+  }
+
   async create(createProductDto: CreateProductDto, currentUser: User): Promise<Product> {
     // Apenas funcionários podem criar produtos
     if (currentUser.role === UserRole.CUSTOMER) {
       throw new ForbiddenException('Acesso negado');
     }
 
+    // Validar permissões para campos de oferta
+    this.validateSaleFields(createProductDto, currentUser, createProductDto.storeId);
+
+    // Converter datas de string para Date se necessário
+    const data: any = { ...createProductDto };
+    if (data.saleStartDate) data.saleStartDate = new Date(data.saleStartDate);
+    if (data.saleEndDate) data.saleEndDate = new Date(data.saleEndDate);
+    if (data.flashSaleStartDate) data.flashSaleStartDate = new Date(data.flashSaleStartDate);
+    if (data.flashSaleEndDate) data.flashSaleEndDate = new Date(data.flashSaleEndDate);
+
     return this.prisma.product.create({
-      data: createProductDto as any,
+      data,
     });
   }
 
@@ -28,9 +71,19 @@ export class ProductsService {
       throw new ForbiddenException('Acesso negado');
     }
 
+    // Validar permissões para campos de oferta
+    this.validateSaleFields(createProductDto, currentUser, createProductDto.storeId);
+
+    // Converter datas de string para Date se necessário
+    const data: any = { ...createProductDto };
+    if (data.saleStartDate) data.saleStartDate = new Date(data.saleStartDate);
+    if (data.saleEndDate) data.saleEndDate = new Date(data.saleEndDate);
+    if (data.flashSaleStartDate) data.flashSaleStartDate = new Date(data.flashSaleStartDate);
+    if (data.flashSaleEndDate) data.flashSaleEndDate = new Date(data.flashSaleEndDate);
+
     // Criar produto primeiro
     const product = await this.prisma.product.create({
-      data: createProductDto as any,
+      data,
     });
 
     // Se há imagens, fazer upload
@@ -111,9 +164,19 @@ export class ProductsService {
       throw new ForbiddenException('Acesso negado');
     }
 
+    // Validar permissões para campos de oferta
+    this.validateSaleFields(updateProductDto, currentUser, product.storeId);
+
+    // Converter datas de string para Date se necessário
+    const data: any = { ...updateProductDto };
+    if (data.saleStartDate) data.saleStartDate = new Date(data.saleStartDate);
+    if (data.saleEndDate) data.saleEndDate = new Date(data.saleEndDate);
+    if (data.flashSaleStartDate) data.flashSaleStartDate = new Date(data.flashSaleStartDate);
+    if (data.flashSaleEndDate) data.flashSaleEndDate = new Date(data.flashSaleEndDate);
+
     await this.prisma.product.update({
       where: { id },
-      data: updateProductDto as any,
+      data,
     });
     return this.findOne(id, currentUser);
   }

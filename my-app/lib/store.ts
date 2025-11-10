@@ -61,6 +61,17 @@ export interface Product {
   isBestSeller?: boolean;
   isFeatured?: boolean;
   originalPrice?: number;
+  // Campos de Oferta Normal
+  isOnSale?: boolean;
+  salePrice?: number;
+  saleStartDate?: string;
+  saleEndDate?: string;
+  // Campos de Oferta Relâmpago
+  isFlashSale?: boolean;
+  flashSalePrice?: number;
+  flashSaleDiscountPercent?: number;
+  flashSaleStartDate?: string;
+  flashSaleEndDate?: string;
 }
 
 export interface CartItem {

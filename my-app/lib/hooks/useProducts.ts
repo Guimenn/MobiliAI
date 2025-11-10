@@ -141,26 +141,38 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
       
       // Mapear os dados da API para o formato do Product
       const mappedProducts: Product[] = allProducts.map((product: any) => ({
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        category: product.category?.toLowerCase() || 'mesa_centro',
-        price: Number(product.price),
-        stock: Number(product.stock) || 0,
-        color: product.colorHex || product.colorName,
-        material: product.material,
-        brand: product.brand,
-        dimensions: product.width && product.height && product.depth 
-          ? `${product.width}x${product.height}x${product.depth}cm` 
-          : product.dimensions,
-        weight: product.weight,
-        style: product.style,
-        imageUrl: product.imageUrls?.[0] || product.imageUrl,
-        storeId: product.store?.id || product.storeId || '',
-        rating: product.rating ? Number(product.rating) : 0,
-        reviewCount: product.reviewCount ? Number(product.reviewCount) : 0,
-        storeName: product.store?.name,
-        storeAddress: product.store?.address,
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          category: product.category?.toLowerCase() || 'mesa_centro',
+          price: Number(product.price),
+          stock: Number(product.stock) || 0,
+          color: product.colorHex || product.colorName,
+          material: product.material,
+          brand: product.brand,
+          dimensions: product.width && product.height && product.depth 
+            ? `${product.width}x${product.height}x${product.depth}cm` 
+            : product.dimensions,
+          weight: product.weight,
+          style: product.style,
+          imageUrl: product.imageUrls?.[0] || product.imageUrl,
+          imageUrls: product.imageUrls || [],
+          storeId: product.store?.id || product.storeId || '',
+          rating: product.rating ? Number(product.rating) : 0,
+          reviewCount: product.reviewCount ? Number(product.reviewCount) : 0,
+          storeName: product.store?.name,
+          storeAddress: product.store?.address,
+          // Campos de Oferta Normal
+          isOnSale: product.isOnSale || false,
+          salePrice: product.salePrice ? Number(product.salePrice) : undefined,
+          saleStartDate: product.saleStartDate,
+          saleEndDate: product.saleEndDate,
+          // Campos de Oferta Relâmpago
+          isFlashSale: product.isFlashSale || false,
+          flashSalePrice: product.flashSalePrice ? Number(product.flashSalePrice) : undefined,
+          flashSaleDiscountPercent: product.flashSaleDiscountPercent ? Number(product.flashSaleDiscountPercent) : undefined,
+        flashSaleStartDate: product.flashSaleStartDate,
+        flashSaleEndDate: product.flashSaleEndDate,
       }));
 
       setProducts(mappedProducts);

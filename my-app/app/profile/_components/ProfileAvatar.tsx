@@ -9,7 +9,7 @@ interface ProfileAvatarProps {
   avatarUrl?: string;
   username?: string;
   onAvatarChange?: (file: File | null) => void;
-  onAvatarSave?: () => Promise<void>;
+  onAvatarSave?: () => Promise<string | void>;
   onAvatarRemove?: () => void;
   isSaving?: boolean;
 }
@@ -26,11 +26,21 @@ export default function ProfileAvatar({
   const [isDragging, setIsDragging] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevHasPendingChangesRef = useRef(hasPendingChanges);
 
   useEffect(() => {
+    // Atualizar o preview quando avatarUrl mudar, mas apenas se não houver mudanças pendentes do usuário
+    // Isso permite que o preview seja atualizado após salvar
     if (!hasPendingChanges) {
       setPreview(avatarUrl || null);
     }
+    
+    // Se hasPendingChanges mudou de true para false, forçar atualização do preview
+    if (prevHasPendingChangesRef.current && !hasPendingChanges && avatarUrl) {
+      setPreview(avatarUrl);
+    }
+    
+    prevHasPendingChangesRef.current = hasPendingChanges;
   }, [avatarUrl, hasPendingChanges]);
 
   const handleFileSelect = (file: File) => {
@@ -101,7 +111,14 @@ export default function ProfileAvatar({
   const handleSaveClick = async () => {
     if (!onAvatarSave) return;
     try {
-      await onAvatarSave();
+      const result = await onAvatarSave();
+      // Se o callback retornar uma URL, usar ela diretamente
+      if (typeof result === 'string') {
+        setPreview(result);
+      } else if (avatarUrl) {
+        // Caso contrário, usar o avatarUrl atual
+        setPreview(avatarUrl);
+      }
       setHasPendingChanges(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";

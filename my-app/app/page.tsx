@@ -376,38 +376,143 @@ export default function HomePage() {
     setCurrentPage(1);
   };
 
-  // Seleciona produto aleatório para oferta especial
-  const pickRandomProduct = () => {
-    if (!allProducts || allProducts.length === 0) return null;
-    const randomIndex = Math.floor(Math.random() * allProducts.length);
-    return allProducts[randomIndex];
+  // Função para verificar se uma oferta relâmpago está ativa
+  const isFlashSaleActive = (product: any): boolean => {
+    if (!product.isFlashSale) {
+      return false;
+    }
+    
+    if (!product.flashSaleStartDate || !product.flashSaleEndDate) {
+      return false;
+    }
+    
+    const now = new Date();
+    const start = new Date(product.flashSaleStartDate);
+    const end = new Date(product.flashSaleEndDate);
+    
+    // Verificar se as datas são válidas
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return false;
+    }
+    
+    return now >= start && now <= end;
   };
 
-  // Inicializa oferta e cronômetro quando produtos carregarem
+  // Função para calcular tempo restante da oferta relâmpago
+  const getTimeRemaining = (product: any): number => {
+    if (!product.flashSaleEndDate) return 0;
+    const now = new Date();
+    const end = new Date(product.flashSaleEndDate);
+    const diff = Math.max(0, Math.floor((end.getTime() - now.getTime()) / 1000));
+    return diff;
+  };
+
+  // Função para obter preço com desconto - APENAS se a oferta estiver ATIVA
+  const getFlashSalePrice = (product: any): number => {
+    // Verificar se a oferta está ativa
+    const isActive = isFlashSaleActive(product);
+    
+    if (!isActive || !product.isFlashSale) {
+      return product.price; // Oferta não está ativa - retornar preço normal
+    }
+    
+    // Oferta está ativa - aplicar desconto
+    if (product.flashSalePrice) {
+      return product.flashSalePrice;
+    }
+    if (product.flashSaleDiscountPercent && product.price) {
+      const discount = (product.price * product.flashSaleDiscountPercent) / 100;
+      return product.price - discount;
+    }
+    return product.price;
+  };
+
+  // Função para obter percentual de desconto - APENAS se a oferta estiver ATIVA
+  const getDiscountPercent = (product: any): number => {
+    // Verificar se a oferta está ativa
+    const isActive = isFlashSaleActive(product);
+    
+    if (!isActive || !product.isFlashSale) {
+      return 0; // Oferta não está ativa - sem desconto
+    }
+    
+    // Oferta está ativa - calcular desconto
+    if (product.flashSaleDiscountPercent) {
+      return product.flashSaleDiscountPercent;
+    }
+    if (product.flashSalePrice && product.price) {
+      return Math.round(((product.price - product.flashSalePrice) / product.price) * 100);
+    }
+    return 0;
+  };
+
+  // Seleciona produto com oferta relâmpago ativa
+  const pickFlashSaleProduct = () => {
+    if (!allProducts || allProducts.length === 0) {
+      return null;
+    }
+    
+    // Buscar produtos com oferta relâmpago ativa
+    const flashSaleProducts = allProducts.filter(p => isFlashSaleActive(p));
+    
+    if (flashSaleProducts.length > 0) {
+      // Selecionar aleatoriamente entre os produtos com oferta ativa
+      const randomIndex = Math.floor(Math.random() * flashSaleProducts.length);
+      return flashSaleProducts[randomIndex];
+    }
+    
+    return null;
+  };
+
+  // Inicializa oferta relâmpago quando produtos carregarem
   useEffect(() => {
-    if (allProducts && allProducts.length > 0 && !specialOfferProduct) {
-      const product = pickRandomProduct();
-      setSpecialOfferProduct(product);
-      setOfferSecondsLeft(OFFER_DURATION);
+    if (allProducts && allProducts.length > 0) {
+      const product = pickFlashSaleProduct();
+      if (product) {
+        setSpecialOfferProduct(product);
+        const timeRemaining = getTimeRemaining(product);
+        setOfferSecondsLeft(timeRemaining > 0 ? timeRemaining : OFFER_DURATION);
+      } else {
+        // Se não houver oferta ativa, ainda assim mostrar um produto com oferta configurada
+        const productsWithFlashSale = allProducts.filter(p => p.isFlashSale);
+        if (productsWithFlashSale.length > 0) {
+          setSpecialOfferProduct(productsWithFlashSale[0]);
+          setOfferSecondsLeft(0);
+        }
+      }
     }
   }, [allProducts]);
 
-  // Cronômetro da oferta
+  // Cronômetro da oferta relâmpago - atualiza baseado no tempo real restante
   useEffect(() => {
     if (!specialOfferProduct) return;
-    const intervalId = setInterval(() => {
-      setOfferSecondsLeft((prev) => {
-        if (prev <= 1) {
-          const nextProduct = pickRandomProduct();
+    
+    // Atualizar timer imediatamente
+    const updateTimer = () => {
+      const timeRemaining = getTimeRemaining(specialOfferProduct);
+      if (timeRemaining > 0) {
+        setOfferSecondsLeft(timeRemaining);
+      } else {
+        // Se a oferta expirou, buscar próximo produto
+        const nextProduct = pickFlashSaleProduct();
+        if (nextProduct) {
           setSpecialOfferProduct(nextProduct);
-          return OFFER_DURATION; // reinicia
+          const nextTimeRemaining = getTimeRemaining(nextProduct);
+          setOfferSecondsLeft(nextTimeRemaining > 0 ? nextTimeRemaining : 0);
+        } else {
+          setOfferSecondsLeft(0);
         }
-        return prev - 1;
-      });
-    }, 1000);
+      }
+    };
+    
+    // Atualizar imediatamente
+    updateTimer();
+    
+    // Atualizar a cada segundo
+    const intervalId = setInterval(updateTimer, 1000);
 
     return () => clearInterval(intervalId);
-  }, [specialOfferProduct]);
+  }, [specialOfferProduct, allProducts]);
 
   const formatTime = (totalSeconds: number) => {
     const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
@@ -688,30 +793,44 @@ export default function HomePage() {
 
                   <div className="w-full h-56 md:h-64 lg:h-72 rounded-3xl overflow-hidden relative shadow-lg border-2 border-gray-200/60 bg-white" style={{ borderRadius: '24px 48px 32px 40px' }}>
                     {/* Product Image - if available */}
-                    {specialOfferProduct.imageUrl ? (
-                      <Image
-                        src={specialOfferProduct.imageUrl}
-                        alt={specialOfferProduct.name}
-                        width={800}
-                        height={600}
-                        className="w-full h-full object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent" />
-                    )}
+                    {(() => {
+                      const imageUrl = specialOfferProduct.imageUrls && specialOfferProduct.imageUrls.length > 0 
+                        ? specialOfferProduct.imageUrls[0] 
+                        : specialOfferProduct.imageUrl;
+                      
+                      return imageUrl ? (
+                        <Image
+                          src={imageUrl}
+                          alt={specialOfferProduct.name}
+                          width={800}
+                          height={600}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent" />
+                      );
+                    })()}
 
                     {/* Selo de desconto - estilo mais artesanal */}
-                    <div className="absolute -right-2 top-4 transform rotate-3">
-                      <div className="bg-[#3e2626] text-white shadow-lg px-4 py-3 rounded-2xl" style={{ borderRadius: '12px 16px 20px 8px' }}>
-                        <div className="text-2xl font-black leading-none transform -rotate-1">30%</div>
-                        <div className="text-[9px] tracking-widest font-bold uppercase mt-0.5 transform rotate-1">OFF</div>
-                        {/* Rabisco decorativo */}
-                        <svg className="absolute -top-1 -right-1 w-4 h-4 text-gray-400" viewBox="0 0 20 20" fill="none">
-                          <path d="M2 5c3 2 6 1 8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                        </svg>
-                      </div>
-                    </div>
+                    {(() => {
+                      const discountPercent = getDiscountPercent(specialOfferProduct);
+                      if (discountPercent > 0) {
+                        return (
+                          <div className="absolute -right-2 top-4 transform rotate-3">
+                            <div className="bg-[#3e2626] text-white shadow-lg px-4 py-3 rounded-2xl" style={{ borderRadius: '12px 16px 20px 8px' }}>
+                              <div className="text-2xl font-black leading-none transform -rotate-1">{discountPercent}%</div>
+                              <div className="text-[9px] tracking-widest font-bold uppercase mt-0.5 transform rotate-1">OFF</div>
+                              {/* Rabisco decorativo */}
+                              <svg className="absolute -top-1 -right-1 w-4 h-4 text-gray-400" viewBox="0 0 20 20" fill="none">
+                                <path d="M2 5c3 2 6 1 8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                              </svg>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     {/* Oferta relâmpago - estilo mais orgânico e humano */}
                     <div className="absolute left-4 top-4 z-20 transform -rotate-1">
@@ -738,12 +857,14 @@ export default function HomePage() {
                     </svg>
 
                     {/* Timer no rodapé - estilo mais casual */}
-                    <div className="absolute bottom-4 right-4 z-10 transform rotate-1">
-                      <span className="inline-flex items-center gap-2 bg-[#3e2626]/95 backdrop-blur-sm text-white rounded-2xl px-4 py-2.5 text-sm font-bold shadow-lg" style={{ borderRadius: '12px 20px 16px 8px' }}>
-                        <Clock className="h-4 w-4" />
-                        {formatTime(offerSecondsLeft)}
-                      </span>
-                    </div>
+                    {offerSecondsLeft > 0 && (
+                      <div className="absolute bottom-4 right-4 z-10 transform rotate-1">
+                        <span className="inline-flex items-center gap-2 bg-[#3e2626]/95 backdrop-blur-sm text-white rounded-2xl px-4 py-2.5 text-sm font-bold shadow-lg" style={{ borderRadius: '12px 20px 16px 8px' }}>
+                          <Clock className="h-4 w-4" />
+                          {formatTime(offerSecondsLeft)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -764,7 +885,17 @@ export default function HomePage() {
                       </div>
                       <div>
                         <div className="text-base font-bold text-[#3e2626] mb-1">Qualidade garantida</div>
-                        <div className="text-sm text-gray-600 leading-relaxed">Peças selecionadas com até <span className="font-semibold text-[#3e2626]">30% de desconto</span> - uma oportunidade imperdível!</div>
+                        <div className="text-sm text-gray-600 leading-relaxed">
+                          {(() => {
+                            const discountPercent = getDiscountPercent(specialOfferProduct);
+                            if (discountPercent > 0) {
+                              return (
+                                <>Peças selecionadas com <span className="font-semibold text-[#3e2626]">{discountPercent}% de desconto</span> - uma oportunidade imperdível!</>
+                              );
+                            }
+                            return <>Peças selecionadas com desconto especial - uma oportunidade imperdível!</>;
+                          })()}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-start gap-3 group">
@@ -779,25 +910,57 @@ export default function HomePage() {
                   </div>
 
                   {/* Preços - estilo mais destacado e humano */}
-                  <div className="flex flex-wrap items-end gap-3 pt-2">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-base font-bold text-[#3e2626]">R$</span>
-                      <span className="text-4xl md:text-5xl font-black text-[#3e2626] leading-none tracking-tight">
-                        {(specialOfferProduct.price ? specialOfferProduct.price * 0.7 : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    {specialOfferProduct.price && (
-                      <div className="flex items-baseline gap-1 text-gray-400">
-                        <span className="text-sm line-through font-medium">R$</span>
-                        <span className="text-xl md:text-2xl line-through font-semibold">
-                          {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
+                  {(() => {
+                    const originalFlashPrice = Number(specialOfferProduct.price);
+                    const isActive = isFlashSaleActive(specialOfferProduct);
+                    let currentFlashPrice = originalFlashPrice;
+                    let flashDiscountPercent = 0;
+                    
+                    // Calcular desconto se houver oferta relâmpago configurada
+                    if (specialOfferProduct.isFlashSale) {
+                      if (specialOfferProduct.flashSaleDiscountPercent && specialOfferProduct.flashSaleDiscountPercent > 0) {
+                        flashDiscountPercent = specialOfferProduct.flashSaleDiscountPercent;
+                        // SEMPRE calcular o preço com desconto para visualização
+                        const discount = (originalFlashPrice * flashDiscountPercent) / 100;
+                        currentFlashPrice = originalFlashPrice - discount;
+                      } else if (specialOfferProduct.flashSalePrice) {
+                        const flashPrice = Number(specialOfferProduct.flashSalePrice);
+                        // SEMPRE usar o preço de oferta para visualização
+                        currentFlashPrice = flashPrice;
+                        // Calcular percentual de desconto baseado no flashSalePrice
+                        if (flashPrice < originalFlashPrice) {
+                          flashDiscountPercent = Math.round(((originalFlashPrice - flashPrice) / originalFlashPrice) * 100);
+                        }
+                      }
+                    }
+                    
+                    // Sempre mostrar desconto se houver oferta configurada
+                    const hasDiscount = flashDiscountPercent > 0 && currentFlashPrice < originalFlashPrice;
+                    
+                    return (
+                      <div className="flex flex-wrap items-end gap-3 pt-2">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-base font-bold text-[#3e2626]">R$</span>
+                          <span className="text-4xl md:text-5xl font-black text-[#3e2626] leading-none tracking-tight">
+                            {currentFlashPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        {hasDiscount && (
+                          <>
+                            <div className="flex items-baseline gap-1 text-gray-400">
+                              <span className="text-sm line-through font-medium">R$</span>
+                              <span className="text-xl md:text-2xl line-through font-semibold">
+                                {originalFlashPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <span className="ml-2 inline-flex items-center px-3 py-1.5 rounded-xl bg-[#3e2626] text-white text-sm font-bold shadow-md transform -rotate-1" style={{ borderRadius: '8px 12px 10px 6px' }}>
+                              -{flashDiscountPercent}%
+                            </span>
+                          </>
+                        )}
                       </div>
-                    )}
-                    <span className="ml-2 inline-flex items-center px-3 py-1.5 rounded-xl bg-[#3e2626] text-white text-sm font-bold shadow-md transform -rotate-1" style={{ borderRadius: '8px 12px 10px 6px' }}>
-                      -30%
-                    </span>
-                  </div>
+                    );
+                  })()}
 
                   {/* Ações - Botões com estilo mais orgânico */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
@@ -823,9 +986,21 @@ export default function HomePage() {
               <div className="flex items-center justify-between gap-6">
                 <div>
                   <h3 className="text-2xl md:text-3xl font-semibold text-[#3e2626]">Oferta especial</h3>
-                  <p className="text-gray-600 mt-2">Carregando produto em destaque...</p>
+                  <p className="text-gray-600 mt-2">
+                    {allProducts.length > 0 
+                      ? 'Nenhum produto com oferta relâmpago ativa no momento' 
+                      : 'Carregando produtos...'}
+                  </p>
+                  {allProducts.length > 0 && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Total de produtos: {allProducts.length} | 
+                      Produtos com oferta configurada: {allProducts.filter(p => p.isFlashSale).length}
+                    </p>
+                  )}
                 </div>
-                <div className="w-10 h-10 border-4 border-[#3e2626]/20 border-t-[#3e2626] rounded-full animate-spin" />
+                {allProducts.length === 0 && (
+                  <div className="w-10 h-10 border-4 border-[#3e2626]/20 border-t-[#3e2626] rounded-full animate-spin" />
+                )}
               </div>
             )}
             </div>

@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsEnum, IsBoolean, IsUUID, IsArray } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsEnum, IsBoolean, IsUUID, IsArray, IsDateString } from 'class-validator';
 import { ProductCategory } from '@prisma/client';
 
 export class CreateProductDto {
@@ -89,6 +89,44 @@ export class CreateProductDto {
 
   @IsUUID()
   storeId: string;
+
+  // Campos de Oferta Normal (apenas ADMIN ou STORE_MANAGER)
+  @IsOptional()
+  @IsBoolean()
+  isOnSale?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  salePrice?: number;
+
+  @IsOptional()
+  @IsDateString()
+  saleStartDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  saleEndDate?: string;
+
+  // Campos de Oferta Relâmpago (apenas ADMIN ou STORE_MANAGER)
+  @IsOptional()
+  @IsBoolean()
+  isFlashSale?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  flashSalePrice?: number;
+
+  @IsOptional()
+  @IsNumber()
+  flashSaleDiscountPercent?: number;
+
+  @IsOptional()
+  @IsDateString()
+  flashSaleStartDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  flashSaleEndDate?: string;
 }
 
 export class UpdateProductDto {
@@ -184,4 +222,42 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // Campos de Oferta Normal (apenas ADMIN ou STORE_MANAGER)
+  @IsOptional()
+  @IsBoolean()
+  isOnSale?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  salePrice?: number;
+
+  @IsOptional()
+  @IsDateString()
+  saleStartDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  saleEndDate?: string;
+
+  // Campos de Oferta Relâmpago (apenas ADMIN ou STORE_MANAGER)
+  @IsOptional()
+  @IsBoolean()
+  isFlashSale?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  flashSalePrice?: number;
+
+  @IsOptional()
+  @IsNumber()
+  flashSaleDiscountPercent?: number;
+
+  @IsOptional()
+  @IsDateString()
+  flashSaleStartDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  flashSaleEndDate?: string;
 }

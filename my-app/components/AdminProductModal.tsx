@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { X, Eye, Edit, Save, DollarSign, Package, Tag, Hash, Palette, Building, Ruler, Weight, Brush, Trash2 } from 'lucide-react';
+import { X, Eye, Edit, Save, DollarSign, Package, Tag, Hash, Palette, Building, Ruler, Weight, Brush, Trash2, Zap, Percent, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import ImageUpload from './ImageUpload';
 import ImageCarousel from './ImageCarousel';
@@ -23,7 +23,11 @@ interface AdminProductModalProps {
 }
 
 export default function AdminProductModal({ product, isOpen, mode, onClose, onProductUpdated, onProductDeleted }: AdminProductModalProps) {
-  const { token } = useAppStore();
+  const { token, user } = useAppStore();
+  
+  // Verificar se o usuário pode gerenciar ofertas (apenas ADMIN ou STORE_MANAGER)
+  const canManageSales = user?.role === 'ADMIN' || user?.role === 'admin' || 
+                         user?.role === 'STORE_MANAGER' || user?.role === 'store_manager';
   const [isEditing, setIsEditing] = useState(mode === 'edit' || mode === 'create');
   const [editedProduct, setEditedProduct] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,12 +48,56 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
         isActive: true,
         rating: 0,
         reviews: 0,
-        is3D: false
+        is3D: false,
+        // Campos de oferta
+        isOnSale: false,
+        salePrice: undefined,
+        saleStartDate: '',
+        saleEndDate: '',
+        isFlashSale: false,
+        flashSalePrice: undefined,
+        flashSaleStartDate: '',
+        flashSaleEndDate: '',
+        flashSaleDurationHours: undefined
       });
       setExistingImages([]);
       setUploadedImages([]);
     } else if (product) {
-      setEditedProduct({ ...product });
+      // Converter datas para formato correto se vierem do backend
+      const processedProduct = { ...product };
+      
+      // Converter datas de oferta normal se existirem
+      if (processedProduct.saleStartDate) {
+        processedProduct.saleStartDate = typeof processedProduct.saleStartDate === 'string' 
+          ? processedProduct.saleStartDate 
+          : new Date(processedProduct.saleStartDate).toISOString();
+      }
+      if (processedProduct.saleEndDate) {
+        processedProduct.saleEndDate = typeof processedProduct.saleEndDate === 'string' 
+          ? processedProduct.saleEndDate 
+          : new Date(processedProduct.saleEndDate).toISOString();
+      }
+      
+      // Converter datas de oferta relâmpago se existirem
+      if (processedProduct.flashSaleStartDate) {
+        processedProduct.flashSaleStartDate = typeof processedProduct.flashSaleStartDate === 'string' 
+          ? processedProduct.flashSaleStartDate 
+          : new Date(processedProduct.flashSaleStartDate).toISOString();
+      }
+      if (processedProduct.flashSaleEndDate) {
+        processedProduct.flashSaleEndDate = typeof processedProduct.flashSaleEndDate === 'string' 
+          ? processedProduct.flashSaleEndDate 
+          : new Date(processedProduct.flashSaleEndDate).toISOString();
+      }
+      // Calcular duração em horas se tiver data início e fim
+      if (processedProduct.flashSaleStartDate && processedProduct.flashSaleEndDate) {
+        const start = new Date(processedProduct.flashSaleStartDate);
+        const end = new Date(processedProduct.flashSaleEndDate);
+        const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60));
+        processedProduct.flashSaleDurationHours = hours > 0 ? hours : undefined;
+      }
+      
+      setEditedProduct(processedProduct);
       setExistingImages(product?.imageUrls || []);
       setUploadedImages([]);
     }
@@ -77,8 +125,18 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
     try {
       setIsLoading(true);
       
-      let result;
-      if (mode === 'create') {
+      let result: any = null;
+      console.log('🔍 Modo atual:', mode);
+      console.log('🔍 isEditing:', isEditing);
+      console.log('🔍 editedProduct:', editedProduct);
+      console.log('🔍 editedProduct.id:', editedProduct?.id);
+      
+      // Determinar o modo real baseado em isEditing e editedProduct.id
+      const actualMode = mode === 'create' ? 'create' : (isEditing && editedProduct?.id ? 'edit' : mode);
+      console.log('🔍 Modo real determinado:', actualMode);
+      
+      if (actualMode === 'create') {
+        console.log('✅ Entrando no modo de criação');
         // Obter storeId - usar o primeiro store disponível
         const stores = await adminAPI.getStores();
         const storeId = stores.length > 0 ? stores[0].id : null;
@@ -132,6 +190,69 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
           imageUrls: existingImages || [],
           storeId: storeId
         };
+
+        // Adicionar campos de oferta apenas se o usuário tiver permissão
+        if (canManageSales) {
+          if (editedProduct.isOnSale) {
+            productData.isOnSale = true;
+            if (editedProduct.salePrice) productData.salePrice = Number(editedProduct.salePrice);
+            if (editedProduct.saleStartDate) productData.saleStartDate = editedProduct.saleStartDate;
+            if (editedProduct.saleEndDate) productData.saleEndDate = editedProduct.saleEndDate;
+          } else {
+            productData.isOnSale = false;
+          }
+
+          if (editedProduct.isFlashSale) {
+            productData.isFlashSale = true;
+            // Salvar percentual de desconto se houver
+            if (editedProduct.flashSaleDiscountPercent) {
+              productData.flashSaleDiscountPercent = Number(editedProduct.flashSaleDiscountPercent);
+              // Calcular preço baseado no percentual
+              if (editedProduct.price) {
+                const discount = (editedProduct.price * editedProduct.flashSaleDiscountPercent) / 100;
+                productData.flashSalePrice = editedProduct.price - discount;
+              }
+            } else if (editedProduct.flashSalePrice) {
+              productData.flashSalePrice = Number(editedProduct.flashSalePrice);
+            }
+            // Sempre garantir que há data início e fim
+            if (editedProduct.flashSaleStartDate) {
+              // Converter para formato ISO completo se necessário
+              // O input datetime-local retorna formato "YYYY-MM-DDTHH:mm" sem segundos e timezone
+              const startDateStr = editedProduct.flashSaleStartDate;
+              let startDate: Date;
+              if (startDateStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                // Formato datetime-local: criar Date usando componentes no timezone local
+                const [datePart, timePart] = startDateStr.split('T');
+                const [year, month, day] = datePart.split('-').map(Number);
+                const [hours, minutes] = timePart.split(':').map(Number);
+                // Usar construtor Date com componentes (sempre usa timezone local)
+                startDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+              } else {
+                startDate = new Date(startDateStr);
+              }
+              // Garantir formato ISO completo (com segundos e timezone)
+              if (isNaN(startDate.getTime())) {
+                throw new Error(`Data de início inválida: ${startDateStr}`);
+              }
+              productData.flashSaleStartDate = startDate.toISOString();
+              
+              // Se houver duração em horas, SEMPRE calcular data fim
+              if (editedProduct.flashSaleDurationHours && editedProduct.flashSaleDurationHours > 0) {
+                const end = new Date(startDate.getTime() + (editedProduct.flashSaleDurationHours * 60 * 60 * 1000));
+                productData.flashSaleEndDate = end.toISOString();
+              } else if (editedProduct.flashSaleEndDate) {
+                // Garantir que flashSaleEndDate também está em formato ISO
+                const endDate = editedProduct.flashSaleEndDate.includes('T') && !editedProduct.flashSaleEndDate.includes('Z') && !editedProduct.flashSaleEndDate.includes('+')
+                  ? new Date(editedProduct.flashSaleEndDate + ':00')
+                  : new Date(editedProduct.flashSaleEndDate);
+                productData.flashSaleEndDate = endDate.toISOString();
+              }
+            }
+          } else {
+            productData.isFlashSale = false;
+          }
+        }
 
         // Adicionar campos opcionais apenas se tiverem valor válido
         if (editedProduct.colorHex?.trim() && editedProduct.colorHex.trim().length <= 7) {
@@ -268,6 +389,26 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
             if (productData.supplierId) {
               formData.append('supplierId', productData.supplierId);
             }
+
+            // Adicionar campos de oferta no FormData
+            if (canManageSales) {
+              formData.append('isOnSale', productData.isOnSale ? 'true' : 'false');
+              if (productData.salePrice) formData.append('salePrice', productData.salePrice.toString());
+              if (productData.saleStartDate) formData.append('saleStartDate', productData.saleStartDate);
+              if (productData.saleEndDate) formData.append('saleEndDate', productData.saleEndDate);
+              formData.append('isFlashSale', productData.isFlashSale ? 'true' : 'false');
+              if (productData.flashSaleDiscountPercent) {
+                formData.append('flashSaleDiscountPercent', productData.flashSaleDiscountPercent.toString());
+              }
+              if (productData.flashSalePrice) formData.append('flashSalePrice', productData.flashSalePrice.toString());
+              if (productData.flashSaleStartDate) {
+                formData.append('flashSaleStartDate', productData.flashSaleStartDate);
+                // SEMPRE garantir que flashSaleEndDate seja salvo se houver duração em horas
+                if (productData.flashSaleEndDate) {
+                  formData.append('flashSaleEndDate', productData.flashSaleEndDate);
+                }
+              }
+            }
             
             // Adicionar is3D
             if (editedProduct.is3D) {
@@ -373,7 +514,12 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
       }
       
       // Modo de edição
-      if (mode === 'edit' && editedProduct.id) {
+      if (actualMode === 'edit') {
+        console.log('✅ Entrando no modo de edição');
+        if (!editedProduct.id) {
+          console.error('❌ Produto não tem ID para edição');
+          throw new Error('Produto não encontrado para edição. ID não disponível.');
+        }
         // Fazer upload das novas imagens (se houver)
         let newUploadedImageUrls: string[] = [];
         if (uploadedImages.length > 0) {
@@ -397,7 +543,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
 
         // Atualizar produto existente
         try {
-          result = await adminAPI.updateProduct(editedProduct.id, {
+          const updateData: any = {
             name: editedProduct.name,
             description: editedProduct.description,
             category: editedProduct.category,
@@ -416,7 +562,63 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
             style: editedProduct.style,
             imageUrls: [...existingImages, ...newUploadedImageUrls],
             model3DUrl: updatedModel3DUrl, // Incluir modelo 3D atualizado
-          });
+          };
+
+          // Adicionar campos de oferta apenas se o usuário tiver permissão
+          if (canManageSales) {
+            updateData.isOnSale = editedProduct.isOnSale || false;
+            if (editedProduct.salePrice) updateData.salePrice = Number(editedProduct.salePrice);
+            if (editedProduct.saleStartDate) updateData.saleStartDate = editedProduct.saleStartDate;
+            if (editedProduct.saleEndDate) updateData.saleEndDate = editedProduct.saleEndDate;
+            updateData.isFlashSale = editedProduct.isFlashSale || false;
+            // Salvar percentual de desconto se houver
+            if (editedProduct.flashSaleDiscountPercent) {
+              updateData.flashSaleDiscountPercent = Number(editedProduct.flashSaleDiscountPercent);
+              // Calcular preço baseado no percentual
+              if (editedProduct.price) {
+                const discount = (editedProduct.price * editedProduct.flashSaleDiscountPercent) / 100;
+                updateData.flashSalePrice = editedProduct.price - discount;
+              }
+            } else if (editedProduct.flashSalePrice) {
+              updateData.flashSalePrice = Number(editedProduct.flashSalePrice);
+            }
+            // Sempre garantir que há data início e fim
+            if (editedProduct.flashSaleStartDate) {
+              // Converter para formato ISO completo se necessário
+              // O input datetime-local retorna formato "YYYY-MM-DDTHH:mm" sem segundos e timezone
+              const startDateStr = editedProduct.flashSaleStartDate;
+              let startDate: Date;
+              if (startDateStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                // Formato datetime-local: criar Date usando componentes no timezone local
+                const [datePart, timePart] = startDateStr.split('T');
+                const [year, month, day] = datePart.split('-').map(Number);
+                const [hours, minutes] = timePart.split(':').map(Number);
+                // Usar construtor Date com componentes (sempre usa timezone local)
+                startDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+              } else {
+                startDate = new Date(startDateStr);
+              }
+              // Garantir formato ISO completo (com segundos e timezone)
+              if (isNaN(startDate.getTime())) {
+                throw new Error(`Data de início inválida: ${startDateStr}`);
+              }
+              updateData.flashSaleStartDate = startDate.toISOString();
+              
+              // Se houver duração em horas, SEMPRE calcular data fim
+              if (editedProduct.flashSaleDurationHours && editedProduct.flashSaleDurationHours > 0) {
+                const end = new Date(startDate.getTime() + (editedProduct.flashSaleDurationHours * 60 * 60 * 1000));
+                updateData.flashSaleEndDate = end.toISOString();
+              } else if (editedProduct.flashSaleEndDate) {
+                // Garantir que flashSaleEndDate também está em formato ISO
+                const endDate = editedProduct.flashSaleEndDate.includes('T') && !editedProduct.flashSaleEndDate.includes('Z') && !editedProduct.flashSaleEndDate.includes('+')
+                  ? new Date(editedProduct.flashSaleEndDate + ':00')
+                  : new Date(editedProduct.flashSaleEndDate);
+                updateData.flashSaleEndDate = endDate.toISOString();
+              }
+            }
+          }
+
+          result = await adminAPI.updateProduct(editedProduct.id, updateData);
           
           toast.success('Produto atualizado com sucesso!', {
             description: `${editedProduct.name} foi atualizado.`,
@@ -429,7 +631,13 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
       }
 
       if (!result) {
-        throw new Error('Nenhuma operação foi realizada');
+        console.error('❌ Nenhuma operação foi realizada');
+        console.error('❌ Modo prop:', mode);
+        console.error('❌ Modo real:', actualMode);
+        console.error('❌ isEditing:', isEditing);
+        console.error('❌ editedProduct:', editedProduct);
+        console.error('❌ editedProduct.id:', editedProduct?.id);
+        throw new Error(`Nenhuma operação foi realizada. Modo prop: ${mode}, Modo real: ${actualMode}, isEditing: ${isEditing}, ID: ${editedProduct?.id || 'não disponível'}`);
       }
 
       onProductUpdated(result);
@@ -885,6 +1093,443 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Sales Section - Apenas para ADMIN e STORE_MANAGER */}
+              {canManageSales && (
+                <Card className="border-2 border-blue-100">
+                  <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                    <CardTitle className="flex items-center text-lg text-blue-900">
+                      <Percent className="h-5 w-5 mr-2 text-blue-600" />
+                      Ofertas e Promoções
+                    </CardTitle>
+                    <CardDescription className="text-blue-700">
+                      Configure ofertas normais e relâmpago para este produto aparecer na loja
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6 pt-6">
+                    {/* Oferta Normal */}
+                    <div className="border-2 border-green-200 rounded-xl p-5 space-y-4 bg-gradient-to-br from-green-50 to-emerald-50 hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Tag className="h-5 w-5 text-green-600" />
+                          <Label className="text-base font-bold text-gray-900">
+                            Oferta Normal
+                          </Label>
+                        </div>
+                        {isEditing ? (
+                          <label className="flex items-center cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={editedProduct?.isOnSale || false}
+                              onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, isOnSale: e.target.checked } : null)}
+                              className="mr-2 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                            />
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-green-700">
+                              {editedProduct?.isOnSale ? 'Ativa' : 'Ativar Oferta'}
+                            </span>
+                          </label>
+                        ) : (
+                          <span className={`px-4 py-2 rounded-full text-sm font-semibold shadow-sm ${
+                            product?.isOnSale ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {product?.isOnSale ? '✓ Ativa' : 'Inativa'}
+                          </span>
+                        )}
+                      </div>
+
+                      {((isEditing && editedProduct?.isOnSale) || (!isEditing && product?.isOnSale)) && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="salePrice" className="text-sm font-medium text-gray-700">
+                              Preço de Oferta
+                            </Label>
+                            {isEditing ? (
+                              <div className="relative mt-1">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
+                                <Input
+                                  id="salePrice"
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={editedProduct?.salePrice || ''}
+                                  onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, salePrice: parseFloat(e.target.value) || undefined } : null)}
+                                  placeholder="0.00"
+                                  className="pl-10"
+                                />
+                              </div>
+                            ) : (
+                              <p className="mt-1 text-lg font-semibold text-[#3e2626]">
+                                {product?.salePrice ? formatPrice(product.salePrice) : '-'}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <Label htmlFor="saleStartDate" className="text-sm font-medium text-gray-700">
+                              Data Início
+                            </Label>
+                            {isEditing ? (
+                              <Input
+                                id="saleStartDate"
+                                type="datetime-local"
+                                value={editedProduct?.saleStartDate 
+                                  ? (typeof editedProduct.saleStartDate === 'string' 
+                                      ? editedProduct.saleStartDate.slice(0, 16)
+                                      : new Date(editedProduct.saleStartDate).toISOString().slice(0, 16))
+                                  : ''}
+                                onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, saleStartDate: e.target.value } : null)}
+                                className="mt-1"
+                              />
+                            ) : (
+                              <div className="mt-1">
+                                {product?.saleStartDate ? (
+                                  <div className="flex flex-col">
+                                    <p className="text-gray-900 font-medium">
+                                      {new Date(product.saleStartDate).toLocaleDateString('pt-BR', { 
+                                        day: '2-digit', 
+                                        month: '2-digit', 
+                                        year: 'numeric' 
+                                      })}
+                                    </p>
+                                    <p className="text-sm text-gray-500">
+                                      {new Date(product.saleStartDate).toLocaleTimeString('pt-BR', { 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                      })}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className="text-gray-400 italic">Não definida</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <Label htmlFor="saleEndDate" className="text-sm font-medium text-gray-700">
+                              Data Fim
+                            </Label>
+                            {isEditing ? (
+                              <Input
+                                id="saleEndDate"
+                                type="datetime-local"
+                                value={editedProduct?.saleEndDate 
+                                  ? (typeof editedProduct.saleEndDate === 'string' 
+                                      ? editedProduct.saleEndDate.slice(0, 16)
+                                      : new Date(editedProduct.saleEndDate).toISOString().slice(0, 16))
+                                  : ''}
+                                onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, saleEndDate: e.target.value } : null)}
+                                className="mt-1"
+                              />
+                            ) : (
+                              <div className="mt-1">
+                                {product?.saleEndDate ? (
+                                  <div className="flex flex-col">
+                                    <p className="text-gray-900 font-medium">
+                                      {new Date(product.saleEndDate).toLocaleDateString('pt-BR', { 
+                                        day: '2-digit', 
+                                        month: '2-digit', 
+                                        year: 'numeric' 
+                                      })}
+                                    </p>
+                                    <p className="text-sm text-gray-500">
+                                      {new Date(product.saleEndDate).toLocaleTimeString('pt-BR', { 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                      })}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className="text-gray-400 italic">Não definida</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Oferta Relâmpago */}
+                    <div className="border-2 border-yellow-300 rounded-xl p-5 space-y-4 bg-gradient-to-br from-yellow-50 via-orange-50 to-amber-50 hover:shadow-lg transition-all">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Zap className="h-6 w-6 text-yellow-600 fill-yellow-400 animate-pulse" />
+                          <Label className="text-base font-bold text-gray-900">
+                            Oferta Relâmpago
+                          </Label>
+                          <span className="ml-2 px-2 py-0.5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full">
+                            DESTAQUE
+                          </span>
+                        </div>
+                        {isEditing ? (
+                          <label className="flex items-center cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={editedProduct?.isFlashSale || false}
+                              onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, isFlashSale: e.target.checked } : null)}
+                              className="mr-2 w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500 cursor-pointer"
+                            />
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-yellow-700">
+                              {editedProduct?.isFlashSale ? 'Ativa' : 'Ativar Relâmpago'}
+                            </span>
+                          </label>
+                        ) : (
+                          <span className={`px-4 py-2 rounded-full text-sm font-semibold shadow-sm ${
+                            product?.isFlashSale ? 'bg-yellow-500 text-white animate-pulse' : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {product?.isFlashSale ? '⚡ Ativa' : 'Inativa'}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Sempre mostrar campos quando estiver editando, ou quando estiver visualizando e a oferta estiver ativa */}
+                      {(isEditing || (!isEditing && product?.isFlashSale)) && (
+                        <div className="space-y-4">
+                          {/* Aviso sobre duração em horas */}
+                          {isEditing && (
+                            <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3">
+                              <p className="text-xs text-yellow-800 font-medium flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                <span>Oferta Relâmpago funciona em HORAS. Configure a data/hora de início e a duração em horas.</span>
+                              </p>
+                            </div>
+                          )}
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                                Tipo de Desconto
+                              </Label>
+                              {isEditing ? (
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditedProduct((prev: any) => prev ? { ...prev, flashSaleDiscountType: 'percent' } : null)}
+                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-all ${
+                                      editedProduct?.flashSaleDiscountType === 'percent' || !editedProduct?.flashSaleDiscountType
+                                        ? 'bg-yellow-500 text-white border-yellow-600'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:border-yellow-400'
+                                    }`}
+                                  >
+                                    Porcentagem (%)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditedProduct((prev: any) => prev ? { ...prev, flashSaleDiscountType: 'fixed' } : null)}
+                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-all ${
+                                      editedProduct?.flashSaleDiscountType === 'fixed'
+                                        ? 'bg-yellow-500 text-white border-yellow-600'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:border-yellow-400'
+                                    }`}
+                                  >
+                                    Preço Fixo
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="mt-1 text-sm text-gray-600">
+                                  {product?.flashSaleDiscountPercent ? 'Porcentagem' : 'Preço Fixo'}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <Label htmlFor="flashSaleDiscount" className="text-sm font-medium text-gray-700">
+                                {isEditing && (editedProduct?.flashSaleDiscountType === 'percent' || !editedProduct?.flashSaleDiscountType)
+                                  ? 'Desconto (%)'
+                                  : 'Preço Relâmpago (R$)'}
+                              </Label>
+                              {isEditing ? (
+                                <div className="relative mt-1">
+                                  {editedProduct?.flashSaleDiscountType === 'percent' || !editedProduct?.flashSaleDiscountType ? (
+                                    <>
+                                      <Input
+                                        id="flashSaleDiscountPercent"
+                                        type="number"
+                                        step="1"
+                                        min="1"
+                                        max="99"
+                                        value={editedProduct?.flashSaleDiscountPercent ?? ''}
+                                        onChange={(e) => {
+                                          const percent = parseInt(e.target.value) || undefined;
+                                          setEditedProduct((prev: any) => {
+                                            if (!prev) return null;
+                                            const newProduct = { ...prev, flashSaleDiscountPercent: percent };
+                                            // Calcular preço baseado no percentual
+                                            if (percent && prev.price) {
+                                              const discount = (prev.price * percent) / 100;
+                                              newProduct.flashSalePrice = prev.price - discount;
+                                            }
+                                            return newProduct;
+                                          });
+                                        }}
+                                        placeholder="Ex: 30"
+                                        className="pr-12 h-14 text-lg font-semibold px-4"
+                                        autoComplete="off"
+                                      />
+                                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-gray-600 font-semibold pointer-events-none">%</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-base">R$</span>
+                                      <Input
+                                        id="flashSalePrice"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={editedProduct?.flashSalePrice || ''}
+                                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, flashSalePrice: parseFloat(e.target.value) || undefined } : null)}
+                                        placeholder="0.00"
+                                        className="pl-10 h-14 text-lg font-semibold px-4"
+                                        autoComplete="off"
+                                      />
+                                    </>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="mt-1 text-lg font-semibold text-yellow-600">
+                                  {product?.flashSaleDiscountPercent 
+                                    ? `${product.flashSaleDiscountPercent}% OFF`
+                                    : product?.flashSalePrice 
+                                    ? formatPrice(product.flashSalePrice) 
+                                    : '-'}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="flashSaleStartDate" className="text-sm font-medium text-gray-700">
+                                Data/Hora Início
+                              </Label>
+                              {isEditing ? (
+                                <Input
+                                  id="flashSaleStartDate"
+                                  type="datetime-local"
+                                  value={editedProduct?.flashSaleStartDate 
+                                    ? (typeof editedProduct.flashSaleStartDate === 'string' 
+                                        ? editedProduct.flashSaleStartDate.slice(0, 16)
+                                        : new Date(editedProduct.flashSaleStartDate).toISOString().slice(0, 16))
+                                    : ''}
+                                  onChange={(e) => {
+                                    const startDate = e.target.value;
+                                    setEditedProduct((prev: any) => {
+                                      if (!prev) return null;
+                                      const newProduct = { ...prev, flashSaleStartDate: startDate };
+                                      // Se houver duração em horas, calcular data fim automaticamente
+                                      if (startDate && prev.flashSaleDurationHours) {
+                                        const start = new Date(startDate);
+                                        const end = new Date(start.getTime() + (prev.flashSaleDurationHours * 60 * 60 * 1000));
+                                        newProduct.flashSaleEndDate = end.toISOString();
+                                      }
+                                      return newProduct;
+                                    });
+                                  }}
+                                  className="mt-1 h-12 text-base"
+                                />
+                              ) : (
+                                <div className="mt-1">
+                                  {product?.flashSaleStartDate ? (
+                                    <div className="flex flex-col">
+                                      <p className="text-gray-900 font-medium">
+                                        {new Date(product.flashSaleStartDate).toLocaleDateString('pt-BR', { 
+                                          day: '2-digit', 
+                                          month: '2-digit', 
+                                          year: 'numeric' 
+                                        })}
+                                      </p>
+                                      <p className="text-sm text-gray-500">
+                                        {new Date(product.flashSaleStartDate).toLocaleTimeString('pt-BR', { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit' 
+                                        })}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <p className="text-gray-400 italic">Não definida</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <Label htmlFor="flashSaleDurationHours" className="text-sm font-medium text-gray-700">
+                                Duração (Horas)
+                              </Label>
+                              {isEditing ? (
+                                <div className="relative mt-1">
+                                  <Input
+                                    id="flashSaleDurationHours"
+                                    type="number"
+                                    step="1"
+                                    min="1"
+                                    max="168"
+                                    value={editedProduct?.flashSaleDurationHours ?? ''}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      const hours = value === '' ? undefined : parseInt(value);
+                                      setEditedProduct((prev: any) => {
+                                        if (!prev) return null;
+                                        const newProduct = { ...prev, flashSaleDurationHours: hours };
+                                        // Calcular data fim automaticamente baseado na data início + horas
+                                        if (prev.flashSaleStartDate && hours && hours > 0) {
+                                          const start = new Date(prev.flashSaleStartDate);
+                                          const end = new Date(start.getTime() + (hours * 60 * 60 * 1000));
+                                          newProduct.flashSaleEndDate = end.toISOString();
+                                        }
+                                        return newProduct;
+                                      });
+                                    }}
+                                    placeholder="Ex: 24"
+                                    className="pr-24 h-14 text-lg font-semibold px-4"
+                                    autoComplete="off"
+                                    style={{ fontSize: '18px', paddingRight: '80px' }}
+                                  />
+                                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-gray-600 font-semibold pointer-events-none">horas</span>
+                                </div>
+                              ) : (
+                                <div className="mt-1">
+                                  {product?.flashSaleStartDate && product?.flashSaleEndDate ? (
+                                    <div className="flex flex-col">
+                                      <p className="text-gray-900 font-medium">
+                                        {Math.round((new Date(product.flashSaleEndDate).getTime() - new Date(product.flashSaleStartDate).getTime()) / (1000 * 60 * 60))} horas
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        Termina: {new Date(product.flashSaleEndDate).toLocaleString('pt-BR', { 
+                                          day: '2-digit', 
+                                          month: '2-digit', 
+                                          hour: '2-digit', 
+                                          minute: '2-digit' 
+                                        })}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <p className="text-gray-400 italic">Não definida</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Exibir data fim calculada (somente leitura) */}
+                          {isEditing && editedProduct?.flashSaleStartDate && editedProduct?.flashSaleDurationHours && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                              <p className="text-xs text-blue-800">
+                                <strong>Data/Hora Fim calculada:</strong>{' '}
+                                {editedProduct.flashSaleEndDate 
+                                  ? new Date(editedProduct.flashSaleEndDate).toLocaleString('pt-BR', {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                  : 'Calculando...'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Additional Specifications */}
               <Card>
