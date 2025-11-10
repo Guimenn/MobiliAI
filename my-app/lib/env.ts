@@ -1,4 +1,7 @@
 export const env = {
   API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
   NODE_ENV: process.env.NODE_ENV || 'development',
+  PIX_FALLBACK_BR_CODE: process.env.NEXT_PUBLIC_PIX_FALLBACK_BR_CODE || '',
+  ABACATEPAY_ENVIRONMENT: process.env.NEXT_PUBLIC_ABACATEPAY_ENVIRONMENT || 'sandbox',
+  STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_51RkFwCEO8CNDTrrtJ2NNTHnmGqyldJhuOdnePjnmWW1H9fMkcz5ASsJr1gHR9EBgR6i3IbyR9hmCKSaKFX6BW0J600WNgCf3Ds',
 };

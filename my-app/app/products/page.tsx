@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useAppStore, Product } from '@/lib/store';
 import { useProducts } from '@/lib/hooks/useProducts';
 import Header from '@/components/Header';
@@ -139,6 +139,54 @@ export default function ProductsPage() {
     return Array.from(new Set(products.map(p => p.color).filter(Boolean))) as string[];
   }, [products]);
 
+  // Função para verificar se uma oferta está ativa (dentro do período de datas)
+  const isSaleActive = useCallback((product: Product): boolean => {
+    const now = new Date();
+    
+    // Verificar oferta relâmpago primeiro (tem prioridade)
+    if (product.isFlashSale && product.flashSaleStartDate && product.flashSaleEndDate) {
+      const start = new Date(product.flashSaleStartDate);
+      const end = new Date(product.flashSaleEndDate);
+      if (now >= start && now <= end) {
+        return true;
+      }
+    }
+    
+    // Verificar oferta normal
+    if (product.isOnSale && product.saleStartDate && product.saleEndDate) {
+      const start = new Date(product.saleStartDate);
+      const end = new Date(product.saleEndDate);
+      if (now >= start && now <= end) {
+        return true;
+      }
+    }
+    
+    return false;
+  }, []);
+
+  // Função para obter o preço atual (com oferta se ativa)
+  const getCurrentPrice = useCallback((product: Product): number => {
+    if (isSaleActive(product)) {
+      // Prioridade para oferta relâmpago
+      if (product.isFlashSale) {
+        // Se tem flashSalePrice, usar ele
+        if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+          return Number(product.flashSalePrice);
+        }
+        // Se não tem flashSalePrice mas tem flashSaleDiscountPercent, calcular
+        if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && product.price) {
+          const discount = (Number(product.price) * Number(product.flashSaleDiscountPercent)) / 100;
+          return Number(product.price) - discount;
+        }
+      }
+      // Depois oferta normal
+      if (product.isOnSale && product.salePrice) {
+        return Number(product.salePrice);
+      }
+    }
+    return Number(product.price);
+  }, [isSaleActive]);
+
   const filteredProducts = useMemo(() => {
     const term = debouncedTerm.trim().toLowerCase();
     return products
@@ -149,20 +197,17 @@ export default function ProductsPage() {
         const matchesCategory = selectedCategory === 'all' || 
           product.category?.toString().toUpperCase() === selectedCategory.toUpperCase();
         const matchesColor = !selectedColor || product.color === selectedColor;
-        const price = Number(product.price) || 0;
-        const matchesMin = !minPrice || minPrice === '' || price >= Number(minPrice);
-        const matchesMax = !maxPrice || maxPrice === '' || price <= Number(maxPrice);
-        // Filtro de desconto: produtos que estão em promoção
-        // Quando o filtro está ativo (hasDiscount = true), mostra apenas produtos com estoque disponível
-        // que podem receber desconto (produtos ativos e disponíveis)
+        const currentPrice = getCurrentPrice(product);
+        const matchesMin = !minPrice || minPrice === '' || currentPrice >= Number(minPrice);
+        const matchesMax = !maxPrice || maxPrice === '' || currentPrice <= Number(maxPrice);
+        // Filtro de desconto: produtos que estão em oferta ativa
         let matchesDiscount = true;
         if (hasDiscount) {
-          // Apenas produtos com estoque disponível podem ter desconto
-          matchesDiscount = (product.stock || 0) > 0;
+          matchesDiscount = isSaleActive(product);
         }
         return matchesSearch && matchesCategory && matchesColor && matchesMin && matchesMax && matchesDiscount;
       });
-  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount]);
+  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount, isSaleActive, getCurrentPrice]);
 
   const sortedProducts = useMemo(() => {
     return [...filteredProducts].sort((a, b) => {
@@ -282,42 +327,80 @@ export default function ProductsPage() {
     return 'Localização não cadastrada';
   };
 
-  // Seleciona produto aleatório para oferta especial
-  const pickRandomProduct = () => {
+  // Função para calcular tempo restante da oferta relâmpago
+  const getTimeRemaining = useCallback((product: Product): number => {
+    if (!product.flashSaleEndDate) return 0;
+    const now = new Date();
+    const end = new Date(product.flashSaleEndDate);
+    const diff = Math.max(0, Math.floor((end.getTime() - now.getTime()) / 1000));
+    return diff;
+  }, []);
+
+  // Seleciona produto com oferta relâmpago ativa
+  const pickFlashSaleProduct = useCallback(() => {
     if (!products || products.length === 0) return null;
-    const inStockProducts = products.filter(p => (p.stock || 0) > 0);
-    if (inStockProducts.length === 0) return null;
-    const randomIndex = Math.floor(Math.random() * inStockProducts.length);
-    return inStockProducts[randomIndex];
-  };
-
-  // Inicializa oferta e cronômetro quando produtos carregarem
-  useEffect(() => {
-    if (products && products.length > 0 && !specialOfferProduct) {
-      const product = pickRandomProduct();
-      setSpecialOfferProduct(product || null);
-      setOfferSecondsLeft(OFFER_DURATION);
+    
+    // Buscar produtos com oferta relâmpago ativa
+    const flashSaleProducts = products.filter(p => isSaleActive(p) && p.isFlashSale);
+    
+    if (flashSaleProducts.length > 0) {
+      // Selecionar aleatoriamente entre os produtos com oferta ativa
+      const randomIndex = Math.floor(Math.random() * flashSaleProducts.length);
+      return flashSaleProducts[randomIndex];
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products]);
+    
+    return null;
+  }, [products, isSaleActive]);
 
-  // Cronômetro da oferta
+  // Inicializa produto em destaque quando produtos carregarem
+  useEffect(() => {
+    if (products && products.length > 0) {
+      const product = pickFlashSaleProduct();
+      if (product) {
+        setSpecialOfferProduct(product);
+        const timeRemaining = getTimeRemaining(product);
+        setOfferSecondsLeft(timeRemaining > 0 ? timeRemaining : OFFER_DURATION);
+      } else {
+        // Se não houver oferta ativa, ainda assim mostrar um produto com oferta configurada (para debug)
+        const productsWithFlashSale = products.filter(p => p.isFlashSale);
+        if (productsWithFlashSale.length > 0) {
+          setSpecialOfferProduct(productsWithFlashSale[0]);
+          setOfferSecondsLeft(0);
+        }
+      }
+    }
+  }, [products, pickFlashSaleProduct, getTimeRemaining]);
+
+  // Cronômetro da oferta relâmpago - atualiza baseado no tempo real restante
   useEffect(() => {
     if (!specialOfferProduct) return;
-    const intervalId = setInterval(() => {
-      setOfferSecondsLeft((prev) => {
-        if (prev <= 1) {
-          const nextProduct = pickRandomProduct();
-          setSpecialOfferProduct(nextProduct || null);
-          return OFFER_DURATION; // reinicia
+    
+    // Atualizar timer imediatamente
+    const updateTimer = () => {
+      const timeRemaining = getTimeRemaining(specialOfferProduct);
+      if (timeRemaining > 0) {
+        setOfferSecondsLeft(timeRemaining);
+      } else {
+        // Se a oferta expirou, buscar próximo produto
+        const nextProduct = pickFlashSaleProduct();
+        if (nextProduct) {
+          setSpecialOfferProduct(nextProduct);
+          const nextTimeRemaining = getTimeRemaining(nextProduct);
+          setOfferSecondsLeft(nextTimeRemaining > 0 ? nextTimeRemaining : 0);
+        } else {
+          setOfferSecondsLeft(0);
         }
-        return prev - 1;
-      });
-    }, 1000);
+      }
+    };
+    
+    // Atualizar imediatamente
+    updateTimer();
+    
+    // Atualizar a cada segundo
+    const intervalId = setInterval(updateTimer, 1000);
 
     return () => clearInterval(intervalId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [specialOfferProduct]);
+  }, [specialOfferProduct, pickFlashSaleProduct, getTimeRemaining]);
 
   const formatTime = (totalSeconds: number) => {
     const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
@@ -463,93 +546,144 @@ export default function ProductsPage() {
             <div className="mb-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
               
               {/* Card de Oferta Relâmpago */}
-              {specialOfferProduct && (
-                <div 
-                  className="lg:col-span-3 relative bg-white rounded-lg border-2 border-brand-100 hover:border-brand-300 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer h-72"
-                  onClick={() => router.push(`/products/${specialOfferProduct.id}`)}
-                >
-                  {/* Badge Oferta Relâmpago - Topo Esquerdo */}
-                  <div className="absolute top-3 left-3 z-20">
-                    <div className="inline-flex items-center gap-1.5 bg-brand-700 text-black rounded-lg px-3 py-1.5 shadow-lg">
-                      <Zap className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <span className="text-[11px] font-bold uppercase tracking-tight">Oferta Relâmpago</span>
+              {specialOfferProduct && (() => {
+                const originalFlashPrice = Number(specialOfferProduct.price);
+                const isFlashActive = isSaleActive(specialOfferProduct) && specialOfferProduct.isFlashSale;
+                let currentFlashPrice: number;
+                let flashDiscountPercent = 0;
+                
+                // Calcular desconto se houver oferta relâmpago configurada
+                if (specialOfferProduct.isFlashSale) {
+                  // Calcular preço com desconto baseado no flashSaleDiscountPercent
+                  if (specialOfferProduct.flashSaleDiscountPercent && specialOfferProduct.flashSaleDiscountPercent > 0) {
+                    flashDiscountPercent = specialOfferProduct.flashSaleDiscountPercent;
+                    // SEMPRE calcular o preço com desconto para visualização
+                    const discount = (originalFlashPrice * flashDiscountPercent) / 100;
+                    currentFlashPrice = originalFlashPrice - discount;
+                  } else if (specialOfferProduct.flashSalePrice) {
+                    const flashPrice = Number(specialOfferProduct.flashSalePrice);
+                    // SEMPRE usar o preço de oferta para visualização
+                    currentFlashPrice = flashPrice;
+                    // Calcular percentual de desconto baseado no flashSalePrice
+                    if (flashPrice < originalFlashPrice) {
+                      flashDiscountPercent = Math.round(((originalFlashPrice - flashPrice) / originalFlashPrice) * 100);
+                    }
+                  } else {
+                    currentFlashPrice = isFlashActive ? getCurrentPrice(specialOfferProduct) : originalFlashPrice;
+                    if (currentFlashPrice < originalFlashPrice) {
+                      flashDiscountPercent = Math.round(((originalFlashPrice - currentFlashPrice) / originalFlashPrice) * 100);
+                    }
+                  }
+                } else {
+                  // Sem oferta relâmpago configurada
+                  currentFlashPrice = originalFlashPrice;
+                }
+                
+                const savings = originalFlashPrice > currentFlashPrice ? originalFlashPrice - currentFlashPrice : 0;
+                // Sempre mostrar desconto se houver oferta configurada, mesmo que não esteja ativa
+                const hasDiscount = flashDiscountPercent > 0;
+                
+                return (
+                  <div 
+                    className="lg:col-span-3 relative bg-white rounded-lg border-2 border-yellow-400 hover:border-yellow-500 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer h-72 shadow-yellow-100"
+                    onClick={() => router.push(`/products/${specialOfferProduct.id}`)}
+                  >
+                    {/* Badge Oferta Relâmpago - Topo Esquerdo */}
+                    <div className="absolute top-3 left-3 z-20">
+                      <div className="inline-flex items-center gap-1.5 bg-yellow-500 text-white rounded-lg px-3 py-1.5 shadow-lg animate-pulse">
+                        <Zap className="h-4 w-4 fill-white text-white" />
+                        <span className="text-[11px] font-bold uppercase tracking-tight">Oferta Relâmpago</span>
+                        {flashDiscountPercent > 0 && (
+                          <span className="ml-1 text-[10px] font-bold">-{flashDiscountPercent}%</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Timer - Topo Direito */}
-                  <div className="absolute top-3 right-3 z-20">
-                    <div className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-lg px-3 py-1.5 shadow-lg">
-                      <Clock className="h-4 w-4" />
-                      <span className="font-mono text-xs font-bold">{formatTime(offerSecondsLeft)}</span>
-                    </div>
-                  </div>
-
-                  {/* Conteúdo Principal */}
-                  <div className="relative z-10 h-full flex flex-row gap-4 pt-14">
-                    
-                    {/* Seção da Imagem - Esquerda */}
-                    <div className="flex-shrink-0 w-40 h-48 items-center justify-center overflow-hidden">
-                      {specialOfferProduct.imageUrl ? (
-                        <img
-                          src={specialOfferProduct.imageUrl}
-                          alt={specialOfferProduct.name}
-                          className="w-full h-full object-cover pl-5  group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gray-50 flex items-center justify-center">
-                          <Package className="h-16 w-16 text-gray-300" />
+                    {/* Timer - Topo Direito */}
+                    {offerSecondsLeft > 0 && (
+                      <div className="absolute top-3 right-3 z-20">
+                        <div className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-lg px-3 py-1.5 shadow-lg">
+                          <Clock className="h-4 w-4" />
+                          <span className="font-mono text-xs font-bold">{formatTime(offerSecondsLeft)}</span>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
-                    {/* Seção de Informações - Direita */}
-                    <div className="flex-1 flex flex-col justify-between h-[calc(100%-3.5rem)]">
+                    {/* Conteúdo Principal */}
+                    <div className="relative z-10 h-full flex flex-row gap-4 pt-14">
                       
-                      {/* Informações do Produto */}
-                      <div className="space-y-2">
-                        {/* Nome do Produto */}
-                        <h3 className="text-base font-semibold text-gray-900 line-clamp-2 leading-tight">
-                          {specialOfferProduct.name}
-                        </h3>
+                      {/* Seção da Imagem - Esquerda */}
+                      <div className="flex-shrink-0 w-40 h-48 items-center justify-center overflow-hidden">
+                        {(() => {
+                          const imageUrl = specialOfferProduct.imageUrls && specialOfferProduct.imageUrls.length > 0 
+                            ? specialOfferProduct.imageUrls[0] 
+                            : specialOfferProduct.imageUrl;
+                          
+                          return imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={specialOfferProduct.name}
+                              className="w-full h-full object-cover pl-5 group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-50 flex items-center justify-center">
+                              <Package className="h-16 w-16 text-gray-300" />
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Seção de Informações - Direita */}
+                      <div className="flex-1 flex flex-col justify-between h-[calc(100%-3.5rem)]">
                         
-                        {/* Preço Original e Badge */}
-                        {specialOfferProduct.price && (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm text-gray-500 line-through">
-                              R$ {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                            <span className="inline-flex items-center px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded uppercase">
-                              -30% OFF
-                            </span>
+                        {/* Informações do Produto */}
+                        <div className="space-y-2">
+                          {/* Nome do Produto */}
+                          <h3 className="text-base font-semibold text-gray-900 line-clamp-2 leading-tight">
+                            {specialOfferProduct.name}
+                          </h3>
+                          
+                          {/* Preço Original e Badge - mostrar se houver desconto configurado */}
+                          {hasDiscount && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm text-gray-500 line-through">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalFlashPrice)}
+                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded uppercase">
+                                -{flashDiscountPercent}% OFF
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Seção de Preços */}
+                        {currentFlashPrice && (
+                          <div className="space-y-2">
+                            <p className="text-xs text-gray-600 font-medium">Por apenas</p>
+                            <div className="text-2xl font-bold text-brand-700">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentFlashPrice)}
+                            </div>
+                            {savings > 0 && (
+                              <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" />
+                                Economia de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(savings)}
+                              </p>
+                            )}
+                            
+                            {/* Botão de ação */}
+                            <div>
+                              <div className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 group-hover:text-brand-800 transition-colors">
+                                <span>Ver oferta</span>
+                                <ChevronRight className="h-4 w-4 text-brand-700 group-hover:translate-x-1 transition-transform" />
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
-
-                      {/* Seção de Preços */}
-                      {specialOfferProduct.price && (
-                        <div className="space-y-2">
-                          <p className="text-xs text-gray-600 font-medium">Por apenas</p>
-                          <div className="text-2xl font-bold text-brand-700">
-                            R$ {(specialOfferProduct.price * 0.7).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </div>
-                          <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" />
-                            Economia de R$ {(specialOfferProduct.price * 0.3).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                          
-                          {/* Botão de ação */}
-                          <div >
-                            <div className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 group-hover:text-brand-800 transition-colors">
-                              <span>Ver oferta</span>
-                              <ChevronRight className="h-4 w-4 text-brand-700 group-hover:translate-x-1 transition-transform" />
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Banner de Produtos Recentes */}
               {recentProducts.length > 0 && (
@@ -855,14 +989,30 @@ export default function ProductsPage() {
                 {/* Grid de produtos estilo Mercado Livre */}
                 <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
                   {paginatedProducts.map((product) => {
-                    const hasDiscount = false; // Pode adicionar lógica de desconto
-                    const rating = product.rating || 0; // Rating real do banco
-                    const reviews = product.reviewCount || 0; // Reviews reais do banco
+                    const rating = product.rating || 0;
+                    const reviews = product.reviewCount || 0;
+                    const hasActiveSale = isSaleActive(product);
+                    const isFlashSaleActive = hasActiveSale && product.isFlashSale;
+                    const isNormalSaleActive = hasActiveSale && product.isOnSale && !product.isFlashSale;
+                    const currentPrice = getCurrentPrice(product);
+                    const originalPrice = product.price;
+                    // Usar percentual de desconto se disponível, senão calcular
+                    const discountPercent = isFlashSaleActive && product.flashSaleDiscountPercent
+                      ? product.flashSaleDiscountPercent
+                      : hasActiveSale && originalPrice > currentPrice
+                      ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
+                      : 0;
                     
                     return (
                       <div
                         key={product.id}
-                        className="bg-white rounded-lg border-2 border-brand-100 hover:border-brand-300 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer"
+                        className={`bg-white rounded-lg border-2 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer ${
+                          isFlashSaleActive 
+                            ? 'border-yellow-400 hover:border-yellow-500 shadow-yellow-100' 
+                            : isNormalSaleActive
+                            ? 'border-green-300 hover:border-green-400 shadow-green-100'
+                            : 'border-brand-100 hover:border-brand-300'
+                        }`}
                         onClick={() => router.push(`/products/${product.id}`)}
                       >
                         {/* Imagem do produto */}
@@ -878,10 +1028,22 @@ export default function ProductsPage() {
                               Sem imagem
                             </div>
                           )}
-                          {hasDiscount && (
-                            <Badge className="absolute top-2 left-2 bg-red-500 text-white">
-                              -30%
-                            </Badge>
+                          {/* Badge de Oferta Relâmpago */}
+                          {isFlashSaleActive && (
+                            <div className="absolute top-2 left-2 z-10">
+                              <Badge className="bg-yellow-500 text-white font-bold shadow-lg flex items-center gap-1 animate-pulse">
+                                <Zap className="h-3 w-3 fill-white" />
+                                {discountPercent > 0 ? `-${discountPercent}%` : 'Relâmpago'}
+                              </Badge>
+                            </div>
+                          )}
+                          {/* Badge de Oferta Normal */}
+                          {isNormalSaleActive && discountPercent > 0 && (
+                            <div className="absolute top-2 left-2 z-10">
+                              <Badge className="bg-green-600 text-white font-bold shadow-lg">
+                                -{discountPercent}%
+                              </Badge>
+                            </div>
                           )}
                           {/* Favorite Tooltip */}
                           <FavoriteTooltip productId={product.id} />
@@ -946,24 +1108,54 @@ export default function ProductsPage() {
 
                           {/* Preço */}
                           <div className="space-y-1">
-                            {hasDiscount && (
-                              <div className="text-xs text-gray-500 line-through">
-                                R$ {(Number(product.price) * 1.3).toFixed(2)}
+                            {(() => {
+                              const originalPriceNum = Number(originalPrice);
+                              let calculatedPrice = currentPrice;
+                              
+                              // Se for oferta relâmpago e tiver flashSaleDiscountPercent, calcular desconto
+                              if (isFlashSaleActive && product.flashSaleDiscountPercent && product.flashSaleDiscountPercent > 0) {
+                                const discount = (originalPriceNum * product.flashSaleDiscountPercent) / 100;
+                                calculatedPrice = originalPriceNum - discount;
+                              }
+                              
+                              // Sempre mostrar preço com desconto se houver oferta ativa e preços diferentes
+                              if (hasActiveSale && originalPriceNum > calculatedPrice) {
+                                return (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-lg font-bold text-gray-900">
+                                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedPrice)}
+                                    </span>
+                                    <span className="text-xs text-gray-500 line-through">
+                                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalPriceNum)}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              
+                              // Se não houver desconto, mostrar apenas o preço atual
+                              return (
+                                <span className="text-lg font-bold text-gray-900">
+                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedPrice)}
+                                </span>
+                              );
+                            })()}
+                            {/* Informação adicional de oferta */}
+                            {isFlashSaleActive && (
+                              <div className="flex items-center gap-1 text-xs text-yellow-600 font-medium">
+                                <Zap className="h-3 w-3" />
+                                <span>Oferta Relâmpago Ativa</span>
                               </div>
                             )}
-                            <div className="text-2xl font-bold text-brand-700">
-                              R$ {Number(product.price).toFixed(2)}
-                            </div>
-                            {hasDiscount && (
+                            {isNormalSaleActive && (
                               <div className="text-xs text-green-600 font-medium">
-                                30% OFF em PIX
+                                Oferta Especial
                               </div>
                             )}
                           </div>
 
                           {/* Parcelamento */}
                           <div className="text-xs text-green-600 font-medium">
-                            18x R$ {(Number(product.price) / 18).toFixed(2)} sem juros
+                            18x {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice / 18)} sem juros
                           </div>
 
                           {/* Badges */}

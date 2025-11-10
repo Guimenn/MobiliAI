@@ -1012,31 +1012,61 @@ export const customerAPI = {
     return response.data;
   },
 
+  simulatePixPayment: async (saleId: string) => {
+    const response = await api.post('/payment/pix/simulate', { saleId });
+    return response.data;
+  },
+
   // Pagamento Cartão (Checkout AbacatePay)
-  createCardPayment: async (saleId: string, customerInfo?: {
-    name?: string;
-    email?: string;
-    phone?: string;
-    cpf?: string;
-  }) => {
-    const response = await api.post('/payment/card/create', {
+  createCardPayment: async (
+    saleId: string,
+    data?: {
+      customerInfo?: {
+        name?: string;
+        email?: string;
+        phone?: string;
+        cpf?: string;
+      };
+      installments?: number;
+    },
+  ) => {
+    const payload: Record<string, any> = { saleId };
+    if (data?.customerInfo) {
+      payload.customerInfo = data.customerInfo;
+    }
+    if (data?.installments) {
+      payload.installments = data.installments;
+    }
+    const response = await api.post('/payment/card/create', payload);
+    return response.data;
+  },
+
+  // Pagamento Stripe
+  createStripePaymentIntent: async (
+    saleId: string,
+    customerInfo?: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      cpf?: string;
+    }
+  ) => {
+    const response = await api.post('/payment/stripe/create-intent', {
       saleId,
       customerInfo,
     });
     return response.data;
   },
 
-  // Pagamento Boleto (Checkout AbacatePay)
-  createBoletoPayment: async (saleId: string, customerInfo?: {
-    name?: string;
-    email?: string;
-    phone?: string;
-    cpf?: string;
-  }) => {
-    const response = await api.post('/payment/boleto/create', {
-      saleId,
-      customerInfo,
+  confirmStripePayment: async (paymentIntentId: string) => {
+    const response = await api.post('/payment/stripe/confirm', {
+      paymentIntentId,
     });
+    return response.data;
+  },
+
+  checkStripePaymentStatus: async (paymentIntentId: string) => {
+    const response = await api.get(`/payment/stripe/status/${paymentIntentId}`);
     return response.data;
   },
 
@@ -1094,6 +1124,7 @@ export const customerAPI = {
     city?: string;
     state?: string;
     zipCode?: string;
+    avatarUrl?: string;
   }) => {
     const response = await api.put('/customer/profile', updateData);
     return response.data;

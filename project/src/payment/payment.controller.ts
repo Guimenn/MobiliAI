@@ -65,26 +65,6 @@ export class PaymentController {
         throw new ForbiddenException('Venda não pertence ao usuário');
       }
 
-      // Se já existe um pagamento PIX para esta venda, retornar os dados existentes
-      if (sale.paymentReference && sale.paymentReference.startsWith('MOCK-')) {
-        console.log('Pagamento mock já existe para esta venda, retornando dados existentes');
-        // Buscar informações completas da venda
-        const fullSale = await this.prisma.sale.findUnique({
-          where: { id: data.saleId },
-          select: { saleNumber: true },
-        });
-        
-        return {
-          qrCode: `00020126580014br.gov.bcb.pix0136${data.saleId}5204000053039865802BR5925MobiliAI Loja de Tintas6009SAO PAULO62070503***6304${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-          qrCodeImage: null,
-          paymentId: sale.paymentReference,
-          expiresAt: new Date(Date.now() + 3600000), // 1 hora
-          amount: Number(sale.totalAmount),
-          saleId: data.saleId,
-          saleNumber: fullSale?.saleNumber || 'MOCK',
-        };
-      }
-
       return await this.paymentService.createPixPayment(
         data.saleId,
         Number(sale.totalAmount),
@@ -126,6 +106,35 @@ export class PaymentController {
   }
 
   /**
+   * Simula o pagamento de um QR Code PIX (apenas ambientes não produtivos)
+   */
+  @Post('pix/simulate')
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  async simulatePixPayment(
+    @Request() req,
+    @Body() data: { saleId: string },
+  ) {
+    if (!data.saleId) {
+      throw new BadRequestException('ID da venda é obrigatório');
+    }
+
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: data.saleId },
+      select: { customerId: true },
+    });
+
+    if (!sale) {
+      throw new BadRequestException('Venda não encontrada');
+    }
+
+    if (req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+      throw new ForbiddenException('Venda não pertence ao usuário');
+    }
+
+    return this.paymentService.simulatePixPayment(data.saleId);
+  }
+
+  /**
    * Cria pagamento por Cartão de Crédito (checkout AbacatePay)
    */
   @Post('card/create')
@@ -140,6 +149,7 @@ export class PaymentController {
         phone?: string;
         cpf?: string;
       };
+      installments?: number;
     }
   ) {
     if (!data.saleId) {
@@ -162,16 +172,17 @@ export class PaymentController {
     return this.paymentService.createCardPayment(
       data.saleId,
       Number(sale.totalAmount),
-      data.customerInfo
+      data.customerInfo,
+      { installments: data.installments },
     );
   }
 
   /**
-   * Cria pagamento por Boleto (checkout AbacatePay)
+   * Cria um PaymentIntent do Stripe para pagamento com cartão
    */
-  @Post('boleto/create')
+  @Post('stripe/create-intent')
   @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
-  async createBoletoPayment(
+  async createStripePaymentIntent(
     @Request() req,
     @Body() data: {
       saleId: string;
@@ -187,24 +198,90 @@ export class PaymentController {
       throw new BadRequestException('ID da venda é obrigatório');
     }
 
-    const sale = await this.prisma.sale.findUnique({
-      where: { id: data.saleId },
-      select: { customerId: true, totalAmount: true },
+    // Garantir conexão com o banco antes de buscar a venda
+    await this.prisma.ensureConnection();
+
+    const sale = await this.prisma.executeWithRetry(async () => {
+      return await this.prisma.sale.findUnique({
+        where: { id: data.saleId },
+        select: { customerId: true, totalAmount: true, saleNumber: true },
+      });
     });
 
     if (!sale) {
-      throw new BadRequestException(`Venda com ID ${data.saleId} não encontrada`);
+      console.error('Venda não encontrada:', {
+        saleId: data.saleId,
+        userId: req.user.id,
+        userRole: req.user.role,
+      });
+      throw new BadRequestException(`Venda com ID ${data.saleId} não encontrada. Verifique se o pedido foi criado corretamente.`);
     }
 
     if (req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
       throw new ForbiddenException('Venda não pertence ao usuário');
     }
 
-    return this.paymentService.createBoletoPayment(
+    return this.paymentService.createStripePaymentIntent(
       data.saleId,
       Number(sale.totalAmount),
       data.customerInfo
     );
+  }
+
+  /**
+   * Confirma o pagamento do Stripe após confirmação no frontend
+   */
+  @Post('stripe/confirm')
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  async confirmStripePayment(
+    @Request() req,
+    @Body() data: { paymentIntentId: string }
+  ) {
+    if (!data.paymentIntentId) {
+      throw new BadRequestException('ID do PaymentIntent é obrigatório');
+    }
+
+    // Verificar se o pagamento pertence ao usuário
+    const paymentStatus = await this.paymentService.checkStripePaymentStatus(data.paymentIntentId);
+    
+    if (paymentStatus.saleId) {
+      const sale = await this.prisma.sale.findUnique({
+        where: { id: paymentStatus.saleId },
+        select: { customerId: true },
+      });
+
+      if (sale && req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+        throw new ForbiddenException('Pagamento não pertence ao usuário');
+      }
+    }
+
+    return this.paymentService.confirmStripePayment(data.paymentIntentId);
+  }
+
+  /**
+   * Verifica o status de um pagamento Stripe
+   */
+  @Get('stripe/status/:paymentIntentId')
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  async checkStripePaymentStatus(
+    @Request() req,
+    @Param('paymentIntentId') paymentIntentId: string
+  ) {
+    const paymentStatus = await this.paymentService.checkStripePaymentStatus(paymentIntentId);
+    
+    // Verificar se o pagamento pertence ao usuário
+    if (paymentStatus.saleId) {
+      const sale = await this.prisma.sale.findUnique({
+        where: { id: paymentStatus.saleId },
+        select: { customerId: true },
+      });
+
+      if (sale && req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+        throw new ForbiddenException('Pagamento não pertence ao usuário');
+      }
+    }
+
+    return paymentStatus;
   }
 }
 

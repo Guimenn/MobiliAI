@@ -117,6 +117,17 @@ model Product {
   reviewCount        Int                    @default(0)
   isActive           Boolean                @default(true)
   isAvailable        Boolean                @default(true)
+  // Campos de Oferta Normal
+  isOnSale           Boolean                @default(false)
+  salePrice          Decimal?               @db.Decimal(10, 2)
+  saleStartDate      DateTime?
+  saleEndDate        DateTime?
+  // Campos de Oferta Relâmpago
+  isFlashSale             Boolean                @default(false)
+  flashSalePrice          Decimal?               @db.Decimal(10, 2)
+  flashSaleDiscountPercent Int?                  // Percentual de desconto (1-99)
+  flashSaleStartDate      DateTime?
+  flashSaleEndDate        DateTime?
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
   storeId            String
@@ -156,16 +167,15 @@ model Sale {
   employeeId       String
   storeId          String
   dailyCashId      String?
-  // Campos para pedidos online
+  deliveredAt      DateTime?
   isOnlineOrder    Boolean         @default(false)
+  shippedAt        DateTime?
   shippingAddress  String?
   shippingCity     String?
+  shippingPhone    String?
   shippingState    String?
   shippingZipCode  String?
-  shippingPhone    String?
   trackingCode     String?
-  shippedAt        DateTime?
-  deliveredAt      DateTime?
   reviews          ProductReview[]
   items            SaleItem[]
   customer         User?           @relation("CustomerSales", fields: [customerId], references: [id])
@@ -551,11 +561,33 @@ model Notification {
   metadata  Json?
   actionUrl String?
   createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
   userId    String
+  updatedAt DateTime         @updatedAt
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model ShippingAddress {
+  id            String   @id @default(uuid())
+  name          String
+  recipientName String
+  phone         String
+  cpf           String?
+  address       String
+  number        String
+  complement    String?
+  neighborhood  String
+  city          String
+  state         String
+  zipCode       String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("shipping_addresses")
 }
 
 enum UserRole {
@@ -582,9 +614,9 @@ enum SaleStatus {
   COMPLETED
   CANCELLED
   REFUNDED
+  DELIVERED
   PREPARING
   SHIPPED
-  DELIVERED
 }
 
 enum PaymentMethod {
@@ -612,28 +644,6 @@ enum MaterialType {
   METAL
   COURO
   TECIDO
-}
-
-model ShippingAddress {
-  id           String   @id @default(uuid())
-  name         String   // Nome do endereço (ex: "Casa", "Trabalho", "Casa da Mãe")
-  recipientName String   // Nome do destinatário
-  phone        String
-  cpf          String?
-  address      String
-  number       String
-  complement   String?
-  neighborhood String
-  city         String
-  state        String
-  zipCode      String
-  isDefault    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("shipping_addresses")
 }
 
 enum NotificationType {

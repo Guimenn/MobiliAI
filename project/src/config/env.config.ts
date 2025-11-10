@@ -17,6 +17,8 @@ export const envConfig = {
   // AbacatePay (PIX)
   ABACATEPAY_API_KEY: process.env.ABACATEPAY_API_KEY || '',
   ABACATEPAY_ENVIRONMENT: process.env.ABACATEPAY_ENVIRONMENT || 'sandbox',
+  ABACATEPAY_BASE_URL: process.env.ABACATEPAY_BASE_URL || 'https://api.abacatepay.com',
+  ABACATEPAY_DEV_MODE: process.env.ABACATEPAY_DEV_MODE === 'true',
 
   // App
   PORT: parseInt(process.env.PORT || '3001'),
@@ -33,4 +35,8 @@ export const envConfig = {
 
   // Replicate
   REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN || 'r8_WwmiM2PiqGiJsyW0oVQ5LJDDHZqLQid1AzXRU',
+
+  // Stripe
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+  STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
 };

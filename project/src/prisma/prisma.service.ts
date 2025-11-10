@@ -30,13 +30,40 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   // Método para verificar e garantir conexão
   async ensureConnection() {
     try {
+      // Testar conexão
       await this.$queryRaw`SELECT 1`;
       return true;
     } catch (error: any) {
-      if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
-        this.logger.warn('Conexão perdida, reconectando...');
-        await this.handleReconnect();
-        return true;
+      const errorMessage = error.message || '';
+      const errorCode = error.code || '';
+      
+      if (
+        errorCode === 'P1017' || 
+        errorMessage.includes('Server has closed the connection') ||
+        errorMessage.includes('Engine is not yet connected') ||
+        errorMessage.includes('not connected') ||
+        errorMessage.includes('not yet connected')
+      ) {
+        this.logger.warn('Conexão perdida, reconectando...', { errorCode, errorMessage });
+        
+        // Tentar reconectar
+        try {
+          await this.$disconnect().catch(() => {
+            // Ignorar erros ao desconectar
+          });
+          await this.$connect();
+          this.logger.log('✅ Reconexão bem-sucedida!');
+          
+          // Testar novamente
+          await this.$queryRaw`SELECT 1`;
+          return true;
+        } catch (reconnectError: any) {
+          this.logger.error('Falha ao reconectar:', reconnectError);
+          // Tentar usar o método de reconexão completo
+          await this.handleReconnect();
+          await this.$queryRaw`SELECT 1`;
+          return true;
+        }
       }
       throw error;
     }

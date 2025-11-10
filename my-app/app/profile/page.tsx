@@ -96,13 +96,25 @@ export default function ProfilePage() {
         throw new Error("Não foi possível obter a URL do avatar.");
       }
 
-      setUser({
+      // Salvar avatarUrl no banco de dados
+      const updatedUser = await customerAPI.updateProfile({ avatarUrl: uploadedUrl });
+
+      // Atualizar estado local com os dados retornados do backend
+      // Garantir que avatarUrl esteja presente - usar uploadedUrl como fallback
+      const finalAvatarUrl = updatedUser?.avatarUrl || uploadedUrl;
+      const mergedUser = {
         ...user,
-        avatarUrl: uploadedUrl,
-      });
+        ...(updatedUser || {}),
+        avatarUrl: finalAvatarUrl,
+      };
+
+      setUser(mergedUser as typeof user);
 
       toast.success("Avatar atualizado com sucesso!");
       setAvatarFile(null);
+      
+      // Retornar a URL do avatar para o componente ProfileAvatar atualizar o preview
+      return finalAvatarUrl;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro ao salvar avatar.";
       toast.error(message);
