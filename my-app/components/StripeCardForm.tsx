@@ -58,7 +58,8 @@ export default function StripeCardForm({
         elements,
         clientSecret,
         confirmParams: {
-          return_url: `${window.location.origin}/checkout/success`,
+          // Não usar return_url aqui, vamos fazer o redirecionamento manualmente
+          // para garantir que o saleId seja passado corretamente
         },
         redirect: 'if_required',
       });

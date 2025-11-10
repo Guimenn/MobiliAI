@@ -93,11 +93,28 @@ export default function CardPaymentPage() {
 
   const handlePaymentSuccess = async (paymentIntentId: string) => {
     try {
-      // Confirmar pagamento no backend
-      await customerAPI.confirmStripePayment(paymentIntentId);
+      // Confirmar pagamento no backend e obter o saleId
+      const confirmationResult = await customerAPI.confirmStripePayment(paymentIntentId);
       
-      // Redirecionar para página de sucesso
-      router.push(`/checkout/success?saleId=${saleId}`);
+      // Usar o saleId retornado ou o saleId da URL
+      const finalSaleId = confirmationResult?.saleId || saleId;
+      
+      if (!finalSaleId) {
+        console.error('SaleId não encontrado após confirmação do pagamento', {
+          confirmationResult,
+          saleId,
+        });
+        setError('Erro ao obter ID do pedido. Entre em contato com o suporte.');
+        return;
+      }
+      
+      // Salvar saleId no sessionStorage como backup
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('last-sale-id', finalSaleId);
+      }
+      
+      // Redirecionar para página de sucesso com o saleId
+      router.push(`/checkout/success?saleId=${finalSaleId}`);
     } catch (err: any) {
       console.error('Erro ao confirmar pagamento:', err);
       setError('Erro ao confirmar pagamento. Entre em contato com o suporte.');

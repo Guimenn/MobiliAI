@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -8,20 +8,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { customerAPI } from '@/lib/api';
 import {
   CheckCircle,
   Package,
   Home,
   ShoppingCart,
   Mail,
-  Phone
+  Phone,
+  Loader2
 } from 'lucide-react';
 
 export default function CheckoutSuccessPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const orderId = searchParams.get('orderId') || 'N/A';
+  // Aceitar tanto orderId quanto saleId para compatibilidade
+  const orderId = searchParams.get('orderId') || searchParams.get('saleId') || 'N/A';
   const { clearCart } = useAppStore();
+  const [saleNumber, setSaleNumber] = useState<string>('');
+  const [isLoadingSale, setIsLoadingSale] = useState(false);
 
   // Limpar carrinho ao chegar na página de sucesso
   React.useEffect(() => {
@@ -30,6 +35,42 @@ export default function CheckoutSuccessPage() {
       clearCart();
     }
   }, [clearCart]);
+
+  // Se não tiver orderId/saleId, tentar buscar do sessionStorage
+  React.useEffect(() => {
+    if (orderId === 'N/A' && typeof window !== 'undefined') {
+      const storedSaleId = sessionStorage.getItem('last-sale-id');
+      if (storedSaleId) {
+        // Atualizar URL sem recarregar a página
+        router.replace(`/checkout/success?saleId=${storedSaleId}`);
+      }
+    }
+  }, [orderId, router]);
+
+  // Buscar informações do pedido se tiver o ID
+  useEffect(() => {
+    const fetchOrderInfo = async () => {
+      if (orderId && orderId !== 'N/A') {
+        setIsLoadingSale(true);
+        try {
+          const order = await customerAPI.getOrderById(orderId);
+          if (order?.saleNumber) {
+            setSaleNumber(order.saleNumber);
+          }
+        } catch (error) {
+          console.error('Erro ao buscar informações do pedido:', error);
+          // Se não conseguir buscar, usar o ID mesmo
+          setSaleNumber(orderId);
+        } finally {
+          setIsLoadingSale(false);
+        }
+      }
+    };
+
+    fetchOrderInfo();
+  }, [orderId]);
+
+  const displayOrderId = saleNumber || orderId;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white page-with-fixed-header">
@@ -50,7 +91,16 @@ export default function CheckoutSuccessPage() {
               Obrigado pela sua compra
             </p>
             <p className="text-sm text-gray-500">
-              Número do pedido: <span className="font-semibold text-[#3e2626]">{orderId}</span>
+              Número do pedido: <span className="font-semibold text-[#3e2626]">
+                {isLoadingSale ? (
+                  <span className="inline-flex items-center">
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    Carregando...
+                  </span>
+                ) : (
+                  displayOrderId
+                )}
+              </span>
             </p>
           </div>
 
@@ -113,14 +163,16 @@ export default function CheckoutSuccessPage() {
               Voltar ao Início
             </Button>
 
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/customer/orders/${orderId}`)}
-              className="border-2 border-green-600 text-green-700 hover:bg-green-600 hover:text-white px-8 py-6 rounded-full font-semibold text-lg transition-all duration-300"
-            >
-              <CheckCircle className="h-5 w-5 mr-2" />
-              Ver pedido
-            </Button>
+            {orderId !== 'N/A' && (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/customer/orders/${orderId}`)}
+                className="border-2 border-green-600 text-green-700 hover:bg-green-600 hover:text-white px-8 py-6 rounded-full font-semibold text-lg transition-all duration-300"
+              >
+                <CheckCircle className="h-5 w-5 mr-2" />
+                Ver pedido
+              </Button>
+            )}
             
             <Button
               variant="outline"
