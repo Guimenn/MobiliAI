@@ -96,6 +96,26 @@ export class AdminController {
     return this.adminService.updateUserWorkingHours(id, data.workingHours);
   }
 
+  // ==================== GESTÃO DE CLIENTES ====================
+
+  @Get('customers')
+  async getAllCustomers(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('search') search: string = ''
+  ) {
+    return this.adminService.getAllCustomers(
+      parseInt(page),
+      parseInt(limit),
+      search
+    );
+  }
+
+  @Get('customers/:id')
+  async getCustomerById(@Param('id') id: string) {
+    return this.adminService.getCustomerById(id);
+  }
+
   // ==================== GESTÃO DE LOJAS ====================
 
   @Get('stores')

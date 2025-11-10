@@ -48,91 +48,115 @@ export default function CustomersPage() {
     try {
       setIsLoading(true);
       
-      // Carregar usuários do banco de dados
-      const usersResponse = await adminAPI.getUsers();
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        // Verificar se usersData é um array e filtrar apenas clientes
-        const customersData = Array.isArray(usersData) 
-          ? usersData.filter((user: any) => user.role === 'CUSTOMER')
-          : [];
-        setCustomers(customersData);
+      // Tentar usar o endpoint específico de clientes primeiro
+      try {
+        const customersResponse = await adminAPI.getCustomers(1, 1000, '');
+        
+        // Verificar se a resposta tem a estrutura esperada
+        // O endpoint retorna { customers: [...], pagination: {...} }
+        const customers = Array.isArray(customersResponse) 
+          ? customersResponse 
+          : (customersResponse?.customers || customersResponse?.data || []);
+        
+        setCustomers(customers);
         
         // Calcular estatísticas
-        const activeCustomers = customersData.filter((customer: any) => customer.isActive).length;
-        const newCustomers = customersData.filter((customer: any) => {
+        const activeCustomers = customers.filter((customer: any) => customer.isActive !== false).length;
+        const newCustomers = customers.filter((customer: any) => {
+          if (!customer.createdAt) return false;
           const createdAt = new Date(customer.createdAt);
           const thirtyDaysAgo = new Date();
           thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
           return createdAt > thirtyDaysAgo;
         }).length;
         
-        setStats({
-          totalCustomers: customersData.length,
-          activeCustomers,
-          newCustomers,
-          totalSpent: 0 // Seria calculado com dados de vendas
-        });
-      } else {
-        console.log('API de usuários não disponível, usando dados mock');
-        // Dados mock para clientes
-        const mockCustomers = [
-          {
-            id: '1',
-            name: 'João Silva',
-            email: 'joao@email.com',
-            phone: '(11) 99999-9999',
-            role: 'CUSTOMER',
-            isActive: true,
-            createdAt: new Date('2024-01-10'),
-            totalSpent: 1250.00,
-            lastPurchase: new Date('2024-01-15')
-          },
-          {
-            id: '2',
-            name: 'Maria Santos',
-            email: 'maria@email.com',
-            phone: '(11) 88888-8888',
-            role: 'CUSTOMER',
-            isActive: true,
-            createdAt: new Date('2024-01-05'),
-            totalSpent: 850.00,
-            lastPurchase: new Date('2024-01-14')
-          },
-          {
-            id: '3',
-            name: 'Pedro Costa',
-            email: 'pedro@email.com',
-            phone: '(11) 77777-7777',
-            role: 'CUSTOMER',
-            isActive: false,
-            createdAt: new Date('2023-12-20'),
-            totalSpent: 2100.00,
-            lastPurchase: new Date('2024-01-13')
+        // Calcular total gasto (se houver dados de vendas)
+        let totalSpent = 0;
+        if (customers.length > 0) {
+          // Tentar buscar vendas para calcular total gasto
+          try {
+            const sales = await adminAPI.getSales();
+            if (Array.isArray(sales)) {
+              customers.forEach((customer: any) => {
+                const customerSales = sales.filter((sale: any) => sale.customerId === customer.id);
+                const customerTotal = customerSales.reduce((sum: number, sale: any) => sum + (sale.total || 0), 0);
+                totalSpent += customerTotal;
+              });
+            }
+          } catch (salesError) {
+            console.log('Não foi possível calcular total gasto:', salesError);
           }
-        ];
-        
-        setCustomers(mockCustomers);
-        
-        // Calcular estatísticas dos dados mock
-        const activeCustomers = mockCustomers.filter(customer => customer.isActive).length;
-        const newCustomers = mockCustomers.filter(customer => {
-          const createdAt = new Date(customer.createdAt);
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return createdAt > thirtyDaysAgo;
-        }).length;
+        }
         
         setStats({
-          totalCustomers: mockCustomers.length,
+          totalCustomers: customers.length,
           activeCustomers,
           newCustomers,
-          totalSpent: mockCustomers.reduce((sum, customer) => sum + customer.totalSpent, 0)
+          totalSpent
         });
+        
+        return;
+      } catch (customersError) {
+        console.log('Endpoint de clientes não disponível, tentando buscar usuários:', customersError);
       }
+      
+      // Fallback: buscar todos os usuários e filtrar clientes
+      const usersData = await adminAPI.getUsers();
+      
+      // Verificar se a resposta tem a estrutura esperada
+      const users = Array.isArray(usersData) 
+        ? usersData 
+        : (usersData?.data || usersData?.users || []);
+      
+      // Filtrar apenas clientes
+      const customersData = users.filter((user: any) => user.role === 'CUSTOMER');
+      
+      setCustomers(customersData);
+      
+      // Calcular estatísticas
+      const activeCustomers = customersData.filter((customer: any) => customer.isActive !== false).length;
+      const newCustomers = customersData.filter((customer: any) => {
+        if (!customer.createdAt) return false;
+        const createdAt = new Date(customer.createdAt);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return createdAt > thirtyDaysAgo;
+      }).length;
+      
+      // Calcular total gasto (se houver dados de vendas)
+      let totalSpent = 0;
+      if (customersData.length > 0) {
+        try {
+          const sales = await adminAPI.getSales();
+          if (Array.isArray(sales)) {
+            customersData.forEach((customer: any) => {
+              const customerSales = sales.filter((sale: any) => sale.customerId === customer.id);
+              const customerTotal = customerSales.reduce((sum: number, sale: any) => sum + (sale.total || 0), 0);
+              totalSpent += customerTotal;
+            });
+          }
+        } catch (salesError) {
+          console.log('Não foi possível calcular total gasto:', salesError);
+        }
+      }
+      
+      setStats({
+        totalCustomers: customersData.length,
+        activeCustomers,
+        newCustomers,
+        totalSpent
+      });
+      
     } catch (error) {
       console.error('Erro ao carregar dados do banco:', error);
+      // Em caso de erro, mostrar lista vazia
       setCustomers([]);
+      setStats({
+        totalCustomers: 0,
+        activeCustomers: 0,
+        newCustomers: 0,
+        totalSpent: 0
+      });
     } finally {
       setIsLoading(false);
     }
@@ -275,8 +299,8 @@ export default function CustomersPage() {
                         </div>
                         <div className="flex items-center space-x-4">
                           <div className="text-right">
-                            <Badge variant={customer.isActive ? 'default' : 'secondary'}>
-                              {customer.isActive ? 'Ativo' : 'Inativo'}
+                            <Badge variant={customer.isActive !== false ? 'default' : 'secondary'}>
+                              {customer.isActive !== false ? 'Ativo' : 'Inativo'}
                             </Badge>
                             <p className="text-xs text-gray-500 mt-1">
                               Cadastrado em {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('pt-BR') : 'Data não disponível'}

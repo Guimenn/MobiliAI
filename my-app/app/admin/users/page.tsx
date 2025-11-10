@@ -85,7 +85,16 @@ export default function UsersPage() {
           
           // Verificar se os dados estão em usersData.users ou se é um array direto
       const usersArray = Array.isArray(usersData) ? usersData : (usersData?.users || []);
-      setUsers(usersArray);
+      
+      // Filtrar apenas admins, gerentes e caixas (excluir clientes)
+      const filteredUsers = usersArray.filter((user: any) => 
+        user.role === 'ADMIN' || 
+        user.role === 'STORE_MANAGER' || 
+        user.role === 'CASHIER' ||
+        user.role === 'EMPLOYEE'
+      );
+      
+      setUsers(filteredUsers);
           
           // Verificar se os dados estão em storesData.stores ou se é um array direto
       const storesArray = Array.isArray(storesData) ? storesData : (storesData?.stores || []);
@@ -474,6 +483,11 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
         index === self.findIndex((u: any) => u.email === user.email)
       )
       .filter((user: any) => {
+        // Excluir clientes sempre
+        if (user.role === 'CUSTOMER') {
+          return false;
+        }
+        
         // Filtro por role
         if (userFilters.role !== 'all' && user.role !== userFilters.role) {
           return false;
@@ -497,7 +511,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
         return true;
       })
       .sort((a: any, b: any) => {
-        const roleOrder = { 'ADMIN': 0, 'STORE_MANAGER': 1, 'CASHIER': 2, 'CUSTOMER': 3 };
+        const roleOrder = { 'ADMIN': 0, 'STORE_MANAGER': 1, 'CASHIER': 2, 'EMPLOYEE': 3 };
         return (roleOrder[a.role as keyof typeof roleOrder] || 4) - (roleOrder[b.role as keyof typeof roleOrder] || 4);
       });
   };
@@ -526,7 +540,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                 </div>
                 <div className="text-left">
                   <h1 className="text-3xl font-bold">Gestão de Usuários</h1>
-                  <p className="text-white/80 text-lg">Gerencie funcionários, gerentes e clientes do sistema</p>
+                  <p className="text-white/80 text-lg">Gerencie funcionários, gerentes e administradores do sistema</p>
                 </div>
               </div>
             </div>
@@ -605,22 +619,6 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
             </CardContent>
           </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-2 border-purple-500/20 shadow-lg hover:shadow-xl hover:border-purple-500/30 transition-all duration-300">
-            <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-purple-600 uppercase tracking-wide">Clientes</p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {users.filter((u: any) => u.role === 'CUSTOMER').length}
-                </p>
-                <p className="text-xs text-purple-600/70">Cadastrados</p>
-                </div>
-              <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
-                <User className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
       {/* Filtros e Controles */}
@@ -642,7 +640,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                   <option value="ADMIN">Administrador</option>
                   <option value="STORE_MANAGER">Gerente</option>
                   <option value="CASHIER">Caixa</option>
-                  <option value="CUSTOMER">Cliente</option>
+                  <option value="EMPLOYEE">Funcionário</option>
                 </select>
               </div>
 
@@ -735,7 +733,8 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                           >
                             {user.role === 'ADMIN' ? 'Admin' :
                              user.role === 'STORE_MANAGER' ? 'Gerente' :
-                             user.role === 'CASHIER' ? 'Caixa' : 'Cliente'}
+                             user.role === 'CASHIER' ? 'Caixa' :
+                             user.role === 'EMPLOYEE' ? 'Funcionário' : user.role}
                         </Badge>
                           <Badge 
                             variant={user.isActive ? 'default' : 'secondary'}
@@ -869,7 +868,8 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                           >
                             {user.role === 'ADMIN' ? 'Admin' :
                              user.role === 'STORE_MANAGER' ? 'Gerente' :
-                             user.role === 'CASHIER' ? 'Caixa' : 'Cliente'}
+                             user.role === 'CASHIER' ? 'Caixa' :
+                             user.role === 'EMPLOYEE' ? 'Funcionário' : user.role}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1016,7 +1016,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                       <option value="CASHIER">Caixa</option>
                       <option value="STORE_MANAGER">Gerente</option>
                       <option value="ADMIN">Administrador</option>
-                      <option value="CUSTOMER">Cliente</option>
+                      <option value="EMPLOYEE">Funcionário</option>
                     </select>
                   </div>
                   <div className="space-y-2">

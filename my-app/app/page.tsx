@@ -850,7 +850,7 @@ export default function HomePage() {
               <div className="group relative h-full bg-gradient-to-br from-[#3e2626] via-[#8B4513] to-[#A0522D] rounded-3xl overflow-hidden cursor-pointer shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.02]">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[1.79]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[0].id]})` }}
                 ></div>
                 {/* Background Pattern */}
@@ -863,23 +863,12 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 
                 {/* Conteúdo Principal */}
-                <div className="relative z-10 p-8 h-full flex flex-col justify-between">
-                  <div>
-                   
-                    <h3 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+                <div className="relative z-10 p-6 md:p-8 h-full flex flex-col justify-between">
+                  {/* Selo de categoria - Card Grande */}
+                  <div className="absolute top-5 left-5 md:top-6 md:left-6 z-20">
+                    <span className="inline-flex items-center px-5 py-2.5 md:px-6 md:py-3 rounded-2xl bg-black/60 backdrop-blur-md text-white text-xl md:text-3xl lg:text-4xl font-bold tracking-tight shadow-xl border border-white/30">
                       {categories[0].name}
-                    </h3>
-                   
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                     
-                      
-                    </div>
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                      <ArrowRight className="h-6 w-6 text-white group-hover:translate-x-1 transition-transform" />
-                    </div>
+                    </span>
                   </div>
                 </div>
                 
@@ -897,22 +886,17 @@ export default function HomePage() {
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.33]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[5].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[5].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-6 h-full flex flex-col justify-between">
-                  <div className="flex items-start justify-between">
-                    
-                   
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-2xl font-bold text-[#3e2626] mb-2">
+                <div className="relative z-10 p-4 md:p-6 h-full">
+                  {/* Selo de categoria - Card Médio 2x2 */}
+                  <div className="absolute top-4 left-4 md:top-5 md:left-5 z-20">
+                    <span className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 rounded-xl bg-black/60 backdrop-blur-md text-white text-base md:text-xl lg:text-2xl font-bold tracking-tight shadow-lg border border-white/30">
                       {categories[5].name}
-                    </h4>
-                    
+                    </span>
                   </div>
                 </div>
                 
@@ -925,19 +909,17 @@ export default function HomePage() {
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[2].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex flex-col justify-between">
-                  
-                  
-                  <div className="text-center">
-                    <h4 className="text-lg font-bold text-[#3e2626] mb-1">
+                <div className="relative z-10 p-3 md:p-4 h-full">
+                  {/* Selo de categoria - Card Estreito 1x2 */}
+                  <div className="absolute top-3 left-3 md:top-4 md:left-4 z-20">
+                    <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-black/60 backdrop-blur-md text-white text-sm md:text-base lg:text-lg font-bold tracking-tight shadow-md border border-white/30">
                       {categories[2].name}
-                    </h4>
-                   
+                    </span>
                   </div>
                 </div>
                 
@@ -950,19 +932,17 @@ export default function HomePage() {
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.36]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[1].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[1].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-6 h-full flex flex-col justify-between">
-                 
-                  
-                  <div>
-                    <h4 className="text-2xl font-bold text-[#3e2626] mb-2">
+                <div className="relative z-10 p-4 md:p-6 h-full">
+                  {/* Selo de categoria - Card Médio 2x2 */}
+                  <div className="absolute top-4 left-4 md:top-5 md:left-5 z-20">
+                    <span className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 rounded-xl bg-black/60 backdrop-blur-md text-white text-base md:text-xl lg:text-2xl font-bold tracking-tight shadow-lg border border-white/30">
                       {categories[1].name}
-                    </h4>
-                   
+                    </span>
                   </div>
                 </div>
                 
@@ -975,22 +955,18 @@ export default function HomePage() {
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[1.85]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[4].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[4].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                   
-                    <div>
-                      <h4 className="text-lg font-bold text-[#3e2626] mb-1">
-                        {categories[4].name}
-                      </h4>
-                     
-                    </div>
+                <div className="relative z-10 p-3 md:p-4 h-full">
+                  {/* Selo de categoria - Card Horizontal 2x1 */}
+                  <div className="absolute top-3 left-3 md:top-4 md:left-4 z-20">
+                    <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-black/60 backdrop-blur-md text-white text-sm md:text-base lg:text-lg font-bold tracking-tight shadow-md border border-white/30">
+                      {categories[4].name}
+                    </span>
                   </div>
-                 
                 </div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
@@ -1002,18 +978,17 @@ export default function HomePage() {
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.8]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[6].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
-                 
-                  <div className="text-center">
-                    <h4 className="text-sm font-bold text-[#3e2626] mb-1">
+                <div className="relative z-10 p-3 md:p-4 h-full">
+                  {/* Selo de categoria - Card Horizontal 2x1 */}
+                  <div className="absolute top-3 left-3 md:top-4 md:left-4 z-20">
+                    <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-black/60 backdrop-blur-md text-white text-sm md:text-base lg:text-lg font-bold tracking-tight shadow-md border border-white/30">
                       {categories[6].name}
-                    </h4>
-                    
+                    </span>
                   </div>
                 </div>
                 
@@ -1028,22 +1003,18 @@ export default function HomePage() {
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[1.8]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[7].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[7].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                   
-                    <div>
-                      <h4 className="text-lg font-bold text-[#3e2626] mb-1">
-                        {categories[7].name}
-                      </h4>
-                    
-                    </div>
+                <div className="relative z-10 p-3 md:p-4 h-full">
+                  {/* Selo de categoria - Card Horizontal 2x1 */}
+                  <div className="absolute top-3 left-3 md:top-4 md:left-4 z-20">
+                    <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-black/60 backdrop-blur-md text-white text-sm md:text-base lg:text-lg font-bold tracking-tight shadow-md border border-white/30">
+                      {categories[7].name}
+                    </span>
                   </div>
-                 
                 </div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
@@ -1055,18 +1026,17 @@ export default function HomePage() {
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.4]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[8].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[8].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
-                  
-                  <div className="text-center">
-                    <h4 className="text-sm font-bold text-[#3e2626] mb-1">
+                <div className="relative z-10 p-2.5 md:p-3 h-full">
+                  {/* Selo de categoria - Card Pequeno 1x1 */}
+                  <div className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-20">
+                    <span className="inline-flex items-center px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg bg-black/60 backdrop-blur-md text-white text-xs md:text-sm lg:text-base font-bold tracking-tight shadow-md border border-white/30">
                       {categories[8].name}
-                    </h4>
-                    
+                    </span>
                   </div>
                 </div>
                 
