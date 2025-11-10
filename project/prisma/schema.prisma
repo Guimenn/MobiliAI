@@ -83,59 +83,68 @@ model Store {
 }
 
 model Product {
-  id                 String                 @id @default(uuid())
-  name               String
-  description        String?
-  shortDescription   String?
-  category           ProductCategory        @default(SOFA)
-  price              Decimal                @db.Decimal(10, 2)
-  costPrice          Decimal?               @db.Decimal(10, 2)
-  stock              Int                    @default(0)
-  minStock           Int                    @default(0)
-  style              ProductStyle?
-  material           MaterialType?
-  colorHex           String?
-  colorName          String?
-  customColor        String?
-  width              Decimal?               @db.Decimal(8, 2)
-  height             Decimal?               @db.Decimal(8, 2)
-  depth              Decimal?               @db.Decimal(8, 2)
-  weight             Decimal?               @db.Decimal(8, 2)
-  brand              String?
-  model              String?
-  sku                String?                @unique
-  barcode            String?                @unique
-  imageUrl           String?
-  imageUrls          String[]
-  videoUrl           String?
-  tags               String[]
-  keywords           String[]
-  isFeatured         Boolean                @default(false)
-  isNew              Boolean                @default(false)
-  isBestSeller       Boolean                @default(false)
-  rating             Decimal?               @db.Decimal(3, 2)
-  reviewCount        Int                    @default(0)
-  isActive           Boolean                @default(true)
-  isAvailable        Boolean                @default(true)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-  storeId            String
-  collectionId       String?
-  supplierId         String?
-  model3DUrl         String?
-  cartItems          CartItem[]
-  comparisons        Comparison[]
-  favorites          Favorite[]
-  moodboardItems     MoodboardItem[]
-  compatibleProducts ProductCompatibility[] @relation("CompatibleProducts")
-  compatibility      ProductCompatibility[]
-  reviews            ProductReview[]
-  variants           ProductVariant[]
-  collection         Collection?            @relation(fields: [collectionId], references: [id])
-  store              Store                  @relation(fields: [storeId], references: [id])
-  supplier           Supplier?              @relation(fields: [supplierId], references: [id])
-  saleItems          SaleItem[]
-  storeInventory     StoreInventory[]
+  id                       String                 @id @default(uuid())
+  name                     String
+  description              String?
+  shortDescription         String?
+  category                 ProductCategory        @default(SOFA)
+  price                    Decimal                @db.Decimal(10, 2)
+  costPrice                Decimal?               @db.Decimal(10, 2)
+  stock                    Int                    @default(0)
+  minStock                 Int                    @default(0)
+  style                    ProductStyle?
+  material                 MaterialType?
+  colorHex                 String?
+  colorName                String?
+  customColor              String?
+  width                    Decimal?               @db.Decimal(8, 2)
+  height                   Decimal?               @db.Decimal(8, 2)
+  depth                    Decimal?               @db.Decimal(8, 2)
+  weight                   Decimal?               @db.Decimal(8, 2)
+  brand                    String?
+  model                    String?
+  sku                      String?                @unique
+  barcode                  String?                @unique
+  imageUrl                 String?
+  imageUrls                String[]
+  videoUrl                 String?
+  tags                     String[]
+  keywords                 String[]
+  isFeatured               Boolean                @default(false)
+  isNew                    Boolean                @default(false)
+  isBestSeller             Boolean                @default(false)
+  rating                   Decimal?               @db.Decimal(3, 2)
+  reviewCount              Int                    @default(0)
+  isActive                 Boolean                @default(true)
+  isAvailable              Boolean                @default(true)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  storeId                  String
+  collectionId             String?
+  supplierId               String?
+  model3DUrl               String?
+  flashSaleEndDate         DateTime?
+  flashSalePrice           Decimal?               @db.Decimal(10, 2)
+  flashSaleStartDate       DateTime?
+  isFlashSale              Boolean                @default(false)
+  isOnSale                 Boolean                @default(false)
+  saleEndDate              DateTime?
+  salePrice                Decimal?               @db.Decimal(10, 2)
+  saleStartDate            DateTime?
+  flashSaleDiscountPercent Int?
+  cartItems                CartItem[]
+  comparisons              Comparison[]
+  favorites                Favorite[]
+  moodboardItems           MoodboardItem[]
+  compatibleProducts       ProductCompatibility[] @relation("CompatibleProducts")
+  compatibility            ProductCompatibility[]
+  reviews                  ProductReview[]
+  variants                 ProductVariant[]
+  collection               Collection?            @relation(fields: [collectionId], references: [id])
+  store                    Store                  @relation(fields: [storeId], references: [id])
+  supplier                 Supplier?              @relation(fields: [supplierId], references: [id])
+  saleItems                SaleItem[]
+  storeInventory           StoreInventory[]
 
   @@map("products")
 }
@@ -156,16 +165,15 @@ model Sale {
   employeeId       String
   storeId          String
   dailyCashId      String?
-  // Campos para pedidos online
+  deliveredAt      DateTime?
   isOnlineOrder    Boolean         @default(false)
+  shippedAt        DateTime?
   shippingAddress  String?
   shippingCity     String?
+  shippingPhone    String?
   shippingState    String?
   shippingZipCode  String?
-  shippingPhone    String?
   trackingCode     String?
-  shippedAt        DateTime?
-  deliveredAt      DateTime?
   reviews          ProductReview[]
   items            SaleItem[]
   customer         User?           @relation("CustomerSales", fields: [customerId], references: [id])
@@ -551,11 +559,33 @@ model Notification {
   metadata  Json?
   actionUrl String?
   createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
   userId    String
+  updatedAt DateTime         @updatedAt
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model ShippingAddress {
+  id            String   @id @default(uuid())
+  name          String
+  recipientName String
+  phone         String
+  cpf           String?
+  address       String
+  number        String
+  complement    String?
+  neighborhood  String
+  city          String
+  state         String
+  zipCode       String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("shipping_addresses")
 }
 
 enum UserRole {
@@ -582,9 +612,9 @@ enum SaleStatus {
   COMPLETED
   CANCELLED
   REFUNDED
+  DELIVERED
   PREPARING
   SHIPPED
-  DELIVERED
 }
 
 enum PaymentMethod {
@@ -612,28 +642,6 @@ enum MaterialType {
   METAL
   COURO
   TECIDO
-}
-
-model ShippingAddress {
-  id           String   @id @default(uuid())
-  name         String   // Nome do endereço (ex: "Casa", "Trabalho", "Casa da Mãe")
-  recipientName String   // Nome do destinatário
-  phone        String
-  cpf          String?
-  address      String
-  number       String
-  complement   String?
-  neighborhood String
-  city         String
-  state        String
-  zipCode      String
-  isDefault    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("shipping_addresses")
 }
 
 enum NotificationType {

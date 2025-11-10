@@ -63,12 +63,7 @@ interface ShippingAddress {
 
 
 interface PaymentMethod {
-  type: 'pix' | 'credit_card' | 'debit_card' | 'boleto';
-  installments?: number;
-  cardNumber?: string;
-  cardName?: string;
-  expiryDate?: string;
-  cvv?: string;
+  type: 'pix' | 'card';
 }
 
 // Funções de validação
@@ -103,8 +98,11 @@ const validateCPF = (cpf: string): boolean => {
 
 const validatePhone = (phone: string): boolean => {
   const cleanPhone = phone.replace(/\D/g, '');
-  // Aceita telefone com 10 ou 11 dígitos (com ou sem DDD)
-  return cleanPhone.length === 10 || cleanPhone.length === 11;
+  // Aceita telefone com 10 ou 11 dígitos (com DDD) ou 12/13 com código do país (55)
+  if (cleanPhone.length === 0) return false;
+  if (cleanPhone.length === 10 || cleanPhone.length === 11) return true;
+  if ((cleanPhone.length === 12 || cleanPhone.length === 13) && cleanPhone.startsWith('55')) return true;
+  return false;
 };
 
 const formatCPF = (value: string): string => {
@@ -221,10 +219,9 @@ export default function CheckoutPage() {
     zipCode: '',
   });
 
-  // Estado do método de pagamento
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>({
-    type: 'pix',
-  });
+  // Método de pagamento selecionado
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'pix' | 'card'>('pix');
+  const paymentMethod: PaymentMethod = { type: selectedPaymentMethod };
 
   // Cupom e descontos
   const [couponCode, setCouponCode] = useState('');
@@ -767,14 +764,14 @@ export default function CheckoutPage() {
     }
 
     // Validar telefone
-    if (!validatePhone(shippingAddress.phone)) {
+    if (!validatePhone(address.phone)) {
       setPhoneError('Telefone inválido. Use o formato (11) 99999-9999');
       alert('Por favor, digite um telefone válido');
       return false;
     }
 
     // Validar CPF
-    const cpf = shippingAddress.cpf.replace(/\D/g, '');
+    const cpf = address.cpf.replace(/\D/g, '');
     if (cpf.length !== 11) {
       setCpfError('CPF inválido. Digite um CPF válido com 11 dígitos');
       alert('Por favor, digite um CPF válido');
@@ -790,15 +787,7 @@ export default function CheckoutPage() {
     return true;
   };
 
-  const validatePayment = () => {
-    if (paymentMethod.type === 'credit_card') {
-      if (!paymentMethod.cardNumber || !paymentMethod.cardName || !paymentMethod.expiryDate || !paymentMethod.cvv) {
-        alert('Por favor, preencha todos os dados do cartão de crédito');
-        return false;
-      }
-    }
-    return true;
-  };
+  const validatePayment = () => true;
 
   // Finalizar pedido
   const handleFinalizeOrder = async () => {
@@ -870,56 +859,11 @@ export default function CheckoutPage() {
         notes: `Pedido via checkout web. Frete: ${selectedShipping === 'express' ? 'Expresso' : 'Padrão'}. ${shippingInsurance ? 'Com seguro de envio' : 'Sem seguro'}.${appliedCoupon ? ` Cupom aplicado: ${appliedCoupon.code}` : ''}`,
       });
 
-      // Se o método de pagamento for PIX, redirecionar para página de pagamento PIX
-      if (paymentMethod.type === 'pix') {
-        router.push(`/payment/pix?saleId=${saleResponse.id}`);
-      } else if (paymentMethod.type === 'credit_card') {
-        // Criar pagamento de cartão via checkout AbacatePay e redirecionar
-        try {
-          const res = await customerAPI.createCardPayment(saleResponse.id, {
-            name: user?.name,
-            email: user?.email,
-            phone: user?.phone,
-            cpf: shippingAddress?.cpf,
-          });
-          const redirectUrl = res?.checkoutUrl || res?.paymentUrl || res?.url;
-          if (redirectUrl) {
-            window.location.href = redirectUrl;
-            return;
-          }
-          // Fallback: se não veio URL, ir para sucesso
-          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-        } catch (err: any) {
-          console.error('Erro ao criar pagamento de cartão:', err);
-          const msg = err?.response?.data?.message || err?.message || 'Erro ao iniciar pagamento com cartão';
-          alert(msg);
-          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-        }
-      } else if (paymentMethod.type === 'boleto') {
-        // Criar pagamento de boleto via checkout AbacatePay e redirecionar
-        try {
-          const res = await customerAPI.createBoletoPayment(saleResponse.id, {
-            name: user?.name,
-            email: user?.email,
-            phone: user?.phone,
-            cpf: shippingAddress?.cpf,
-          });
-          const redirectUrl = res?.checkoutUrl || res?.paymentUrl || res?.url;
-          if (redirectUrl) {
-            window.location.href = redirectUrl;
-            return;
-          }
-          // Fallback: se não veio URL, ir para sucesso
-          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-        } catch (err: any) {
-          console.error('Erro ao criar pagamento por boleto:', err);
-          const msg = err?.response?.data?.message || err?.message || 'Erro ao iniciar pagamento por boleto';
-          alert(msg);
-          router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
-        }
+      // Redirecionar para a página de pagamento apropriada
+      if (selectedPaymentMethod === 'card') {
+        router.push(`/payment/card?saleId=${saleResponse.id}`);
       } else {
-        // Para outros métodos, redirecionar para página de confirmação
-        router.push(`/checkout/success?orderId=${saleResponse.id || saleResponse.saleNumber || 'pending'}`);
+        router.push(`/payment/pix?saleId=${saleResponse.id}`);
       }
     } catch (error: any) {
       console.error('Erro ao finalizar pedido:', error);
@@ -1298,17 +1242,17 @@ export default function CheckoutPage() {
                     {/* PIX */}
                     <div
                       className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        paymentMethod.type === 'pix'
+                        selectedPaymentMethod === 'pix'
                           ? 'border-[#3e2626] bg-[#3e2626]/5'
                           : 'border-gray-200 hover:border-[#3e2626]/50'
                       }`}
-                      onClick={() => setPaymentMethod({ type: 'pix' })}
+                      onClick={() => setSelectedPaymentMethod('pix')}
                     >
                       <div className="flex items-center space-x-3">
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          paymentMethod.type === 'pix' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
+                          selectedPaymentMethod === 'pix' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
                         }`}>
-                          {paymentMethod.type === 'pix' && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                          {selectedPaymentMethod === 'pix' && <div className="w-2 h-2 rounded-full bg-white"></div>}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center space-x-2">
@@ -1320,147 +1264,27 @@ export default function CheckoutPage() {
                       </div>
                     </div>
 
-                    {/* QR Code do Pix não é exibido no checkout. Ele aparece apenas na tela de pagamento Pix. */}
-
                     {/* Cartão de Crédito */}
                     <div
                       className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        paymentMethod.type === 'credit_card'
+                        selectedPaymentMethod === 'card'
                           ? 'border-[#3e2626] bg-[#3e2626]/5'
                           : 'border-gray-200 hover:border-[#3e2626]/50'
                       }`}
-                      onClick={() => setPaymentMethod({ type: 'credit_card', installments: 1 })}
+                      onClick={() => setSelectedPaymentMethod('card')}
                     >
                       <div className="flex items-center space-x-3">
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          paymentMethod.type === 'credit_card' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
+                          selectedPaymentMethod === 'card' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
                         }`}>
-                          {paymentMethod.type === 'credit_card' && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                          {selectedPaymentMethod === 'card' && <div className="w-2 h-2 rounded-full bg-white"></div>}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center space-x-2">
                             <span className="font-semibold text-[#3e2626]">Cartão de Crédito</span>
-                            <div className="flex items-center space-x-1">
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">VISA</span>
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">MASTERCARD</span>
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">ELO</span>
-                            </div>
+                            <Badge className="bg-blue-500 text-white text-xs">Seguro</Badge>
                           </div>
-                          <p className="text-sm text-gray-600">Parcelamento em até 12x sem juros</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {paymentMethod.type === 'credit_card' && (
-                      <div className="ml-8 mt-4 p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
-                        <div>
-                          <Label htmlFor="cardNumber">Número do Cartão *</Label>
-                          <Input
-                            id="cardNumber"
-                            value={paymentMethod.cardNumber || ''}
-                            onChange={(e) => setPaymentMethod({ ...paymentMethod, cardNumber: e.target.value })}
-                            placeholder="0000 0000 0000 0000"
-                            className="mt-1"
-                            maxLength={19}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="cardName">Nome no Cartão *</Label>
-                          <Input
-                            id="cardName"
-                            value={paymentMethod.cardName || ''}
-                            onChange={(e) => setPaymentMethod({ ...paymentMethod, cardName: e.target.value })}
-                            placeholder="NOME COMO NO CARTÃO"
-                            className="mt-1"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="expiryDate">Validade *</Label>
-                            <Input
-                              id="expiryDate"
-                              value={paymentMethod.expiryDate || ''}
-                              onChange={(e) => setPaymentMethod({ ...paymentMethod, expiryDate: e.target.value })}
-                              placeholder="MM/AA"
-                              className="mt-1"
-                              maxLength={5}
-                            />
-                          </div>
-
-                          <div>
-                            <Label htmlFor="cvv">CVV *</Label>
-                            <Input
-                              id="cvv"
-                              type="password"
-                              value={paymentMethod.cvv || ''}
-                              onChange={(e) => setPaymentMethod({ ...paymentMethod, cvv: e.target.value })}
-                              placeholder="000"
-                              className="mt-1"
-                              maxLength={4}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="installments">Parcelas</Label>
-                          <select
-                            id="installments"
-                            value={paymentMethod.installments || 1}
-                            onChange={(e) => setPaymentMethod({ ...paymentMethod, installments: parseInt(e.target.value) })}
-                            className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          >
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => (
-                              <option key={num} value={num}>
-                                {num}x de R$ {(total / num).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} sem juros
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Cartão de Débito */}
-                    <div
-                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        paymentMethod.type === 'debit_card'
-                          ? 'border-[#3e2626] bg-[#3e2626]/5'
-                          : 'border-gray-200 hover:border-[#3e2626]/50'
-                      }`}
-                      onClick={() => setPaymentMethod({ type: 'debit_card' })}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          paymentMethod.type === 'debit_card' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
-                        }`}>
-                          {paymentMethod.type === 'debit_card' && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-semibold text-[#3e2626]">Cartão de Débito</span>
-                          <p className="text-sm text-gray-600">Débito online</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Boleto */}
-                    <div
-                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        paymentMethod.type === 'boleto'
-                          ? 'border-[#3e2626] bg-[#3e2626]/5'
-                          : 'border-gray-200 hover:border-[#3e2626]/50'
-                      }`}
-                      onClick={() => setPaymentMethod({ type: 'boleto' })}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          paymentMethod.type === 'boleto' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
-                        }`}>
-                          {paymentMethod.type === 'boleto' && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-semibold text-[#3e2626]">Boleto Bancário</span>
-                          <p className="text-sm text-gray-600">Vencimento em 3 dias úteis</p>
+                          <p className="text-sm text-gray-600">Pague com cartão de crédito via Stripe</p>
                         </div>
                       </div>
                     </div>
@@ -1644,16 +1468,8 @@ export default function CheckoutPage() {
                       </div>
                       <div className="bg-gray-50 rounded-lg p-4">
                         <p className="font-semibold text-[#3e2626] capitalize">
-                          {paymentMethod.type === 'pix' && 'PIX'}
-                          {paymentMethod.type === 'credit_card' && `Cartão de Crédito${paymentMethod.installments ? ` - ${paymentMethod.installments}x` : ''}`}
-                          {paymentMethod.type === 'debit_card' && 'Cartão de Débito'}
-                          {paymentMethod.type === 'boleto' && 'Boleto Bancário'}
+                          {selectedPaymentMethod === 'card' ? 'Cartão de Crédito' : 'PIX'}
                         </p>
-                        {paymentMethod.type === 'credit_card' && paymentMethod.cardNumber && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            •••• •••• •••• {paymentMethod.cardNumber.slice(-4)}
-                          </p>
-                        )}
                       </div>
                     </div>
                   </CardContent>

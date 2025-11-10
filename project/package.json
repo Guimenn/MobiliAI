@@ -55,6 +55,7 @@
     "replicate": "^0.34.1",
     "rxjs": "^7.8.1",
     "sharp": "^0.33.2",
+    "stripe": "^19.3.0",
     "typeorm": "^0.3.20"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -10,6 +11,8 @@ export class PaymentService {
   private readonly baseUrl: string;
   private readonly returnUrl: string;
   private readonly completionUrl: string;
+  private readonly devMode: boolean;
+  private readonly stripe: Stripe | null;
 
   constructor(
     private configService: ConfigService,
@@ -17,15 +20,27 @@ export class PaymentService {
   ) {
     this.apiKey = this.configService.get<string>('ABACATEPAY_API_KEY') || '';
     this.environment = this.configService.get<string>('ABACATEPAY_ENVIRONMENT') || 'sandbox';
-    this.baseUrl = this.environment === 'production' 
-      ? 'https://api.abacatepay.com'
-      : 'https://sandbox.abacatepay.com';
+    this.devMode = this.configService.get<boolean>('ABACATEPAY_DEV_MODE') ?? false;
+    const configuredBaseUrl = this.configService.get<string>('ABACATEPAY_BASE_URL');
+    const defaultBaseUrl = 'https://api.abacatepay.com/v1';
+    this.baseUrl = (configuredBaseUrl || defaultBaseUrl).replace(/\/+$/, '');
     this.returnUrl = this.configService.get<string>('ABACATEPAY_RETURN_URL') 
       || this.configService.get<string>('FRONTEND_BASE_URL')
       || 'http://localhost:3000/payment/return';
     this.completionUrl = this.configService.get<string>('ABACATEPAY_COMPLETION_URL') 
       || this.configService.get<string>('FRONTEND_BASE_URL')
       || 'http://localhost:3000/checkout/success';
+    
+    // Inicializar Stripe
+    const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY') || '';
+    if (stripeSecretKey && stripeSecretKey.trim() !== '') {
+      this.stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2025-10-29.clover',
+      });
+    } else {
+      // Criar instância vazia para evitar erros de tipo
+      this.stripe = null as any;
+    }
   }
 
   /**
@@ -38,20 +53,62 @@ export class PaymentService {
     return SDK(this.apiKey);
   }
 
+  private buildDefaultHeaders() {
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    };
+
+    if (this.devMode && this.environment !== 'production') {
+      headers['X-AbacatePay-DevMode'] = 'true';
+    }
+
+    return headers;
+  }
+
+  private buildCompletionUrl(orderId: string) {
+    const base = (this.completionUrl || '').trim();
+    if (!base) {
+      return `http://localhost:3000/customer/orders/${orderId}`;
+    }
+
+    const normalized = base.replace(/\/+$/, '');
+
+    if (normalized.includes('{orderId}')) {
+      return normalized.replace('{orderId}', orderId);
+    }
+
+    if (normalized.includes('{id}')) {
+      return normalized.replace('{id}', orderId);
+    }
+
+    if (normalized.includes(':orderId')) {
+      return normalized.replace(':orderId', orderId);
+    }
+
+    if (normalized.includes(':id')) {
+      return normalized.replace(':id', orderId);
+    }
+
+    if (normalized.includes('?')) {
+      const needsAmpersand = !normalized.endsWith('?') && !normalized.endsWith('&');
+      return `${normalized}${needsAmpersand ? '&' : ''}orderId=${orderId}`;
+    }
+
+    return `${normalized}?orderId=${orderId}`;
+  }
+
   /**
    * Cria uma cobrança (billing) na AbacatePay para um método específico
    * Suporta: 'PIX' | 'CREDIT_CARD' | 'BOLETO'
    */
   private async createBillingForSale(
     saleId: string,
-    method: 'PIX' | 'CREDIT_CARD' | 'BOLETO',
+    method: 'PIX' | 'CARD',
     amount: number,
-    customerInfo?: { name?: string; email?: string; phone?: string; cpf?: string; }
+    customerInfo?: { name?: string; email?: string; phone?: string; cpf?: string; },
+    options?: { installments?: number },
   ) {
-    if (!this.apiKey || this.apiKey.trim() === '') {
-      throw new BadRequestException('AbacatePay API key não configurada.');
-    }
-
     // Buscar a venda com itens e cliente
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
@@ -69,6 +126,10 @@ export class PaymentService {
       throw new BadRequestException('Venda não encontrada');
     }
 
+    if (!this.apiKey || this.apiKey.trim() === '') {
+      throw new BadRequestException('AbacatePay API key não configurada.');
+    }
+
     const products = (sale.items || []).map((it) => ({
       externalId: it.productId,
       name: it.product?.name || 'Produto',
@@ -80,11 +141,38 @@ export class PaymentService {
       name: customerInfo?.name || sale.customer?.name || undefined,
       email: customerInfo?.email || sale.customer?.email || undefined,
       cellphone: customerInfo?.phone || sale.customer?.phone || undefined,
-      tax_id: customerInfo?.cpf || sale.customer?.cpf || undefined,
+      taxId: customerInfo?.cpf || sale.customer?.cpf || undefined,
     };
+
+    if (method === 'PIX') {
+      return this.createPixQrCodeForSale(
+        sale,
+        amount,
+        customer,
+      );
+    }
 
     try {
       const abacate = this.getAbacateClient();
+
+      const metadata: Record<string, any> = {
+        saleId,
+        saleNumber: sale.saleNumber,
+        method,
+      };
+
+      if (method === 'CARD' && options?.installments) {
+        metadata.installments = options.installments;
+      }
+
+      const customerPayload = Object.fromEntries(
+        Object.entries({
+          email: customer.email,
+          name: customer.name,
+          cellphone: customer.cellphone,
+          taxId: customer.taxId,
+        }).filter(([, value]) => !!value),
+      );
 
       const billing = await abacate.billing.create({
         frequency: 'ONE_TIME',
@@ -96,38 +184,39 @@ export class PaymentService {
           price: Math.round(Number(amount) * 100),
         }],
         returnUrl: this.returnUrl,
-        completionUrl: `${this.completionUrl}?orderId=${saleId}`,
-        customer: {
-          email: customer.email,
-          name: customer.name,
-          cellphone: customer.cellphone,
-          tax_id: customer.tax_id,
-        },
+        completionUrl: this.buildCompletionUrl(saleId),
+        customer: Object.keys(customerPayload).length > 0 ? customerPayload : undefined,
+        metadata,
       });
 
       const provider = billing || {};
       const providerData = provider.data || provider;
 
-      // Persistir referência no pedido
-      const paymentId: string = providerData.id || providerData.reference || providerData.paymentId || '';
-      if (paymentId) {
-        await this.prisma.sale.update({
-          where: { id: saleId },
-          data: { paymentReference: paymentId },
-        });
-      }
-
-      // Tentar extrair dados úteis
-      const checkoutUrl = providerData.checkoutUrl || providerData.paymentLink || providerData.url;
-      const pixBrCode = providerData?.pix?.brCode || providerData?.brCode || providerData?.qrCode || providerData?.code;
-      const expiresAt = providerData.expiresAt
+      let paymentId: string =
+        providerData.id || providerData.reference || providerData.paymentId || '';
+      let checkoutUrl =
+        providerData.checkoutUrl || providerData.paymentLink || providerData.url;
+      let expiresAt = providerData.expiresAt
         ? new Date(providerData.expiresAt)
         : new Date(Date.now() + 3600000);
 
+      if (!paymentId) {
+        console.error('AbacatePay (billing.create via SDK) não retornou paymentId válido.', {
+          providerData,
+        });
+        throw new BadRequestException('AbacatePay não retornou identificador da cobrança.');
+      }
+
+      await this.prisma.sale.update({
+        where: { id: saleId },
+        data: { paymentReference: paymentId },
+      });
+
       return {
-        paymentId: paymentId || `ABACATE-${saleId}`,
+        paymentId,
         checkoutUrl,
-        qrCode: method === 'PIX' ? pixBrCode : undefined,
+        qrCode: undefined,
+        qrCodeImage: undefined,
         amount,
         expiresAt,
         saleId,
@@ -135,34 +224,7 @@ export class PaymentService {
         providerResponse: providerData,
       };
     } catch (error: any) {
-      // Em caso de erro, podemos aplicar fallbacks em desenvolvimento
-      const isNetworkError = error.code === 'ENOTFOUND' || 
-        error.code === 'ECONNREFUSED' || 
-        error.code === 'ETIMEDOUT' ||
-        error.message?.includes('getaddrinfo') ||
-        error.message?.includes('ECONNREFUSED');
-
-      // Em desenvolvimento, faça fallback para mock em QUALQUER erro do provedor
-      if (this.environment !== 'production') {
-        const mockQrCode = `00020126580014br.gov.bcb.pix0136${saleId}5204000053039865802BR5925MobiliAI Loja de Tintas6009SAO PAULO62070503***6304${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-        await this.prisma.sale.update({
-          where: { id: saleId },
-          data: { paymentReference: `MOCK-${saleId}-${Date.now()}` },
-        });
-
-        return {
-          paymentId: `MOCK-${saleId}`,
-          checkoutUrl: undefined,
-          qrCode: method === 'PIX' ? mockQrCode : undefined,
-          amount,
-          expiresAt: new Date(Date.now() + 3600000),
-          saleId,
-          saleNumber: sale.saleNumber,
-          providerResponse: { mock: true },
-        };
-      }
-
-      console.error('Erro AbacatePay (billing.create):', {
+      console.error('Erro AbacatePay (billing.create via SDK):', {
         message: error.message,
         code: error.code,
         response: error.response?.data,
@@ -188,178 +250,114 @@ export class PaymentService {
       cpf?: string;
     }
   ) {
-    // Se tiver SDK e chave, usar billing.create (Abacate oficial)
-    if (this.apiKey && this.apiKey.trim() !== '') {
-      return this.createBillingForSale(saleId, 'PIX', amount, customerInfo);
-    }
+    return this.createBillingForSale(saleId, 'PIX', amount, customerInfo);
+  }
 
-    // Modo de desenvolvimento: se não houver API key configurada, gerar QR code mock
+  private async createPixQrCodeForSale(
+    sale: {
+      id: string;
+      saleNumber?: string | null;
+    } & Partial<{
+      customer: {
+        name?: string | null;
+        email?: string | null;
+        phone?: string | null;
+        cpf?: string | null;
+      };
+    }>,
+    amount: number,
+    customer: {
+      name?: string;
+      email?: string;
+      cellphone?: string;
+      taxId?: string;
+    },
+  ) {
     if (!this.apiKey || this.apiKey.trim() === '') {
-      if (this.environment !== 'production') {
-        console.warn('⚠️ AbacatePay API key não configurada. Usando modo de desenvolvimento com QR code mock.');
-        
-        // Buscar informações da venda para obter o saleNumber
-        const sale = await this.prisma.sale.findUnique({
-          where: { id: saleId },
-          select: { saleNumber: true }
-        });
-        
-        // Gerar um código PIX mock para desenvolvimento
-        const mockQrCode = `00020126580014br.gov.bcb.pix0136${saleId}5204000053039865802BR5925MobiliAI Loja de Tintas6009SAO PAULO62070503***6304${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-        
-        // Atualizar a venda com referência mock
-        await this.prisma.sale.update({
-          where: { id: saleId },
-          data: {
-            paymentReference: `MOCK-${saleId}-${Date.now()}`,
-          }
-        });
-
-        return {
-          qrCode: mockQrCode,
-          qrCodeImage: null,
-          paymentId: `MOCK-${saleId}`,
-          expiresAt: new Date(Date.now() + 3600000), // 1 hora
-          amount: amount,
-          saleId: saleId,
-          saleNumber: sale?.saleNumber || 'MOCK',
-        };
-      } else {
-        throw new BadRequestException('AbacatePay API key não configurada. Configure a chave de API para usar pagamentos PIX.');
-      }
+      throw new BadRequestException('AbacatePay API key não configurada.');
     }
 
-    // Buscar informações da venda
-    const sale = await this.prisma.sale.findUnique({
-      where: { id: saleId },
-      include: {
-        customer: {
-          select: {
-            name: true,
-            email: true,
-            phone: true,
-            cpf: true,
-          }
-        }
-      }
-    });
+    const hasCompleteCustomer =
+      customer.name && customer.email && customer.cellphone && customer.taxId;
 
-    if (!sale) {
-      throw new BadRequestException('Venda não encontrada');
-    }
-
-    // Preparar dados do cliente
-    const customer = {
-      name: customerInfo?.name || sale.customer?.name || 'Cliente',
-      email: customerInfo?.email || sale.customer?.email || '',
-      cellphone: customerInfo?.phone || sale.customer?.phone || '',
-      tax_id: customerInfo?.cpf || sale.customer?.cpf || '',
+    const payload: Record<string, any> = {
+      amount: Math.round(Number(amount) * 100),
+      description: `Pedido ${sale.saleNumber}`,
+      expiresIn: 3600,
+      metadata: {
+        externalId: sale.id,
+        saleNumber: sale.saleNumber,
+      },
     };
 
-    try {
-      // Preparar payload para AbacatePay (rota legacy - fallback)
-      const payload: any = {
-        amount: Math.round(amount * 100), // Converter para centavos
-        description: `Pedido ${sale.saleNumber}`,
-        expires_in: 3600, // 1 hora
+    if (hasCompleteCustomer) {
+      payload.customer = {
+        name: customer.name,
+        email: customer.email,
+        cellphone: customer.cellphone,
+        taxId: customer.taxId,
       };
+    }
 
-      // Adicionar dados do cliente se disponíveis
-      if (customer.name) {
-        payload.customer = {};
-        if (customer.name) payload.customer.name = customer.name;
-        if (customer.email) payload.customer.email = customer.email;
-        if (customer.cellphone) payload.customer.cellphone = customer.cellphone;
-        if (customer.tax_id) payload.customer.tax_id = customer.tax_id;
-      }
-
-      // Criar cobrança PIX via AbacatePay
+    try {
       const response = await axios.post(
-        `${this.baseUrl}/v1/pix/qrcode`,
+        `${this.baseUrl}/pixQrCode/create`,
         payload,
         {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
-          },
+          headers: this.buildDefaultHeaders(),
         }
       );
 
-      const pixData = response.data;
+      const paymentData = response.data?.data || response.data;
 
-      // Atualizar a venda com a referência do pagamento
-      await this.prisma.sale.update({
-        where: { id: saleId },
-        data: {
-          paymentReference: pixData.id || pixData.qrCodeId || pixData.paymentId,
-        }
-      });
+      const paymentId =
+        paymentData.id || paymentData.qrCodeId || paymentData.paymentId;
 
-      // Calcular data de expiração
-      const expiresAt = pixData.expiresAt 
-        ? new Date(pixData.expiresAt)
-        : new Date(Date.now() + 3600000); // 1 hora padrão
-
-      return {
-        qrCode: pixData.brCode || pixData.qrCode || pixData.code,
-        qrCodeImage: pixData.qrCodeImage || pixData.image || pixData.qrCodeImageUrl,
-        paymentId: pixData.id || pixData.qrCodeId || pixData.paymentId,
-        expiresAt: expiresAt,
-        amount: amount,
-        saleId: saleId,
-        saleNumber: sale.saleNumber,
-      };
-    } catch (error: any) {
-      // Em desenvolvimento, usar modo mock para QUALQUER erro
-      if (this.environment !== 'production') {
-        console.warn('⚠️ Erro de conexão com AbacatePay. Usando modo de desenvolvimento com QR code mock.');
-        
-        // Buscar informações da venda para obter o saleNumber
-        const sale = await this.prisma.sale.findUnique({
-          where: { id: saleId },
-          select: { saleNumber: true }
+      if (!paymentId) {
+        console.error('AbacatePay (pixQrCode/create) não retornou paymentId válido.', {
+          paymentData,
         });
-        
-        // Gerar um código PIX mock para desenvolvimento
-        const mockQrCode = `00020126580014br.gov.bcb.pix0136${saleId}5204000053039865802BR5925MobiliAI Loja de Tintas6009SAO PAULO62070503***6304${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-        
-        // Atualizar a venda com referência mock
-        await this.prisma.sale.update({
-          where: { id: saleId },
-          data: {
-            paymentReference: `MOCK-${saleId}-${Date.now()}`,
-          }
-        });
-
-        return {
-          qrCode: mockQrCode,
-          qrCodeImage: null,
-          paymentId: `MOCK-${saleId}`,
-          expiresAt: new Date(Date.now() + 3600000), // 1 hora
-          amount: amount,
-          saleId: saleId,
-          saleNumber: sale?.saleNumber || 'MOCK',
-        };
+        throw new BadRequestException('AbacatePay não retornou identificador da cobrança PIX.');
       }
 
-      console.error('Erro ao criar pagamento PIX:', {
+      await this.prisma.sale.update({
+        where: { id: sale.id },
+        data: { paymentReference: paymentId },
+      });
+
+      const expiresAt = paymentData.expiresAt
+        ? new Date(paymentData.expiresAt)
+        : new Date(Date.now() + 3600000);
+
+      return {
+        paymentId,
+        checkoutUrl:
+          paymentData.checkoutUrl ||
+          paymentData.paymentLink ||
+          paymentData.url,
+        qrCode: paymentData.brCode || paymentData.qrCode || paymentData.code,
+        qrCodeImage:
+          paymentData.brCodeBase64 ||
+          paymentData.qrCodeImage ||
+          paymentData.image ||
+          paymentData.qrCodeImageUrl,
+        amount,
+        expiresAt,
+        saleId: sale.id,
+        saleNumber: sale.saleNumber,
+        providerResponse: paymentData,
+      };
+    } catch (error: any) {
+      console.error('Erro AbacatePay (pixQrCode/create):', {
         message: error.message,
         code: error.code,
         response: error.response?.data,
         status: error.response?.status,
       });
-      
-      // Mensagem de erro mais detalhada
-      let errorMessage = 'Erro ao gerar QR code PIX';
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = `Erro ao conectar com o gateway de pagamento: ${error.message}`;
-      }
-      
-      throw new BadRequestException(errorMessage);
+
+      throw new BadRequestException(
+        error.response?.data?.message || error.response?.data?.error || 'Erro ao criar cobrança PIX na AbacatePay'
+      );
     }
   }
 
@@ -374,55 +372,47 @@ export class PaymentService {
       email?: string;
       phone?: string;
       cpf?: string;
-    }
+    },
+    options?: { installments?: number },
   ) {
-    return this.createBillingForSale(saleId, 'CREDIT_CARD', amount, customerInfo);
-  }
-
-  /**
-   * Cria cobrança para Boleto (checkout AbacatePay)
-   */
-  async createBoletoPayment(
-    saleId: string,
-    amount: number,
-    customerInfo?: {
-      name?: string;
-      email?: string;
-      phone?: string;
-      cpf?: string;
-    }
-  ) {
-    return this.createBillingForSale(saleId, 'BOLETO', amount, customerInfo);
+    return this.createBillingForSale(saleId, 'CARD', amount, customerInfo, options);
   }
 
   /**
    * Verifica o status de um pagamento PIX
    */
   async checkPixPaymentStatus(paymentId: string) {
+    if (!paymentId) {
+      throw new BadRequestException('ID do pagamento não informado');
+    }
+
     if (!this.apiKey) {
       throw new BadRequestException('AbacatePay API key não configurada');
     }
 
     try {
       // Tentar via SDK
-      try {
-        const abacate = this.getAbacateClient();
-        const billing = await abacate.billing.get(paymentId);
-        const data = billing?.data || billing;
-        const status = (data?.status || 'PENDING').toUpperCase();
-        return {
-          status,
-          paidAt: data?.paidAt,
-          amount: data?.amount ? data.amount / 100 : null,
-        };
-      } catch {
-        // Fallback HTTP (rota legacy)
+      if (!this.devMode || this.environment === 'production') {
+        try {
+          const abacate = this.getAbacateClient();
+          const billing = await abacate.billing.get(paymentId);
+          const data = billing?.data || billing;
+          const status = (data?.status || 'PENDING').toUpperCase();
+          return {
+            status,
+            paidAt: data?.paidAt,
+            amount: data?.amount ? data.amount / 100 : null,
+          };
+        } catch {
+          // Fallback HTTP (rota legacy)
+        }
       }
 
-      const response = await axios.get(`${this.baseUrl}/v1/pix/qrcode/${paymentId}`, {
-        headers: { 'Authorization': `Bearer ${this.apiKey}` },
+      const response = await axios.get(`${this.baseUrl}/pixQrCode/check`, {
+        headers: this.buildDefaultHeaders(),
+        params: { id: paymentId },
       });
-      const paymentData = response.data;      
+      const paymentData = response.data?.data || response.data;      
       return {
         status: paymentData.status || 'PENDING', // PAID, PENDING, EXPIRED
         paidAt: paymentData.paidAt,
@@ -455,22 +445,265 @@ export class PaymentService {
       };
     }
 
-    const paymentStatus = await this.checkPixPaymentStatus(sale.paymentReference);
+    try {
+      const paymentStatus = await this.checkPixPaymentStatus(sale.paymentReference);
 
-    // Se o pagamento foi confirmado, atualizar o status da venda
-    if (paymentStatus.status === 'PAID' && sale.status === 'PENDING') {
-      await this.prisma.sale.update({
-        where: { id: saleId },
-        data: {
-          status: 'COMPLETED',
-        }
-      });
+      return {
+        ...paymentStatus,
+        saleStatus: sale.status,
+      };
+    } catch (error: any) {
+      const notFoundMessage = 'Pix QRCode not found';
+      const errorMessage = error?.message || error?.response?.data?.message;
+
+      if (
+        error instanceof BadRequestException &&
+        typeof errorMessage === 'string' &&
+        errorMessage.includes(notFoundMessage)
+      ) {
+        await this.prisma.sale.update({
+          where: { id: saleId },
+          data: {
+            paymentReference: null,
+          },
+        });
+
+        throw new BadRequestException(notFoundMessage);
+      }
+
+      throw error;
+    }
+  }
+
+  async simulatePixPayment(saleId: string) {
+    if (this.environment === 'production') {
+      throw new BadRequestException('Simulação de pagamento não permitida em produção.');
     }
 
-    return {
-      ...paymentStatus,
-      saleStatus: paymentStatus.status === 'PAID' ? 'COMPLETED' : sale.status,
-    };
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      select: {
+        paymentReference: true,
+        status: true,
+      },
+    });
+
+    if (!sale) {
+      throw new BadRequestException('Venda não encontrada');
+    }
+
+    if (!sale.paymentReference) {
+      throw new BadRequestException('Venda não possui referência de pagamento PIX ativa.');
+    }
+
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/pixQrCode/simulate-payment`,
+        { metadata: { saleId } },
+        {
+          headers: this.buildDefaultHeaders(),
+          params: { id: sale.paymentReference },
+        }
+      );
+
+      const paymentData = response.data?.data || response.data;
+      const paymentStatus = paymentData?.status?.toUpperCase?.() || 'PAID';
+
+      return {
+        status: paymentStatus,
+        providerResponse: paymentData,
+      };
+    } catch (error: any) {
+      console.error('Erro ao simular pagamento PIX:', {
+        message: error.message,
+        code: error.code,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+
+      throw new BadRequestException(
+        error.response?.data?.message || error.response?.data?.error || 'Erro ao simular pagamento PIX'
+      );
+    }
+  }
+
+  /**
+   * Cria um PaymentIntent do Stripe para pagamento com cartão
+   */
+  async createStripePaymentIntent(
+    saleId: string,
+    amount: number,
+    customerInfo?: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      cpf?: string;
+    }
+  ) {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe não configurado. Verifique STRIPE_SECRET_KEY.');
+    }
+
+    // Garantir conexão com o banco
+    await this.prisma.ensureConnection();
+
+    // Buscar a venda com retry
+    const sale = await this.prisma.executeWithRetry(async () => {
+      return await this.prisma.sale.findUnique({
+        where: { id: saleId },
+        include: {
+          items: {
+            include: { product: true }
+          },
+          customer: {
+            select: { name: true, email: true, phone: true, cpf: true }
+          }
+        }
+      });
+    });
+
+    if (!sale) {
+      throw new BadRequestException(`Venda com ID ${saleId} não encontrada`);
+    }
+
+    try {
+      // Converter valor para centavos (Stripe usa centavos)
+      const amountInCents = Math.round(amount * 100);
+
+      // Preparar metadados
+      const metadata: Record<string, string> = {
+        saleId,
+        saleNumber: sale.saleNumber || '',
+      };
+
+      // Criar PaymentIntent
+      const paymentIntent = await this.stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: 'brl',
+        metadata,
+        description: `Pedido ${sale.saleNumber}`,
+        receipt_email: customerInfo?.email || sale.customer?.email || undefined,
+      });
+
+      // Atualizar venda com paymentReference (com retry)
+      await this.prisma.executeWithRetry(async () => {
+        return await this.prisma.sale.update({
+          where: { id: saleId },
+          data: { paymentReference: paymentIntent.id },
+        });
+      });
+
+      return {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount,
+        saleId,
+        saleNumber: sale.saleNumber,
+      };
+    } catch (error: any) {
+      console.error('Erro ao criar PaymentIntent do Stripe:', {
+        message: error.message,
+        code: error.code,
+        type: error.type,
+      });
+
+      throw new BadRequestException(
+        error.message || 'Erro ao criar pagamento com cartão'
+      );
+    }
+  }
+
+  /**
+   * Confirma o pagamento do Stripe após o cliente confirmar no frontend
+   */
+  async confirmStripePayment(paymentIntentId: string) {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe não configurado.');
+    }
+
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+
+      if (!paymentIntent.metadata?.saleId) {
+        throw new BadRequestException('PaymentIntent não possui saleId nos metadados');
+      }
+
+      const saleId = paymentIntent.metadata.saleId;
+
+      // Garantir conexão com o banco
+      await this.prisma.ensureConnection();
+
+      // Verificar status do pagamento
+      if (paymentIntent.status === 'succeeded') {
+        // Atualizar venda como paga (com retry)
+        await this.prisma.executeWithRetry(async () => {
+          return await this.prisma.sale.update({
+            where: { id: saleId },
+            data: {
+              status: 'COMPLETED',
+              paymentMethod: 'CREDIT_CARD',
+              paymentReference: paymentIntentId,
+            },
+          });
+        });
+
+        return {
+          success: true,
+          status: 'succeeded',
+          saleId,
+          amount: paymentIntent.amount / 100, // Converter de centavos
+        };
+      } else if (paymentIntent.status === 'requires_payment_method') {
+        throw new BadRequestException('Pagamento requer método de pagamento');
+      } else if (paymentIntent.status === 'requires_confirmation') {
+        throw new BadRequestException('Pagamento requer confirmação');
+      } else {
+        return {
+          success: false,
+          status: paymentIntent.status,
+          saleId,
+        };
+      }
+    } catch (error: any) {
+      console.error('Erro ao confirmar pagamento Stripe:', {
+        message: error.message,
+        code: error.code,
+        type: error.type,
+      });
+
+      throw new BadRequestException(
+        error.message || 'Erro ao confirmar pagamento'
+      );
+    }
+  }
+
+  /**
+   * Verifica o status de um pagamento Stripe
+   */
+  async checkStripePaymentStatus(paymentIntentId: string) {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe não configurado.');
+    }
+
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+
+      return {
+        status: paymentIntent.status,
+        amount: paymentIntent.amount / 100,
+        currency: paymentIntent.currency,
+        saleId: paymentIntent.metadata?.saleId,
+      };
+    } catch (error: any) {
+      console.error('Erro ao verificar status do pagamento Stripe:', {
+        message: error.message,
+        code: error.code,
+      });
+
+      throw new BadRequestException(
+        error.message || 'Erro ao verificar status do pagamento'
+      );
+    }
   }
 }
 

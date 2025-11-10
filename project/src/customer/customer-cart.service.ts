@@ -247,9 +247,14 @@ export class CustomerCartService {
       notes?: string;
     }
   ) {
-    // Verificar se há itens no carrinho antes de validar
-    const cartCount = await this.prisma.cartItem.count({
-      where: { customerId }
+    // Garantir conexão com o banco antes de processar checkout
+    await this.prisma.ensureConnection();
+
+    // Verificar se há itens no carrinho antes de validar (com retry)
+    const cartCount = await this.prisma.executeWithRetry(async () => {
+      return await this.prisma.cartItem.count({
+        where: { customerId }
+      });
     });
 
     if (cartCount === 0) {
@@ -308,48 +313,53 @@ export class CustomerCartService {
     
     const isOnlineOrder = !!shippingInfo;
     
-    const sale = await this.prisma.sale.create({
-      data: {
-        store: { connect: { id: validStoreId } },
-        customer: { connect: { id: customerId } },
-        employee: { connect: { id: customerId } }, // Cliente é o próprio vendedor
-        saleNumber: `SALE-${Date.now()}`,
-        totalAmount,
-        discount: discount,
-        tax: tax,
-        status: isOnlineOrder ? 'PENDING' : 'PENDING',
-        paymentMethod: 'PIX',
-        isOnlineOrder,
-        shippingAddress: shippingInfo?.address,
-        shippingCity: shippingInfo?.city,
-        shippingState: shippingInfo?.state,
-        shippingZipCode: shippingInfo?.zipCode,
-        shippingPhone: shippingInfo?.phone,
-        notes: additionalCosts?.notes,
-        items: {
-          create: validation.validItems.map(item => ({
-            product: { connect: { id: item.productId } },
-            quantity: item.quantity,
-            unitPrice: item.product.price,
-            totalPrice: Number(item.product.price) * item.quantity
-          }))
-        }
-      },
-      include: {
-        items: {
-          include: {
-            product: { select: { name: true, price: true } }
+    // Criar venda com retry para garantir que seja criada mesmo se houver problemas de conexão
+    const sale = await this.prisma.executeWithRetry(async () => {
+      return await this.prisma.sale.create({
+        data: {
+          store: { connect: { id: validStoreId } },
+          customer: { connect: { id: customerId } },
+          employee: { connect: { id: customerId } }, // Cliente é o próprio vendedor
+          saleNumber: `SALE-${Date.now()}`,
+          totalAmount,
+          discount: discount,
+          tax: tax,
+          status: isOnlineOrder ? 'PENDING' : 'PENDING',
+          paymentMethod: 'PIX',
+          isOnlineOrder,
+          shippingAddress: shippingInfo?.address,
+          shippingCity: shippingInfo?.city,
+          shippingState: shippingInfo?.state,
+          shippingZipCode: shippingInfo?.zipCode,
+          shippingPhone: shippingInfo?.phone,
+          notes: additionalCosts?.notes,
+          items: {
+            create: validation.validItems.map(item => ({
+              product: { connect: { id: item.productId } },
+              quantity: item.quantity,
+              unitPrice: item.product.price,
+              totalPrice: Number(item.product.price) * item.quantity
+            }))
           }
         },
-        store: { select: { name: true, address: true } }
-      }
+        include: {
+          items: {
+            include: {
+              product: { select: { name: true, price: true } }
+            }
+          },
+          store: { select: { name: true, address: true } }
+        }
+      });
     });
 
-    // Atualizar estoque dos produtos
+    // Atualizar estoque dos produtos (com retry)
     for (const item of validation.validItems) {
-      await this.prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } }
+      await this.prisma.executeWithRetry(async () => {
+        return await this.prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } }
+        });
       });
     }
 

@@ -112,6 +112,15 @@ export default function CheckoutSuccessPage() {
               <Home className="h-5 w-5 mr-2" />
               Voltar ao Início
             </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/customer/orders/${orderId}`)}
+              className="border-2 border-green-600 text-green-700 hover:bg-green-600 hover:text-white px-8 py-6 rounded-full font-semibold text-lg transition-all duration-300"
+            >
+              <CheckCircle className="h-5 w-5 mr-2" />
+              Ver pedido
+            </Button>
             
             <Button
               variant="outline"

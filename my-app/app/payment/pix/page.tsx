@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { env } from '@/lib/env';
 import {
   ArrowLeft,
   Copy,
@@ -34,6 +35,12 @@ export default function PixPaymentPage() {
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [error, setError] = useState<string>('');
+  const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
+  const [simulationMessage, setSimulationMessage] = useState<string>('');
+  const [simulationError, setSimulationError] = useState<string>('');
+
+  const isProductionEnv =
+    env.ABACATEPAY_ENVIRONMENT === 'production' || env.NODE_ENV === 'production';
 
   // ===== Utilitários para gerar BR Code PIX estático com valor dinâmico (fallback) =====
   type EmvFieldId = string;
@@ -83,7 +90,12 @@ export default function PixPaymentPage() {
     return payloadWithoutCrc + crc;
   }
 
-  const fallbackPixCode = useMemo(() => buildStaticPixBrCode(Number(paymentData?.amount) || 0), [paymentData?.amount]);
+  const fallbackPixCode = useMemo(() => {
+    if (env.PIX_FALLBACK_BR_CODE) {
+      return env.PIX_FALLBACK_BR_CODE;
+    }
+    return buildStaticPixBrCode(Number(paymentData?.amount) || 0);
+  }, [paymentData?.amount]);
 
   // Carregar dados do pagamento
   useEffect(() => {
@@ -169,7 +181,7 @@ export default function PixPaymentPage() {
         if (status.status === 'PAID') {
           // Redirecionar para página de sucesso após 2 segundos
           setTimeout(() => {
-            router.push(`/checkout/success?orderId=${saleId}`);
+            router.push(`/customer/orders/${saleId}`);
           }, 2000);
         }
       } catch (err) {
@@ -204,6 +216,8 @@ export default function PixPaymentPage() {
     
     setIsCreatingPayment(true);
     setError('');
+    setSimulationMessage('');
+    setSimulationError('');
     try {
       const data = await customerAPI.createPixPayment(saleId, {
         name: user?.name,
@@ -226,6 +240,39 @@ export default function PixPaymentPage() {
       setError(err.response?.data?.message || 'Erro ao gerar QR code PIX');
     } finally {
       setIsCreatingPayment(false);
+    }
+  };
+
+  const handleSimulatePayment = async () => {
+    if (!saleId) return;
+
+    setSimulationMessage('');
+    setSimulationError('');
+    setIsSimulatingPayment(true);
+
+    try {
+      const result = await customerAPI.simulatePixPayment(saleId);
+      const status = result?.status?.toUpperCase?.() || 'PAID';
+
+      if (status === 'PAID') {
+        setPaymentStatus('PAID');
+        setSimulationMessage('Pagamento simulado com sucesso. Redirecionando...');
+        setTimeout(() => {
+          router.push(`/customer/orders/${saleId}`);
+        }, 1500);
+      } else {
+        setSimulationMessage(`Simulação concluída com status: ${status}.`);
+      }
+    } catch (err: any) {
+      console.error('Erro ao simular pagamento:', err);
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Erro ao simular pagamento PIX';
+      setSimulationError(message);
+    } finally {
+      setIsSimulatingPayment(false);
     }
   };
 
@@ -519,6 +566,45 @@ export default function PixPaymentPage() {
             </CardContent>
           </Card>
         </div>
+        {!isProductionEnv && paymentData && (
+          <div className="max-w-6xl mx-auto mt-6">
+            <Card className="border border-blue-200 bg-blue-50">
+              <CardContent className="p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-2">
+                  <p className="text-sm text-blue-900 font-semibold">
+                    Ambiente de desenvolvimento
+                  </p>
+                  <p className="text-sm text-blue-800">
+                    Use o botão abaixo para simular a confirmação do pagamento diretamente pela AbacatePay.
+                  </p>
+                  {simulationMessage && (
+                    <p className="text-sm font-medium text-green-700">{simulationMessage}</p>
+                  )}
+                  {simulationError && (
+                    <p className="text-sm font-medium text-red-700">{simulationError}</p>
+                  )}
+                </div>
+                <Button
+                  onClick={handleSimulatePayment}
+                  disabled={isSimulatingPayment || paymentStatus === 'PAID'}
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isSimulatingPayment ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Simulando pagamento...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Simular pagamento PIX
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       <Footer />
