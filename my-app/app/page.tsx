@@ -311,16 +311,16 @@ export default function HomePage() {
 
   // Imagens de fundo por categoria (pasta public/MobiliAI_MóveisCategoria)
   const categoryBackgrounds: Record<string, string> = {
-    'SOFA': '/MobiliAI_MóveisCategoria/139.png',
-    'MESA': '/MobiliAI_MóveisCategoria/122.png',
+    'SOFA': '/MobiliAI_MóveisCategoria/25.png',
+    'MESA': '/MobiliAI_MóveisCategoria/54.png',
     'CADEIRA': '/MobiliAI_MóveisCategoria/103.png',
     'ARMARIO': '/MobiliAI_MóveisCategoria/82.png',
-    'ESTANTE': '/MobiliAI_MóveisCategoria/69.png',
-    'POLTRONA': '/MobiliAI_MóveisCategoria/54.png',
-    'QUADRO': '/MobiliAI_MóveisCategoria/25.png',
-    'LUMINARIA': '/MobiliAI_MóveisCategoria/8.png',
+    'ESTANTE': '/MobiliAI_MóveisCategoria/139.png',
+    'POLTRONA': '/MobiliAI_MóveisCategoria/8.png',
+    'QUADRO': '/MobiliAI_MóveisCategoria/122.png',
+    'LUMINARIA': '/MobiliAI_MóveisCategoria/82.png',
     // Fallback temporário para mesa de centro
-    'MESA_CENTRO': '/MobiliAI_MóveisCategoria/8.png',
+    'MESA_CENTRO': '/MobiliAI_MóveisCategoria/69.png',
   };
   // Mapear categorias do banco para categorias de exibição
   // Mapeamento de categorias para nomes amigáveis
@@ -849,14 +849,10 @@ export default function HomePage() {
             <Link href={`/products?category=${categories[0].id}`} className="md:col-span-3 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-[#3e2626] via-[#8B4513] to-[#A0522D] rounded-3xl overflow-hidden cursor-pointer shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.02]">
                 {/* Background Image */}
-                <Image
-                  src={categoryBackgrounds[categories[0].id]}
-                  alt={categories[0].name}
-                  fill
-                  sizes="(min-width: 1024px) 50vw, 100vw"
-                  className="absolute inset-0 object-cover"
-                  priority
-                />
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${categoryBackgrounds[categories[0].id]})` }}
+                ></div>
                 {/* Background Pattern */}
                 <div className="absolute inset-0 opacity-20">
                   <div className="absolute inset-0" style={{
@@ -900,13 +896,10 @@ export default function HomePage() {
             <Link href={`/products?category=${categories[5].id}`} className="md:col-span-2 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
-                <Image
-                  src={categoryBackgrounds[categories[5].id]}
-                  alt={categories[5].name}
-                  fill
-                  sizes="(min-width: 1024px) 33vw, 100vw"
-                  className="absolute inset-0 object-cover"
-                />
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${categoryBackgrounds[categories[5].id]})` }}
+                ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[5].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-6 h-full flex flex-col justify-between">
@@ -931,13 +924,10 @@ export default function HomePage() {
             <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
-                <Image
-                  src={categoryBackgrounds[categories[2].id]}
-                  alt={categories[2].name}
-                  fill
-                  sizes="(min-width: 1024px) 16vw, 100vw"
-                  className="absolute inset-0 object-cover"
-                />
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${categoryBackgrounds[categories[2].id]})` }}
+                ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-4 h-full flex flex-col justify-between">
@@ -959,13 +949,10 @@ export default function HomePage() {
             <Link href={`/products?category=${categories[1].id}`} className="md:col-span-2 md:row-span-2">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
-                <Image
-                  src={categoryBackgrounds[categories[1].id]}
-                  alt={categories[1].name}
-                  fill
-                  sizes="(min-width: 1024px) 33vw, 100vw"
-                  className="absolute inset-0 object-cover"
-                />
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${categoryBackgrounds[categories[1].id]})` }}
+                ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[1].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-6 h-full flex flex-col justify-between">
@@ -987,13 +974,10 @@ export default function HomePage() {
             <Link href={`/products?category=${categories[4].id}`} className="md:col-span-2 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
-                <Image
-                  src={categoryBackgrounds[categories[4].id]}
-                  alt={categories[4].name}
-                  fill
-                  sizes="(min-width: 1024px) 33vw, 100vw"
-                  className="absolute inset-0 object-cover"
-                />
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${categoryBackgrounds[categories[4].id]})` }}
+                ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[4].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-4 h-full flex items-center justify-between">
@@ -1017,13 +1001,10 @@ export default function HomePage() {
             <Link href={`/products?category=${categories[6].id}`} className="md:col-span-2 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
-                <Image
-                  src={categoryBackgrounds[categories[6].id]}
-                  alt={categories[6].name}
-                  fill
-                  sizes="(min-width: 1024px) 16vw, 100vw"
-                  className="absolute inset-0 object-cover"
-                />
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${categoryBackgrounds[categories[6].id]})` }}
+                ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">
@@ -1046,13 +1027,10 @@ export default function HomePage() {
             <Link href={`/products?category=${categories[7].id}`} className="md:col-span-2 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
-                <Image
-                  src={categoryBackgrounds[categories[7].id]}
-                  alt={categories[7].name}
-                  fill
-                  sizes="(min-width: 1024px) 33vw, 100vw"
-                  className="absolute inset-0 object-cover"
-                />
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${categoryBackgrounds[categories[7].id]})` }}
+                ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[7].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-4 h-full flex items-center justify-between">
@@ -1076,13 +1054,10 @@ export default function HomePage() {
             <Link href={`/products?category=${categories[8].id}`} className="md:col-span-1 md:row-span-1">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
-                <Image
-                  src={categoryBackgrounds[categories[8].id]}
-                  alt={categories[8].name}
-                  fill
-                  sizes="(min-width: 1024px) 16vw, 100vw"
-                  className="absolute inset-0 object-cover"
-                />
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${categoryBackgrounds[categories[8].id]})` }}
+                ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[8].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
                 <div className="relative z-10 p-3 h-full flex flex-col items-center justify-center">

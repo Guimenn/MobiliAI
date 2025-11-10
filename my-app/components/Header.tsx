@@ -889,18 +889,7 @@ export default function Header() {
                  )}
                </div>
               
-               {/* FAQ Icon */}
-               <button 
-                 onClick={goToFAQ}
-                 className={`p-2 transition-colors ${
-                   isHomePage 
-                     ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
-                     : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
-                 }`}
-                 title="Perguntas Frequentes"
-               >
-                 <MessageCircle className="h-6 w-6" />
-               </button>
+            
               
                {/* Account Icon - Sempre visível */}
                <div className="relative user-dropdown-container" ref={userDropdownRef}>

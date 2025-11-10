@@ -91,7 +91,7 @@ export async function seedDatabase() {
     {
       name: 'Tinta Acrílica Branco Gelo',
       description: 'Tinta acrílica de alta qualidade para interiores',
-      category: ProductCategory.OUTROS,
+      category: ProductCategory.MESA_CENTRO,
       price: 89.90,
       costPrice: 60.00,
       stock: 50,
@@ -106,7 +106,7 @@ export async function seedDatabase() {
     {
       name: 'Tinta Acrílica Azul Oceano',
       description: 'Tinta acrílica para interiores e exteriores',
-      category: ProductCategory.OUTROS,
+      category: ProductCategory.MESA_CENTRO,
       price: 95.50,
       costPrice: 65.00,
       stock: 30,
@@ -121,7 +121,7 @@ export async function seedDatabase() {
     {
       name: 'Tinta Acrílica Verde Menta',
       description: 'Tinta acrílica suave para quartos e salas',
-      category: ProductCategory.OUTROS,
+      category: ProductCategory.MESA_CENTRO,
       price: 92.00,
       costPrice: 62.00,
       stock: 25,
@@ -136,7 +136,7 @@ export async function seedDatabase() {
     {
       name: 'Pincel Chato 2"',
       description: 'Pincel chato profissional para acabamentos',
-      category: ProductCategory.OUTROS,
+      category: ProductCategory.MESA_CENTRO,
       price: 15.90,
       costPrice: 8.00,
       stock: 100,
@@ -149,7 +149,7 @@ export async function seedDatabase() {
     {
       name: 'Rolo de Pintura 9"',
       description: 'Rolo de pintura para grandes superfícies',
-      category: ProductCategory.OUTROS,
+      category: ProductCategory.MESA_CENTRO,
       price: 12.50,
       costPrice: 6.00,
       stock: 80,
@@ -162,7 +162,7 @@ export async function seedDatabase() {
     {
       name: 'Fita Crepe 48mm',
       description: 'Fita crepe para proteção e acabamentos',
-      category: ProductCategory.OUTROS,
+      category: ProductCategory.MESA_CENTRO,
       price: 8.90,
       costPrice: 4.00,
       stock: 200,
@@ -175,7 +175,7 @@ export async function seedDatabase() {
     {
       name: 'Kit Pintura Completo',
       description: 'Kit com tinta, pincel, rolo e fita crepe',
-      category: ProductCategory.OUTROS,
+      category: ProductCategory.MESA_CENTRO,
       price: 199.90,
       costPrice: 120.00,
       stock: 15,

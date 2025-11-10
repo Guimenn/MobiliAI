@@ -20,3 +20,5 @@ END$$;
 -- 2) Atualizar linhas existentes
 -- UPDATE "products" SET "category" = 'MESA_CENTRO' WHERE "category" = 'OUTROS';
 
+
+
