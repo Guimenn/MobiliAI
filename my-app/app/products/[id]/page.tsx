@@ -100,6 +100,7 @@ export default function ProductDetailPage() {
 
           if (response.ok) {
             const data = await response.json();
+            
             const mappedProduct: Product = {
               id: data.id,
               name: data.name,
@@ -118,10 +119,23 @@ export default function ProductDetailPage() {
               imageUrl: Array.isArray(data.imageUrls) && data.imageUrls.length > 0 
                 ? data.imageUrls[0] 
                 : data.imageUrl,
+              imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : [],
               storeId: data.store?.id || data.storeId || '',
               rating: data.rating ? Number(data.rating) : undefined,
               reviewCount: data.reviewCount ? Number(data.reviewCount) : undefined,
+              // Campos de Oferta Normal
+              isOnSale: data.isOnSale || false,
+              salePrice: data.salePrice ? Number(data.salePrice) : undefined,
+              saleStartDate: data.saleStartDate,
+              saleEndDate: data.saleEndDate,
+              // Campos de Oferta Relâmpago
+              isFlashSale: data.isFlashSale || false,
+              flashSalePrice: data.flashSalePrice ? Number(data.flashSalePrice) : undefined,
+              flashSaleDiscountPercent: data.flashSaleDiscountPercent ? Number(data.flashSaleDiscountPercent) : undefined,
+              flashSaleStartDate: data.flashSaleStartDate,
+              flashSaleEndDate: data.flashSaleEndDate,
             };
+            
             setProduct(mappedProduct);
             
             // Salvar todas as imagens do produto
@@ -169,9 +183,9 @@ export default function ProductDetailPage() {
             }
             return;
           }
-        } catch (apiError) {
-          console.log('Endpoint público não disponível, tentando produtos locais');
-        }
+         } catch (apiError) {
+           // Endpoint público não disponível, tentando produtos locais
+         }
 
         // Fallback: buscar da lista de produtos
         const foundProduct = products.find(p => p.id === productId);
@@ -337,6 +351,93 @@ export default function ProductDetailPage() {
   const rating = product?.rating || 0;
   const reviews = product?.reviewCount || 0;
 
+  // Função para verificar se uma oferta está ativa
+  const isSaleActive = (product: Product | null): boolean => {
+    if (!product) return false;
+    const now = new Date();
+    
+    // Verificar oferta relâmpago primeiro (tem prioridade)
+    if (product.isFlashSale && product.flashSaleStartDate && product.flashSaleEndDate) {
+      const start = new Date(product.flashSaleStartDate);
+      const end = new Date(product.flashSaleEndDate);
+      if (now >= start && now <= end) {
+        return true;
+      }
+    }
+    
+    // Verificar oferta normal
+    if (product.isOnSale && product.saleStartDate && product.saleEndDate) {
+      const start = new Date(product.saleStartDate);
+      const end = new Date(product.saleEndDate);
+      if (now >= start && now <= end) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // Função para obter o preço atual (com oferta se ativa)
+  const getCurrentPrice = (product: Product | null): number => {
+    if (!product) return 0;
+    
+    if (isSaleActive(product)) {
+      // Prioridade para oferta relâmpago
+      if (product.isFlashSale) {
+        // Se tem flashSalePrice, usar ele
+        if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+          return Number(product.flashSalePrice);
+        }
+        // Se não tem flashSalePrice mas tem flashSaleDiscountPercent, calcular
+        if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && product.price) {
+          const discount = (Number(product.price) * Number(product.flashSaleDiscountPercent)) / 100;
+          return Number(product.price) - discount;
+        }
+      }
+      // Depois oferta normal
+      if (product.isOnSale && product.salePrice) {
+        return Number(product.salePrice);
+      }
+    }
+    return Number(product.price);
+  };
+
+  // Calcular valores de oferta
+  const hasActiveSale = isSaleActive(product);
+  const isFlashSaleActive = hasActiveSale && product?.isFlashSale;
+  const originalPrice = product ? Number(product.price) : 0;
+  
+  // Calcular preço atual e desconto - SEMPRE se houver oferta configurada
+  let currentPrice = originalPrice;
+  let flashDiscountPercent = 0;
+  
+  if (product?.isFlashSale) {
+    // Oferta relâmpago configurada - SEMPRE calcular desconto para visualização
+    // Se tem flashSalePrice, usar ele
+    if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+      currentPrice = Number(product.flashSalePrice);
+      // Calcular percentual de desconto baseado no flashSalePrice
+      if (currentPrice < originalPrice) {
+        flashDiscountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+      }
+    }
+    // Se tem flashSaleDiscountPercent, calcular preço
+    else if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && product.flashSaleDiscountPercent > 0) {
+      flashDiscountPercent = product.flashSaleDiscountPercent;
+      const discount = (originalPrice * flashDiscountPercent) / 100;
+      currentPrice = originalPrice - discount;
+    }
+  } else if (hasActiveSale && product?.isOnSale) {
+    // Oferta normal ativa
+    currentPrice = getCurrentPrice(product);
+  } else {
+    // Nenhuma oferta - preço normal
+    currentPrice = originalPrice;
+  }
+  
+  // Sempre mostrar desconto se houver oferta relâmpago configurada
+  const hasDiscount = product?.isFlashSale && flashDiscountPercent > 0 && currentPrice < originalPrice;
+
   const handleReviewAdded = () => {
     setReviewKey(prev => prev + 1);
     setShowReviewForm(false);
@@ -446,7 +547,13 @@ export default function ProductDetailPage() {
               )}
               
               {/* Badges */}
-              <div className="absolute top-4 left-4 flex flex-col gap-2">
+              <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
+                {product?.isFlashSale && hasDiscount && (
+                  <Badge className="bg-yellow-500 text-white font-bold shadow-lg flex items-center gap-1 animate-pulse">
+                    <Zap className="h-3 w-3 fill-white" />
+                    {flashDiscountPercent > 0 ? `-${flashDiscountPercent}%` : 'Relâmpago'}
+                  </Badge>
+                )}
                 {product.stock && product.stock > 0 && product.stock <= 10 && (
                   <Badge className="bg-orange-500 text-white">
                     Últimas unidades!
@@ -661,14 +768,35 @@ export default function ProductDetailPage() {
               <Card className="border-2 border-brand-100 shadow-sm">
                 <CardContent className="p-6 space-y-6">
                   {/* Preço */}
-                  <div className="bg-gradient-to-br from-brand-50 to-brand-100 rounded-2xl p-5 border-2 border-brand-200">
+                  <div className={`bg-gradient-to-br ${isFlashSaleActive ? 'from-yellow-50 to-yellow-100 border-yellow-300' : 'from-brand-50 to-brand-100 border-brand-200'} rounded-2xl p-5 border-2`}>
                     <div className="flex items-baseline gap-3 flex-wrap">
                       <span className="text-sm font-medium text-gray-600">Por apenas</span>
-                      <span className="text-4xl font-black text-brand-700">R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="text-4xl font-black text-brand-700">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice)}
+                      </span>
                     </div>
+                    {/* Mostrar desconto se houver oferta relâmpago configurada */}
+                    {hasDiscount && (
+                      <>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className="text-sm text-gray-500 line-through">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalPrice)}
+                          </span>
+                          <Badge className="bg-red-600 text-white text-xs font-bold">
+                            -{flashDiscountPercent}% OFF
+                          </Badge>
+                        </div>
+                        {product?.isFlashSale && hasDiscount && (
+                          <div className="flex items-center gap-1 mt-2 text-xs text-yellow-600 font-medium">
+                            <Zap className="h-3 w-3" />
+                            <span>Oferta Relâmpago Ativa</span>
+                          </div>
+                        )}
+                      </>
+                    )}
                     <p className="text-sm text-green-600 font-semibold mt-2 flex items-center gap-1">
                       <Sparkles className="h-4 w-4" />
-                      Parcelamento em até 18x sem juros
+                      Parcelamento em até 18x {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice / 18)} sem juros
                     </p>
                   </div>
 

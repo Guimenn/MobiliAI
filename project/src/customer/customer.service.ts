@@ -86,6 +86,7 @@ export class CustomerService {
     state?: string;
     zipCode?: string;
     cpf?: string;
+    avatarUrl?: string;
   }) {
     const customer = await this.prisma.user.findUnique({
       where: { id: customerId }
@@ -110,6 +111,7 @@ export class CustomerService {
         cpf: true,
         role: true,
         isActive: true,
+        avatarUrl: true,
         updatedAt: true
       }
     });

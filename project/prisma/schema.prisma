@@ -117,6 +117,17 @@ model Product {
   reviewCount        Int                    @default(0)
   isActive           Boolean                @default(true)
   isAvailable        Boolean                @default(true)
+  // Campos de Oferta Normal
+  isOnSale           Boolean                @default(false)
+  salePrice          Decimal?               @db.Decimal(10, 2)
+  saleStartDate      DateTime?
+  saleEndDate        DateTime?
+  // Campos de Oferta Relâmpago
+  isFlashSale             Boolean                @default(false)
+  flashSalePrice          Decimal?               @db.Decimal(10, 2)
+  flashSaleDiscountPercent Int?                  // Percentual de desconto (1-99)
+  flashSaleStartDate      DateTime?
+  flashSaleEndDate        DateTime?
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
   storeId            String

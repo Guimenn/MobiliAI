@@ -207,6 +207,38 @@ export default function CartPage() {
     return Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
   };
 
+  // Função para obter o preço atual com desconto (se houver oferta relâmpago configurada)
+  const getCurrentPrice = (product: any): number => {
+    const originalPrice = Number(product.price);
+    
+    // Se houver oferta relâmpago configurada, calcular preço com desconto
+    if (product.isFlashSale) {
+      // Se tem flashSaleDiscountPercent, calcular preço
+      if (product.flashSaleDiscountPercent && product.flashSaleDiscountPercent > 0) {
+        const discount = (originalPrice * product.flashSaleDiscountPercent) / 100;
+        return originalPrice - discount;
+      }
+      // Se tem flashSalePrice, usar ele
+      if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+        return Number(product.flashSalePrice);
+      }
+    }
+    
+    // Se houver oferta normal ativa
+    if (product.isOnSale && product.salePrice) {
+      const now = new Date();
+      if (product.saleStartDate && product.saleEndDate) {
+        const start = new Date(product.saleStartDate);
+        const end = new Date(product.saleEndDate);
+        if (now >= start && now <= end) {
+          return Number(product.salePrice);
+        }
+      }
+    }
+    
+    return originalPrice;
+  };
+
   // Agrupar produtos por loja
   const productsByStore = useMemo(() => {
     const grouped: { [storeId: string]: { storeName: string; storeAddress?: string; items: typeof cart } } = {};
@@ -244,10 +276,11 @@ export default function CartPage() {
     return cart.filter(item => selectedProducts.has(item.product.id));
   }, [cart, selectedProducts]);
 
-  // Calcular total dos produtos selecionados
+  // Calcular total dos produtos selecionados (com desconto se houver oferta)
   const selectedTotal = useMemo(() => {
     return selectedCartItems.reduce((total, item) => {
-      return total + (item.product.price * item.quantity);
+      const currentPrice = getCurrentPrice(item.product);
+      return total + (currentPrice * item.quantity);
     }, 0);
   }, [selectedCartItems]);
 
@@ -741,19 +774,50 @@ export default function CartPage() {
                           </div>
                           
                           <div className="text-right sm:text-left">
-                            <div className="flex items-baseline space-x-2">
-                              <span className="text-sm text-gray-500">Total:</span>
-                              <div className="text-2xl font-bold text-[#3e2626] bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] bg-clip-text text-transparent">
-                                R$ {(item.product.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </div>
-                            </div>
-                            {item.quantity > 1 && (
-                              <div className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
-                                <span>R$ {item.product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                <span className="text-gray-400">×</span>
-                                <span>{item.quantity} un.</span>
-                              </div>
-                            )}
+                            {(() => {
+                              const originalPrice = Number(item.product.price);
+                              const currentPrice = getCurrentPrice(item.product);
+                              const hasDiscount = currentPrice < originalPrice;
+                              const itemTotal = currentPrice * item.quantity;
+                              
+                              return (
+                                <>
+                                  <div className="flex items-baseline space-x-2">
+                                    <span className="text-sm text-gray-500">Total:</span>
+                                    <div className="flex flex-col items-end sm:items-start">
+                                      <div className="text-2xl font-bold text-[#3e2626] bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] bg-clip-text text-transparent">
+                                        R$ {itemTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </div>
+                                      {hasDiscount && (
+                                        <div className="text-xs text-gray-500 line-through mt-0.5">
+                                          R$ {(originalPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {item.quantity > 1 && (
+                                    <div className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
+                                      <span>R$ {currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                      {hasDiscount && (
+                                        <span className="text-gray-400 line-through ml-1">
+                                          R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </span>
+                                      )}
+                                      <span className="text-gray-400">×</span>
+                                      <span>{item.quantity} un.</span>
+                                    </div>
+                                  )}
+                                  {hasDiscount && item.product.isFlashSale && (
+                                    <div className="mt-1">
+                                      <Badge className="bg-yellow-500 text-white text-xs font-bold">
+                                        <Zap className="h-3 w-3 mr-1" />
+                                        Oferta Relâmpago
+                                      </Badge>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>

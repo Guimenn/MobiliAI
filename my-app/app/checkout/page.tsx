@@ -254,9 +254,44 @@ export default function CheckoutPage() {
   // Modal: itens da compra (sumário detalhado)
   const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
 
+  // Função para obter o preço atual com desconto (se houver oferta relâmpago configurada)
+  const getCurrentPrice = (product: any): number => {
+    const originalPrice = Number(product.price);
+    
+    // Se houver oferta relâmpago configurada, calcular preço com desconto
+    if (product.isFlashSale) {
+      // Se tem flashSaleDiscountPercent, calcular preço
+      if (product.flashSaleDiscountPercent && product.flashSaleDiscountPercent > 0) {
+        const discount = (originalPrice * product.flashSaleDiscountPercent) / 100;
+        return originalPrice - discount;
+      }
+      // Se tem flashSalePrice, usar ele
+      if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+        return Number(product.flashSalePrice);
+      }
+    }
+    
+    // Se houver oferta normal ativa
+    if (product.isOnSale && product.salePrice) {
+      const now = new Date();
+      if (product.saleStartDate && product.saleEndDate) {
+        const start = new Date(product.saleStartDate);
+        const end = new Date(product.saleEndDate);
+        if (now >= start && now <= end) {
+          return Number(product.salePrice);
+        }
+      }
+    }
+    
+    return originalPrice;
+  };
+
   // Cálculos
   const subtotal = useMemo(() => {
-    return checkoutItems.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+    return checkoutItems.reduce((total, item) => {
+      const currentPrice = getCurrentPrice(item.product);
+      return total + (currentPrice * item.quantity);
+    }, 0);
   }, [checkoutItems]);
 
   const shippingCost = useMemo(() => {
@@ -1163,7 +1198,22 @@ export default function CheckoutPage() {
                           </div>
                           <div className="text-xs text-gray-800 line-clamp-2 mb-1">{item.product.name}</div>
                           <div className="text-sm font-bold text-[#3e2626] mb-1">
-                            R$ {Number(item.product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {(() => {
+                              const originalPrice = Number(item.product.price);
+                              const currentPrice = getCurrentPrice(item.product);
+                              const hasDiscount = currentPrice < originalPrice;
+                              
+                              return (
+                                <div className="flex flex-col">
+                                  <span>R$ {currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                  {hasDiscount && (
+                                    <span className="text-xs text-gray-500 line-through">
+                                      R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                           <div className="text-xs text-gray-500">Qtd: {item.quantity}</div>
                         </div>
@@ -1593,7 +1643,24 @@ export default function CheckoutPage() {
                             <h4 className="font-semibold text-[#3e2626]">{item.product.name}</h4>
                             <p className="text-sm text-gray-600">Quantidade: {item.quantity}</p>
                             <p className="text-lg font-bold text-[#3e2626] mt-1">
-                              R$ {(item.product.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              {(() => {
+                                const originalPrice = Number(item.product.price);
+                                const currentPrice = getCurrentPrice(item.product);
+                                const itemTotal = currentPrice * item.quantity;
+                                const originalTotal = originalPrice * item.quantity;
+                                const hasDiscount = currentPrice < originalPrice;
+                                
+                                return (
+                                  <div className="flex flex-col">
+                                    <span>R$ {itemTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    {hasDiscount && (
+                                      <span className="text-sm text-gray-500 line-through font-normal">
+                                        R$ {originalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </p>
                           </div>
                         </div>
@@ -2091,7 +2158,24 @@ export default function CheckoutPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
                     <h4 className="font-semibold text-[#1f2937] truncate pr-2">{item.product.name}</h4>
-                    <div className="text-sm text-gray-500 whitespace-nowrap">R$ {Number(item.product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                    <div className="text-sm text-gray-500 whitespace-nowrap">
+                      {(() => {
+                        const originalPrice = Number(item.product.price);
+                        const currentPrice = getCurrentPrice(item.product);
+                        const hasDiscount = currentPrice < originalPrice;
+                        
+                        return (
+                          <div className="flex flex-col items-end">
+                            <span>R$ {currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            {hasDiscount && (
+                              <span className="text-xs line-through">
+                                R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                   <div className="mt-2 flex items-center gap-3">
                     <div className="flex items-center border rounded">
@@ -2135,7 +2219,27 @@ export default function CheckoutPage() {
                         }}
                       >+</button>
                     </div>
-                    <div className="text-sm text-gray-500">Subtotal: R$ {(Number(item.product.price) * (item.quantity || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                    <div className="text-sm text-gray-500">
+                      {(() => {
+                        const originalPrice = Number(item.product.price);
+                        const currentPrice = getCurrentPrice(item.product);
+                        const quantity = item.quantity || 1;
+                        const itemTotal = currentPrice * quantity;
+                        const originalTotal = originalPrice * quantity;
+                        const hasDiscount = currentPrice < originalPrice;
+                        
+                        return (
+                          <div className="flex flex-col">
+                            <span>Subtotal: R$ {itemTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            {hasDiscount && (
+                              <span className="text-xs line-through">
+                                R$ {originalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2144,7 +2248,10 @@ export default function CheckoutPage() {
             <div className="pt-2 flex items-center justify-between">
               <div className="text-sm text-gray-600">Total de itens: {totalCheckoutQuantity}</div>
               <div className="text-base font-semibold text-[#3e2626]">
-                Total: R$ {checkoutItems.reduce((sum, it) => sum + Number(it.product.price) * (it.quantity || 1), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                Total: R$ {checkoutItems.reduce((sum, it) => {
+                  const currentPrice = getCurrentPrice(it.product);
+                  return sum + currentPrice * (it.quantity || 1);
+                }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
           </div>
@@ -2200,7 +2307,23 @@ export default function CheckoutPage() {
               <div className="space-y-4">
                 <h3 className="text-2xl font-semibold text-[#3e2626]">{quickViewProduct.name}</h3>
                 <div className="text-3xl font-bold text-[#3e2626]">
-                  R$ {Number(quickViewProduct.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  {(() => {
+                    if (!quickViewProduct) return 'R$ 0,00';
+                    const originalPrice = Number(quickViewProduct.price);
+                    const currentPrice = getCurrentPrice(quickViewProduct);
+                    const hasDiscount = currentPrice < originalPrice;
+                    
+                    return (
+                      <div className="flex flex-col">
+                        <span>R$ {currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        {hasDiscount && (
+                          <span className="text-sm text-gray-500 line-through">
+                            R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 {quickViewProduct.brand && (
                   <p className="text-sm text-gray-600">Marca: {quickViewProduct.brand}</p>

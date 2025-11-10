@@ -1094,6 +1094,7 @@ export const customerAPI = {
     city?: string;
     state?: string;
     zipCode?: string;
+    avatarUrl?: string;
   }) => {
     const response = await api.put('/customer/profile', updateData);
     return response.data;
