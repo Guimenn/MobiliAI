@@ -64,6 +64,7 @@ export interface Product {
   // Campos de Oferta Normal
   isOnSale?: boolean;
   salePrice?: number;
+  saleDiscountPercent?: number;
   saleStartDate?: string;
   saleEndDate?: string;
   // Campos de Oferta Relâmpago

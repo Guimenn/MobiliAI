@@ -59,15 +59,6 @@ export default function UsersPage() {
     loadUsersData();
   }, []);
 
-  // Atualizar dados a cada 30 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadUsersData();
-    }, 30000); // 30 segundos
-
-    return () => clearInterval(interval);
-  }, []);
-
   const loadUsersData = async () => {
     try {
       setIsLoading(true);
@@ -127,18 +118,21 @@ export default function UsersPage() {
       });
       
       if (response.ok) {
-        await loadUsersData(); // Recarregar a lista
         setIsEditModalOpen(false);
         setEditingUser(null);
         toast.success('Usuário atualizado com sucesso!', {
           description: `${userData.name} foi atualizado.`,
           duration: 4000,
         });
+        // Recarregar a lista após um pequeno delay para evitar conflitos
+        setTimeout(() => {
+          loadUsersData();
+        }, 100);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Erro ao atualizar usuário');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar usuário:', error);
       toast.error('Erro ao salvar usuário', {
         description: error.message || 'Tente novamente mais tarde.',
@@ -196,9 +190,12 @@ export default function UsersPage() {
           description: `${userToDelete.name} foi removido do sistema.`,
           duration: 4000,
         });
-        loadUsersData();
         setIsDeleteDialogOpen(false);
         setUserToDelete(null);
+        // Recarregar após um pequeno delay
+        setTimeout(() => {
+          loadUsersData();
+        }, 100);
       } else {
         const errorData = await response.json();
         toast.error('Erro ao deletar usuário', {
@@ -411,8 +408,10 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
          });
         setUserAvatar(null);
         
-        // Recarregar dados do banco
-        onUsersChange();
+        // Recarregar dados do banco após um pequeno delay
+        setTimeout(() => {
+          onUsersChange();
+        }, 100);
     } catch (error) {
       console.error('Erro ao criar usuário:', error);
       toast.error('Erro ao criar usuário', {

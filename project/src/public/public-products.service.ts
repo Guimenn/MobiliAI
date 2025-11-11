@@ -148,6 +148,18 @@ export class PublicProductsService {
                   isBestSeller: true,
                   rating: true,
                   reviewCount: true,
+                  // Campos de Oferta Normal
+                  isOnSale: true,
+                  salePrice: true,
+                  saleDiscountPercent: true,
+                  saleStartDate: true,
+                  saleEndDate: true,
+                  // Campos de Oferta Relâmpago
+                  isFlashSale: true,
+                  flashSalePrice: true,
+                  flashSaleDiscountPercent: true,
+                  flashSaleStartDate: true,
+                  flashSaleEndDate: true,
                   store: { 
                     select: { 
                       id: true,
@@ -238,11 +250,13 @@ export class PublicProductsService {
           // Campos de Oferta Normal
           isOnSale: true,
           salePrice: true,
+          saleDiscountPercent: true,
           saleStartDate: true,
           saleEndDate: true,
           // Campos de Oferta Relâmpago
           isFlashSale: true,
           flashSalePrice: true,
+          flashSaleDiscountPercent: true,
           flashSaleStartDate: true,
           flashSaleEndDate: true,
           store: { 
@@ -299,6 +313,18 @@ export class PublicProductsService {
               isBestSeller: true,
               rating: true,
               reviewCount: true,
+              // Campos de Oferta Normal
+              isOnSale: true,
+              salePrice: true,
+              saleDiscountPercent: true,
+              saleStartDate: true,
+              saleEndDate: true,
+              // Campos de Oferta Relâmpago
+              isFlashSale: true,
+              flashSalePrice: true,
+              flashSaleDiscountPercent: true,
+              flashSaleStartDate: true,
+              flashSaleEndDate: true,
               store: { 
                 select: { 
                   id: true,

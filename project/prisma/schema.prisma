@@ -120,6 +120,7 @@ model Product {
   // Campos de Oferta Normal
   isOnSale           Boolean                @default(false)
   salePrice          Decimal?               @db.Decimal(10, 2)
+  saleDiscountPercent Int?                  // Percentual de desconto (1-99)
   saleStartDate      DateTime?
   saleEndDate        DateTime?
   // Campos de Oferta Relâmpago

@@ -100,6 +100,10 @@ export class CreateProductDto {
   salePrice?: number;
 
   @IsOptional()
+  @IsNumber()
+  saleDiscountPercent?: number;
+
+  @IsOptional()
   @IsDateString()
   saleStartDate?: string;
 
@@ -231,6 +235,10 @@ export class UpdateProductDto {
   @IsOptional()
   @IsNumber()
   salePrice?: number;
+
+  @IsOptional()
+  @IsNumber()
+  saleDiscountPercent?: number;
 
   @IsOptional()
   @IsDateString()

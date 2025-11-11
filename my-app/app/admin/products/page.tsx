@@ -80,6 +80,7 @@ import ProductViewer3D from '@/components/ProductViewer3D';
 import ProductViewer3DAdvanced from '@/components/ProductViewer3DAdvanced';
 import PhotoTo3DConverter from '@/components/PhotoTo3DConverter';
 import Direct3DUploader from '@/components/Direct3DUploader';
+import FlashSaleModal from '@/components/FlashSaleModal';
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -120,46 +121,28 @@ export default function ProductsPage() {
   const [productToDelete, setProductToDelete] = useState<any>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Estado para o modal de oferta relâmpago
+  const [isFlashSaleModalOpen, setIsFlashSaleModalOpen] = useState(false);
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Quando filtros mudam, resetar para página 1
-        if (currentPage === 1) {
-          await loadProductsData(1, pageLimit);
-        } else {
-          setCurrentPage(1);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-      }
-    };
+  // Removido useEffect que estava causando recarregamentos constantes
+  // Os filtros agora são gerenciados no componente ProductsSection
 
-    // Usar setTimeout para evitar problemas de hidratação
-    const timer = setTimeout(checkAuth, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productFilters.search, productFilters.category]);
-
+  // Carregar dados quando o componente montar ou quando página/limite mudarem
   useEffect(() => {
     loadProductsData(currentPage, pageLimit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, pageLimit]);
 
-  // Atualizar dados a cada 30 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadProductsData(currentPage, pageLimit);
-    }, 30000); // 30 segundos
-
-    return () => clearInterval(interval);
-  }, [currentPage, pageLimit]);
-
-  const loadProductsData = async (page: number = currentPage, limit: number = pageLimit) => {
+  const loadProductsData = async (page: number = currentPage, limit: number = pageLimit, filters?: { search?: string; category?: string }) => {
     try {
       setIsLoading(true);
       
-      console.log('Carregando dados de produtos do banco...', { page, limit });
+      console.log('Carregando dados de produtos do banco...', { page, limit, filters });
+      
+      // Usar filtros fornecidos ou os do estado
+      const searchFilter = filters?.search ?? productFilters.search;
+      const categoryFilter = filters?.category ?? productFilters.category;
       
       // Carregar dados reais da API
       try {
@@ -167,8 +150,8 @@ export default function ProductsPage() {
         const productsData = await adminAPI.getProducts(
           page,
           limit,
-          productFilters.search || undefined,
-          productFilters.category !== 'all' ? productFilters.category : undefined
+          searchFilter || undefined,
+          categoryFilter !== 'all' ? categoryFilter : undefined
         );
         console.log('📦 Dados recebidos:', productsData);
         
@@ -177,11 +160,19 @@ export default function ProductsPage() {
           ? productsData 
           : (productsData?.products || []);
         
-        // Atualizar informações de paginação
+        // Atualizar informações de paginação (sem atualizar currentPage para evitar loops)
         if (productsData?.pagination) {
-          setTotalPages(productsData.pagination.pages || 1);
-          setTotalProducts(productsData.pagination.total || 0);
-          setCurrentPage(productsData.pagination.page || 1);
+          const newTotalPages = productsData.pagination.pages || 1;
+          const newTotal = productsData.pagination.total || 0;
+          
+          // Só atualizar se os valores realmente mudaram
+          if (newTotalPages !== totalPages) {
+            setTotalPages(newTotalPages);
+          }
+          if (newTotal !== totalProducts) {
+            setTotalProducts(newTotal);
+          }
+          // NÃO atualizar currentPage aqui para evitar loops infinitos
         }
         
         console.log('📦 Produtos extraídos:', productsArray.length, 'produtos de', productsData?.pagination?.total || 0, 'total');
@@ -220,13 +211,25 @@ export default function ProductsPage() {
   };
 
   const handleProductUpdated = (updatedProduct: any) => {
-    // Atualizar produtos via callback
-    loadProductsData();
+    // Fechar modal primeiro
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+    // Atualizar produtos via callback - usar página atual
+    // Usar setTimeout para evitar conflitos com estados
+    setTimeout(() => {
+      loadProductsData(currentPage, pageLimit);
+    }, 100);
   };
 
   const handleProductDeleted = (productId: string) => {
-    // Atualizar produtos via callback
-    loadProductsData();
+    // Fechar modal primeiro
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+    // Atualizar produtos via callback - usar página atual
+    // Usar setTimeout para evitar conflitos com estados
+    setTimeout(() => {
+      loadProductsData(currentPage, pageLimit);
+    }, 100);
   };
 
   // Abrir modal de confirmação de exclusão
@@ -334,6 +337,8 @@ function ProductsSection({
   onPageChange,
   onLimitChange
 }: any) {
+  // Estado para o modal de oferta relâmpago
+  const [isFlashSaleModalOpen, setIsFlashSaleModalOpen] = useState(false);
   // Estados para filtros
   const [productFilters, setProductFilters] = useState({
     category: 'all',
@@ -580,7 +585,15 @@ function ProductsSection({
                 </div>
               </div>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex space-x-3 flex-wrap gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => setIsFlashSaleModalOpen(true)}
+                className="border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white font-semibold shadow-lg"
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Oferta Relâmpago
+              </Button>
               <Button 
                 variant="outline"
                 onClick={() => setIsPhotoTo3DOpen(true)}
@@ -1120,6 +1133,15 @@ function ProductsSection({
           onClose={() => setIsDirect3DUploadOpen(false)}
         />
       )}
+
+      {/* Modal de Oferta Relâmpago */}
+      <FlashSaleModal
+        isOpen={isFlashSaleModalOpen}
+        onClose={() => setIsFlashSaleModalOpen(false)}
+        products={products}
+        onProductUpdated={onProductsChange}
+        token={token || ''}
+      />
     </div>
   );
 }

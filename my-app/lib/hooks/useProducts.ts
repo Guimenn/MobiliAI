@@ -155,8 +155,7 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
             : product.dimensions,
           weight: product.weight,
           style: product.style,
-          imageUrl: product.imageUrls?.[0] || product.imageUrl,
-          imageUrls: product.imageUrls || [],
+          imageUrl: (product.imageUrls && product.imageUrls.length > 0) ? product.imageUrls[0] : (product.imageUrl || undefined),
           storeId: product.store?.id || product.storeId || '',
           rating: product.rating ? Number(product.rating) : 0,
           reviewCount: product.reviewCount ? Number(product.reviewCount) : 0,
@@ -165,14 +164,15 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
           // Campos de Oferta Normal
           isOnSale: product.isOnSale || false,
           salePrice: product.salePrice ? Number(product.salePrice) : undefined,
-          saleStartDate: product.saleStartDate,
-          saleEndDate: product.saleEndDate,
+          saleDiscountPercent: product.saleDiscountPercent ? Number(product.saleDiscountPercent) : undefined,
+          saleStartDate: product.saleStartDate ? new Date(product.saleStartDate).toISOString() : undefined,
+          saleEndDate: product.saleEndDate ? new Date(product.saleEndDate).toISOString() : undefined,
           // Campos de Oferta Relâmpago
           isFlashSale: product.isFlashSale || false,
           flashSalePrice: product.flashSalePrice ? Number(product.flashSalePrice) : undefined,
           flashSaleDiscountPercent: product.flashSaleDiscountPercent ? Number(product.flashSaleDiscountPercent) : undefined,
-        flashSaleStartDate: product.flashSaleStartDate,
-        flashSaleEndDate: product.flashSaleEndDate,
+          flashSaleStartDate: product.flashSaleStartDate ? new Date(product.flashSaleStartDate).toISOString() : undefined,
+          flashSaleEndDate: product.flashSaleEndDate ? new Date(product.flashSaleEndDate).toISOString() : undefined,
       }));
 
       setProducts(mappedProducts);
