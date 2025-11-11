@@ -16,62 +16,87 @@ export class AdminService {
   // ==================== DASHBOARD E ESTATÍSTICAS ====================
   
   async getDashboardStats() {
-    const [
-      totalStores,
-      totalUsers,
-      totalProducts,
-      totalSales,
-      monthlyRevenue,
-      activeStores
-    ] = await Promise.all([
-      this.prisma.store.count(),
-      this.prisma.user.count(),
-      this.prisma.product.count(),
-      this.prisma.sale.count(),
-      this.getMonthlyRevenue(),
-      this.prisma.store.count({ where: { isActive: true } })
-    ]);
-
-    const recentSales = await this.prisma.sale.findMany({
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-        include: {
-          customer: { select: { name: true, email: true } },
-          store: { select: { name: true } },
-          items: {
-            include: {
-              product: { select: { name: true, price: true } }
+    try {
+      // Agrupar contagens em uma única conexão para reduzir erros de pool
+      const [
+        counts,
+        recentSales,
+        topProducts,
+      ] = await Promise.all([
+        this.prisma.$transaction([
+          this.prisma.store.count(),
+          this.prisma.user.count(),
+          this.prisma.product.count(),
+          this.prisma.sale.count(),
+          this.prisma.store.count({ where: { isActive: true } }),
+        ]),
+        this.prisma.sale.findMany({
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            customer: { select: { name: true, email: true } },
+            store: { select: { name: true } },
+            items: {
+              include: {
+                product: { select: { name: true, price: true } }
+              }
             }
           }
-        }
-    });
+        }),
+        this.prisma.product.findMany({
+          take: 5,
+          orderBy: { rating: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            rating: true,
+            reviewCount: true,
+            stock: true,
+            store: { select: { name: true } }
+          }
+        })
+      ]);
 
-    const topProducts = await this.prisma.product.findMany({
-      take: 5,
-      orderBy: { rating: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        rating: true,
-        reviewCount: true,
-        stock: true,
-        store: { select: { name: true } }
+      const [totalStores, totalUsers, totalProducts, totalSales, activeStores] = counts as unknown as number[];
+
+      // Receita mensal separada e protegida
+      let monthlyRevenue = 0;
+      try {
+        monthlyRevenue = await this.getMonthlyRevenue();
+      } catch (revenueError) {
+        console.error('Erro ao calcular receita mensal:', revenueError);
+        monthlyRevenue = 0;
       }
-    });
 
-    return {
-      overview: {
-        totalStores,
-        totalUsers,
-        totalProducts,
-        totalSales,
-        monthlyRevenue,
-        activeStores
-      },
-      recentSales,
-      topProducts
-    };
+      return {
+        overview: {
+          totalStores,
+          totalUsers,
+          totalProducts,
+          totalSales,
+          monthlyRevenue,
+          activeStores
+        },
+        recentSales,
+        topProducts
+      };
+    } catch (error) {
+      // Fallback seguro para não quebrar o frontend quando houver problema de conexão
+      console.error('Erro ao obter estatísticas do dashboard:', error);
+      return {
+        overview: {
+          totalStores: 0,
+          totalUsers: 0,
+          totalProducts: 0,
+          totalSales: 0,
+          monthlyRevenue: 0,
+          activeStores: 0
+        },
+        recentSales: [],
+        topProducts: []
+      };
+    }
   }
 
   private async getMonthlyRevenue() {
