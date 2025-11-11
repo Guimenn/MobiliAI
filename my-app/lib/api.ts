@@ -460,6 +460,21 @@ export const adminAPI = {
     return response.data;
   },
 
+  getDashboardSummary: async () => {
+    const response = await api.get('/admin/dashboard/summary');
+    return response.data;
+  },
+
+  getNotifications: async () => {
+    const response = await api.get('/admin/notifications');
+    return response.data;
+  },
+
+  getAlerts: async () => {
+    const response = await api.get('/admin/alerts');
+    return response.data;
+  },
+
   getOverviewStats: async () => {
     const response = await api.get('/admin/stats/overview');
     return response.data;
