@@ -228,36 +228,60 @@ export default function ProductsPage() {
     return false;
   }, []);
 
+  // Função para verificar se a oferta relâmpago está REALMENTE ativa (já começou)
+  const isFlashSaleActuallyActive = useCallback((product: Product): boolean => {
+    if (!product.isFlashSale || !product.flashSaleStartDate || !product.flashSaleEndDate) {
+      return false;
+    }
+    try {
+      const now = new Date();
+      const start = new Date(product.flashSaleStartDate);
+      const end = new Date(product.flashSaleEndDate);
+      return now >= start && now <= end;
+    } catch {
+      return false;
+    }
+  }, []);
+
   // Função para obter o preço atual (com oferta se ativa)
   const getCurrentPrice = useCallback((product: Product): number => {
-    if (isSaleActive(product)) {
-      // Prioridade para oferta relâmpago
-      if (product.isFlashSale) {
-        // Se tem flashSalePrice, usar ele
-        if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
-          return Number(product.flashSalePrice);
-        }
-        // Se não tem flashSalePrice mas tem flashSaleDiscountPercent, calcular
-        if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && product.price) {
-          const discount = (Number(product.price) * Number(product.flashSaleDiscountPercent)) / 100;
-          return Number(product.price) - discount;
-        }
+    // Prioridade para oferta relâmpago - APENAS se estiver REALMENTE ativa (já começou)
+    if (product.isFlashSale && isFlashSaleActuallyActive(product)) {
+      // Se tem flashSalePrice, usar ele
+      if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+        return Number(product.flashSalePrice);
       }
-      // Depois oferta normal
-      if (product.isOnSale) {
-        // Se tem saleDiscountPercent, calcular baseado no percentual
-        if (product.saleDiscountPercent !== undefined && product.saleDiscountPercent !== null && product.price) {
-          const discount = (Number(product.price) * Number(product.saleDiscountPercent)) / 100;
-          return Number(product.price) - discount;
-        }
-        // Se não tem percentual mas tem salePrice, usar ele
-        if (product.salePrice) {
-          return Number(product.salePrice);
-        }
+      // Se não tem flashSalePrice mas tem flashSaleDiscountPercent, calcular
+      if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && product.price) {
+        const discount = (Number(product.price) * Number(product.flashSaleDiscountPercent)) / 100;
+        return Number(product.price) - discount;
       }
     }
+    
+    // Depois oferta normal - APENAS se estiver ativa
+    if (product.isOnSale && product.saleStartDate && product.saleEndDate) {
+      try {
+        const now = new Date();
+        const start = new Date(product.saleStartDate);
+        const end = new Date(product.saleEndDate);
+        if (now >= start && now <= end) {
+          // Se tem saleDiscountPercent, calcular baseado no percentual
+          if (product.saleDiscountPercent !== undefined && product.saleDiscountPercent !== null && product.price) {
+            const discount = (Number(product.price) * Number(product.saleDiscountPercent)) / 100;
+            return Number(product.price) - discount;
+          }
+          // Se não tem percentual mas tem salePrice, usar ele
+          if (product.salePrice) {
+            return Number(product.salePrice);
+          }
+        }
+      } catch {
+        // Erro ao verificar datas, usar preço normal
+      }
+    }
+    
     return Number(product.price);
-  }, [isSaleActive]);
+  }, [isFlashSaleActuallyActive]);
 
   const filteredProducts = useMemo(() => {
     const term = debouncedTerm.trim().toLowerCase();
