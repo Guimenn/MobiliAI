@@ -884,19 +884,33 @@ export default function ProductDetailPage() {
                         <div className="flex gap-2.5">
                           {/* Imagem do produto - maior para ocupar mais espaço */}
                           <div className="relative w-56 h-56 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-200 group">
-                            {relatedProduct.imageUrl ? (
-                              <Image
-                                src={relatedProduct.imageUrl}
-                                alt={relatedProduct.name}
-                                fill
-                                className="object-cover"
-                                unoptimized
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Package className="h-8 w-8 text-gray-300" />
-                              </div>
-                            )}
+                            {(() => {
+                              const imageUrl = (relatedProduct.imageUrls && relatedProduct.imageUrls.length > 0) 
+                                ? relatedProduct.imageUrls[0] 
+                                : relatedProduct.imageUrl;
+                              return imageUrl ? (
+                                <Image
+                                  src={imageUrl}
+                                  alt={relatedProduct.name}
+                                  fill
+                                  className="object-cover"
+                                  unoptimized
+                                  onError={(e) => {
+                                    console.error('Erro ao carregar imagem:', imageUrl);
+                                  }}
+                                />
+                              ) : null;
+                            })()}
+                            {(() => {
+                              const imageUrl = (relatedProduct.imageUrls && relatedProduct.imageUrls.length > 0) 
+                                ? relatedProduct.imageUrls[0] 
+                                : relatedProduct.imageUrl;
+                              return !imageUrl ? (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package className="h-8 w-8 text-gray-300" />
+                                </div>
+                              ) : null;
+                            })()}
                             {/* Favorite Tooltip */}
                             <FavoriteTooltip productId={relatedProduct.id} />
                           </div>

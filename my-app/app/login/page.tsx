@@ -344,7 +344,10 @@ export default function LoginPage() {
           
           if (error?.response?.data?.message) {
             const backendMessage = error.response.data.message;
-            if (backendMessage.includes('email')) {
+            // Traduzir mensagens técnicas para mensagens mais amigáveis
+            if (backendMessage.toLowerCase().includes('unauthorized') || backendMessage === 'Unauthorized') {
+              errorMessage = 'Não foi possível criar sua conta. Verifique os dados e tente novamente.';
+            } else if (backendMessage.includes('email')) {
               errorMessage = 'Este email já está sendo usado. Tente com outro email.';
             } else if (backendMessage.includes('CPF')) {
               errorMessage = 'Este CPF já está cadastrado. Verifique os dados e tente novamente.';
@@ -355,6 +358,8 @@ export default function LoginPage() {
             errorMessage = 'Este email já possui uma conta. Tente fazer login ou use outro email.';
           } else if (error?.response?.status === 400) {
             errorMessage = 'Dados inválidos. Verifique as informações e tente novamente.';
+          } else if (error?.response?.status === 401) {
+            errorMessage = 'Não foi possível criar sua conta. Verifique os dados e tente novamente.';
           }
           
           simulateTyping(`❌ ${errorMessage}`, 1500);
@@ -389,7 +394,11 @@ export default function LoginPage() {
           setLoginStep('forgotPassword');
         }
       } catch (error: any) {
-        const errorMessage = error?.response?.data?.message || 'Erro ao enviar código. Tente novamente.';
+        let errorMessage = error?.response?.data?.message || 'Erro ao enviar código. Tente novamente.';
+        // Traduzir mensagens técnicas para mensagens mais amigáveis
+        if (errorMessage.toLowerCase().includes('unauthorized') || errorMessage === 'Unauthorized') {
+          errorMessage = 'Não foi possível enviar o código. Verifique seu email e tente novamente.';
+        }
         simulateTyping(`❌ ${errorMessage}`, 1500);
         simulateTyping('Digite seu email novamente:', 1000);
         setLoginStep('forgotPassword');
@@ -415,7 +424,13 @@ export default function LoginPage() {
       } catch (error: any) {
         let errorMessage = 'Erro ao verificar código';
         if (error?.response?.data?.message) {
-          errorMessage = error.response.data.message;
+          const backendMessage = error.response.data.message;
+          // Traduzir mensagens técnicas para mensagens mais amigáveis
+          if (backendMessage.toLowerCase().includes('unauthorized') || backendMessage === 'Unauthorized') {
+            errorMessage = 'Código inválido ou expirado. Verifique o código e tente novamente.';
+          } else {
+            errorMessage = backendMessage;
+          }
         }
         simulateTyping(`❌ ${errorMessage}`, 1500);
         simulateTyping('Digite o código novamente:', 1000);
@@ -445,7 +460,13 @@ export default function LoginPage() {
       } catch (error: any) {
         let errorMessage = 'Erro ao redefinir senha';
         if (error?.response?.data?.message) {
-          errorMessage = error.response.data.message;
+          const backendMessage = error.response.data.message;
+          // Traduzir mensagens técnicas para mensagens mais amigáveis
+          if (backendMessage.toLowerCase().includes('unauthorized') || backendMessage === 'Unauthorized') {
+            errorMessage = 'Não foi possível redefinir a senha. Verifique o código e tente novamente.';
+          } else {
+            errorMessage = backendMessage;
+          }
         }
         simulateTyping(`❌ ${errorMessage}`, 1500);
         
@@ -503,7 +524,11 @@ export default function LoginPage() {
         
         if ((error as any)?.response?.data?.message) {
           const backendMessage = (error as any).response.data.message;
-          if (backendMessage.includes('Email não encontrado')) {
+          // Traduzir mensagens técnicas para mensagens mais amigáveis
+          if (backendMessage.toLowerCase().includes('unauthorized') || backendMessage === 'Unauthorized') {
+            errorMessage = '❌ Email ou senha incorretos. Verifique suas credenciais e tente novamente.';
+            needsEmailReset = true;
+          } else if (backendMessage.includes('Email não encontrado')) {
             errorMessage = '❌ Este email não está cadastrado em nosso sistema.';
             needsEmailReset = true;
           } else if (backendMessage.includes('Senha incorreta') || backendMessage.toLowerCase().includes('senha')) {

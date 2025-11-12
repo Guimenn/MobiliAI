@@ -330,17 +330,26 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
                       <TableRow key={item.id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            {item.product.imageUrl ? (
-                              <img
-                                src={item.product.imageUrl}
-                                alt={item.product.name}
-                                className="w-10 h-10 rounded object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center">
-                                <Package className="h-5 w-5 text-gray-400" />
-                              </div>
-                            )}
+                            {(() => {
+                              const imageUrl = (item.product.imageUrls && item.product.imageUrls.length > 0) 
+                                ? item.product.imageUrls[0] 
+                                : item.product.imageUrl;
+                              return imageUrl ? (
+                                <img
+                                  src={imageUrl}
+                                  alt={item.product.name}
+                                  className="w-10 h-10 rounded object-cover"
+                                  onError={(e) => {
+                                    console.error('Erro ao carregar imagem:', imageUrl);
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : null;
+                            })()}
+                            <div className="hidden w-10 h-10 rounded bg-gray-100 flex items-center justify-center">
+                              <Package className="h-5 w-5 text-gray-400" />
+                            </div>
                             <div>
                               <div className="font-medium text-gray-900">{item.product.name}</div>
                               {item.product.brand && (
@@ -562,17 +571,26 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
                       onClick={() => setSelectedProduct(product)}
                     >
                       <div className="flex items-center gap-3">
-                        {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="w-12 h-12 rounded object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center">
-                            <Package className="h-6 w-6 text-gray-400" />
-                          </div>
-                        )}
+                        {(() => {
+                          const imageUrl = (product.imageUrls && product.imageUrls.length > 0) 
+                            ? product.imageUrls[0] 
+                            : product.imageUrl;
+                          return imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={product.name}
+                              className="w-12 h-12 rounded object-cover"
+                              onError={(e) => {
+                                console.error('Erro ao carregar imagem:', imageUrl);
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null;
+                        })()}
+                        <div className="hidden w-12 h-12 rounded bg-gray-100 flex items-center justify-center">
+                          <Package className="h-6 w-6 text-gray-400" />
+                        </div>
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">{product.name}</div>
                           <div className="text-sm text-gray-500">

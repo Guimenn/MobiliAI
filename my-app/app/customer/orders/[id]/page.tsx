@@ -451,13 +451,22 @@ export default function OrderDetailsPage() {
                     <div className="space-y-3">
                       {getUnreviewedProducts().map((item: any) => (
                         <div key={item.id} className="flex items-center gap-4 p-4 bg-white rounded-lg border border-green-200">
-                          {item.product?.imageUrls?.[0] && (
-                            <img
-                              src={item.product.imageUrls[0]}
-                              alt={item.product.name}
-                              className="w-16 h-16 object-cover rounded-lg border-2 border-green-200"
-                            />
-                          )}
+                          {(() => {
+                            const imageUrl = (item.product?.imageUrls && item.product.imageUrls.length > 0) 
+                              ? item.product.imageUrls[0] 
+                              : item.product?.imageUrl;
+                            return imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={item.product.name}
+                                className="w-16 h-16 object-cover rounded-lg border-2 border-green-200"
+                                onError={(e) => {
+                                  console.error('Erro ao carregar imagem:', imageUrl);
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            ) : null;
+                          })()}
                           <div className="flex-1">
                             <p className="font-semibold text-gray-800">{item.product?.name || 'Produto'}</p>
                             <p className="text-sm text-gray-600">Quantidade: {item.quantity}</p>
@@ -504,13 +513,21 @@ export default function OrderDetailsPage() {
                           }
                         }}
                       >
-                        {item.product?.imageUrls?.[0] && (
-                          <img
-                            src={item.product.imageUrls[0]}
-                            alt={item.product.name}
-                            className="w-20 h-20 object-cover rounded-lg border-2 border-gray-200"
-                          />
-                        )}
+                        {(() => {
+                          const imageUrl = (item.product?.imageUrls && item.product.imageUrls.length > 0) 
+                            ? item.product.imageUrls[0] 
+                            : item.product?.imageUrl;
+                          return imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={item.product.name}
+                              onError={(e) => {
+                                console.error('Erro ao carregar imagem:', imageUrl);
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : null;
+                        })()}
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-semibold text-gray-800 hover:text-[#3e2626] transition-colors">

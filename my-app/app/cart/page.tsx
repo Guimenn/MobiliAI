@@ -665,18 +665,27 @@ export default function CartPage() {
                         </div>
                         {/* Product Image */}
                         <div className="sm:w-36 h-36 sm:h-auto relative overflow-hidden rounded-xl flex-shrink-0 shadow-lg group-hover:shadow-xl transition-all duration-300 border-2 border-gray-100 group-hover:border-[#3e2626]/30 group-hover:scale-[1.02]">
-                          {item.product.imageUrl ? (
-                            <img
-                              src={item.product.imageUrl}
-                              alt={item.product.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <div 
-                              className="w-full h-full flex items-center justify-center relative"
-                              style={{ backgroundColor: item.product.color || '#8B4513' }}
-                            >
-                              <div className="absolute inset-0 bg-gradient-to-br from-black/10 to-black/30"></div>
+                          {(() => {
+                            const imageUrl = item.product.imageUrls && item.product.imageUrls.length > 0 
+                              ? item.product.imageUrls[0] 
+                              : item.product.imageUrl;
+                            return imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={item.product.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                  console.error('Erro ao carregar imagem:', imageUrl);
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : (
+                              <div 
+                                className="w-full h-full flex items-center justify-center relative"
+                                style={{ backgroundColor: item.product.color || '#8B4513' }}
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-br from-black/10 to-black/30"></div>
                               <div className="relative z-10 text-center">
                                 {renderCategoryIcon(item.product.category)}
                                 <p className="text-white font-semibold text-xs mt-1 drop-shadow-lg">Móvel</p>

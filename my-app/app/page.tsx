@@ -617,9 +617,9 @@ export default function HomePage() {
   }, [specialOfferProduct, allProducts]);
 
   const formatTime = (totalSeconds: number) => {
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+    const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    return `${h}h ${m}m`;
   };
 
   const testimonials = [
@@ -1532,18 +1532,27 @@ export default function HomePage() {
                   <div className="relative overflow-hidden">
                     <div className="aspect-[4/3] flex items-center justify-center relative bg-gray-100">
                       {/* Product Image - if available */}
-                      {product.imageUrl ? (
-                        <Image
-                          src={product.imageUrl}
-                          alt={product.name}
-                          width={600}
-                          height={450}
-                          className="w-full h-full object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="text-center text-gray-400">Sem imagem</div>
-                      )}
+                      {(() => {
+                        const imageUrl = product.imageUrls && product.imageUrls.length > 0 
+                          ? product.imageUrls[0] 
+                          : product.imageUrl;
+                        
+                        return imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={product.name}
+                            width={600}
+                            height={450}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                            onError={(e) => {
+                              console.error('Erro ao carregar imagem:', imageUrl);
+                            }}
+                          />
+                        ) : (
+                          <div className="text-center text-gray-400">Sem imagem</div>
+                        );
+                      })()}
                     </div>
 
                     {/* Favorite Tooltip */}

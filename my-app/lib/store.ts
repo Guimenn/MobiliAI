@@ -52,6 +52,7 @@ export interface Product {
   weight?: string;
   style?: string;
   imageUrl?: string;
+  imageUrls?: string[]; // Array de URLs de imagens
   storeId: string;
   rating?: number;
   reviewCount?: number;

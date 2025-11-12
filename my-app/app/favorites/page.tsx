@@ -298,10 +298,15 @@ export default function FavoritesPage() {
                         >
                           <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-gray-100">
                             <Image
-                              src={favorite.product.imageUrls[0] || '/image.png'}
+                              src={(favorite.product.imageUrls && favorite.product.imageUrls.length > 0) 
+                                ? favorite.product.imageUrls[0] 
+                                : (favorite.product.imageUrl || '/image.png')}
                               alt={favorite.product.name}
                               fill
                               className="object-cover"
+                              onError={(e) => {
+                                console.error('Erro ao carregar imagem do favorito:', favorite.product.name);
+                              }}
                             />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -399,10 +404,15 @@ export default function FavoritesPage() {
                     {/* Imagem com Badges */}
                     <div className="relative aspect-square overflow-hidden bg-gray-100">
                       <Image
-                        src={favorite.product.imageUrls[0] || '/image.png'}
+                        src={(favorite.product.imageUrls && favorite.product.imageUrls.length > 0) 
+                          ? favorite.product.imageUrls[0] 
+                          : (favorite.product.imageUrl || '/image.png')}
                         alt={favorite.product.name}
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          console.error('Erro ao carregar imagem do favorito:', favorite.product.name);
+                        }}
                       />
                       
                       {/* Badges - Estilo Pichau */}
@@ -476,10 +486,15 @@ export default function FavoritesPage() {
                       {/* Imagem - Estilo Mercado Livre */}
                       <div className="relative w-full sm:w-48 h-48 sm:h-auto flex-shrink-0 overflow-hidden bg-gray-100">
                         <Image
-                          src={favorite.product.imageUrls[0] || '/image.png'}
+                          src={(favorite.product.imageUrls && favorite.product.imageUrls.length > 0) 
+                            ? favorite.product.imageUrls[0] 
+                            : (favorite.product.imageUrl || '/image.png')}
                           alt={favorite.product.name}
                           fill
                           className="object-cover"
+                          onError={(e) => {
+                            console.error('Erro ao carregar imagem do favorito:', favorite.product.name);
+                          }}
                         />
                       </div>
 

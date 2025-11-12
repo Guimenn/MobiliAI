@@ -140,7 +140,21 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
       }
       
       // Mapear os dados da API para o formato do Product
-      const mappedProducts: Product[] = allProducts.map((product: any) => ({
+      const mappedProducts: Product[] = allProducts.map((product: any) => {
+        const imageUrl = (product.imageUrls && product.imageUrls.length > 0) 
+          ? product.imageUrls[0] 
+          : (product.imageUrl || undefined);
+        
+        // Debug: log das URLs de imagem para os primeiros produtos
+        if (allProducts.indexOf(product) < 3) {
+          console.log(`📸 Produto ${product.name}:`, {
+            imageUrl: product.imageUrl,
+            imageUrls: product.imageUrls,
+            finalImageUrl: imageUrl
+          });
+        }
+        
+        return {
           id: product.id,
           name: product.name,
           description: product.description,
@@ -155,7 +169,8 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
             : product.dimensions,
           weight: product.weight,
           style: product.style,
-          imageUrl: (product.imageUrls && product.imageUrls.length > 0) ? product.imageUrls[0] : (product.imageUrl || undefined),
+          imageUrl: imageUrl,
+          imageUrls: product.imageUrls || (imageUrl ? [imageUrl] : []), // Preservar array de imagens
           storeId: product.store?.id || product.storeId || '',
           rating: product.rating ? Number(product.rating) : 0,
           reviewCount: product.reviewCount ? Number(product.reviewCount) : 0,
@@ -173,7 +188,8 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
           flashSaleDiscountPercent: product.flashSaleDiscountPercent ? Number(product.flashSaleDiscountPercent) : undefined,
           flashSaleStartDate: product.flashSaleStartDate ? new Date(product.flashSaleStartDate).toISOString() : undefined,
           flashSaleEndDate: product.flashSaleEndDate ? new Date(product.flashSaleEndDate).toISOString() : undefined,
-      }));
+        };
+      });
 
       setProducts(mappedProducts);
     } catch (err: any) {

@@ -1128,17 +1128,30 @@ export default function CheckoutPage() {
                           className="w-44 min-w-44 border border-gray-200 rounded-lg p-2 bg-white"
                         >
                           <div className="w-full aspect-square rounded-md overflow-hidden bg-gray-100 mb-2">
-                            {item.product.imageUrl ? (
-                              <img
-                                src={item.product.imageUrl}
-                                alt={item.product.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
-                                <Package className="h-8 w-8 text-white" />
-                    </div>
-                            )}
+                            {(() => {
+                              const imageUrl = item.product.imageUrls && item.product.imageUrls.length > 0 
+                                ? item.product.imageUrls[0] 
+                                : item.product.imageUrl;
+                              return imageUrl ? (
+                                <img
+                                  src={imageUrl}
+                                  alt={item.product.name}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    console.error('Erro ao carregar imagem:', imageUrl);
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
+                                  <Package className="h-8 w-8 text-white" />
+                                </div>
+                              );
+                            })()}
+                            <div className="hidden w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
+                              <Package className="h-8 w-8 text-white" />
+                            </div>
                           </div>
                           <div className="text-xs text-gray-800 line-clamp-2 mb-1">{item.product.name}</div>
                           <div className="text-sm font-bold text-[#3e2626] mb-1">
@@ -1455,13 +1468,30 @@ export default function CheckoutPage() {
                       {checkoutItems.map((item) => (
                         <div key={item.product.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
                           <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                            {item.product.imageUrl ? (
-                              <img src={item.product.imageUrl} alt={item.product.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
-                                <Package className="h-8 w-8 text-white" />
-                              </div>
-                            )}
+                            {(() => {
+                              const imageUrl = item.product.imageUrls && item.product.imageUrls.length > 0 
+                                ? item.product.imageUrls[0] 
+                                : item.product.imageUrl;
+                              return imageUrl ? (
+                                <img 
+                                  src={imageUrl} 
+                                  alt={item.product.name} 
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    console.error('Erro ao carregar imagem:', imageUrl);
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
+                                  <Package className="h-8 w-8 text-white" />
+                                </div>
+                              );
+                            })()}
+                            <div className="hidden w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
+                              <Package className="h-8 w-8 text-white" />
+                            </div>
                           </div>
                           <div className="flex-1">
                             <h4 className="font-semibold text-[#3e2626]">{item.product.name}</h4>
@@ -1963,13 +1993,30 @@ export default function CheckoutPage() {
             {checkoutItems.map((item) => (
               <div key={item.product.id} className="flex items-start gap-4 border-b last:border-b-0 pb-4">
                 <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-100 shrink-0">
-                  {item.product.imageUrl ? (
-                    <img src={item.product.imageUrl} alt={item.product.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
-                      <Package className="h-6 w-6 text-white" />
-                    </div>
-                  )}
+                  {(() => {
+                    const imageUrl = item.product.imageUrls && item.product.imageUrls.length > 0 
+                      ? item.product.imageUrls[0] 
+                      : item.product.imageUrl;
+                    return imageUrl ? (
+                      <img 
+                        src={imageUrl} 
+                        alt={item.product.name} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error('Erro ao carregar imagem:', imageUrl);
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
+                        <Package className="h-6 w-6 text-white" />
+                      </div>
+                    );
+                  })()}
+                  <div className="hidden w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
+                    <Package className="h-6 w-6 text-white" />
+                  </div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
