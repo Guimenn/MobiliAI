@@ -1,8 +1,9 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole, ProductCategory, ProductStyle, MaterialType } from '@prisma/client';
 import { UploadService } from '../upload/upload.service';
 import { TrellisService } from '../trellis/trellis.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -10,7 +11,9 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private uploadService: UploadService,
-    private trellisService: TrellisService
+    private trellisService: TrellisService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   // ==================== DASHBOARD E ESTATÍSTICAS ====================
@@ -256,6 +259,17 @@ export class AdminService {
         }
       });
 
+      // Notificar usuários relevantes sobre novo usuário (assíncrono, não bloqueia a resposta)
+      this.notificationsService.notifyRelevantUsersNewUser(
+        user.id,
+        user.name,
+        userData.role,
+        user.storeId || undefined,
+        user.store?.name
+      ).catch(error => {
+        console.error('Erro ao notificar usuários sobre novo usuário:', error);
+      });
+
     return user;
   }
 
@@ -305,6 +319,26 @@ export class AdminService {
         store: { select: { id: true, name: true } }
       }
     });
+
+    // Detectar mudanças significativas e notificar admins
+    const changes: string[] = [];
+    if (userData.name && userData.name !== user.name) changes.push('nome');
+    if (userData.email && userData.email !== user.email) changes.push('email');
+    if (userData.role && userData.role !== user.role) changes.push('função');
+    if (userData.isActive !== undefined && userData.isActive !== user.isActive) {
+      changes.push(userData.isActive ? 'ativado' : 'desativado');
+    }
+
+    // Notificar admins sobre atualização de usuário (apenas se houver mudanças significativas)
+    if (changes.length > 0) {
+      this.notificationsService.notifyAdminsUserUpdate(
+        updatedUser.id,
+        updatedUser.name,
+        changes
+      ).catch(error => {
+        console.error('Erro ao notificar admins sobre atualização de usuário:', error);
+      });
+    }
 
     return updatedUser;
   }
@@ -562,6 +596,16 @@ export class AdminService {
       });
     }
 
+    // Notificar admins sobre nova loja (assíncrono, não bloqueia a resposta)
+    this.notificationsService.notifyAdminsNewStore(
+      store.id,
+      store.name,
+      store.city,
+      store.state
+    ).catch(error => {
+      console.error('Erro ao notificar admins sobre nova loja:', error);
+    });
+
     return store;
   }
 
@@ -580,10 +624,31 @@ export class AdminService {
       throw new NotFoundException('Loja não encontrada');
     }
 
-    return this.prisma.store.update({
+    const updatedStore = await this.prisma.store.update({
       where: { id },
       data: storeData
     });
+
+    // Detectar mudanças significativas e notificar admins
+    const changes: string[] = [];
+    if (storeData.name && storeData.name !== store.name) changes.push('nome');
+    if (storeData.address && storeData.address !== store.address) changes.push('endereço');
+    if (storeData.isActive !== undefined && storeData.isActive !== store.isActive) {
+      changes.push(storeData.isActive ? 'ativada' : 'desativada');
+    }
+
+    // Notificar admins sobre atualização de loja (apenas se houver mudanças significativas)
+    if (changes.length > 0) {
+      this.notificationsService.notifyAdminsStoreUpdate(
+        updatedStore.id,
+        updatedStore.name,
+        changes
+      ).catch(error => {
+        console.error('Erro ao notificar admins sobre atualização de loja:', error);
+      });
+    }
+
+    return updatedStore;
   }
 
   async deleteStore(id: string) {
@@ -714,6 +779,15 @@ export class AdminService {
         store: { select: { id: true, name: true } },
         supplier: { select: { id: true, name: true } }
       }
+    });
+
+    // Notificar admins sobre novo produto (assíncrono, não bloqueia a resposta)
+    this.notificationsService.notifyAdminsNewProduct(
+      product.id,
+      product.name,
+      product.store?.name
+    ).catch(error => {
+      console.error('Erro ao notificar admins sobre novo produto:', error);
     });
 
     return product;
@@ -958,6 +1032,39 @@ export class AdminService {
       flashSaleStartDate: updatedProduct.flashSaleStartDate,
       flashSaleEndDate: updatedProduct.flashSaleEndDate,
     });
+
+    // Verificar estoque e notificar usuários relevantes se necessário (assíncrono, não bloqueia a resposta)
+    if (data.stock !== undefined || productData.stock !== undefined) {
+      const newStock = updatedProduct.stock;
+      const minStock = updatedProduct.minStock || 0;
+      const storeId = updatedProduct.storeId;
+      const storeName = updatedProduct.store?.name;
+
+      // Se o estoque zerou, notificar usuários relevantes
+      if (newStock === 0 && storeId) {
+        this.notificationsService.notifyRelevantUsersOutOfStock(
+          updatedProduct.id,
+          updatedProduct.name,
+          storeId,
+          storeName
+        ).catch(error => {
+          console.error('Erro ao notificar usuários sobre estoque zerado:', error);
+        });
+      }
+      // Se o estoque está abaixo do mínimo, notificar usuários relevantes
+      else if (newStock > 0 && newStock <= minStock && storeId) {
+        this.notificationsService.notifyRelevantUsersLowStock(
+          updatedProduct.id,
+          updatedProduct.name,
+          newStock,
+          minStock,
+          storeId,
+          storeName
+        ).catch(error => {
+          console.error('Erro ao notificar usuários sobre estoque baixo:', error);
+        });
+      }
+    }
 
     return updatedProduct;
   }

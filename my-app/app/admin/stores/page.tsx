@@ -151,7 +151,7 @@ export default function StoresPage() {
   return (
     <div className="space-y-6">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-12 px-6 rounded-2xl">
+      <div className="bg-[#3e2626] text-white py-12 px-6 rounded-2xl">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
@@ -195,7 +195,7 @@ export default function StoresPage() {
                 <p className="text-3xl font-bold text-[#3e2626]">{stores.length}</p>
                 <p className="text-xs text-[#3e2626]/70">Lojas cadastradas</p>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="w-16 h-16 bg-[#3e2626] rounded-2xl flex items-center justify-center shadow-lg">
                 <Store className="h-8 w-8 text-white" />
               </div>
             </div>
@@ -212,7 +212,7 @@ export default function StoresPage() {
                 </p>
                 <p className="text-xs text-[#3e2626]/70">Em operação</p>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="w-16 h-16 bg-[#3e2626] rounded-2xl flex items-center justify-center shadow-lg">
                 <CheckCircle className="h-8 w-8 text-white" />
               </div>
             </div>
@@ -229,7 +229,7 @@ export default function StoresPage() {
                 </p>
                 <p className="text-xs text-[#3e2626]/70">Total de colaboradores</p>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="w-16 h-16 bg-[#3e2626] rounded-2xl flex items-center justify-center shadow-lg">
                 <Users className="h-8 w-8 text-white" />
               </div>
             </div>
@@ -246,7 +246,7 @@ export default function StoresPage() {
                 </p>
                 <p className="text-xs text-[#3e2626]/70">Em estoque</p>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="w-16 h-16 bg-[#3e2626] rounded-2xl flex items-center justify-center shadow-lg">
                 <Package className="h-8 w-8 text-white" />
               </div>
             </div>
@@ -356,7 +356,7 @@ export default function StoresPage() {
                     <div key={store.id} className="bg-gradient-to-br from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl p-6 hover:shadow-xl hover:border-[#3e2626] transition-all duration-300 group">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center space-x-3">
-                          <div className="w-16 h-16 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
+                          <div className="w-16 h-16 bg-[#3e2626] rounded-2xl flex items-center justify-center shadow-lg">
                             <Store className="h-8 w-8 text-white" />
                           </div>
                           <div>
@@ -429,7 +429,7 @@ export default function StoresPage() {
                     <div key={store.id} className="bg-gradient-to-r from-white to-[#3e2626]/5 border-2 border-[#3e2626]/10 rounded-2xl p-6 hover:shadow-lg hover:border-[#3e2626] transition-all duration-300">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                          <div className="w-14 h-14 bg-gradient-to-br from-[#3e2626] to-[#4a2f2f] rounded-2xl flex items-center justify-center shadow-lg">
+                          <div className="w-14 h-14 bg-[#3e2626] rounded-2xl flex items-center justify-center shadow-lg">
                             <Store className="h-7 w-7 text-white" />
                           </div>
                           <div className="flex-1">

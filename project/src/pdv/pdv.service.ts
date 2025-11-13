@@ -1,13 +1,18 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { OpenCashDto } from './dto/open-cash.dto';
 import { CloseCashDto } from './dto/close-cash.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PdvService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
+  ) {}
 
   // Controle de Caixa Diário
   async openCash(openCashDto: OpenCashDto, userId: string, userStoreId: string) {
@@ -181,18 +186,47 @@ export class PdvService {
             email: true,
           },
         },
+        store: {
+          select: {
+            name: true,
+          },
+        },
       },
     });
 
+    // Armazenar informações dos produtos para verificação posterior
+    const productsToCheck: Array<{ id: string; name: string; stock: number; minStock: number; storeName?: string }> = [];
+
     // Atualizar estoque
     for (const item of createSaleDto.items) {
+      // Buscar produto antes de atualizar
+      const product = await this.prisma.product.findUnique({
+        where: { id: item.productId },
+        include: { store: { select: { name: true } } }
+      });
+
+      if (!product) {
+        continue;
+      }
+
+      // Calcular novo estoque
+      const newStock = product.stock - item.quantity;
+
+      // Atualizar estoque
       await this.prisma.product.update({
         where: { id: item.productId },
         data: {
-          stock: {
-            decrement: item.quantity,
-          },
+          stock: newStock,
         },
+      });
+
+      // Armazenar informações do produto para verificação posterior
+      productsToCheck.push({
+        id: product.id,
+        name: product.name,
+        stock: newStock,
+        minStock: product.minStock || 0,
+        storeName: product.store?.name
       });
     }
 
@@ -204,6 +238,48 @@ export class PdvService {
           increment: totalAmount,
         },
       },
+    });
+
+    // Notificar usuários relevantes sobre nova venda (assíncrono, não bloqueia a resposta)
+    setImmediate(async () => {
+      try {
+        // Notificar ADMINs, MANAGERs e EMPLOYEEs relevantes
+        await this.notificationsService.notifyRelevantUsersNewSale(
+          sale.id,
+          sale.saleNumber,
+          Number(totalAmount),
+          userStoreId,
+          userId,
+          sale.customer?.name,
+          sale.store?.name
+        );
+
+        // Verificar estoque dos produtos vendidos e notificar se necessário
+        for (const productInfo of productsToCheck) {
+          // Se o estoque zerou após a venda
+          if (productInfo.stock === 0) {
+            await this.notificationsService.notifyRelevantUsersOutOfStock(
+              productInfo.id,
+              productInfo.name,
+              userStoreId,
+              productInfo.storeName
+            );
+          }
+          // Se o estoque está abaixo do mínimo
+          else if (productInfo.stock > 0 && productInfo.stock <= productInfo.minStock) {
+            await this.notificationsService.notifyRelevantUsersLowStock(
+              productInfo.id,
+              productInfo.name,
+              productInfo.stock,
+              productInfo.minStock,
+              userStoreId,
+              productInfo.storeName
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao notificar usuários sobre nova venda no PDV:', error);
+      }
     });
 
     return sale;

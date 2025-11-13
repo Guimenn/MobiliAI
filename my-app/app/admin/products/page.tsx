@@ -571,7 +571,7 @@ function ProductsSection({
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100"> 
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
+      <div className="bg-[#3e2626] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
         <div className="w-full">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="space-y-4">
@@ -785,7 +785,7 @@ function ProductsSection({
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                         />
                         {product.imageUrls && product.imageUrls.length > 1 && (
-                          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                          <div className="absolute bottom-2 right-2 text-white text-xs px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(62, 38, 38, 0.7)' }}>
                             +{product.imageUrls.length - 1} mais
                           </div>
                         )}

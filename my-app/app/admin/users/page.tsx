@@ -928,7 +928,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
 
       {/* Modal de Novo Usuário */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(62, 38, 38, 0.5)' }}>
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white">
               <div className="flex items-center justify-between">

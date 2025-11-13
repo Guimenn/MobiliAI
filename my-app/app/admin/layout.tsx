@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAppStore } from '@/lib/store';
@@ -20,6 +21,7 @@ import {
   Bell,
   Truck,
   Check,
+  ArrowRight,
 } from 'lucide-react';
 
 type UserNotification = {
@@ -121,7 +123,11 @@ export default function AdminLayout({
 
   const loadNotifications = useCallback(
     async (silent = false) => {
-      if (!isAuthenticated || !user || user.role?.toUpperCase() !== 'ADMIN') {
+      // Permitir notificações para ADMIN, STORE_MANAGER e EMPLOYEE
+      const allowedRoles = ['ADMIN', 'STORE_MANAGER', 'EMPLOYEE', 'CASHIER'];
+      const userRole = user?.role?.toUpperCase();
+      
+      if (!isAuthenticated || !user || !allowedRoles.includes(userRole || '')) {
         setNotifications([]);
         setUnreadCount(0);
         return;
@@ -174,13 +180,17 @@ export default function AdminLayout({
   }, [loadNotifications]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user || user.role?.toUpperCase() !== 'ADMIN') {
+    // Permitir notificações para ADMIN, STORE_MANAGER e EMPLOYEE
+    const allowedRoles = ['ADMIN', 'STORE_MANAGER', 'EMPLOYEE', 'CASHIER'];
+    const userRole = user?.role?.toUpperCase();
+    
+    if (!isAuthenticated || !user || !allowedRoles.includes(userRole || '')) {
       return;
     }
 
     const interval = setInterval(() => {
       void loadNotifications(true);
-    }, 60000);
+    }, 30000); // Atualizar a cada 30 segundos para ser mais responsivo
 
     return () => clearInterval(interval);
   }, [isAuthenticated, user, loadNotifications]);
@@ -392,31 +402,36 @@ export default function AdminLayout({
       >
         <div className="flex h-full flex-col">
           <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Building2 className="h-5 w-5" />
+            <div className="relative h-[54px] w-full flex items-center justify-center">
+              <Image
+                src="/logotipos/8.svg"
+                alt="MobiliAI Logo"
+                width={300}
+                height={100}
+                className="object-contain"
+              />
             </div>
-            <div>
-              <h1 className="text-sm font-semibold uppercase tracking-wide text-sidebar-foreground">
-                MobiliAI
-              </h1>
-              <p className="text-xs text-muted-foreground">Painel Administrativo</p>
-            </div>
+            
           </div>
 
           <div className="border-b border-sidebar-border px-6 py-5">
-            <div className="flex items-center gap-3 rounded-2xl bg-muted/40 p-3">
+            <button
+              onClick={() => router.push('/admin/profile')}
+              className="flex w-full items-center gap-3 rounded-2xl bg-muted/40 p-3 transition-colors hover:bg-muted/60"
+            >
               <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-primary text-primary-foreground">
+                <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
                   {user?.name?.charAt(0)?.toUpperCase() || 'A'}
                 </AvatarFallback>
               </Avatar>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1 text-left">
                 <p className="truncate text-sm font-semibold text-sidebar-foreground">
                   {user?.name || 'Administrador'}
                 </p>
                 <p className="text-xs text-muted-foreground">{userRoleLabel}</p>
               </div>
-            </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            </button>
           </div>
 
           <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-6">
@@ -437,7 +452,7 @@ export default function AdminLayout({
                         onClick={() => handleNavigate(item.href)}
                         className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
                           isActive
-                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            ? 'bg-[#3e2626] text-primary-foreground shadow-sm'
                             : 'text-sidebar-foreground hover:bg-sidebar-accent/80 hover:text-foreground'
                         }`}
                       >
@@ -596,19 +611,23 @@ export default function AdminLayout({
                 )}
               </div>
 
-              <div className="hidden items-center gap-3 rounded-2xl border border-border bg-muted/30 px-3 py-2 sm:flex">
+              <button
+                onClick={() => router.push('/admin/profile')}
+                className="hidden items-center gap-3 rounded-2xl border border-border bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50 sm:flex"
+              >
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground">
+                  <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
                     {user?.name?.charAt(0)?.toUpperCase() || 'A'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="min-w-0">
+                <div className="min-w-0 text-left">
                   <p className="truncate text-sm font-medium text-foreground">
                     {user?.name || 'Administrador'}
                   </p>
                   <p className="text-xs text-muted-foreground">{userRoleLabel}</p>
                 </div>
-              </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </button>
             </div>
           </div>
         </header>

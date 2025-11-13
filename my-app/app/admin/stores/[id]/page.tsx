@@ -61,6 +61,11 @@ import TerminationModal from '@/components/TerminationModal';
 import StoreHoursConfig from '@/components/StoreHoursConfig';
 import StoreSales from './components/StoreSales';
 import StoreInventory from './components/StoreInventory';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
+import { X, Save } from 'lucide-react';
 
 export default function StoreDetailsPage() {
   const router = useRouter();
@@ -98,6 +103,9 @@ export default function StoreDetailsPage() {
   const [isProcessingMedical, setIsProcessingMedical] = useState(false);
   const [isProcessingTermination, setIsProcessingTermination] = useState(false);
   const [isProcessingTimeClock, setIsProcessingTimeClock] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editFormData, setEditFormData] = useState<any>(null);
 
   // Função para organizar funcionários por hierarquia
   const getHierarchyOrder = (role: string) => {
@@ -135,6 +143,39 @@ export default function StoreDetailsPage() {
       loadEmployees();
     }
   }, [activeTab, storeId]);
+
+  // Prevenir scroll do body e do conteúdo principal quando o modal estiver aberto
+  useEffect(() => {
+    if (isEditModalOpen) {
+      // Salvar o estado atual do overflow
+      const originalBodyOverflow = window.getComputedStyle(document.body).overflow;
+      const originalHtmlOverflow = window.getComputedStyle(document.documentElement).overflow;
+      
+      // Bloquear scroll no body e html
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Bloquear scroll no main content também
+      const mainContent = document.querySelector('main');
+      if (mainContent) {
+        const originalMainOverflow = window.getComputedStyle(mainContent).overflow;
+        (mainContent as HTMLElement).style.overflow = 'hidden';
+        
+        // Limpar quando o componente desmontar ou modal fechar
+        return () => {
+          document.body.style.overflow = originalBodyOverflow;
+          document.documentElement.style.overflow = originalHtmlOverflow;
+          (mainContent as HTMLElement).style.overflow = originalMainOverflow;
+        };
+      } else {
+        // Limpar quando o componente desmontar ou modal fechar
+        return () => {
+          document.body.style.overflow = originalBodyOverflow;
+          document.documentElement.style.overflow = originalHtmlOverflow;
+        };
+      }
+    }
+  }, [isEditModalOpen]);
 
   const loadStoreDetails = async () => {
     try {
@@ -272,7 +313,25 @@ export default function StoreDetailsPage() {
   const handleUpdateEmployee = async (employeeData: any) => {
     try {
       setIsUpdatingEmployee(true);
-      await adminAPI.updateEmployee(selectedEmployee.id, employeeData);
+      
+      // Filtrar apenas os campos permitidos pelo DTO do backend
+      const allowedFields = [
+        'name', 'email', 'phone', 'address', 'city', 'state', 'zipCode', 
+        'role', 'isActive', 'cpf', 'workingHours'
+      ];
+      
+      const filteredData: any = {};
+      allowedFields.forEach(field => {
+        if (employeeData[field] !== undefined && employeeData[field] !== null) {
+          // Remover campos vazios (strings vazias)
+          if (typeof employeeData[field] === 'string' && employeeData[field].trim() === '') {
+            return; // Não incluir campos vazios
+          }
+          filteredData[field] = employeeData[field];
+        }
+      });
+      
+      await adminAPI.updateEmployee(selectedEmployee.id, filteredData);
       setShowEditEmployeeModal(false);
       setSelectedEmployee(null);
       // Recarregar funcionários
@@ -331,6 +390,182 @@ export default function StoreDetailsPage() {
       console.error('Erro ao salvar horário de funcionamento:', error);
     }
   };
+
+  const handleOpenEditModal = () => {
+    if (!store) return;
+    
+    // Preparar dados do formulário com os dados atuais da loja
+    const workingDaysArray = Array.isArray(store.workingDays) 
+      ? store.workingDays 
+      : (typeof store.workingDays === 'string' ? JSON.parse(store.workingDays || '[]') : []);
+    
+    // Converter workingDays para formato de workingHours
+    const workingHours: any = {
+      monday: { open: store.openingTime || '08:00', close: store.closingTime || '18:00', isOpen: workingDaysArray.includes('segunda') },
+      tuesday: { open: store.openingTime || '08:00', close: store.closingTime || '18:00', isOpen: workingDaysArray.includes('terca') },
+      wednesday: { open: store.openingTime || '08:00', close: store.closingTime || '18:00', isOpen: workingDaysArray.includes('quarta') },
+      thursday: { open: store.openingTime || '08:00', close: store.closingTime || '18:00', isOpen: workingDaysArray.includes('quinta') },
+      friday: { open: store.openingTime || '08:00', close: store.closingTime || '18:00', isOpen: workingDaysArray.includes('sexta') },
+      saturday: { open: store.openingTime || '08:00', close: store.closingTime || '17:00', isOpen: workingDaysArray.includes('sabado') },
+      sunday: { open: store.openingTime || '09:00', close: store.closingTime || '15:00', isOpen: workingDaysArray.includes('domingo') }
+    };
+
+    setEditFormData({
+      name: store.name || '',
+      address: store.address || '',
+      city: store.city || '',
+      state: store.state || '',
+      zipCode: store.zipCode || '',
+      phone: store.phone || '',
+      email: store.email || '',
+      description: store.description || '',
+      isActive: store.isActive !== undefined ? store.isActive : true,
+      workingHours: workingHours,
+      settings: store.settings || {
+        allowOnlineOrders: true,
+        requireApprovalForOrders: false,
+        sendNotifications: true,
+        autoAcceptPayments: true,
+        lowStockAlert: true,
+        customerRegistrationRequired: false
+      }
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditFormData(null);
+  };
+
+  const handleEditInputChange = (field: string, value: any) => {
+    let formattedValue = value;
+    switch (field) {
+      case 'name':
+        formattedValue = formatName(value);
+        break;
+      case 'email':
+        formattedValue = formatEmail(value);
+        break;
+      case 'phone':
+        formattedValue = formatPhone(value);
+        break;
+      case 'address':
+        formattedValue = formatAddress(value);
+        break;
+      case 'city':
+        formattedValue = formatCity(value);
+        break;
+      case 'state':
+        formattedValue = formatState(value);
+        break;
+      case 'zipCode':
+        formattedValue = formatCEP(value);
+        break;
+      default:
+        formattedValue = value;
+    }
+    
+    setEditFormData((prev: any) => ({
+      ...prev,
+      [field]: formattedValue
+    }));
+  };
+
+  const handleEditWorkingHoursChange = (day: string, field: string, value: any) => {
+    setEditFormData((prev: any) => ({
+      ...prev,
+      workingHours: {
+        ...prev.workingHours,
+        [day]: {
+          ...prev.workingHours[day],
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const handleEditSettingsChange = (field: string, value: any) => {
+    setEditFormData((prev: any) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSaveStore = async () => {
+    if (!editFormData) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Converter workingHours para formato do backend
+      const workingDays: string[] = [];
+      const daysMap: { [key: string]: string } = {
+        monday: 'segunda',
+        tuesday: 'terca',
+        wednesday: 'quarta',
+        thursday: 'quinta',
+        friday: 'sexta',
+        saturday: 'sabado',
+        sunday: 'domingo'
+      };
+      
+      Object.entries(editFormData.workingHours).forEach(([day, data]: [string, any]) => {
+        if (data.isOpen) {
+          workingDays.push(daysMap[day]);
+        }
+      });
+
+      // Pegar horário de abertura e fechamento (usar o primeiro dia aberto)
+      const firstOpenDay = Object.values(editFormData.workingHours).find((day: any) => day.isOpen);
+      const openingTime = firstOpenDay ? (firstOpenDay as any).open : '08:00';
+      const closingTime = firstOpenDay ? (firstOpenDay as any).close : '18:00';
+
+      const updateData = {
+        name: editFormData.name,
+        address: editFormData.address,
+        city: editFormData.city,
+        state: editFormData.state,
+        zipCode: editFormData.zipCode,
+        phone: editFormData.phone,
+        email: editFormData.email,
+        description: editFormData.description,
+        isActive: editFormData.isActive,
+        workingDays: workingDays,
+        openingTime: openingTime,
+        closingTime: closingTime,
+        lunchStart: store?.lunchStart || '',
+        lunchEnd: store?.lunchEnd || '',
+        settings: editFormData.settings
+      };
+
+      await adminAPI.updateStore(storeId, updateData);
+      
+      // Recarregar dados da loja
+      await loadStoreDetails();
+      
+      // Fechar modal
+      handleCloseEditModal();
+    } catch (error) {
+      console.error('Erro ao salvar loja:', error);
+      alert('Erro ao salvar alterações. Tente novamente.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const daysOfWeek = [
+    { key: 'monday', label: 'Segunda-feira' },
+    { key: 'tuesday', label: 'Terça-feira' },
+    { key: 'wednesday', label: 'Quarta-feira' },
+    { key: 'thursday', label: 'Quinta-feira' },
+    { key: 'friday', label: 'Sexta-feira' },
+    { key: 'saturday', label: 'Sábado' },
+    { key: 'sunday', label: 'Domingo' }
+  ];
 
 
   if (isLoading) {
@@ -405,7 +640,7 @@ export default function StoreDetailsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Hero Header */}
-      <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-12 px-6">
+      <div className="bg-[#3e2626] text-white py-12 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="flex items-center space-x-4">
@@ -453,6 +688,7 @@ export default function StoreDetailsPage() {
               <Button 
                 variant="outline" 
                 size="sm"
+                onClick={handleOpenEditModal}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-xl"
               >
                 <Edit className="h-4 w-4 mr-2" />
@@ -1300,6 +1536,304 @@ export default function StoreDetailsPage() {
         employee={selectedEmployee}
         isLoading={isProcessingTermination}
       />
+
+      {/* Modal de Edição de Loja - Overlay Fullscreen */}
+      {isEditModalOpen && editFormData && (
+        <>
+          {/* Backdrop para garantir que nada fique visível por trás */}
+          <div className="fixed z-40 bg-white lg:left-64 lg:top-20 lg:right-0 lg:bottom-0 top-0 left-0 right-0 bottom-0" />
+          {/* Overlay com conteúdo */}
+          <div className="fixed z-50 bg-white overflow-y-auto lg:left-64 lg:top-20 lg:right-0 lg:bottom-0 top-0 left-0 right-0 bottom-0">
+          {/* Header Fixo */}
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+            <div className="max-w-7xl mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-[#3e2626] rounded-lg flex items-center justify-center">
+                    <Store className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Editar Loja</h2>
+                    <p className="text-sm text-gray-600">Atualize as informações da loja</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleCloseEditModal}
+                    disabled={isSaving}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleSaveStore}
+                    disabled={isSaving}
+                    className="bg-[#3e2626] hover:bg-[#2a1a1a] text-white"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Conteúdo do Formulário */}
+          <div className="max-w-4xl mx-auto px-6 py-8">
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveStore(); }} className="space-y-6">
+              {/* Informações Básicas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Store className="h-5 w-5 mr-2" />
+                    Informações Básicas
+                  </CardTitle>
+                  <CardDescription>
+                    Dados principais da loja
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-name">Nome da Loja *</Label>
+                      <Input
+                        id="edit-name"
+                        value={editFormData.name}
+                        onChange={(e) => handleEditInputChange('name', e.target.value)}
+                        placeholder="Ex: Loja Centro"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-email">Email</Label>
+                      <Input
+                        id="edit-email"
+                        type="email"
+                        value={editFormData.email}
+                        onChange={(e) => handleEditInputChange('email', e.target.value)}
+                        placeholder="contato@loja.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-address">Endereço *</Label>
+                    <Input
+                      id="edit-address"
+                      value={editFormData.address}
+                      onChange={(e) => handleEditInputChange('address', e.target.value)}
+                      placeholder="Rua, número, bairro"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="edit-city">Cidade *</Label>
+                      <Input
+                        id="edit-city"
+                        value={editFormData.city}
+                        onChange={(e) => handleEditInputChange('city', e.target.value)}
+                        placeholder="São Paulo"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-state">Estado *</Label>
+                      <Input
+                        id="edit-state"
+                        value={editFormData.state}
+                        onChange={(e) => handleEditInputChange('state', e.target.value)}
+                        placeholder="SP"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-zipCode">CEP *</Label>
+                      <Input
+                        id="edit-zipCode"
+                        value={editFormData.zipCode}
+                        onChange={(e) => handleEditInputChange('zipCode', e.target.value)}
+                        placeholder="01234-567"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-phone">Telefone</Label>
+                    <Input
+                      id="edit-phone"
+                      value={editFormData.phone}
+                      onChange={(e) => handleEditInputChange('phone', e.target.value)}
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-description">Descrição</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={editFormData.description}
+                      onChange={(e) => handleEditInputChange('description', e.target.value)}
+                      placeholder="Descreva características especiais desta filial..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="edit-isActive"
+                      checked={editFormData.isActive}
+                      onCheckedChange={(checked) => handleEditInputChange('isActive', checked)}
+                    />
+                    <Label htmlFor="edit-isActive">Loja ativa</Label>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Horário de Funcionamento */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Clock className="h-5 w-5 mr-2" />
+                    Horário de Funcionamento
+                  </CardTitle>
+                  <CardDescription>
+                    Configure os horários de funcionamento da loja
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {daysOfWeek.map((day) => (
+                    <div key={day.key} className="flex items-center space-x-4 p-4 border rounded-lg">
+                      <div className="w-32">
+                        <Label>{day.label}</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={editFormData.workingHours[day.key].isOpen}
+                          onCheckedChange={(checked) => handleEditWorkingHoursChange(day.key, 'isOpen', checked)}
+                        />
+                        <Label>Aberto</Label>
+                      </div>
+                      {editFormData.workingHours[day.key].isOpen && (
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            type="time"
+                            value={editFormData.workingHours[day.key].open}
+                            onChange={(e) => handleEditWorkingHoursChange(day.key, 'open', e.target.value)}
+                            className="w-32"
+                          />
+                          <span>até</span>
+                          <Input
+                            type="time"
+                            value={editFormData.workingHours[day.key].close}
+                            onChange={(e) => handleEditWorkingHoursChange(day.key, 'close', e.target.value)}
+                            className="w-32"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Configurações da Loja */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Settings className="h-5 w-5 mr-2" />
+                    Configurações da Loja
+                  </CardTitle>
+                  <CardDescription>
+                    Configurações específicas de funcionamento
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="edit-allowOnlineOrders">Permitir pedidos online</Label>
+                          <p className="text-sm text-gray-500">Clientes podem fazer pedidos pela internet</p>
+                        </div>
+                        <Switch
+                          id="edit-allowOnlineOrders"
+                          checked={editFormData.settings.allowOnlineOrders}
+                          onCheckedChange={(checked) => handleEditSettingsChange('allowOnlineOrders', checked)}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="edit-requireApprovalForOrders">Exigir aprovação para pedidos</Label>
+                          <p className="text-sm text-gray-500">Todos os pedidos precisam ser aprovados</p>
+                        </div>
+                        <Switch
+                          id="edit-requireApprovalForOrders"
+                          checked={editFormData.settings.requireApprovalForOrders}
+                          onCheckedChange={(checked) => handleEditSettingsChange('requireApprovalForOrders', checked)}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="edit-sendNotifications">Enviar notificações</Label>
+                          <p className="text-sm text-gray-500">Notificar sobre novos pedidos e atualizações</p>
+                        </div>
+                        <Switch
+                          id="edit-sendNotifications"
+                          checked={editFormData.settings.sendNotifications}
+                          onCheckedChange={(checked) => handleEditSettingsChange('sendNotifications', checked)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="edit-autoAcceptPayments">Aceitar pagamentos automaticamente</Label>
+                          <p className="text-sm text-gray-500">Aprovar pagamentos sem confirmação manual</p>
+                        </div>
+                        <Switch
+                          id="edit-autoAcceptPayments"
+                          checked={editFormData.settings.autoAcceptPayments}
+                          onCheckedChange={(checked) => handleEditSettingsChange('autoAcceptPayments', checked)}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="edit-lowStockAlert">Alerta de estoque baixo</Label>
+                          <p className="text-sm text-gray-500">Notificar quando produtos estão com estoque baixo</p>
+                        </div>
+                        <Switch
+                          id="edit-lowStockAlert"
+                          checked={editFormData.settings.lowStockAlert}
+                          onCheckedChange={(checked) => handleEditSettingsChange('lowStockAlert', checked)}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="edit-customerRegistrationRequired">Cadastro obrigatório</Label>
+                          <p className="text-sm text-gray-500">Clientes devem se cadastrar para comprar</p>
+                        </div>
+                        <Switch
+                          id="edit-customerRegistrationRequired"
+                          checked={editFormData.settings.customerRegistrationRequired}
+                          onCheckedChange={(checked) => handleEditSettingsChange('customerRegistrationRequired', checked)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </form>
+          </div>
+        </div>
+        </>
+      )}
 
     </div>
   );

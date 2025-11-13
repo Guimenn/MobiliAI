@@ -10,12 +10,21 @@ export class AdminNotificationsService {
   async getSystemNotifications() {
     const notifications = [];
 
-    // Verificar estoque baixo
+    // Verificar estoque baixo - produtos onde stock <= minStock E stock > 0
     const lowStockProducts = await this.prisma.product.findMany({
       where: {
-        stock: {
-          lte: this.prisma.product.fields.minStock
-        }
+        AND: [
+          {
+            stock: {
+              lte: this.prisma.product.fields.minStock
+            }
+          },
+          {
+            stock: {
+              gt: 0
+            }
+          }
+        ]
       },
       include: {
         store: { select: { name: true } }
@@ -27,7 +36,7 @@ export class AdminNotificationsService {
       notifications.push({
         type: 'WARNING',
         title: 'Estoque Baixo',
-        message: `${lowStockProducts.length} produtos com estoque baixo`,
+        message: `${lowStockProducts.length} produto(s) com estoque baixo`,
         data: lowStockProducts,
         createdAt: new Date()
       });

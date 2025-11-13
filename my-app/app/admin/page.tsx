@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { adminAPI } from '@/lib/api';
+import { adminAPI, notificationsAPI } from '@/lib/api';
 import {
   Store,
   Users,
@@ -139,6 +139,9 @@ const getNotificationLabel = (type: string) => {
 export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [summaryData, setSummaryData] = useState<DashboardSummary | null>(null);
+  const [realNotifications, setRealNotifications] = useState<any[]>([]);
+  const [systemNotifications, setSystemNotifications] = useState<any[]>([]);
+  const [systemAlerts, setSystemAlerts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -149,9 +152,22 @@ export default function AdminDashboard() {
       setError(null);
 
       try {
-        const [dashboardResponse, summaryResponse] = await Promise.all([
+        // Buscar dados do dashboard, notificações do sistema e notificações reais do banco de dados
+        const [dashboardResponse, summaryResponse, notificationsResponse, systemNotificationsResponse, systemAlertsResponse] = await Promise.all([
           adminAPI.getDashboard(),
           adminAPI.getDashboardSummary(),
+          notificationsAPI.getAll(1, 50).catch(err => {
+            console.warn('Erro ao buscar notificações reais:', err);
+            return { notifications: [], total: 0 };
+          }),
+          adminAPI.getNotifications().catch(err => {
+            console.warn('Erro ao buscar notificações do sistema:', err);
+            return [];
+          }),
+          adminAPI.getAlerts().catch(err => {
+            console.warn('Erro ao buscar alertas do sistema:', err);
+            return [];
+          }),
         ]);
 
         if (signal.cancelled) {
@@ -160,6 +176,18 @@ export default function AdminDashboard() {
 
         setDashboardData(dashboardResponse);
         setSummaryData(summaryResponse);
+        
+        // Processar notificações reais do banco de dados (do usuário logado)
+        const notifications = notificationsResponse?.notifications || [];
+        setRealNotifications(notifications);
+        
+        // Processar notificações do sistema (estoque baixo, etc.)
+        const sysNotifications = Array.isArray(systemNotificationsResponse) ? systemNotificationsResponse : [];
+        setSystemNotifications(sysNotifications);
+        
+        // Processar alertas do sistema
+        const alerts = Array.isArray(systemAlertsResponse) ? systemAlertsResponse : [];
+        setSystemAlerts(alerts);
       } catch (err) {
         console.error('Erro ao carregar dashboard admin:', err);
         if (!signal.cancelled) {
@@ -177,8 +205,17 @@ export default function AdminDashboard() {
   useEffect(() => {
     const state = { cancelled: false };
     void fetchData(state);
+    
+    // Atualizar notificações a cada 30 segundos
+    const interval = setInterval(() => {
+      if (!state.cancelled) {
+        void fetchData(state);
+      }
+    }, 30000);
+    
     return () => {
       state.cancelled = true;
+      clearInterval(interval);
     };
   }, [fetchData]);
 
@@ -264,36 +301,6 @@ export default function AdminDashboard() {
     ];
   }, [dashboardData, formatNumber, formatCurrency]);
 
-  const heroHighlights = useMemo(() => {
-    const overview = dashboardData?.overview;
-    const summary = summaryData?.summary;
-
-    return [
-      {
-        label: 'Lojas operando',
-        value: overview
-          ? `${formatNumber(overview.activeStores)} / ${formatNumber(overview.totalStores)}`
-          : '--',
-        description: 'Unidades com estoque e caixa ativos',
-        icon: Store,
-      },
-      {
-        label: 'Notificações recentes',
-        value: summary ? formatNumber(summary.totalNotifications ?? 0) : '--',
-        description: summary
-          ? `${formatNumber(summary.criticalAlerts ?? 0)} críticas aguardando ação`
-          : 'Sem dados recentes',
-        icon: AlertTriangle,
-      },
-      {
-        label: 'Receita acumulada',
-        value: overview ? formatCurrency(overview.monthlyRevenue) : '--',
-        description: 'Total de vendas consolidadas no mês',
-        icon: DollarSign,
-      },
-    ];
-  }, [dashboardData, summaryData, formatNumber, formatCurrency]);
-
   const performance = summaryData?.performance;
 
   const operationalMetrics = useMemo(
@@ -360,8 +367,92 @@ export default function AdminDashboard() {
     ];
   }, [dashboardData, summaryData, formatNumber]);
 
-  const notificationsList = summaryData?.notifications ?? [];
-  const alertsList = summaryData?.alerts ?? [];
+  // Combinar notificações reais do banco com notificações do sistema
+  // Priorizar notificações reais do banco de dados (mais recentes e específicas)
+  const notificationsList = useMemo(() => {
+    const realNotificationsFormatted = realNotifications.map(n => ({
+      id: n.id,
+      type: n.type === 'ADMIN_NEW_SALE' || n.type === 'MANAGER_NEW_SALE' || n.type === 'EMPLOYEE_SALE_CREATED' 
+        ? 'INFO' 
+        : n.type?.includes('LOW_STOCK') || n.type?.includes('OUT_OF_STOCK')
+        ? 'WARNING'
+        : n.type?.includes('ERROR') || n.type?.includes('SYSTEM_ERROR')
+        ? 'ERROR'
+        : 'INFO',
+      title: n.title,
+      message: n.message,
+      createdAt: n.createdAt,
+      actionUrl: n.actionUrl,
+      isRead: n.isRead,
+    }));
+
+    // Adicionar notificações do sistema (estoque baixo, etc.) apenas se não houver notificações reais similares
+    const systemNotificationsFormatted = systemNotifications.map(n => ({
+      id: `system-${n.type}-${n.createdAt}`,
+      type: n.type || 'INFO',
+      title: n.title,
+      message: n.message,
+      createdAt: n.createdAt,
+      actionUrl: null,
+      isRead: false,
+    }));
+
+    // Combinar: primeiro notificações reais, depois notificações do sistema
+    const combined = [...realNotificationsFormatted, ...systemNotificationsFormatted];
+    
+    // Remover duplicatas baseadas no título e mensagem
+    const unique = combined.filter((n, index, self) => 
+      index === self.findIndex((t) => t.title === n.title && t.message === n.message)
+    );
+    
+    // Ordenar por data (mais recentes primeiro)
+    return unique.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [realNotifications, systemNotifications]);
+
+  // Usar alertas do sistema
+  const alertsList = useMemo(() => {
+    return systemAlerts.map(alert => ({
+      id: `alert-${alert.type}-${alert.createdAt}`,
+      type: alert.type || 'WARNING',
+      title: alert.title,
+      message: alert.message,
+      createdAt: alert.createdAt,
+    }));
+  }, [systemAlerts]);
+
+  // Hero highlights com notificações
+  const heroHighlights = useMemo(() => {
+    const overview = dashboardData?.overview;
+    const unreadCount = realNotifications.filter(n => !n.isRead).length;
+    const criticalAlerts = alertsList.filter(a => a.type === 'ERROR').length;
+
+    return [
+      {
+        label: 'Lojas operando',
+        value: overview
+          ? `${formatNumber(overview.activeStores)} / ${formatNumber(overview.totalStores)}`
+          : '--',
+        description: 'Unidades com estoque e caixa ativos',
+        icon: Store,
+      },
+      {
+        label: 'Notificações recentes',
+        value: formatNumber(notificationsList.length),
+        description: unreadCount > 0
+          ? `${formatNumber(unreadCount)} não lidas`
+          : criticalAlerts > 0
+          ? `${formatNumber(criticalAlerts)} alertas críticos`
+          : 'Tudo atualizado',
+        icon: AlertTriangle,
+      },
+      {
+        label: 'Receita acumulada',
+        value: overview ? formatCurrency(overview.monthlyRevenue) : '--',
+        description: 'Total de vendas consolidadas no mês',
+        icon: DollarSign,
+      },
+    ];
+  }, [dashboardData, notificationsList, realNotifications, alertsList, formatNumber, formatCurrency]);
 
   const recentSales = dashboardData?.recentSales ?? [];
   const topProducts = dashboardData?.topProducts ?? [];
@@ -401,7 +492,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-3xl border border-border bg-primary px-8 py-10 text-primary-foreground shadow-sm">
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-xl space-y-4">
             <Badge
@@ -436,20 +527,22 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="grid w-full max-w-md grid-cols-1 gap-4 sm:grid-cols-3 lg:max-w-lg">
+          <div className="grid w-full max-w-md grid-cols-1 gap-4 sm:grid-cols-3 lg:max-w-2xl">
             {heroHighlights.map((item) => {
               const Icon = item.icon;
               return (
                 <div
                   key={item.label}
-                  className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4"
+                  className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4 overflow-hidden min-w-0 flex flex-col"
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground flex-shrink-0 mb-4">
                     <Icon className="h-5 w-5" />
                   </div>
-                  <p className="mt-4 text-2xl font-semibold">{item.value}</p>
-                  <p className="text-xs uppercase tracking-wide text-primary-foreground/70">{item.label}</p>
-                  <p className="mt-1 text-xs text-primary-foreground/70">{item.description}</p>
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <p className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold leading-tight" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{item.value}</p>
+                    <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-2 break-words">{item.label}</p>
+                    <p className="mt-1 text-xs text-primary-foreground/70 break-words line-clamp-2">{item.description}</p>
+                  </div>
                 </div>
               );
             })}
@@ -573,32 +666,71 @@ export default function AdminDashboard() {
               </CardDescription>
             </div>
             <Badge variant="outline" className="border-transparent text-xs text-muted-foreground">
-              {formatNumber(summaryData?.summary?.totalNotifications ?? 0)} registros
+              {formatNumber(notificationsList.length + alertsList.length)} registros
             </Badge>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Notificações
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Notificações
+                </p>
+                {realNotifications.filter(n => !n.isRead).length > 0 && (
+                  <Badge variant="default" className="bg-primary text-xs">
+                    {realNotifications.filter(n => !n.isRead).length} não lidas
+                  </Badge>
+                )}
+              </div>
               {notificationsList.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma notificação registrada.</p>
               ) : (
-                notificationsList.map((notification, index) => (
+                notificationsList.slice(0, 10).map((notification) => (
                   <div
-                    key={`${notification.title}-${index}`}
-                    className={`rounded-xl border p-3 text-sm ${getNotificationToneClasses(notification.type)}`}
+                    key={notification.id}
+                    className={`rounded-xl border p-3 text-sm transition hover:shadow-md cursor-pointer ${
+                      getNotificationToneClasses(notification.type)
+                    } ${!notification.isRead ? 'ring-2 ring-primary/20 bg-opacity-95' : ''}`}
+                    onClick={async () => {
+                      // Marcar como lida se tiver ID (não é do sistema)
+                      if (notification.id && !notification.id.startsWith('system-') && !notification.isRead) {
+                        try {
+                          await notificationsAPI.markAsRead(notification.id);
+                          // Atualizar estado local
+                          setRealNotifications(prev => 
+                            prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+                          );
+                        } catch (error) {
+                          console.error('Erro ao marcar notificação como lida:', error);
+                        }
+                      }
+                      // Navegar para a ação se houver URL
+                      if (notification.actionUrl) {
+                        window.location.href = notification.actionUrl;
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold">{notification.title}</span>
-                      <Badge variant="outline" className="border-transparent text-[10px] uppercase">
+                      <div className="flex items-center gap-2 flex-1">
+                        {!notification.isRead && !notification.id?.startsWith('system-') && (
+                          <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0"></span>
+                        )}
+                        <span className="font-semibold">{notification.title}</span>
+                      </div>
+                      <Badge variant="outline" className="border-transparent text-[10px] uppercase ml-2">
                         {getNotificationLabel(notification.type)}
                       </Badge>
                     </div>
                     <p className="mt-2 text-xs text-current/80">{notification.message}</p>
-                    <p className="mt-3 text-[11px] text-current/60">
-                      {dateTimeFormatter.format(new Date(notification.createdAt))}
-                    </p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <p className="text-[11px] text-current/60">
+                        {dateTimeFormatter.format(new Date(notification.createdAt))}
+                      </p>
+                      {notification.actionUrl && (
+                        <span className="text-[11px] text-primary hover:underline">
+                          Ver detalhes →
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -611,9 +743,9 @@ export default function AdminDashboard() {
               {alertsList.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem alertas críticos no momento.</p>
               ) : (
-                alertsList.map((alert, index) => (
+                alertsList.map((alert) => (
                   <div
-                    key={`${alert.title}-${index}`}
+                    key={alert.id}
                     className={`rounded-xl border p-3 text-sm ${getNotificationToneClasses(alert.type)}`}
                   >
                     <div className="flex items-center justify-between">

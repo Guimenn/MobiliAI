@@ -240,7 +240,7 @@ export default function OrdersOnlinePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
         {/* Header fixo */}
-        <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-6 px-6 shadow-lg sticky top-0 z-10">
+        <div className="bg-[#3e2626] text-white py-6 px-6 shadow-lg sticky top-0 z-10">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
             <div className="flex items-center space-x-3">
               <Button
@@ -493,7 +493,7 @@ export default function OrdersOnlinePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
+        <div className="bg-[#3e2626] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-4">
             <div className="flex items-center space-x-3">

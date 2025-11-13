@@ -77,9 +77,18 @@ export class SalesService {
       });
 
       // Criar os itens da venda e atualizar estoque
+      const productsToCheck: Array<{ id: string; name: string; stock: number; minStock: number; storeName?: string }> = [];
+      
       for (const item of createSaleDto.items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        const product = await tx.product.findUnique({ 
+          where: { id: item.productId },
+          include: { store: { select: { name: true } } }
+        });
         
+        if (!product) {
+          throw new NotFoundException(`Produto ${item.productId} não encontrado`);
+        }
+
         await tx.saleItem.create({
           data: {
             ...item,
@@ -89,16 +98,26 @@ export class SalesService {
         });
 
         // Atualizar estoque
+        const newStock = product.stock - item.quantity;
         await tx.product.update({
           where: { id: item.productId },
           data: {
-            stock: product!.stock - item.quantity,
+            stock: newStock,
           },
+        });
+
+        // Armazenar informações do produto para verificação posterior
+        productsToCheck.push({
+          id: product.id,
+          name: product.name,
+          stock: newStock,
+          minStock: product.minStock || 0,
+          storeName: product.store?.name
         });
       }
 
       // Retornar a venda completa
-      return tx.sale.findUnique({
+      const saleWithDetails = await tx.sale.findUnique({
         where: { id: sale.id },
         include: {
           customer: true,
@@ -111,6 +130,53 @@ export class SalesService {
           },
         },
       });
+
+      // Notificar usuários relevantes sobre nova venda (fora da transação, assíncrono)
+      if (saleWithDetails) {
+        // Usar setImmediate para executar fora da transação
+        setImmediate(async () => {
+          try {
+            // Notificar ADMINs, MANAGERs e EMPLOYEEs relevantes
+            await this.notificationsService.notifyRelevantUsersNewSale(
+              saleWithDetails.id,
+              saleWithDetails.saleNumber,
+              Number(saleWithDetails.totalAmount),
+              saleWithDetails.storeId,
+              saleWithDetails.employeeId,
+              saleWithDetails.customer?.name,
+              saleWithDetails.store?.name
+            );
+
+            // Verificar estoque dos produtos vendidos e notificar se necessário
+            for (const productInfo of productsToCheck) {
+              // Se o estoque zerou após a venda
+              if (productInfo.stock === 0) {
+                await this.notificationsService.notifyRelevantUsersOutOfStock(
+                  productInfo.id,
+                  productInfo.name,
+                  saleWithDetails.storeId,
+                  productInfo.storeName
+                );
+              }
+              // Se o estoque está abaixo do mínimo
+              else if (productInfo.stock > 0 && productInfo.stock <= productInfo.minStock) {
+                await this.notificationsService.notifyRelevantUsersLowStock(
+                  productInfo.id,
+                  productInfo.name,
+                  productInfo.stock,
+                  productInfo.minStock,
+                  saleWithDetails.storeId,
+                  productInfo.storeName
+                );
+              }
+            }
+          } catch (error) {
+            console.error('Erro ao notificar usuários sobre nova venda:', error);
+          }
+        });
+      }
+
+      return saleWithDetails;
     });
   }
 
