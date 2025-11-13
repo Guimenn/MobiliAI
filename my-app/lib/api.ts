@@ -98,6 +98,11 @@ export const authAPI = {
     return response.data;
   },
 
+  loginWithGoogle: async (idToken: string) => {
+    const response = await api.post('/auth/google', { idToken });
+    return response.data;
+  },
+
   getProfile: async () => {
     const response = await api.get('/auth/profile');
     return response.data;
@@ -951,15 +956,13 @@ export const customerAPI = {
     return response.data;
   },
 
-  updateCartItem: async (productId: string, quantity: number) => {
-    const response = await api.put('/customer/cart/update', { productId, quantity });
+  updateCartItem: async (cartItemId: string, quantity: number) => {
+    const response = await api.put(`/customer/cart/items/${cartItemId}`, { quantity });
     return response.data;
   },
 
-  removeFromCart: async (productId: string) => {
-    const response = await api.delete('/customer/cart/remove', {
-      data: { productId }
-    });
+  removeFromCart: async (cartItemId: string) => {
+    const response = await api.delete(`/customer/cart/items/${cartItemId}`);
     return response.data;
   },
 

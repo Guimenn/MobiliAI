@@ -20,6 +20,7 @@ import {
   Star
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api';
+import { showConfirm } from '@/lib/alerts';
 import AdminProductModal from './AdminProductModal';
 
 export default function AdminProductsManagement() {
@@ -113,7 +114,7 @@ export default function AdminProductsManagement() {
 
   const handleDeleteProduct = async (product: any) => {
     // Mostrar confirmação com botões Sim/Não
-    const confirmDelete = confirm(`Deseja realmente excluir o produto "${product.name}"?`);
+    const confirmDelete = await showConfirm(`Deseja realmente excluir o produto "${product.name}"?`);
     
     if (confirmDelete) {
       try {

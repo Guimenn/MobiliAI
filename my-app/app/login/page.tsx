@@ -10,6 +10,8 @@ import { Send, Loader2, Eye, EyeOff, Home, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
+import { auth as firebaseAuth, googleProvider } from '@/lib/firebase';
+import { signInWithPopup } from 'firebase/auth';
 
 interface ChatMessage {
   id: string;
@@ -51,6 +53,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
   const [currentField, setCurrentField] = useState<'name' | 'phone' | 'cpf' | 'zipCode' | 'address' | 'city' | 'state' | 'password' | 'confirmAddress'>('name');
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -158,12 +161,97 @@ export default function LoginPage() {
     }, delay);
   };
 
+  const handleGoogleLogin = async () => {
+    if (!firebaseAuth) {
+      console.error('Firebase Auth não está disponível');
+      simulateTyping('❌ Erro: Firebase não está configurado. Verifique as variáveis de ambiente.', 1500);
+      return;
+    }
+
+    setIsGoogleLoading(true);
+    try {
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      const user = result.user;
+      
+      // Adicionar mensagem no chat
+      addMessage('user', `Login com Google: ${user.email}`);
+      simulateTyping('🔐 Autenticando com Google...', 1000);
+
+      // Obter o token do Firebase e enviar para o backend
+      const idToken = await user.getIdToken();
+      
+      try {
+        // Enviar token para o backend validar e fazer login/registro
+        const response = await authAPI.loginWithGoogle(idToken);
+        
+        // Salvar dados do usuário e token
+        setUser(response.user);
+        setToken(response.token);
+        setAuthenticated(true);
+        
+        simulateTyping('✅ Login com Google realizado com sucesso!', 1000);
+        simulateTyping('🚀 Redirecionando...', 1500);
+        setLoginStep('complete');
+
+        // Aguardar um pouco para mostrar a mensagem e depois redirecionar
+        setTimeout(() => {
+          // Redirecionamento baseado no role do usuário ou redirectPath
+          const finalRedirectPath = redirectPath || (
+            response.user.role === 'ADMIN' || response.user.role === 'admin'
+              ? '/admin/dashboard' 
+              : response.user.role === 'STORE_MANAGER' || response.user.role === 'store_manager'
+              ? '/manager' 
+              : response.user.role === 'EMPLOYEE' || response.user.role === 'employee' || response.user.role === 'CASHIER' || response.user.role === 'cashier'
+              ? '/employee'
+              : '/'
+          );
+          
+          router.replace(finalRedirectPath);
+        }, 2500);
+      } catch (error: any) {
+        console.error('Erro ao fazer login com Google no backend:', error);
+        let errorMessage = 'Erro ao autenticar com Google';
+        
+        if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error?.response?.status === 401) {
+          errorMessage = 'Não foi possível autenticar com Google. Tente novamente.';
+        }
+        
+        simulateTyping(`❌ ${errorMessage}`, 2000);
+      }
+    } catch (error: any) {
+      console.error('Erro no login com Google:', error);
+      let errorMessage = 'Erro ao fazer login com Google';
+      
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Login cancelado. Tente novamente.';
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage = 'Popup bloqueado. Permita popups para este site.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Erro de conexão. Verifique sua internet.';
+      }
+      
+      simulateTyping(`❌ ${errorMessage}`, 2000);
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!currentInput.trim()) return;
 
     const userInput = currentInput.trim();
+    
+    // Resetar showPassword e limpar input IMEDIATAMENTE ao enviar
+    // Isso garante que a senha não apareça no input após o envio
+    if (loginStep === 'password' || loginStep === 'resetPassword') {
+      setShowPassword(false);
+    }
+    setCurrentInput('');
+    
     addMessage('user', userInput);
 
     if (loginStep === 'email') {
@@ -420,6 +508,7 @@ export default function LoginPage() {
         simulateTyping('Verificando código...', 1000);
         await authAPI.verifyResetCode(resetData.email, cleanCode);
         simulateTyping('✅ Código válido! Agora crie uma nova senha:', 1500);
+        setShowPassword(false);
         setLoginStep('resetPassword');
       } catch (error: any) {
         let errorMessage = 'Erro ao verificar código';
@@ -477,12 +566,11 @@ export default function LoginPage() {
           setCurrentResetCode('');
         } else {
           simulateTyping('Digite sua nova senha:', 1000);
+          setShowPassword(false);
           setLoginStep('resetPassword');
         }
       }
     } else if (loginStep === 'password') {
-      // Resetar estado de mostrar senha
-      setShowPassword(false);
       setCredentials(prev => ({ ...prev, password: userInput }));
       setLoginStep('processing');
       
@@ -561,6 +649,7 @@ export default function LoginPage() {
           setTimeout(() => {
             simulateTyping('🔐 Por favor, digite seu email novamente para tentar fazer login:', 1500);
             setLoginStep('email');
+            setShowPassword(false);
             setCredentials({ 
               email: '', 
               password: '', 
@@ -576,8 +665,6 @@ export default function LoginPage() {
         }
       }
     }
-
-    setCurrentInput('');
   };
 
   // Redirecionamento imediato se usuário estiver logado
@@ -733,7 +820,7 @@ export default function LoginPage() {
                 {loginStep === 'password' || loginStep === 'resetPassword' ? (
                   <div className="relative">
                     <Input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       value={currentInput}
                       onChange={(e) => setCurrentInput(e.target.value)}
                       placeholder={loginStep === 'password' ? 'Digite sua senha' : 'Digite sua nova senha'}
@@ -742,19 +829,14 @@ export default function LoginPage() {
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      onClick={() => {
-                        const input = document.querySelector('input[type="password"]') as HTMLInputElement;
-                        if (input) {
-                          if (input.type === 'password') {
-                            input.type = 'text';
-                          } else {
-                            input.type = 'password';
-                          }
-                        }
-                      }}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center hover:opacity-70 transition-opacity"
+                      onClick={() => setShowPassword(!showPassword)}
                     >
-                      <Eye className="h-4 w-4 text-gray-400" />
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
                     </button>
                   </div>
                 ) : (
@@ -835,6 +917,50 @@ export default function LoginPage() {
               </Button>
             </form>
 
+            {/* Botão de Login com Google - Mostrar apenas no step inicial */}
+            {loginStep === 'email' && messages.length === 1 && !isTyping && (
+              <div className="mt-6">
+                <div className="flex items-center w-full mb-4">
+                  <div className="flex-1 border-t border-gray-300"></div>
+                  <span className="px-4 text-sm text-gray-500">ou</span>
+                  <div className="flex-1 border-t border-gray-300"></div>
+                </div>
+                <Button
+                  onClick={handleGoogleLogin}
+                  disabled={isGoogleLoading || isLoading}
+                  className="w-full h-10 bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-300 hover:border-[#3e2626] rounded-2xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center space-x-3"
+                >
+                  {isGoogleLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Conectando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-5 w-5" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        />
+                      </svg>
+                      <span>Continuar com Google</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
 
             {/* Links */}
             <div className="mt-8 flex justify-center space-x-8 text-base">

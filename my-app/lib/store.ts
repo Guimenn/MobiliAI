@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// Rastrear operações de addToCart em progresso para evitar duplicação
+const addToCartInProgress = new Set<string>();
+
 export type CouponStatus = "active" | "used" | "expired";
 
 export interface Coupon {
@@ -79,6 +82,7 @@ export interface Product {
 export interface CartItem {
   product: Product;
   quantity: number;
+  id?: string; // ID do cartItem no backend (opcional para compatibilidade)
 }
 
 export interface FurnitureAnalysis {
@@ -225,6 +229,109 @@ export const useAppStore = create<AppState>()(
       setUser: (user) => {
         console.log('Store setUser called with:', user);
         set({ user, isAuthenticated: !!user });
+        
+        // Se o usuário fez login, carregar o carrinho do backend (em background)
+        if (user && typeof window !== 'undefined') {
+          // Limpar carrinho local PRIMEIRO para evitar conflitos
+          set({ cart: [], cartTotal: 0 });
+          
+          // Marcar que o setUser vai carregar o carrinho (para evitar que ClientProviders também carregue)
+          const cartLoadedKey = `cart_loaded_${user.id}`;
+          sessionStorage.setItem(cartLoadedKey, 'true');
+          
+          // Forçar limpeza do localStorage também
+          try {
+            const storage = localStorage.getItem('mobili-ai-storage');
+            if (storage) {
+              const parsed = JSON.parse(storage);
+              if (parsed.state?.cart) {
+                parsed.state.cart = [];
+                parsed.state.cartTotal = 0;
+                localStorage.setItem('mobili-ai-storage', JSON.stringify(parsed));
+                console.log('🧹 Carrinho limpo do localStorage');
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Erro ao limpar localStorage:', e);
+          }
+          
+          // Executar em background sem bloquear
+          (async () => {
+            try {
+              // Aguardar um pouco mais para garantir que o token está disponível
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              // Verificar se o token está disponível antes de buscar o carrinho
+              const currentState = get();
+              if (!currentState.token) {
+                console.warn('⚠️ Token não disponível ainda, aguardando...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+              
+              const { customerAPI } = await import('./api');
+              const cartData = await customerAPI.getCart();
+              
+              console.log('📦 Dados do carrinho recebidos do backend:', cartData);
+              
+              // Sempre atualizar o carrinho, mesmo se estiver vazio (para limpar carrinho local se necessário)
+              if (cartData?.items && cartData.items.length > 0) {
+                // Converter os itens do backend para o formato do store
+                const cartItems: CartItem[] = cartData.items.map((item: any) => ({
+                  id: item.id, // ID do cartItem no backend
+                  product: {
+                    id: item.product.id,
+                    name: item.product.name,
+                    description: item.product.description,
+                    category: item.product.category?.toLowerCase() || 'sofa',
+                    price: Number(item.product.price),
+                    stock: item.product.stock || 0,
+                    imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl,
+                    imageUrls: item.product.imageUrls || [],
+                    colorName: item.product.colorName,
+                    colorHex: item.product.colorHex,
+                    brand: item.product.brand,
+                    storeId: item.product.storeId || item.product.store?.id || '',
+                    storeName: item.product.store?.name,
+                    storeAddress: item.product.store?.address,
+                  },
+                  quantity: item.quantity,
+                }));
+                
+                const cartTotal = cartItems.reduce(
+                  (total, item) => total + (Number(item.product.price) * item.quantity),
+                  0
+                );
+                
+                set({ cart: cartItems, cartTotal });
+                console.log('✅ Carrinho carregado do backend:', cartItems.length, 'itens');
+              } else {
+                // Se o carrinho está vazio no backend, garantir que está limpo
+                set({ cart: [], cartTotal: 0 });
+                console.log('✅ Carrinho vazio no backend, carrinho local limpo');
+              }
+            } catch (error: any) {
+              console.error('❌ Erro ao carregar carrinho do backend:', {
+                error: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+              });
+              // Continuar mesmo se houver erro, mas manter carrinho vazio
+              set({ cart: [], cartTotal: 0 });
+            }
+          })();
+        } else if (!user) {
+          // Se não há usuário, limpar o carrinho também (logout)
+          set({ cart: [], cartTotal: 0 });
+          
+          // Limpar flags de carregamento
+          if (typeof window !== 'undefined') {
+            Object.keys(sessionStorage).forEach(key => {
+              if (key.startsWith('cart_loaded_')) {
+                sessionStorage.removeItem(key);
+              }
+            });
+          }
+        }
       },
       setToken: (token) => {
         console.log('Store setToken called with:', token ? 'Token received' : 'No token');
@@ -254,57 +361,239 @@ export const useAppStore = create<AppState>()(
       },
 
       // Cart actions
-      addToCart: (product, quantity = 1) => {
-        const { cart } = get();
+      addToCart: async (product, quantity = 1) => {
+        const { cart, user, isAuthenticated } = get();
+
+        // Se NÃO estiver autenticado, mantém comportamento apenas local
+        if (!isAuthenticated || !user) {
+          const existingItem = cart.find(item => item.product.id === product.id);
+          
+          let updatedCart: CartItem[];
+          if (existingItem) {
+            updatedCart = cart.map(item =>
+              item.product.id === product.id
+                ? { ...item, quantity: item.quantity + quantity }
+                : item
+            );
+          } else {
+            updatedCart = [...cart, { product, quantity }];
+          }
+          
+          const cartTotal = updatedCart.reduce(
+            (total, item) => total + (Number(item.product.price) * item.quantity),
+            0
+          );
+          set({ cart: updatedCart, cartTotal });
+          return;
+        }
+
+        // Usuário autenticado: atualização otimista (imediata) + sincronização em background
+        // Proteção contra chamadas duplicadas
+        if (addToCartInProgress.has(product.id)) {
+          console.warn('⚠️ addToCart já em progresso para este produto, ignorando...');
+          return;
+        }
+
+        // ATUALIZAÇÃO OTIMISTA: atualizar localmente imediatamente para feedback instantâneo
         const existingItem = cart.find(item => item.product.id === product.id);
-        
+        let optimisticCart: CartItem[];
         if (existingItem) {
-          const updatedCart = cart.map(item =>
+          optimisticCart = cart.map(item =>
             item.product.id === product.id
               ? { ...item, quantity: item.quantity + quantity }
               : item
           );
-          set({ 
-            cart: updatedCart,
-            cartTotal: updatedCart.reduce((total, item) => total + (Number(item.product.price) * item.quantity), 0)
-          });
         } else {
-          const updatedCart = [...cart, { product, quantity }];
-          set({ 
-            cart: updatedCart,
-            cartTotal: updatedCart.reduce((total, item) => total + (Number(item.product.price) * item.quantity), 0)
-          });
+          optimisticCart = [...cart, { product, quantity }];
+        }
+        const optimisticTotal = optimisticCart.reduce(
+          (total, item) => total + (Number(item.product.price) * item.quantity),
+          0
+        );
+        set({ cart: optimisticCart, cartTotal: optimisticTotal });
+
+        // Sincronizar com backend em background (sem bloquear a UI)
+        addToCartInProgress.add(product.id);
+        (async () => {
+          try {
+            const { customerAPI } = await import('./api');
+
+            // Chama backend para adicionar
+            await customerAPI.addToCart(product.id, quantity);
+            console.log('✅ Item adicionado ao backend');
+
+            // Pequeno delay para garantir que o backend processou
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Busca carrinho completo do backend para sincronizar
+            const cartData = await customerAPI.getCart();
+            const backendItems = cartData?.items || [];
+
+            const cartItems: CartItem[] = backendItems.map((item: any) => ({
+              id: item.id,
+              product: {
+                id: item.product.id,
+                name: item.product.name,
+                description: item.product.description,
+                category: item.product.category?.toLowerCase() || 'sofa',
+                price: Number(item.product.price),
+                stock: item.product.stock || 0,
+                imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl,
+                imageUrls: item.product.imageUrls || [],
+                colorName: item.product.colorName,
+                colorHex: item.product.colorHex,
+                brand: item.product.brand,
+                storeId: item.product.storeId || item.product.store?.id || '',
+                storeName: item.product.store?.name,
+                storeAddress: item.product.store?.address,
+              },
+              quantity: item.quantity,
+            }));
+
+            const cartTotal = cartItems.reduce(
+              (total, item) => total + (Number(item.product.price) * item.quantity),
+              0
+            );
+
+            // Atualizar com dados do backend (pode ter diferenças de quantidade, etc)
+            set({ cart: cartItems, cartTotal });
+            console.log('✅ Carrinho sincronizado com backend:', cartItems.length, 'itens');
+          } catch (error) {
+            console.error('❌ Erro ao sincronizar com backend:', error);
+            // Em caso de erro, manter a atualização otimista (já foi feita)
+            // O usuário vê o item imediatamente, mesmo se o backend falhar
+          } finally {
+            // Sempre remover da lista de operações em progresso
+            addToCartInProgress.delete(product.id);
+          }
+        })();
+      },
+
+      removeFromCart: async (productId) => {
+        const { cart, user, isAuthenticated } = get();
+
+        // Se não estiver autenticado, apenas atualizar local
+        if (!isAuthenticated || !user) {
+          const updatedCart = cart.filter(item => item.product.id !== productId);
+          const cartTotal = updatedCart.reduce(
+            (total, item) => total + (item.product.price * item.quantity),
+            0
+          );
+          set({ cart: updatedCart, cartTotal });
+          return;
+        }
+
+        try {
+          const { customerAPI } = await import('./api');
+
+          // Buscar carrinho atual no backend para descobrir o ID do item
+          const cartData = await customerAPI.getCart();
+          const backendItems = cartData?.items || [];
+          const backendItem = backendItems.find(
+            (item: any) => item.product.id === productId
+          );
+
+          if (backendItem?.id) {
+            await customerAPI.removeFromCart(backendItem.id);
+          } else {
+            console.warn('⚠️ Item não encontrado no backend para remoção, removendo apenas localmente');
+          }
+
+          // Recarregar carrinho completo do backend
+          const updatedCartData = await customerAPI.getCart();
+          const updatedBackendItems = updatedCartData?.items || [];
+
+          const cartItems: CartItem[] = updatedBackendItems.map((item: any) => ({
+            id: item.id,
+            product: {
+              id: item.product.id,
+              name: item.product.name,
+              description: item.product.description,
+              category: item.product.category?.toLowerCase() || 'sofa',
+              price: Number(item.product.price),
+              stock: item.product.stock || 0,
+              imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl,
+              imageUrls: item.product.imageUrls || [],
+              colorName: item.product.colorName,
+              colorHex: item.product.colorHex,
+              brand: item.product.brand,
+              storeId: item.product.storeId || '',
+            },
+            quantity: item.quantity,
+          }));
+
+          const cartTotal = cartItems.reduce(
+            (total, item) => total + (Number(item.product.price) * item.quantity),
+            0
+          );
+
+          set({ cart: cartItems, cartTotal });
+          console.log('✅ Carrinho recarregado do backend após removeFromCart:', cartItems.length, 'itens');
+        } catch (error) {
+          console.error('❌ Erro ao remover item do carrinho no backend:', error);
+
+          // Fallback: remover apenas localmente para não quebrar a UX
+          const updatedCart = cart.filter(item => item.product.id !== productId);
+          const cartTotal = updatedCart.reduce(
+            (total, item) => total + (item.product.price * item.quantity),
+            0
+          );
+          set({ cart: updatedCart, cartTotal });
         }
       },
 
-      removeFromCart: (productId) => {
-        const { cart } = get();
-        const updatedCart = cart.filter(item => item.product.id !== productId);
-        set({ 
-          cart: updatedCart,
-          cartTotal: updatedCart.reduce((total, item) => total + (item.product.price * item.quantity), 0)
-        });
-      },
-
-      updateCartItemQuantity: (productId, quantity) => {
-        const { cart } = get();
+      updateCartItemQuantity: async (productId, quantity) => {
+        const { cart, user, isAuthenticated } = get();
         if (quantity <= 0) {
-          get().removeFromCart(productId);
+          await get().removeFromCart(productId);
           return;
         }
         
+        const itemToUpdate = cart.find(item => item.product.id === productId);
         const updatedCart = cart.map(item =>
           item.product.id === productId
             ? { ...item, quantity }
             : item
         );
-        set({ 
-          cart: updatedCart,
-          cartTotal: updatedCart.reduce((total, item) => total + (item.product.price * item.quantity), 0)
-        });
+        const cartTotal = updatedCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+        set({ cart: updatedCart, cartTotal });
+        
+        // Sincronizar com o backend se o usuário estiver autenticado
+        if (isAuthenticated && user && itemToUpdate?.id) {
+          try {
+            const { customerAPI } = await import('./api');
+            await customerAPI.updateCartItem(itemToUpdate.id, quantity);
+          } catch (error) {
+            console.warn('⚠️ Erro ao sincronizar atualização do carrinho com o backend:', error);
+            // Continuar mesmo se houver erro
+          }
+        }
       },
 
-      clearCart: () => set({ cart: [], cartTotal: 0 }),
+      clearCart: async () => {
+        const { user, isAuthenticated } = get();
+        
+        // Limpar localmente primeiro
+        set({ cart: [], cartTotal: 0 });
+        
+        // Limpar flag de carregamento para evitar recarregar após limpar
+        if (typeof window !== 'undefined' && user) {
+          const cartLoadedKey = `cart_loaded_${user.id}`;
+          sessionStorage.removeItem(cartLoadedKey);
+        }
+        
+        // Se estiver autenticado, limpar também no backend
+        if (isAuthenticated && user) {
+          try {
+            const { customerAPI } = await import('./api');
+            await customerAPI.clearCart();
+            console.log('✅ Carrinho limpo no backend');
+          } catch (error) {
+            console.error('❌ Erro ao limpar carrinho no backend:', error);
+            // Continuar mesmo se houver erro
+          }
+        }
+      },
 
       // Product actions
       setProducts: (products) => set({ products }),
@@ -350,12 +639,13 @@ export const useAppStore = create<AppState>()(
           }
         }
         
-        // Resetar estado do store
+        // Resetar estado do store (mas manter o carrinho no backend)
+        // O carrinho será recuperado quando o usuário fizer login novamente
         set({
           user: null,
           token: null,
           isAuthenticated: false,
-          cart: [],
+          cart: [], // Limpar apenas do estado local, o backend mantém
           cartTotal: 0,
           products: [],
           selectedProduct: null,
@@ -365,7 +655,7 @@ export const useAppStore = create<AppState>()(
           error: null,
         });
         
-        console.log('✅ Logout concluído - estado resetado');
+        console.log('✅ Logout concluído - estado resetado (carrinho mantido no backend)');
       },
     }),
     {
@@ -374,8 +664,9 @@ export const useAppStore = create<AppState>()(
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
-        cart: state.cart,
-        cartTotal: state.cartTotal,
+        // Não persistir carrinho quando usuário está autenticado (vem sempre do backend)
+        cart: state.isAuthenticated ? [] : state.cart,
+        cartTotal: state.isAuthenticated ? 0 : state.cartTotal,
         furnitureAnalyses: state.furnitureAnalyses,
       }),
     }

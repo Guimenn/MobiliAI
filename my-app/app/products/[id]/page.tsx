@@ -47,6 +47,7 @@ import Image from 'next/image';
 import { env } from '@/lib/env';
 import { customerAPI } from '@/lib/api';
 import { toast } from 'sonner';
+import { showAlert } from '@/lib/alerts';
 import ProductReviews from '@/components/ProductReviews';
 import ReviewForm from '@/components/ReviewForm';
 
@@ -218,19 +219,12 @@ export default function ProductDetailPage() {
   const handleAddToCart = async () => {
     if (product) {
       try {
-        // Adicionar ao store local (sempre funciona)
-        addToCart(product, quantity);
+        // addToCart do store já gerencia backend automaticamente quando autenticado
+        await addToCart(product, quantity);
         
-        // Se estiver autenticado, também adicionar ao backend
+        // Disparar evento para atualizar notificações imediatamente
         if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
-          try {
-            await customerAPI.addToCart(product.id, quantity);
-            // Disparar evento para atualizar notificações imediatamente
-            window.dispatchEvent(new CustomEvent('notification:cart-added'));
-          } catch (apiError) {
-            console.error('Erro ao adicionar ao carrinho no backend:', apiError);
-            // Mesmo com erro na API, o item já está no store local
-          }
+          window.dispatchEvent(new CustomEvent('notification:cart-added'));
         }
         
         // Mostrar mensagem de sucesso
@@ -295,7 +289,7 @@ export default function ProductDetailPage() {
     } else {
       // Fallback: copiar para clipboard
       navigator.clipboard.writeText(window.location.href);
-      alert('Link copiado para a área de transferência!');
+      showAlert('success', 'Link copiado para a área de transferência!');
     }
   };
 

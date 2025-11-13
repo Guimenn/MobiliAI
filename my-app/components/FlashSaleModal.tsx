@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { X, Zap, Search, Clock, Percent, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminAPI } from '@/lib/api';
+import { showConfirm } from '@/lib/alerts';
 
 interface FlashSaleModalProps {
   isOpen: boolean;
@@ -323,7 +324,8 @@ export default function FlashSaleModal({
   const handleRemoveFlashSale = async () => {
     if (!selectedProduct || !selectedProduct.isFlashSale) return;
 
-    if (!confirm(`Tem certeza que deseja remover a oferta relâmpago de "${selectedProduct.name}"?`)) {
+    const confirmed = await showConfirm(`Tem certeza que deseja remover a oferta relâmpago de "${selectedProduct.name}"?`);
+    if (!confirmed) {
       return;
     }
 

@@ -128,8 +128,8 @@ export default function FavoritesPage() {
       
       const mappedCategory = categoryMap[product.category] || 'mesa_centro';
       
-      // Adicionar ao store local
-      addToCartStore({
+      // addToCartStore já gerencia backend automaticamente quando autenticado
+      await addToCartStore({
         id: product.id,
         name: product.name,
         description: product.description,
@@ -141,14 +141,9 @@ export default function FavoritesPage() {
         storeId: product.store.id || '',
       }, 1);
 
-      // Adicionar ao backend se autenticado
+      // Disparar evento para atualizar notificações
       if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
-        try {
-          await customerAPI.addToCart(product.id, 1);
-          window.dispatchEvent(new CustomEvent('notification:cart-added'));
-        } catch (apiError) {
-          console.error('Erro ao adicionar ao carrinho no backend:', apiError);
-        }
+        window.dispatchEvent(new CustomEvent('notification:cart-added'));
       }
 
       toast.success('Produto adicionado ao carrinho!');

@@ -13,6 +13,7 @@ import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import { BackendStatus } from '@/components/BackendStatus';
 import FavoriteTooltip from '@/components/FavoriteTooltip';
+import { showAlert } from '@/lib/alerts';
 import { 
   Search,
   ShoppingCart,
@@ -132,21 +133,13 @@ export default function HomePage() {
     const product = allProducts.find(p => p.id === productId);
     if (product) {
       try {
-        // Adicionar ao store local (sempre funciona)
-        useAppStore.getState().addToCart(product, 1);
+        // addToCart do store já gerencia backend automaticamente quando autenticado
+        await useAppStore.getState().addToCart(product, 1);
         setCartItems(prev => [...prev, productId]);
         
-        // Se estiver autenticado, também adicionar ao backend
+        // Disparar evento para atualizar notificações
         if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
-          try {
-            const { customerAPI } = await import('@/lib/api');
-            await customerAPI.addToCart(product.id, 1);
-            // Disparar evento para atualizar notificações imediatamente
-            window.dispatchEvent(new CustomEvent('notification:cart-added'));
-          } catch (apiError) {
-            console.error('Erro ao adicionar ao carrinho no backend:', apiError);
-            // Mesmo com erro na API, o item já está no store local
-          }
+          window.dispatchEvent(new CustomEvent('notification:cart-added'));
         }
         
         // Mostrar mensagem de sucesso
@@ -180,10 +173,10 @@ export default function HomePage() {
   // Função para abrir carrinho
   const handleCartClick = () => {
     if (cartItems.length > 0) {
-      alert(`Você tem ${cartItems.length} item(s) no carrinho`);
+      showAlert('info', `Você tem ${cartItems.length} item(s) no carrinho`);
       // Aqui você pode implementar lógica para mostrar modal do carrinho ou redirecionar
     } else {
-      alert('Seu carrinho está vazio. Adicione alguns produtos!');
+      showAlert('warning', 'Seu carrinho está vazio. Adicione alguns produtos!');
     }
   };
 
