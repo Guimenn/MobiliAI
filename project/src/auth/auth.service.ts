@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto, VerifyResetCodeDto } from '../dto/auth.dto';
 import { EmailService } from '../email/email.service';
 import { User, UserRole } from '@prisma/client';
+import { getFirebaseAdmin, initializeFirebaseAdmin } from '../config/firebase.config';
 
 type UserWithoutPassword = Omit<User, 'password'>;
 
@@ -14,7 +15,10 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
-  ) {}
+  ) {
+    // Inicializar Firebase Admin quando o serviço for criado
+    initializeFirebaseAdmin();
+  }
 
   async register(registerDto: RegisterDto): Promise<{ user: UserWithoutPassword; token: string }> {
     const { email, password, ...userData } = registerDto;
@@ -354,6 +358,111 @@ export class AuthService {
     ]);
 
     return { message: 'Senha redefinida com sucesso' };
+  }
+
+  async loginWithGoogle(idToken: string): Promise<{ user: UserWithoutPassword; token: string }> {
+    try {
+      // Validar o token do Firebase
+      const firebaseAdmin = getFirebaseAdmin();
+      if (!firebaseAdmin) {
+        throw new UnauthorizedException('Firebase Admin não está configurado');
+      }
+
+      const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
+      const { email, name, uid, picture, phone_number } = decodedToken;
+
+      if (!email) {
+        throw new UnauthorizedException('Email não encontrado no token do Google');
+      }
+
+      // Normalizar email
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Verificar se o usuário já existe
+      let user = await this.prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        include: {
+          store: true,
+        },
+      });
+
+      if (user) {
+        // Usuário existe, fazer login
+        if (!user.isActive) {
+          throw new UnauthorizedException('Usuário inativo');
+        }
+
+        // Atualizar informações do Google se necessário (avatar, nome, etc)
+        const updateData: any = {};
+        if (name && !user.name) {
+          updateData.name = name;
+        }
+        if (picture && !user.avatarUrl) {
+          updateData.avatarUrl = picture;
+        }
+        if (phone_number && !user.phone) {
+          updateData.phone = phone_number;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          user = await this.prisma.user.update({
+            where: { id: user.id },
+            data: updateData,
+            include: {
+              store: true,
+            },
+          });
+        }
+      } else {
+        // Usuário não existe, criar conta
+        const userName = name || email.split('@')[0] || 'Usuário';
+        
+        // Gerar uma senha aleatória que nunca será usada (usuários do Google não precisam de senha)
+        // Mas o campo é obrigatório no schema, então geramos uma senha aleatória segura
+        const randomPassword = await bcrypt.hash(
+          `google_${uid}_${Date.now()}_${Math.random().toString(36)}`,
+          12
+        );
+        
+        user = await this.prisma.user.create({
+          data: {
+            email: normalizedEmail,
+            password: randomPassword, // Senha aleatória que nunca será usada
+            name: userName,
+            phone: phone_number || undefined,
+            avatarUrl: picture || undefined,
+            role: UserRole.CUSTOMER,
+            isActive: true,
+          },
+          include: {
+            store: true,
+          },
+        });
+      }
+
+      // Gerar token JWT
+      const token = this.generateToken(user);
+
+      // Remover senha do retorno
+      const { password: _, ...userWithoutPassword } = user;
+
+      return {
+        user: userWithoutPassword,
+        token,
+      };
+    } catch (error: any) {
+      console.error('Erro no login com Google:', error);
+      
+      if (error.code === 'auth/id-token-expired') {
+        throw new UnauthorizedException('Token do Google expirado. Faça login novamente.');
+      } else if (error.code === 'auth/argument-error') {
+        throw new UnauthorizedException('Token do Google inválido.');
+      } else if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      
+      throw new UnauthorizedException('Erro ao autenticar com Google. Tente novamente.');
+    }
   }
 
   private generateToken(user: User): string {

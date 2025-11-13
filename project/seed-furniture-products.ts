@@ -58,43 +58,95 @@ function getImageFiles(): string[] {
     return [];
   }
 
-  // Listar todas as pastas dentro de public para encontrar "MobiliAI"
+  // Procurar pela pasta "FotoMovel" diretamente
   let imagesFolder: string | null = null;
   
-  try {
-    const dirs = fs.readdirSync(publicFolder, { withFileTypes: true });
-    
-    for (const dir of dirs) {
-      if (dir.isDirectory() && (dir.name.includes('Mobili') || dir.name.includes('Móveis') || dir.name.includes('MobiliAI'))) {
-        imagesFolder = path.join(publicFolder, dir.name);
-        console.log(`📁 Pasta de imagens encontrada: ${imagesFolder}`);
-        break;
+  console.log(`🔍 Procurando pasta FotoMovel em: ${publicFolder}`);
+  
+  // Primeiro, tentar encontrar "FotoMovel" diretamente (prioridade máxima)
+  const fotoMovelPath = path.join(publicFolder, 'FotoMovel');
+  console.log(`   Tentando caminho direto: ${fotoMovelPath}`);
+  
+  if (fs.existsSync(fotoMovelPath) && fs.statSync(fotoMovelPath).isDirectory()) {
+    imagesFolder = fotoMovelPath;
+    console.log(`✅ Pasta FotoMovel encontrada diretamente: ${imagesFolder}`);
+  } else {
+    console.log(`   Caminho direto não encontrado, procurando variações...`);
+    // Se não encontrar, procurar por variações (case-insensitive)
+    try {
+      const dirs = fs.readdirSync(publicFolder, { withFileTypes: true });
+      console.log(`   Pastas encontradas em public:`, dirs.filter(d => d.isDirectory()).map(d => d.name));
+      
+      // Priorizar FotoMovel (case-insensitive)
+      for (const dir of dirs) {
+        if (dir.isDirectory()) {
+          const dirNameLower = dir.name.toLowerCase();
+          if (dirNameLower === 'fotomovel' || dirNameLower.includes('fotomovel')) {
+            imagesFolder = path.join(publicFolder, dir.name);
+            console.log(`✅ Pasta FotoMovel encontrada (variação): ${imagesFolder}`);
+            break;
+          }
+        }
       }
+      
+      // Se ainda não encontrou, tentar outras variações
+      if (!imagesFolder) {
+        for (const dir of dirs) {
+          if (dir.isDirectory() && (dir.name.includes('Mobili') || dir.name.includes('Móveis') || dir.name.includes('MobiliAI'))) {
+            imagesFolder = path.join(publicFolder, dir.name);
+            console.log(`⚠️ Usando pasta alternativa: ${imagesFolder}`);
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao ler pasta public:', error);
+      return [];
     }
-  } catch (error) {
-    console.error('❌ Erro ao ler pasta public:', error);
-    return [];
   }
 
   if (!imagesFolder) {
-    console.warn(`⚠️ Pasta "MobiliAI - Móveis" não encontrada em: ${publicFolder}`);
-    console.warn(`   Pastas disponíveis:`, fs.readdirSync(publicFolder, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name));
+    console.warn(`⚠️ Pasta "FotoMovel" não encontrada em: ${publicFolder}`);
+    try {
+      const availableDirs = fs.readdirSync(publicFolder, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name);
+      console.warn(`   Pastas disponíveis:`, availableDirs);
+    } catch (error) {
+      console.error('❌ Erro ao listar pastas:', error);
+    }
     return [];
+  }
+  
+  // Verificar se a pasta tem arquivos
+  try {
+    const filesInFolder = fs.readdirSync(imagesFolder);
+    const pngFiles = filesInFolder.filter(f => f.toLowerCase().endsWith('.png'));
+    console.log(`📊 Pasta contém ${pngFiles.length} arquivos PNG`);
+    if (pngFiles.length > 0) {
+      console.log(`   Primeiros arquivos:`, pngFiles.slice(0, 5).join(', '));
+    }
+  } catch (error) {
+    console.error('❌ Erro ao listar arquivos da pasta:', error);
   }
 
   const files = fs.readdirSync(imagesFolder)
     .filter(file => file.toLowerCase().endsWith('.png'))
     .map(file => path.join(imagesFolder!, file))
     .sort((a, b) => {
-      // Ordenar numericamente por nome (1.png, 2.png, ..., 87.png)
+      // Ordenar numericamente por nome (1.png, 2.png, ..., 195.png)
       const numA = parseInt(path.basename(a, '.png')) || 0;
       const numB = parseInt(path.basename(b, '.png')) || 0;
       return numA - numB;
     });
 
-  console.log(`📸 Encontradas ${files.length} imagens na pasta`);
+  console.log(`📸 Total de ${files.length} imagens PNG encontradas na pasta FotoMovel`);
+  if (files.length > 0) {
+    const firstFile = path.basename(files[0]);
+    const lastFile = path.basename(files[files.length - 1]);
+    console.log(`   Primeira imagem: ${firstFile}`);
+    console.log(`   Última imagem: ${lastFile}`);
+  }
   return files;
 }
 
@@ -140,7 +192,9 @@ async function uploadImageToSupabase(
 }
 
 // Base de dados de produtos de móveis com variações
-const furnitureProducts = {
+const furnitureProducts: {
+  [key in ProductCategory]?: Array<{ name: string; description: string; price: number; color: string }>;
+} = {
   SOFA: [
     { name: 'Sofá Retrátil 3 Lugares Cinza', description: 'Sofá confortável com mecanismo retrátil e reclinável', price: 1899.90, color: 'Cinza Chumbo' },
     { name: 'Sofá Cama Retrátil 3 Lugares Bege', description: 'Sofá que se transforma em cama de casal', price: 1499.00, color: 'Bege Areia' },
@@ -151,11 +205,18 @@ const furnitureProducts = {
   ],
   MESA: [
     { name: 'Mesa de Jantar 6 Lugares Carvalho', description: 'Mesa rústica em madeira maciça de carvalho', price: 899.90, color: 'Carvalho Claro' },
-    { name: 'Mesa de Centro Moderna Branca', description: 'Mesa de centro com gavetas', price: 449.90, color: 'Branco' },
     { name: 'Mesa de Escritório com Gavetas Preta', description: 'Mesa profissional para home office', price: 599.90, color: 'Preto Fosco' },
     { name: 'Mesa de Jantar Redonda 4 Lugares Vidro', description: 'Mesa de vidro temperado com base metálica', price: 749.90, color: 'Transparente' },
     { name: 'Mesa Extensível 8 Lugares Mogno', description: 'Mesa que expande para receber mais convidados', price: 1299.00, color: 'Mogno' },
     { name: 'Mesa Lateral Moderna Dourada', description: 'Mesa auxiliar decorativa', price: 299.90, color: 'Dourado Brilhante' },
+  ],
+  MESA_CENTRO: [
+    { name: 'Mesa de Centro Moderna Retangular Branca', description: 'Design minimalista com gavetas', price: 449.90, color: 'Branco' },
+    { name: 'Mesa de Centro Redonda Vidro', description: 'Mesa de vidro temperado elegante', price: 599.90, color: 'Transparente' },
+    { name: 'Mesa de Centro Rústica Mogno', description: 'Madeira maciça com acabamento rústico', price: 799.90, color: 'Mogno' },
+    { name: 'Mesa de Centro Industrial Preta', description: 'Estilo industrial com estrutura metálica', price: 549.90, color: 'Preto Metal' },
+    { name: 'Mesa de Centro Escandinava Clara', description: 'Estilo nórdico minimalista', price: 649.90, color: 'Pinus Natural' },
+    { name: 'Mesa de Centro Oval Dourada', description: 'Design elegante com detalhes dourados', price: 899.90, color: 'Dourado Brilhante' },
   ],
   CADEIRA: [
     { name: 'Cadeira Gamer Ergonômica Preta', description: 'Cadeira ergonômica com apoio lombar ajustável', price: 899.90, color: 'Preto e Vermelho' },
@@ -181,6 +242,28 @@ const furnitureProducts = {
     { name: 'Poltrona Reclinável Power Lift Bege', description: 'Assistência para levantar', price: 2499.90, color: 'Bege' },
     { name: 'Conjunto 2 Poltronas Modernas Azul', description: 'Ideal para sala de TV', price: 1199.90, color: 'Azul Marinho' },
   ],
+  LUMINARIA: [
+    { name: 'Luminária de Mesa Moderna Branca', description: 'Iluminação direta para leitura', price: 199.90, color: 'Branco' },
+    { name: 'Luminária de Pé Industrial Preta', description: 'Ajustável com braço articulado', price: 349.90, color: 'Preto' },
+    { name: 'Lustre Cristal Clássico Dourado', description: 'Elegância e sofisticação', price: 1299.90, color: 'Dourado Brilhante' },
+    { name: 'Plafon Moderno Branco', description: 'Iluminação embutida para teto', price: 249.90, color: 'Branco' },
+    { name: 'Abajur de Mesa Vintage Bege', description: 'Estilo retrô com tecido', price: 179.90, color: 'Bege Areia' },
+    { name: 'Arandela de Parede Moderna Preta', description: 'Iluminação decorativa', price: 299.90, color: 'Preto' },
+    { name: 'Luminária LED de Mesa Cinza', description: 'Tecnologia LED com ajuste de intensidade', price: 399.90, color: 'Cinza Chumbo' },
+    { name: 'Pendente Industrial Dourado', description: 'Suspenso com design industrial', price: 549.90, color: 'Dourado Brilhante' },
+    { name: 'Luminária de Chão Minimalista Branca', description: 'Design clean e moderno', price: 449.90, color: 'Branco' },
+    { name: 'Lustre Moderno Preto', description: 'Design contemporâneo', price: 799.90, color: 'Preto' },
+  ],
+  QUADRO: [
+    { name: 'Quadro Decorativo Abstrato Moderno', description: 'Arte abstrata contemporânea', price: 199.90, color: 'Multicolorido' },
+    { name: 'Quadro Natureza Paisagem', description: 'Paisagem natural em alta qualidade', price: 249.90, color: 'Natural' },
+    { name: 'Quadro Minimalista Preto e Branco', description: 'Design minimalista elegante', price: 179.90, color: 'Preto e Branco' },
+    { name: 'Quadro Vintage Retrô', description: 'Estilo retrô com moldura dourada', price: 299.90, color: 'Dourado Brilhante' },
+    { name: 'Quadro Moderno Geométrico', description: 'Formas geométricas coloridas', price: 219.90, color: 'Multicolorido' },
+    { name: 'Quadro Fotográfico Cidade', description: 'Fotografia urbana em alta resolução', price: 269.90, color: 'Natural' },
+    { name: 'Quadro Escandinavo Minimalista', description: 'Estilo nórdico clean', price: 189.90, color: 'Branco e Cinza' },
+    { name: 'Quadro Decorativo Floral', description: 'Arte floral delicada', price: 229.90, color: 'Multicolorido' },
+  ],
 };
 
 // Função para gerar SKU único
@@ -189,16 +272,119 @@ function generateSKU(category: string, index: number): string {
   return `${prefix}-${Date.now()}-${index}`;
 }
 
+// Intervalos de imagens por categoria (pares consecutivos: par = com fundo, ímpar = sem fundo)
+const categoryImageRanges: { [key in ProductCategory]?: { start: number; end: number } } = {
+  [ProductCategory.POLTRONA]: { start: 2, end: 25 },
+  [ProductCategory.SOFA]: { start: 27, end: 48 },
+  [ProductCategory.MESA]: { start: 50, end: 75 },
+  [ProductCategory.MESA_CENTRO]: { start: 77, end: 92 },
+  [ProductCategory.LUMINARIA]: { start: 94, end: 131 },
+  [ProductCategory.CADEIRA]: { start: 133, end: 148 },
+  [ProductCategory.QUADRO]: { start: 150, end: 166 },
+  [ProductCategory.ESTANTE]: { start: 168, end: 195 },
+};
+
 // Função para obter categoria aleatória
 function getRandomCategory(): ProductCategory {
-  const categories: ProductCategory[] = [ProductCategory.SOFA, ProductCategory.MESA, ProductCategory.CADEIRA, ProductCategory.ESTANTE, ProductCategory.POLTRONA];
+  const categories: ProductCategory[] = [
+    ProductCategory.SOFA,
+    ProductCategory.MESA,
+    ProductCategory.CADEIRA,
+    ProductCategory.ESTANTE,
+    ProductCategory.POLTRONA,
+    ProductCategory.MESA_CENTRO,
+    ProductCategory.LUMINARIA,
+    ProductCategory.QUADRO,
+  ];
   return categories[Math.floor(Math.random() * categories.length)];
 }
 
 // Função para obter produto aleatório da categoria
 function getRandomProduct(category: ProductCategory) {
   const products = furnitureProducts[category];
+  if (!products) {
+    // Para categorias que não estão no furnitureProducts, criar produto genérico
+    const categoryNames: { [key in ProductCategory]?: string } = {
+      [ProductCategory.MESA_CENTRO]: 'Mesa de Centro',
+      [ProductCategory.LUMINARIA]: 'Luminária',
+      [ProductCategory.QUADRO]: 'Quadro Decorativo',
+    };
+    const categoryName = categoryNames[category] || category;
+    return {
+      name: `${categoryName} Premium`,
+      description: `Produto de alta qualidade na categoria ${categoryName}`,
+      price: 299.90,
+      color: 'Branco',
+    };
+  }
   return products[Math.floor(Math.random() * products.length)];
+}
+
+// Função para obter par de imagens para uma categoria (com e sem fundo)
+function getImagePairForCategory(
+  category: ProductCategory,
+  imageFiles: string[],
+  usedImagePairs: Set<number>
+): { imageWithBg: string | null; imageWithoutBg: string | null } | null {
+  const range = categoryImageRanges[category];
+  if (!range) {
+    return null;
+  }
+
+  // Encontrar todos os pares disponíveis (números pares no intervalo)
+  const availablePairs: number[] = [];
+  const allPairs: number[] = [];
+
+  for (let i = range.start; i <= range.end; i += 2) {
+    if (i + 1 <= range.end) {
+      // Procurar as duas imagens do par (i = com fundo, i+1 = sem fundo)
+      const image1Index = imageFiles.findIndex(f => {
+        const num = parseInt(path.basename(f, '.png')) || 0;
+        return num === i;
+      });
+      const image2Index = imageFiles.findIndex(f => {
+        const num = parseInt(path.basename(f, '.png')) || 0;
+        return num === i + 1;
+      });
+
+      if (image1Index !== -1 && image2Index !== -1) {
+        allPairs.push(i);
+        if (!usedImagePairs.has(i)) {
+          availablePairs.push(i);
+        }
+      }
+    }
+  }
+
+  // Se não houver pares disponíveis, usar qualquer par (permitir reutilização)
+  const pairsToUse = availablePairs.length > 0 ? availablePairs : allPairs;
+
+  if (pairsToUse.length === 0) {
+    return null;
+  }
+
+  // Selecionar um par aleatório
+  const randomPair = pairsToUse[Math.floor(Math.random() * pairsToUse.length)];
+
+  // Marcar como usado se for um par novo
+  if (availablePairs.length > 0) {
+    usedImagePairs.add(randomPair);
+  }
+
+  // Encontrar os caminhos das imagens
+  const image1Path = imageFiles.find(f => {
+    const num = parseInt(path.basename(f, '.png')) || 0;
+    return num === randomPair;
+  });
+  const image2Path = imageFiles.find(f => {
+    const num = parseInt(path.basename(f, '.png')) || 0;
+    return num === randomPair + 1;
+  });
+
+  return {
+    imageWithBg: image1Path || null,      // Imagem com fundo (número par)
+    imageWithoutBg: image2Path || null,  // Imagem sem fundo (número ímpar)
+  };
 }
 
 export async function seedFurnitureProducts() {
@@ -213,7 +399,7 @@ export async function seedFurnitureProducts() {
 
     // Ler todas as imagens da pasta
     const imageFiles = getImageFiles();
-    let imageIndex = 0; // Índice para distribuir as imagens circularmente
+    const usedImagePairs = new Set<number>(); // Rastrear pares de imagens já usados
 
     // Buscar todas as lojas
     const stores = await prisma.store.findMany({
@@ -231,6 +417,9 @@ export async function seedFurnitureProducts() {
     // Definir quantos produtos por loja
     const productsPerStore = 15;
     let totalCreated = 0;
+    
+    // Rastrear produtos criados para evitar duplicatas (nome + categoria)
+    const createdProductKeys = new Set<string>();
 
     for (const store of stores) {
       console.log(`\n📦 Criando produtos para: ${store.name}`);
@@ -239,8 +428,28 @@ export async function seedFurnitureProducts() {
 
       // Criar produtos aleatórios
       for (let i = 0; i < productsPerStore; i++) {
-        const category = getRandomCategory();
-        const productTemplate = getRandomProduct(category);
+        let category = getRandomCategory();
+        let productTemplate = getRandomProduct(category);
+        
+        // Criar chave única baseada em nome + categoria para evitar duplicatas
+        let productKey = `${productTemplate.name}_${category}`.toLowerCase();
+        let attempts = 0;
+        const maxAttempts = 100;
+        
+        // Tentar encontrar um produto único
+        while (createdProductKeys.has(productKey) && attempts < maxAttempts) {
+          category = getRandomCategory();
+          productTemplate = getRandomProduct(category);
+          productKey = `${productTemplate.name}_${category}`.toLowerCase();
+          attempts++;
+        }
+        
+        // Se ainda estiver duplicado após muitas tentativas, adicionar sufixo único
+        if (createdProductKeys.has(productKey)) {
+          productKey = `${productKey}_${Date.now()}_${i}`;
+        }
+        
+        createdProductKeys.add(productKey);
         const sku = generateSKU(category, i);
 
         // Gerar dimensões aleatórias baseadas na categoria
@@ -269,6 +478,24 @@ export async function seedFurnitureProducts() {
             width: parseFloat((Math.random() * 40 + 80).toFixed(2)),  // 80-120cm
             height: parseFloat((Math.random() * 100 + 150).toFixed(2)), // 150-250cm
             depth: parseFloat((Math.random() * 10 + 30).toFixed(2)),  // 30-40cm
+          };
+        } else if (category === ProductCategory.MESA_CENTRO) {
+          dimensions = {
+            width: parseFloat((Math.random() * 60 + 80).toFixed(2)),  // 80-140cm
+            height: parseFloat((Math.random() * 10 + 40).toFixed(2)),  // 40-50cm
+            depth: parseFloat((Math.random() * 60 + 40).toFixed(2)),  // 40-100cm
+          };
+        } else if (category === ProductCategory.LUMINARIA) {
+          dimensions = {
+            width: parseFloat((Math.random() * 20 + 20).toFixed(2)),  // 20-40cm
+            height: parseFloat((Math.random() * 50 + 30).toFixed(2)), // 30-80cm
+            depth: parseFloat((Math.random() * 20 + 20).toFixed(2)),  // 20-40cm
+          };
+        } else if (category === ProductCategory.QUADRO) {
+          dimensions = {
+            width: parseFloat((Math.random() * 60 + 40).toFixed(2)),  // 40-100cm
+            height: parseFloat((Math.random() * 80 + 50).toFixed(2)), // 50-130cm
+            depth: parseFloat((Math.random() * 5 + 2).toFixed(2)),   // 2-7cm
           };
         }
 
@@ -306,39 +533,61 @@ export async function seedFurnitureProducts() {
       
       for (let i = 0; i < productsToCreate.length; i++) {
         const productData = productsToCreate[i];
-        let imageUrl: string | null = null;
+        const imageUrls: string[] = [];
         
         // Criar produto primeiro para obter o ID
         const createdProduct = await prisma.product.create({
           data: productData,
         });
 
-        // Fazer upload da imagem DEPOIS de criar o produto (para usar o ID real)
+        // Fazer upload das imagens DEPOIS de criar o produto (para usar o ID real)
         if (imageFiles.length > 0 && supabase) {
-          // Usar imagem circularmente (se acabarem, volta ao início)
-          const imageFile = imageFiles[imageIndex % imageFiles.length];
-          imageIndex++;
-
-          // Fazer upload usando o ID real do produto
-          imageUrl = await uploadImageToSupabase(
-            supabase,
-            imageFile,
-            createdProduct.id,
-            i
+          // Obter par de imagens para a categoria (com e sem fundo)
+          const imagePair = getImagePairForCategory(
+            productData.category,
+            imageFiles,
+            usedImagePairs
           );
 
-          if (imageUrl) {
-            // Atualizar produto com a URL da imagem
-            await prisma.product.update({
-              where: { id: createdProduct.id },
-              data: {
-                imageUrl: imageUrl,
-                imageUrls: [imageUrl],
-              },
-            });
-            console.log(`✅ Produto criado e imagem ${i + 1}/${productsToCreate.length} enviada para o bucket`);
+          if (imagePair && imagePair.imageWithBg && imagePair.imageWithoutBg) {
+            // Fazer upload da imagem com fundo
+            const imageUrl1 = await uploadImageToSupabase(
+              supabase,
+              imagePair.imageWithBg,
+              createdProduct.id,
+              i * 2
+            );
+
+            // Fazer upload da imagem sem fundo
+            const imageUrl2 = await uploadImageToSupabase(
+              supabase,
+              imagePair.imageWithoutBg,
+              createdProduct.id,
+              i * 2 + 1
+            );
+
+            if (imageUrl1) {
+              imageUrls.push(imageUrl1);
+            }
+            if (imageUrl2) {
+              imageUrls.push(imageUrl2);
+            }
+
+            if (imageUrls.length > 0) {
+              // Atualizar produto com as URLs das imagens
+              await prisma.product.update({
+                where: { id: createdProduct.id },
+                data: {
+                  imageUrl: imageUrls[0], // Primeira imagem como principal
+                  imageUrls: imageUrls,    // Array com ambas as imagens
+                },
+              });
+              console.log(`✅ Produto criado e ${imageUrls.length} imagem(ns) ${i + 1}/${productsToCreate.length} enviada(s) para o bucket`);
+            } else {
+              console.warn(`⚠️ Produto criado mas falha ao enviar imagens ${i + 1}/${productsToCreate.length}`);
+            }
           } else {
-            console.warn(`⚠️ Produto criado mas falha ao enviar imagem ${i + 1}/${productsToCreate.length}`);
+            console.warn(`⚠️ Nenhuma imagem disponível para categoria ${productData.category} ou todas já foram usadas`);
           }
         } else {
           console.log(`✅ Produto ${i + 1}/${productsToCreate.length} criado (sem imagem)`);
@@ -388,6 +637,8 @@ function generateColorHex(colorName: string): string {
     'Vermelho Bordeaux': '#800020',
     'Bege Couro': '#DEB887',
     'Azul Marinho': '#000080',
+    'Multicolorido': '#FF6B6B',
+    'Preto e Branco': '#000000',
   };
   return colorMap[colorName] || '#CCCCCC';
 }

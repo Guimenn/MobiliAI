@@ -45,9 +45,11 @@ import {
   Store
 } from 'lucide-react';
 import Link from 'next/link';
+import { showAlert, showConfirm } from '@/lib/alerts';
+import { env } from '@/lib/env';
 
 // Componente para checkbox com suporte a indeterminate
-function StoreCheckbox({ checked, indeterminate, onChange }: { checked: boolean; indeterminate: boolean; onChange: () => void }) {
+function StoreCheckbox({ checked, indeterminate, onCheckedChange }: { checked: boolean; indeterminate: boolean; onCheckedChange: (checked: boolean) => void }) {
   const checkboxRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -56,11 +58,15 @@ function StoreCheckbox({ checked, indeterminate, onChange }: { checked: boolean;
     }
   }, [indeterminate]);
 
+  const handleChange = (isChecked: boolean) => {
+    onCheckedChange(isChecked);
+  };
+
   return (
     <Checkbox
       ref={checkboxRef}
       checked={checked}
-      onChange={onChange}
+      onCheckedChange={handleChange}
       className="h-5 w-5"
     />
   );
@@ -73,6 +79,8 @@ export default function CartPage() {
   const [showEmptyCart, setShowEmptyCart] = useState(false);
   const [storeInfoCache, setStoreInfoCache] = useState<{ [storeId: string]: { name: string; address?: string } }>({});
   const [showAIModal, setShowAIModal] = useState(false);
+  const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
+  const [isLoadingRecommended, setIsLoadingRecommended] = useState(false);
   
   // Estado para controlar produtos selecionados
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(
@@ -349,7 +357,7 @@ export default function CartPage() {
   // Função para checkout apenas com produtos selecionados
   const handleCheckout = () => {
     if (selectedCartItems.length === 0) {
-      alert('Selecione pelo menos um produto para finalizar a compra');
+      showAlert('warning', 'Selecione pelo menos um produto para finalizar a compra');
       return;
     }
     
@@ -375,8 +383,15 @@ export default function CartPage() {
   };
 
   // Função para limpar carrinho
-  const handleClearCart = () => {
-    if (confirm('Tem certeza que deseja limpar o carrinho?')) {
+  const handleClearCart = async () => {
+    const confirmed = await showConfirm(
+      'Tem certeza que deseja limpar o carrinho?',
+      'Limpar carrinho',
+      'Limpar',
+      'Cancelar',
+      'destructive'
+    );
+    if (confirmed) {
       clearCart();
     }
   };
@@ -384,47 +399,81 @@ export default function CartPage() {
   // Função para adicionar aos favoritos
   const addToFavorites = (product: any) => {
     // Aqui você integraria com o sistema de favoritos
-    alert(`${product.name} adicionado aos favoritos!`);
+    showAlert('success', `${product.name} adicionado aos favoritos!`);
   };
 
-  // Produtos recomendados (simulados)
-  const recommendedProducts = [
-    {
-      id: 'rec1',
-      name: 'Cadeira Executiva Premium',
-      price: 899.99,
-      originalPrice: 1199.99,
-      category: 'cadeira',
-      color: '#8B4513',
-      rating: 4.8,
-      reviews: 89,
-      stock: 10,
-      storeId: 'default-store'
-    },
-    {
-      id: 'rec2',
-      name: 'Mesa de Centro Elegante',
-      price: 1299.99,
-      originalPrice: 1599.99,
-      category: 'mesa',
-      color: '#D2B48C',
-      rating: 4.7,
-      reviews: 124,
-      stock: 8,
-      storeId: 'default-store'
-    },
-    {
-      id: 'rec3',
-      name: 'Luminária Pendant Moderna',
-      price: 599.99,
-      category: 'iluminacao',
-      color: '#A0522D',
-      rating: 4.6,
-      reviews: 67,
-      stock: 15,
-      storeId: 'default-store'
-    }
-  ];
+  // Buscar produtos recomendados do banco de dados
+  useEffect(() => {
+    const fetchRecommendedProducts = async () => {
+      try {
+        setIsLoadingRecommended(true);
+        // Buscar produtos públicos do banco, limitando a 3 produtos
+        const params = new URLSearchParams({
+          limit: '3',
+          page: '1',
+        });
+        
+        // Usar endpoint público de produtos (sem autenticação)
+        const response = await fetch(`${env.API_URL}/public/products?${params.toString()}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        
+        if (!response.ok) {
+          // Se o endpoint não existir, tentar endpoint alternativo
+          console.warn('Endpoint /public/products não disponível, tentando endpoint alternativo...');
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('📦 Resposta da API de produtos recomendados:', data);
+        
+        // Extrair produtos da resposta (pode ter estrutura de paginação)
+        let productsArray: any[] = [];
+        if (data.products && Array.isArray(data.products)) {
+          productsArray = data.products;
+        } else if (data.data && Array.isArray(data.data)) {
+          productsArray = data.data;
+        } else if (data.items && Array.isArray(data.items)) {
+          productsArray = data.items;
+        } else if (Array.isArray(data)) {
+          productsArray = data;
+        }
+        
+        if (productsArray.length > 0) {
+          // Mapear produtos do backend para o formato esperado (limitar a 3 produtos)
+          const mappedProducts = productsArray.slice(0, 3).map((product: any) => ({
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            price: Number(product.price),
+            originalPrice: product.originalPrice ? Number(product.originalPrice) : undefined,
+            category: product.category?.toLowerCase() || 'mesa',
+            color: product.colorHex || product.color || '#8B4513',
+            imageUrl: product.imageUrls?.[0] || product.imageUrl || '',
+            imageUrls: product.imageUrls || (product.imageUrl ? [product.imageUrl] : []),
+            rating: product.rating || 4.5,
+            reviews: product.reviewCount || product.reviews || 0,
+            stock: product.stock || 0,
+            storeId: product.storeId || product.store?.id || '',
+            storeName: product.store?.name,
+            brand: product.brand,
+            colorName: product.colorName,
+            colorHex: product.colorHex || product.color,
+          }));
+          setRecommendedProducts(mappedProducts);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar produtos recomendados:', error);
+        // Em caso de erro, manter array vazio
+        setRecommendedProducts([]);
+      } finally {
+        setIsLoadingRecommended(false);
+      }
+    };
+
+    fetchRecommendedProducts();
+  }, []);
 
   if (cart.length === 0) {
     return (
@@ -432,7 +481,7 @@ export default function CartPage() {
         <Header />
         
         {/* Empty Cart State */}
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-44 pb-20">
           <div className="text-center">
             {/* Empty Cart Icon */}
             <div className="mx-auto w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-8 shadow-lg">
@@ -472,30 +521,46 @@ export default function CartPage() {
               Produtos Recomendados
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {recommendedProducts.map((product) => (
-                <Card key={product.id} className="group relative overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
-                  <div className="relative">
-                    <div 
-                      className="aspect-square flex items-center justify-center relative"
-                      style={{ backgroundColor: product.color }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
-                      <div className="relative z-10 text-center">
-                        {renderCategoryIcon(product.category)}
-                        <p className="text-white font-semibold text-sm mt-2">Móvel Premium</p>
-                      </div>
+            {isLoadingRecommended ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626]"></div>
+              </div>
+            ) : recommendedProducts.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {recommendedProducts.map((product) => (
+                  <Card key={product.id} className="group relative overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
+                    <div className="relative">
+                      {product.imageUrl ? (
+                        <div className="aspect-square relative overflow-hidden">
+                          <img 
+                            src={product.imageUrl} 
+                            alt={product.name}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
+                        </div>
+                      ) : (
+                        <div 
+                          className="aspect-square flex items-center justify-center relative"
+                          style={{ backgroundColor: product.color }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
+                          <div className="relative z-10 text-center">
+                            {renderCategoryIcon(product.category)}
+                            <p className="text-white font-semibold text-sm mt-2">Móvel Premium</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Discount Badge */}
+                      {product.originalPrice && (
+                        <div className="absolute top-4 left-4 z-20">
+                          <Badge className="bg-red-500 text-white">
+                            -{calculateDiscount(product.originalPrice, product.price)}%
+                          </Badge>
+                        </div>
+                      )}
                     </div>
-                    
-                    {/* Discount Badge */}
-                    {product.originalPrice && (
-                      <div className="absolute top-4 left-4">
-                        <Badge className="bg-red-500 text-white">
-                          -{calculateDiscount(product.originalPrice, product.price)}%
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
                   
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
@@ -549,6 +614,11 @@ export default function CartPage() {
                 </Card>
               ))}
             </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <p>Nenhum produto disponível no momento.</p>
+              </div>
+            )}
           </div>
         </div>
         
@@ -558,10 +628,10 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white page-with-fixed-header">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
       <Header />
       
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 ">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
           <div className="flex items-center space-x-4">
@@ -600,7 +670,9 @@ export default function CartPage() {
               <div className="flex items-center space-x-3">
                 <Checkbox
                   checked={cart.every(item => selectedProducts.has(item.product.id))}
-                  onChange={toggleAllProducts}
+                  onCheckedChange={(checked) => {
+                    toggleAllProducts();
+                  }}
                   className="h-5 w-5 border-white/50 data-[state=checked]:bg-white data-[state=checked]:border-white"
                 />
                 <label className="text-sm font-bold text-white cursor-pointer hover:text-gray-200 transition-colors flex items-center space-x-2" onClick={toggleAllProducts}>
@@ -622,7 +694,7 @@ export default function CartPage() {
                       <StoreCheckbox
                         checked={isStoreSelected(storeId)}
                         indeterminate={isStorePartiallySelected(storeId)}
-                        onChange={() => toggleStoreSelection(storeId)}
+                        onCheckedChange={() => toggleStoreSelection(storeId)}
                       />
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg border-2 border-white/30">
@@ -648,7 +720,7 @@ export default function CartPage() {
                 <div className="divide-y divide-gray-200">
                   {storeData.items.map((item, index) => (
                     <div 
-                      key={item.product.id} 
+                      key={item.id || `${item.product.id}-${index}`} 
                       className="relative flex flex-col sm:flex-row p-6 hover:bg-gradient-to-r hover:from-gray-50 hover:via-blue-50/30 hover:to-gray-50 transition-all duration-300 group"
                     >
                       {/* Background decoration */}
@@ -659,30 +731,40 @@ export default function CartPage() {
                         <div className="pt-1">
                           <Checkbox
                             checked={selectedProducts.has(item.product.id)}
-                            onChange={() => toggleProductSelection(item.product.id)}
+                            onCheckedChange={() => toggleProductSelection(item.product.id)}
                             className="h-5 w-5 border-2"
                           />
                         </div>
                         {/* Product Image */}
                         <div className="sm:w-36 h-36 sm:h-auto relative overflow-hidden rounded-xl flex-shrink-0 shadow-lg group-hover:shadow-xl transition-all duration-300 border-2 border-gray-100 group-hover:border-[#3e2626]/30 group-hover:scale-[1.02]">
-                          {item.product.imageUrl ? (
-                            <img
-                              src={item.product.imageUrl}
-                              alt={item.product.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <div 
-                              className="w-full h-full flex items-center justify-center relative"
-                              style={{ backgroundColor: item.product.color || '#8B4513' }}
-                            >
-                              <div className="absolute inset-0 bg-gradient-to-br from-black/10 to-black/30"></div>
-                              <div className="relative z-10 text-center">
-                                {renderCategoryIcon(item.product.category)}
-                                <p className="text-white font-semibold text-xs mt-1 drop-shadow-lg">Móvel</p>
+                          {(() => {
+                            const imageUrl = item.product.imageUrls && item.product.imageUrls.length > 0 
+                              ? item.product.imageUrls[0] 
+                              : item.product.imageUrl;
+                            return imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={item.product.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                  console.error('Erro ao carregar imagem:', imageUrl);
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : (
+                              <div 
+                                className="w-full h-full flex items-center justify-center relative"
+                                style={{ backgroundColor: item.product.color || '#8B4513' }}
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-br from-black/10 to-black/30"></div>
+                                <div className="relative z-10 text-center">
+                                  {renderCategoryIcon(item.product.category)}
+                                  <p className="text-white font-semibold text-xs mt-1 drop-shadow-lg">Móvel</p>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                           {/* Overlay on hover */}
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300"></div>
                         </div>
@@ -1011,77 +1093,105 @@ export default function CartPage() {
             Você também pode gostar
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {recommendedProducts.map((product) => (
-              <Card key={product.id} className="group relative overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
-                <div className="relative">
-                  <div 
-                    className="aspect-square flex items-center justify-center relative group"
-                    style={{ backgroundColor: product.color }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
-                    <div className="relative z-10 text-center">
-                      {renderCategoryIcon(product.category)}
-                      <p className="text-white font-semibold text-sm mt-2">Móvel Premium</p>
-                    </div>
+          {isLoadingRecommended ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626]"></div>
+            </div>
+          ) : recommendedProducts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {recommendedProducts.map((product) => (
+                <Card key={product.id} className="group relative overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
+                  <div className="relative">
+                    {product.imageUrl ? (
+                      <div className="aspect-square relative overflow-hidden">
+                        <img 
+                          src={product.imageUrl} 
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
+                      </div>
+                    ) : (
+                      <div 
+                        className="aspect-square flex items-center justify-center relative group"
+                        style={{ backgroundColor: product.color }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
+                        <div className="relative z-10 text-center">
+                          {renderCategoryIcon(product.category)}
+                          <p className="text-white font-semibold text-sm mt-2">Móvel Premium</p>
+                        </div>
+                      </div>
+                    )}
+                    
                     {/* Favorite Tooltip */}
                     <FavoriteTooltip productId={product.id} />
+                    
+                    {/* Discount Badge */}
+                    {product.originalPrice && (
+                      <div className="absolute top-4 left-4 z-20">
+                        <Badge className="bg-red-500 text-white">
+                          -{calculateDiscount(product.originalPrice, product.price)}%
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                   
-                  {/* Discount Badge */}
-                  {product.originalPrice && (
-                    <div className="absolute top-4 left-4">
-                      <Badge className="bg-red-500 text-white">
-                        -{calculateDiscount(product.originalPrice, product.price)}%
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-                
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-bold text-lg text-[#3e2626]">
-                      {product.name}
-                    </h3>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 mb-4">
-                    <div className="flex items-center">
-                      {[...Array(5)].map((_, i) => (
-                        <Star 
-                          key={i} 
-                          className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm text-gray-600">
-                      {product.rating} ({product.reviews} avaliações)
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xl font-bold text-[#3e2626]">
-                        R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                      {product.originalPrice && (
-                        <span className="text-sm text-gray-500 line-through">
-                          R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      )}
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-bold text-lg text-[#3e2626] line-clamp-2">
+                        {product.name}
+                      </h3>
                     </div>
                     
-                    <Button 
-                      onClick={() => addToCart(product as any, 1)}
-                      className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-full w-10 h-10 p-0 hover:scale-110 transition-all duration-300"
-                    >
-                      <ShoppingCart className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    {product.description && (
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                        {product.description}
+                      </p>
+                    )}
+                    
+                    <div className="flex items-center space-x-2 mb-4">
+                      <div className="flex items-center">
+                        {[...Array(5)].map((_, i) => (
+                          <Star 
+                            key={i} 
+                            className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600">
+                        {product.rating.toFixed(1)} ({product.reviews} avaliações)
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl font-bold text-[#3e2626]">
+                          R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        {product.originalPrice && (
+                          <span className="text-sm text-gray-500 line-through">
+                            R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <Button 
+                        onClick={() => addToCart(product as any, 1)}
+                        className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-full w-10 h-10 p-0 hover:scale-110 transition-all duration-300"
+                      >
+                        <ShoppingCart className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <p>Nenhum produto disponível no momento.</p>
+            </div>
+          )}
         </div>
       </div>
       

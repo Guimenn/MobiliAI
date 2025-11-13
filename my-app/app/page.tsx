@@ -13,6 +13,7 @@ import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import { BackendStatus } from '@/components/BackendStatus';
 import FavoriteTooltip from '@/components/FavoriteTooltip';
+import { showAlert } from '@/lib/alerts';
 import { 
   Search,
   ShoppingCart,
@@ -132,21 +133,13 @@ export default function HomePage() {
     const product = allProducts.find(p => p.id === productId);
     if (product) {
       try {
-        // Adicionar ao store local (sempre funciona)
-        useAppStore.getState().addToCart(product, 1);
+        // addToCart do store já gerencia backend automaticamente quando autenticado
+        await useAppStore.getState().addToCart(product, 1);
         setCartItems(prev => [...prev, productId]);
         
-        // Se estiver autenticado, também adicionar ao backend
+        // Disparar evento para atualizar notificações
         if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
-          try {
-            const { customerAPI } = await import('@/lib/api');
-            await customerAPI.addToCart(product.id, 1);
-            // Disparar evento para atualizar notificações imediatamente
-            window.dispatchEvent(new CustomEvent('notification:cart-added'));
-          } catch (apiError) {
-            console.error('Erro ao adicionar ao carrinho no backend:', apiError);
-            // Mesmo com erro na API, o item já está no store local
-          }
+          window.dispatchEvent(new CustomEvent('notification:cart-added'));
         }
         
         // Mostrar mensagem de sucesso
@@ -180,10 +173,10 @@ export default function HomePage() {
   // Função para abrir carrinho
   const handleCartClick = () => {
     if (cartItems.length > 0) {
-      alert(`Você tem ${cartItems.length} item(s) no carrinho`);
+      showAlert('info', `Você tem ${cartItems.length} item(s) no carrinho`);
       // Aqui você pode implementar lógica para mostrar modal do carrinho ou redirecionar
     } else {
-      alert('Seu carrinho está vazio. Adicione alguns produtos!');
+      showAlert('warning', 'Seu carrinho está vazio. Adicione alguns produtos!');
     }
   };
 
@@ -410,9 +403,9 @@ export default function HomePage() {
   }, [specialOfferProduct]);
 
   const formatTime = (totalSeconds: number) => {
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+    const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    return `${h}h ${m}m`;
   };
 
   const testimonials = [
@@ -1400,18 +1393,27 @@ export default function HomePage() {
                   <div className="relative overflow-hidden">
                     <div className="aspect-[4/3] flex items-center justify-center relative bg-gray-100">
                       {/* Product Image - if available */}
-                      {product.imageUrl ? (
-                        <Image
-                          src={product.imageUrl}
-                          alt={product.name}
-                          width={600}
-                          height={450}
-                          className="w-full h-full object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="text-center text-gray-400">Sem imagem</div>
-                      )}
+                      {(() => {
+                        const imageUrl = product.imageUrls && product.imageUrls.length > 0 
+                          ? product.imageUrls[0] 
+                          : product.imageUrl;
+                        
+                        return imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={product.name}
+                            width={600}
+                            height={450}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                            onError={(e) => {
+                              console.error('Erro ao carregar imagem:', imageUrl);
+                            }}
+                          />
+                        ) : (
+                          <div className="text-center text-gray-400">Sem imagem</div>
+                        );
+                      })()}
                     </div>
 
                     {/* Favorite Tooltip */}

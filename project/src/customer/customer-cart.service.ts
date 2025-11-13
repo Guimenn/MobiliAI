@@ -108,7 +108,15 @@ export class CustomerCartService {
             category: true,
             brand: true,
             colorName: true,
-            colorHex: true
+            colorHex: true,
+            storeId: true,
+            store: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
           }
         }
       },

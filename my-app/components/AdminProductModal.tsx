@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { X, Eye, Edit, Save, DollarSign, Package, Tag, Hash, Palette, Building, Ruler, Weight, Brush, Trash2, Zap, Percent, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { showConfirm } from '@/lib/alerts';
 import ImageUpload from './ImageUpload';
 import ImageCarousel from './ImageCarousel';
 import { uploadMultipleProductImages, supabase } from '@/lib/supabase';
@@ -706,7 +707,8 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
   const handleDelete = async () => {
     if (!product) return;
 
-    if (!confirm(`Tem certeza que deseja excluir o produto "${product?.name}"? Esta ação não pode ser desfeita.`)) {
+    const confirmed = await showConfirm(`Tem certeza que deseja excluir o produto "${product?.name}"? Esta ação não pode ser desfeita.`);
+    if (!confirmed) {
       return;
     }
 

@@ -533,13 +533,22 @@ export default function EmployeeOrdersOnlinePage() {
                   <div className="space-y-4">
                     {selectedOrder.items?.map((item: any) => (
                       <div key={item.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                        {item.product?.imageUrl && (
-                          <img
-                            src={item.product.imageUrl}
-                            alt={item.product.name}
-                            className="w-20 h-20 object-cover rounded-lg"
-                          />
-                        )}
+                        {(() => {
+                          const imageUrl = (item.product?.imageUrls && item.product.imageUrls.length > 0) 
+                            ? item.product.imageUrls[0] 
+                            : item.product?.imageUrl;
+                          return imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={item.product.name}
+                              className="w-20 h-20 object-cover rounded-lg"
+                              onError={(e) => {
+                                console.error('Erro ao carregar imagem:', imageUrl);
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : null;
+                        })()}
                         <div className="flex-1">
                           <p className="font-semibold">{item.product?.name}</p>
                           <p className="text-sm text-gray-600">

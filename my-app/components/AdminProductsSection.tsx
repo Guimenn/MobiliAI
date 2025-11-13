@@ -17,6 +17,7 @@ import {
   Filter
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api';
+import { showConfirm } from '@/lib/alerts';
 import AdminProductModal from './AdminProductModal';
 
 interface AdminProductsSectionProps {
@@ -90,7 +91,7 @@ export default function AdminProductsSection({ products, isLoading, onProductDel
 
   const handleDeleteProduct = async (product: any) => {
     // Mostrar confirmação com botões Sim/Não
-    const confirmDelete = confirm(`Deseja realmente excluir o produto "${product.name}"?`);
+    const confirmDelete = await showConfirm(`Deseja realmente excluir o produto "${product.name}"?`);
     
     if (confirmDelete) {
       try {

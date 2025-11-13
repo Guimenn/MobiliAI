@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { customerAPI } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { toast } from "sonner";
+import { showConfirm } from "@/lib/alerts";
 
 interface Address {
   id: string;
@@ -186,7 +187,8 @@ export function AddressSection() {
   const handleDelete = async (id: string, isFromUserProfile?: boolean) => {
     // Endereços do perfil não podem ser excluídos, apenas limpos
     if (isFromUserProfile) {
-      if (confirm("Deseja remover o endereço do seu perfil?")) {
+      const confirmed = await showConfirm("Deseja remover o endereço do seu perfil?");
+      if (confirmed) {
         try {
           const { user } = useAppStore.getState();
           if (!user) return;

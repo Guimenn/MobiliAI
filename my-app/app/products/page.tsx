@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { customerAPI } from '@/lib/api';
 import { toast } from 'sonner';
+import { showAlert } from '@/lib/alerts';
 
 // Mapeamento de categorias para ícones
 const categoryIcons: Record<string, any> = {
@@ -350,7 +351,7 @@ export default function ProductsPage() {
     
     // Validar se min <= max se ambos estiverem preenchidos
     if (min !== '' && max !== '' && min > max) {
-      alert('O preço mínimo não pode ser maior que o preço máximo');
+      showAlert('error', 'O preço mínimo não pode ser maior que o preço máximo');
       return;
     }
     
@@ -361,19 +362,12 @@ export default function ProductsPage() {
 
   const handleAddToCart = async (product: Product) => {
     try {
-      // Adicionar ao store local (sempre funciona)
-      addToCart(product, 1);
+      // addToCart do store já gerencia backend automaticamente quando autenticado
+      await addToCart(product, 1);
       
-      // Se estiver autenticado, também adicionar ao backend
+      // Disparar evento para atualizar notificações imediatamente
       if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
-        try {
-          await customerAPI.addToCart(product.id, 1);
-          // Disparar evento para atualizar notificações imediatamente
-          window.dispatchEvent(new CustomEvent('notification:cart-added'));
-        } catch (apiError) {
-          console.error('Erro ao adicionar ao carrinho no backend:', apiError);
-          // Mesmo com erro na API, o item já está no store local
-        }
+        window.dispatchEvent(new CustomEvent('notification:cart-added'));
       }
       
       // Mostrar mensagem de sucesso
@@ -527,9 +521,9 @@ export default function ProductsPage() {
   }, [specialOfferProduct, products]);
 
   const formatTime = (totalSeconds: number) => {
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+    const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    return `${h}h ${m}m`;
   };
 
   return (
@@ -863,17 +857,31 @@ export default function ProductsPage() {
                             onClick={() => router.push(`/products/${product.id}`)}
                           >
                             <div className="w-48 h-48 rounded-lg overflow-hidden border-2 border-white bg-white shadow-lg hover:shadow-xl hover:border-brand-300 hover:-translate-y-1 transition-all duration-300">
-                              {product.imageUrl ? (
-                                <img
-                                  src={product.imageUrl}
-                                  alt={product.name}
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                                  <Package className="h-4 w-4 text-gray-400" />
-                                </div>
-                              )}
+                              {(() => {
+                                const imageUrl = product.imageUrls && product.imageUrls.length > 0 
+                                  ? product.imageUrls[0] 
+                                  : product.imageUrl;
+                                
+                                return imageUrl ? (
+                                  <img
+                                    src={imageUrl}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                    onError={(e) => {
+                                      console.error('Erro ao carregar imagem:', imageUrl);
+                                      e.currentTarget.style.display = 'none';
+                                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                                    <Package className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                );
+                              })()}
+                              <div className="hidden w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                                <Package className="h-4 w-4 text-gray-400" />
+                              </div>
                             </div>
                             {idx < recentProducts.length - 1 && (
                               <div className="absolute -right-1 top-1/2 -translate-y-1/2 translate-x-1/2 w-1.5 h-1.5 bg-brand-600 rounded-full border border-white shadow-sm"></div>
@@ -1148,17 +1156,31 @@ export default function ProductsPage() {
                       >
                         {/* Imagem do produto */}
                         <div className="relative aspect-square bg-gray-100 overflow-hidden group">
-                        {product.imageUrl ? (
+                        {(() => {
+                          const imageUrl = product.imageUrls && product.imageUrls.length > 0 
+                            ? product.imageUrls[0] 
+                            : product.imageUrl;
+                          
+                          return imageUrl ? (
                             <img
-                              src={product.imageUrl}
+                              src={imageUrl}
                               alt={product.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                console.error('Erro ao carregar imagem:', imageUrl);
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                              }}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
                               Sem imagem
                             </div>
-                          )}
+                          );
+                        })()}
+                        <div className="hidden w-full h-full flex items-center justify-center text-gray-400">
+                          Erro ao carregar imagem
+                        </div>
                           {/* Badge de Oferta Relâmpago */}
                           {isFlashSaleActive && (
                             <div className="absolute top-2 left-2 z-10">
