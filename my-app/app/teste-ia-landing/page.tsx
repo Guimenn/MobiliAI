@@ -212,17 +212,24 @@ export default function TestIALandingPage() {
       <Header />
       <main className="overflow-hidden">
         {/* Hero */}
-        <section className="relative overflow-hidden min-h-[85vh] flex items-center pt-40 pb-24 bg-white">
+        <section className="relative overflow-hidden min-h-[85vh] flex items-center pt-40 pb-24">
+          {/* Background Image */}
+          <div className="absolute inset-0 z-0">
+            <Image src="/hero-bg.png" alt="Ambiente decorado com IA" fill priority className="object-cover" />
+            <div className="absolute inset-0 bg-[#3e2626]/85 mix-blend-multiply" />
+            <div className="absolute inset-0 bg-linear-to-br from-[#3e2626]/85 via-[#4f3223]/75 to-[#8B4513]/60" />
+          </div>
+
           <div className="container relative z-10 mx-auto flex flex-col gap-20 px-4 lg:flex-row lg:items-center">
-            <div className="max-w-4xl text-[#3e2626]">
+            <div className="max-w-4xl text-white">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className="inline-flex items-center gap-2 rounded-2xl border border-[#3e2626]/20 bg-[#3e2626]/5 px-5 py-2.5 text-sm font-semibold tracking-wide mb-8"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold tracking-wide backdrop-blur-sm mb-8"
               >
-                <Sparkles className="h-4 w-4 text-[#C07A45]" />
-                <span className="text-[#3e2626]">Powered by nano-banana AI · Replicate</span>
+                <Sparkles className="h-4 w-4 text-[#F7C194]" />
+                <span className="text-white">Powered by MobiliAI</span>
               </motion.div>
               
               <motion.div
@@ -236,16 +243,16 @@ export default function TestIALandingPage() {
                   delay={100}
                   animateBy="words"
                   direction="top"
-                  className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight text-[#3e2626] mb-4"
+                  className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight text-white mb-4"
                 />
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight text-[#3e2626]">
+                  <span className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight text-white">
                     com a paleta
                   </span>
                   <FlipWords
-                    words={['da sua marca', 'personalizada', 'exclusiva', 'única']}
+                    words={['da sua marca.', 'personalizada.', 'exclusiva.', 'única.']}
                     duration={3000}
-                    className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight text-[#C07A45]"
+                    className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight text-[#F7C194]"
                   />
                 </div>
               </motion.div>
@@ -254,7 +261,7 @@ export default function TestIALandingPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.4 }}
-                className="text-lg sm:text-xl text-[#4f3a2f]/80 leading-relaxed max-w-2xl mb-12"
+                className="text-lg sm:text-xl text-white/90 leading-relaxed max-w-2xl mb-12"
               >
                 Transforme fotos de clientes em minutos, substituindo cores de parede, mobiliário e iluminação com o
                 motor nano-banana AI. O mesmo tom, a mesma textura, bem na tela.
@@ -270,7 +277,7 @@ export default function TestIALandingPage() {
                   <TextRevealButton
                     text="Experimentar agora"
                     icon={<Rocket className="h-6 w-6" />}
-                    className="h-16 rounded-full bg-white px-12 text-lg font-semibold text-[#3e2626] shadow-2xl hover:bg-white/95 hover:shadow-white/50"
+                    className="h-16 rounded-full bg-white px-12 text-lg font-semibold text-[#3e2626] shadow-2xl hover:bg-white/95 hover:shadow-white/50 hover:text-brown-500"
                   />
                 </Link>
                 <Link href="/products">
@@ -286,7 +293,7 @@ export default function TestIALandingPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.8 }}
-                className="mt-6 text-sm text-[#4f3a2f]/60"
+                className="mt-6 text-sm text-white/70"
               >
                 * Login necessário apenas para utilizar a experiência completa com IA.
               </motion.p>
@@ -298,7 +305,7 @@ export default function TestIALandingPage() {
               transition={{ duration: 0.8, delay: 0.4 }}
               className="relative w-full max-w-xl lg:max-w-lg"
             >
-              <div className="relative h-[450px] lg:h-[550px] rounded-3xl border-2 border-[#3e2626]/20 bg-white shadow-xl overflow-hidden group">
+              <div className="relative h-[450px] lg:h-[550px] rounded-3xl border-2 border-white/30 bg-white/10 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.8)] backdrop-blur-xl overflow-hidden group">
                 <Image
                   src="/IAsection/ImagemIA3.png"
                   alt="Visualização de quarto gerada pela IA"
@@ -307,19 +314,20 @@ export default function TestIALandingPage() {
                   sizes="(max-width: 1024px) 100vw, 500px"
                   priority
                 />
+                <div className="absolute inset-0 bg-linear-to-t from-[#3e2626]/20 to-transparent" />
               </div>
               
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.8 }}
-                className="absolute -bottom-10 -right-8 hidden w-56 rounded-3xl border border-[#3e2626]/20 bg-white p-4 shadow-2xl md:block"
+                className="absolute -bottom-10 -right-8 hidden w-56 rounded-3xl border border-white/30 bg-white/10 p-4 shadow-2xl backdrop-blur-lg md:block"
               >
                 <div className="relative h-28 overflow-hidden rounded-2xl">
                   <Image src="/IAsection/ImagemIA1.png" alt="Renderização de sala pela IA" fill className="object-cover" sizes="190px" />
                 </div>
-                <p className="mt-3 text-xs font-medium uppercase tracking-[0.3em] text-[#4f3a2f]/70">Resultado em 12s</p>
-                <p className="text-sm text-[#3e2626]">IA posicionou paleta e mobiliário da coleção Oslo automaticamente.</p>
+                <p className="mt-3 text-xs font-medium uppercase tracking-[0.3em] text-white/80">Resultado em 12s</p>
+                <p className="text-sm text-white">IA posicionou paleta e mobiliário da coleção Oslo automaticamente.</p>
               </motion.div>
             </motion.div>
           </div>

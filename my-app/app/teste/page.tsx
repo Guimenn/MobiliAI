@@ -105,6 +105,12 @@ export default function TestAIPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
   
+  // Estado para seleção de posição
+  const [pendingFurniture, setPendingFurniture] = useState<FurnitureItem | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isSelectingPosition, setIsSelectingPosition] = useState(false);
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
+  
   // Buscar produtos reais
   const { products: allProducts } = useProducts();
 
@@ -176,8 +182,30 @@ export default function TestAIPage() {
   };
 
 
+  // Iniciar seleção de posição
+  const handleStartAddFurniture = (furniture: FurnitureItem) => {
+    if (!uploadedImageFile || !isAuthenticated) {
+      setError('Você precisa estar logado e ter um arquivo carregado.');
+      return;
+    }
+    
+    setPendingFurniture(furniture);
+    setIsSelectingPosition(true);
+    setSelectedPosition(null);
+    setError(null);
+    setSuccessMessage('Clique na imagem para escolher onde colocar o móvel');
+  };
+
+  // Cancelar seleção de posição
+  const handleCancelPositionSelection = () => {
+    setPendingFurniture(null);
+    setIsSelectingPosition(false);
+    setSelectedPosition(null);
+    setSuccessMessage(null);
+  };
+
   // Adicionar móvel ao ambiente - COM IA do nano-banana
-  const handleAddFurniture = async (furniture: FurnitureItem) => {
+  const handleAddFurniture = async (furniture: FurnitureItem, position?: { x: number; y: number }) => {
     if (!uploadedImageFile || !isAuthenticated) {
       setError('Você precisa estar logado e ter um arquivo carregado.');
       return;
@@ -187,11 +215,18 @@ export default function TestAIPage() {
       setIsProcessingAI(true);
       setError(null);
       setLoading(true);
+      setIsSelectingPosition(false);
 
-      // Calcular posição centralizada na imagem
+      // Calcular posição: usar a selecionada ou calcular centralizada
       const calculatePosition = (): { x: number; y: number } => {
+        if (position) {
+          // Usar posição selecionada pelo usuário
+          return position;
+        }
+
+        // Fallback: posição centralizada
         if (!imageRef.current || !canvasRef.current) {
-          return { x: 200, y: 200 }; // Fallback
+          return { x: 200, y: 200 };
         }
 
         const imgRect = imageRef.current.getBoundingClientRect();
@@ -199,11 +234,9 @@ export default function TestAIPage() {
         
         if (!canvasRect) return { x: 200, y: 200 };
 
-        // Calcular offset da imagem no canvas
         const imgOffsetX = imgRect.left - canvasRect.left;
         const imgOffsetY = imgRect.top - canvasRect.top;
 
-        // Posição centralizada na imagem
         const centerX = imgOffsetX + imgRect.width / 2 - 75;
         const centerY = imgOffsetY + imgRect.height / 2 - 75;
 
@@ -215,32 +248,92 @@ export default function TestAIPage() {
 
       const pos = calculatePosition();
 
-      // Criar prompt detalhado para a IA do nano-banana
-      const prompt = `Adicione um ${furniture.name} (${furniture.category.toLowerCase()}) nesta sala de forma realista e natural. O móvel deve estar perfeitamente integrado ao ambiente com: 
-- Iluminação e sombras corretas que seguem a luz do ambiente
-- Perspectiva adequada que respeita o ponto de vista da foto
-- Proporções realistas em relação aos outros elementos
-- Texturas e materiais que combinam com o ambiente
-- Sem distorções ou artefatos visuais
-O móvel deve parecer que realmente está na sala, como se tivesse sido fotografado no local.`;
-      
-      // Preparar arquivos: imagem do ambiente + imagem do produto (se disponível)
+      // Preparar arquivos: imagem do ambiente + imagem do produto (OBRIGATÓRIA)
       const productFiles: File[] = [];
       
-      // Se o produto tem imagem, tentar adicionar
-      if (furniture.imageUrl || (furniture.imageUrls && furniture.imageUrls.length > 0)) {
-        try {
-          const productImageUrl = furniture.imageUrl || (furniture.imageUrls && furniture.imageUrls[0]);
-          if (productImageUrl) {
-            const response = await fetch(productImageUrl);
-            const blob = await response.blob();
-            const productFile = new File([blob], `product-${furniture.id}.jpg`, { type: 'image/jpeg' });
-            productFiles.push(productFile);
-          }
-        } catch (err) {
-          console.warn('Não foi possível carregar imagem do produto:', err);
-        }
+      // OBRIGATÓRIO: Buscar imagem do produto selecionado
+      let productImageUrl = furniture.imageUrl || furniture.image || '';
+      
+      // Se não tem imageUrl, tentar imageUrls
+      if (!productImageUrl && furniture.imageUrls && furniture.imageUrls.length > 0) {
+        productImageUrl = furniture.imageUrls[0];
       }
+      
+      if (!productImageUrl) {
+        throw new Error(`Produto ${furniture.name} não possui imagem. Por favor, selecione um produto com imagem.`);
+      }
+
+      console.log('🖼️ Carregando imagem do produto:', productImageUrl);
+      
+      try {
+        // Tentar carregar a imagem do produto
+        const response = await fetch(productImageUrl, {
+          mode: 'cors',
+          credentials: 'omit',
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Erro ao carregar imagem: ${response.status} ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        
+        // Verificar se é uma imagem válida
+        if (!blob.type.startsWith('image/')) {
+          throw new Error('Arquivo não é uma imagem válida');
+        }
+        
+        const productFile = new File([blob], `product-${furniture.id}-${Date.now()}.${blob.type.split('/')[1] || 'jpg'}`, { 
+          type: blob.type || 'image/jpeg' 
+        });
+        
+        productFiles.push(productFile);
+        console.log('✅ Imagem do produto carregada com sucesso:', productFile.name, productFile.size, 'bytes');
+      } catch (err) {
+        console.error('❌ Erro ao carregar imagem do produto:', err);
+        throw new Error(`Não foi possível carregar a imagem do produto ${furniture.name}. Verifique se a URL da imagem está acessível.`);
+      }
+
+      // Calcular posição relativa na imagem (em porcentagem) para o prompt
+      let positionDescription = '';
+      if (position && imageRef.current && canvasRef.current) {
+        const imgRect = imageRef.current.getBoundingClientRect();
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const imgOffsetX = imgRect.left - canvasRect.left;
+        const imgOffsetY = imgRect.top - canvasRect.top;
+        
+        // Calcular posição relativa (0-100%)
+        const relativeX = ((position.x + 75 - imgOffsetX) / imgRect.width) * 100;
+        const relativeY = ((position.y + 75 - imgOffsetY) / imgRect.height) * 100;
+        
+        // Determinar região aproximada
+        let region = '';
+        if (relativeX < 33) region += 'lado esquerdo';
+        else if (relativeX > 67) region += 'lado direito';
+        else region += 'centro horizontal';
+        
+        if (relativeY < 33) region += ' da parte superior';
+        else if (relativeY > 67) region += ' da parte inferior';
+        else region += ' do meio';
+        
+        positionDescription = `\n\nPOSIÇÃO ESPECÍFICA: Coloque o móvel na região ${region} da imagem (aproximadamente ${Math.round(relativeX)}% da esquerda, ${Math.round(relativeY)}% do topo).`;
+      }
+
+      // Criar prompt detalhado que ESPECIFICA usar a imagem do produto enviada
+      const prompt = `IMPORTANTE: Use EXATAMENTE a imagem do produto que foi enviada como arquivo adicional. 
+
+Adicione o ${furniture.name} (${furniture.category.toLowerCase()}) desta imagem de produto na sala de forma realista e natural.${positionDescription}
+
+REQUISITOS OBRIGATÓRIOS:
+- Use a imagem EXATA do produto que foi enviada, não invente ou substitua por outro produto
+- O móvel deve estar perfeitamente integrado ao ambiente com iluminação e sombras corretas
+- Perspectiva adequada que respeita o ponto de vista da foto original
+- Proporções realistas em relação aos outros elementos da sala
+- Texturas e materiais que combinam com o ambiente
+- Sem distorções ou artefatos visuais
+- O móvel deve parecer que realmente está na sala, como se tivesse sido fotografado no local
+
+NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviada.`;
 
       // Usar o arquivo original (pode ser qualquer tipo)
       // Se temos uma imagem processada, usar ela; senão usar arquivo original
@@ -270,10 +363,20 @@ O móvel deve parecer que realmente está na sala, como se tivesse sido fotograf
         }
       }
 
+      // Validar que temos a imagem do produto antes de enviar
+      if (productFiles.length === 0) {
+        throw new Error('Erro: Imagem do produto não foi carregada. Por favor, tente novamente.');
+      }
+
+      console.log('📤 Enviando para IA:');
+      console.log('  - Ambiente:', environmentFile.name, environmentFile.size, 'bytes');
+      console.log('  - Produto:', productFiles[0].name, productFiles[0].size, 'bytes');
+      console.log('  - Prompt:', prompt.substring(0, 100) + '...');
+
       // Chamar IA do nano-banana - processa qualquer arquivo
       const result = await aiAPI.processImageWithUpload({
         file: environmentFile,
-        productFiles: productFiles.length > 0 ? productFiles : undefined,
+        productFiles: productFiles, // SEMPRE enviar a imagem do produto
         prompt,
         outputFormat: 'jpg',
       });
@@ -316,6 +419,8 @@ O móvel deve parecer que realmente está na sala, como se tivesse sido fotograf
         });
         
         setSelectedFurniture(null);
+        setPendingFurniture(null);
+        setSelectedPosition(null);
         setSuccessMessage(`${furniture.name} adicionado com IA!`);
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
@@ -328,9 +433,51 @@ O móvel deve parecer que realmente está na sala, como se tivesse sido fotograf
         : (error as { response?: { data?: { message?: string } } })?.response?.data?.message 
         || 'Erro ao processar imagem com IA. Tente novamente.';
       setError(errorMessage);
+      setPendingFurniture(null);
+      setIsSelectingPosition(false);
     } finally {
       setIsProcessingAI(false);
       setLoading(false);
+    }
+  };
+
+  // Handler para clicar na imagem e selecionar posição
+  const handleImageClickForPosition = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isSelectingPosition || !pendingFurniture || !imageRef.current || !canvasRef.current) {
+      return;
+    }
+
+    e.stopPropagation();
+    
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const imgRect = imageRef.current.getBoundingClientRect();
+    
+    if (!canvasRect || !imgRect) return;
+
+    // Calcular posição relativa à imagem
+    const imgOffsetX = imgRect.left - canvasRect.left;
+    const imgOffsetY = imgRect.top - canvasRect.top;
+    
+    const clickX = e.clientX - canvasRect.left;
+    const clickY = e.clientY - canvasRect.top;
+    
+    // Verificar se o clique foi dentro da imagem
+    if (clickX >= imgOffsetX && clickX <= imgOffsetX + imgRect.width &&
+        clickY >= imgOffsetY && clickY <= imgOffsetY + imgRect.height) {
+      
+      // Posição relativa à imagem (ajustar para o centro do móvel)
+      const position = {
+        x: clickX - 75, // Ajustar para o centro do móvel (150px / 2)
+        y: clickY - 75,
+      };
+      
+      setSelectedPosition(position);
+      setSuccessMessage('Posição selecionada! Processando com IA...');
+      
+      // Processar automaticamente após selecionar posição
+      setTimeout(() => {
+        handleAddFurniture(pendingFurniture, position);
+      }, 500);
     }
   };
 
@@ -650,8 +797,13 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
     return matchesSearch && matchesCategory;
   });
 
-  // Click no canvas para deselecionar
-  const handleCanvasClick = () => {
+  // Click no canvas para deselecionar ou selecionar posição
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (isSelectingPosition) {
+      handleImageClickForPosition(e);
+      return;
+    }
+    
     setSelectedFurniture(null);
     setPlacedFurniture(placedFurniture.map((f) => ({ ...f, isSelected: false })));
   };
@@ -661,19 +813,19 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
     return (
       <>
         <Header />
-        <div className="min-h-screen flex items-center justify-center bg-gray-50" style={{ paddingTop: '140px' }}>
-          <Card className="max-w-md w-full mx-4">
+        <div className="min-h-screen flex items-center justify-center bg-white" style={{ paddingTop: '180px' }}>
+          <Card className="max-w-md w-full mx-4 border-[#3e2626]/20 bg-white shadow-xl">
             <CardHeader>
-              <CardTitle className="text-2xl text-center">Acesso Necessário</CardTitle>
-              <CardDescription className="text-center">
+              <CardTitle className="text-2xl text-center text-[#3e2626]">Acesso Necessário</CardTitle>
+              <CardDescription className="text-center text-[#4f3a2f]/75">
                 Você precisa estar logado para usar o Visualizador de Móveis com IA
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button className="w-full" asChild>
+              <Button className="w-full bg-[#3e2626] hover:bg-[#4f3223] text-white" asChild>
                 <Link href="/login">Fazer Login</Link>
               </Button>
-              <Button variant="outline" className="w-full" asChild>
+              <Button variant="outline" className="w-full border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10" asChild>
                 <Link href="/teste-ia-landing">Ver Demonstração</Link>
               </Button>
             </CardContent>
@@ -688,18 +840,18 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
       {/* Navbar */}
       <Header />
       
-      <div className="flex flex-col bg-gray-50" style={{ minHeight: '100vh', paddingTop: '140px' }}>
+      <div className="flex flex-col bg-white" style={{ minHeight: '100vh', paddingTop: '180px' }}>
         {/* Header com ferramentas */}
-        <div className="sticky top-[140px] z-30 bg-white shadow-sm">
-          <div className="container mx-auto flex items-center justify-between gap-4 border-b border-gray-200 px-4 py-3">
+        <div className="sticky top-[180px] z-30 bg-white shadow-sm border-b border-[#3e2626]/10">
+          <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-3">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-blue-600" />
-                <h1 className="text-xl font-bold text-gray-900">Visualizador de Móveis com IA</h1>
+                <Sparkles className="h-6 w-6 text-[#C07A45]" />
+                <h1 className="text-xl font-black text-[#3e2626]">Visualizador de Móveis com IA</h1>
               </div>
               {uploadedImage && (
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={handleUndo} disabled={historyIndex === 0}>
+                  <Button variant="outline" size="sm" onClick={handleUndo} disabled={historyIndex === 0} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
                     <Undo2 className="h-4 w-4" />
                   </Button>
                   <Button
@@ -707,22 +859,23 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                     size="sm"
                     onClick={handleRedo}
                     disabled={historyIndex === history.length - 1}
+                    className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10"
                   >
                     <Redo2 className="h-4 w-4" />
                   </Button>
-                  <div className="mx-2 h-6 w-px bg-gray-300" />
+                  <div className="mx-2 h-6 w-px bg-[#3e2626]/20" />
                   {selectedFurniture && (
                     <>
-                      <Button variant="outline" size="sm" onClick={() => handleRotate('left')}>
+                      <Button variant="outline" size="sm" onClick={() => handleRotate('left')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
                         <RotateCw className="h-4 w-4 rotate-[-90]" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleRotate('right')}>
+                      <Button variant="outline" size="sm" onClick={() => handleRotate('right')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
                         <RotateCw className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleScale('out')}>
+                      <Button variant="outline" size="sm" onClick={() => handleScale('out')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
                         <ZoomIn className="h-4 w-4 rotate-180" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleScale('in')}>
+                      <Button variant="outline" size="sm" onClick={() => handleScale('in')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
                         <ZoomIn className="h-4 w-4" />
                       </Button>
                     </>
@@ -737,20 +890,21 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                   variant="outline"
                   onClick={handleAutoPosition}
                   disabled={isProcessingAI || placedFurniture.length === 0}
+                  className="border-[#C07A45]/50 text-[#3e2626] hover:bg-[#C07A45]/10 hover:border-[#C07A45]"
                 >
                   {isProcessingAI ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin text-[#C07A45]" />
                       Processando imagem com IA...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="mr-2 h-4 w-4" />
+                      <Sparkles className="mr-2 h-4 w-4 text-[#C07A45]" />
                       Auto posicionar móveis
                     </>
                   )}
                 </Button>
-                <Button onClick={handleSaveImage}>
+                <Button onClick={handleSaveImage} className="bg-[#3e2626] hover:bg-[#4f3223] text-white">
                   <Download className="mr-2 h-4 w-4" />
                   Salvar imagem
                 </Button>
@@ -762,10 +916,10 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
         {/* Mensagens de erro/sucesso */}
         {error && (
           <div className="container mx-auto px-4">
-            <div className="mt-2 flex items-center gap-2 border-l-4 border-red-500 bg-red-50 px-4 py-3">
+            <div className="mt-2 flex items-center gap-2 border-l-4 border-red-500 bg-red-50 px-4 py-3 rounded-r-lg">
               <AlertCircle className="h-5 w-5 text-red-500" />
               <p className="text-sm text-red-700">{error}</p>
-              <Button variant="ghost" size="icon" onClick={() => setError(null)} className="ml-auto h-6 w-6">
+              <Button variant="ghost" size="icon" onClick={() => setError(null)} className="ml-auto h-6 w-6 hover:bg-red-100">
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -774,8 +928,8 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
 
         {successMessage && (
           <div className="container mx-auto px-4">
-            <div className="mt-2 flex items-center gap-2 border-l-4 border-green-500 bg-green-50 px-4 py-3 text-sm text-green-700 animate-in slide-in-from-top">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
+            <div className="mt-2 flex items-center gap-2 border-l-4 border-[#C07A45] bg-[#F7C194]/20 px-4 py-3 text-sm text-[#3e2626] rounded-r-lg animate-in slide-in-from-top">
+              <CheckCircle2 className="h-5 w-5 text-[#C07A45]" />
               <p>{successMessage}</p>
             </div>
           </div>
@@ -788,23 +942,23 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
             style={{ height: 'calc(100vh - 220px)' }}
           >
             {/* Coluna esquerda - Canvas */}
-            <div className="flex flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white">
+            <div className="flex flex-1 flex-col overflow-hidden border-r border-[#3e2626]/10 bg-white">
               {!uploadedImage ? (
                 <div className="flex flex-1 items-center justify-center p-8 animate-in fade-in duration-500">
-                  <Card className="w-full max-w-2xl animate-in slide-in-from-bottom-4 duration-500">
+                  <Card className="w-full max-w-2xl animate-in slide-in-from-bottom-4 duration-500 border-[#3e2626]/20 bg-white shadow-xl">
                     <CardContent className="p-8">
                       <div
                         {...getRootProps()}
-                        className={`cursor-pointer rounded-lg border-2 border-dashed p-12 text-center transition-all ${
-                          isDragActive ? 'border-blue-500 bg-blue-50 scale-105' : 'border-gray-300 hover:border-gray-400'
+                        className={`cursor-pointer rounded-3xl border-2 border-dashed p-12 text-center transition-all ${
+                          isDragActive ? 'border-[#C07A45] bg-[#F7C194]/20 scale-105' : 'border-[#3e2626]/30 hover:border-[#C07A45] hover:bg-white'
                         }`}
                       >
                         <input {...getInputProps()} />
-                        <Upload className="mx-auto mb-4 h-16 w-16 text-gray-400" />
-                        <p className="mb-2 text-lg font-medium text-gray-700">
+                        <Upload className="mx-auto mb-4 h-16 w-16 text-[#C07A45]" />
+                        <p className="mb-2 text-lg font-semibold text-[#3e2626]">
                           {isDragActive ? 'Solte a imagem aqui' : 'Arraste sua foto aqui ou clique para enviar'}
                         </p>
-                        <p className="mb-6 text-sm text-gray-500">
+                        <p className="mb-6 text-sm text-[#4f3a2f]/70">
                           Aceita qualquer tipo de arquivo - imagens serão processadas com IA do nano-banana
                         </p>
                         <div className="flex justify-center gap-4">
@@ -814,6 +968,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                               e.stopPropagation();
                               open();
                             }}
+                            className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10"
                           >
                             <Upload className="mr-2 h-4 w-4" />
                             Enviar foto
@@ -824,6 +979,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                               e.stopPropagation();
                               handleCameraClick();
                             }}
+                            className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10"
                           >
                             <Camera className="mr-2 h-4 w-4" />
                             Abrir câmera
@@ -834,11 +990,39 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                   </Card>
                 </div>
               ) : (
-                <div className="relative flex flex-1 overflow-auto bg-gray-100 animate-in fade-in duration-500">
+                <div className="relative flex flex-1 overflow-auto bg-white animate-in fade-in duration-500">
                   <div
                     ref={canvasRef}
-                    className="relative flex min-h-full items-center justify-center cursor-default p-8"
+                    className={`relative flex min-h-full items-center justify-center p-8 ${
+                      isSelectingPosition ? 'cursor-crosshair' : 'cursor-default'
+                    }`}
                     onClick={handleCanvasClick}
+                    onMouseMove={(e) => {
+                      if (isSelectingPosition && imageRef.current && canvasRef.current) {
+                        const canvasRect = canvasRef.current.getBoundingClientRect();
+                        const imgRect = imageRef.current.getBoundingClientRect();
+                        const imgOffsetX = imgRect.left - canvasRect.left;
+                        const imgOffsetY = imgRect.top - canvasRect.top;
+                        
+                        const mouseX = e.clientX - canvasRect.left;
+                        const mouseY = e.clientY - canvasRect.top;
+                        
+                        if (mouseX >= imgOffsetX && mouseX <= imgOffsetX + imgRect.width &&
+                            mouseY >= imgOffsetY && mouseY <= imgOffsetY + imgRect.height) {
+                          setHoverPosition({
+                            x: mouseX - 75,
+                            y: mouseY - 75,
+                          });
+                        } else {
+                          setHoverPosition(null);
+                        }
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      if (isSelectingPosition) {
+                        setHoverPosition(null);
+                      }
+                    }}
                   >
                     <div className="relative max-h-full max-w-full animate-in zoom-in-95 duration-500">
                       {uploadedImage && uploadedImage.startsWith('data:image') ? (
@@ -870,54 +1054,75 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                         </div>
                       ) : null}
 
-                      {/* Overlay de móveis colocados */}
-                      {placedFurniture.map((furniture) => (
-                        <div
-                          key={furniture.id}
-                          className={`absolute cursor-move animate-in fade-in zoom-in-95 duration-300 ${
-                            furniture.isSelected ? 'z-10 ring-2 ring-blue-500 ring-offset-2' : 'z-0'
-                          }`}
-                          style={{
-                            left: `${furniture.x}px`,
-                            top: `${furniture.y}px`,
-                            width: `${furniture.width}px`,
-                            height: `${furniture.height}px`,
-                            transform: `rotate(${furniture.rotation}deg) scale(${furniture.scale})`,
-                            transformOrigin: 'center center',
-                          }}
-                          onClick={(e) => handleFurnitureClick(furniture, e)}
-                          onMouseDown={(e) => handleMouseDown(furniture, e)}
-                        >
-                          <div className="relative flex h-full w-full items-center justify-center rounded-lg border-2 border-gray-300 bg-white shadow-lg">
-                            <div className="p-2 text-center text-xs text-gray-400">{furniture.name}</div>
-                            {furniture.isSelected && (
-                              <>
-                                <div className="absolute -left-2 -top-2 cursor-grab rounded-full bg-blue-500 p-1 text-white active:cursor-grabbing">
-                                  <GripVertical className="h-4 w-4" />
-                                </div>
-                                <button
-                                  className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveFurniture(furniture.id);
-                                  }}
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </>
-                            )}
+                      {/* Overlay de seleção de posição */}
+                      {isSelectingPosition && !isProcessingAI && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/20 backdrop-blur-[2px] pointer-events-none">
+                          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white/95 backdrop-blur-sm p-6 shadow-2xl border-2 border-[#C07A45] pointer-events-auto">
+                            <Sparkles className="h-8 w-8 text-[#C07A45] animate-pulse" />
+                            <p className="text-lg font-semibold text-[#3e2626] text-center">
+                              Clique na imagem para escolher onde colocar
+                            </p>
+                            <p className="text-sm text-[#4f3a2f]/70 text-center">
+                              {pendingFurniture?.name}
+                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCancelPositionSelection}
+                              className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10"
+                            >
+                              Cancelar
+                            </Button>
                           </div>
                         </div>
-                      ))}
+                      )}
+
+                      {/* Indicador de hover (posição do mouse) */}
+                      {hoverPosition && isSelectingPosition && !isProcessingAI && !selectedPosition && (
+                        <div
+                          className="absolute z-20 pointer-events-none"
+                          style={{
+                            left: `${hoverPosition.x}px`,
+                            top: `${hoverPosition.y}px`,
+                            width: '150px',
+                            height: '150px',
+                          }}
+                        >
+                          <div className="relative w-full h-full border-2 border-[#C07A45] border-dashed rounded-lg bg-[#C07A45]/5">
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45]/80 text-white px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
+                              {pendingFurniture?.name}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Indicador de posição selecionada */}
+                      {selectedPosition && isSelectingPosition && !isProcessingAI && imageRef.current && canvasRef.current && (
+                        <div
+                          className="absolute z-20 pointer-events-none"
+                          style={{
+                            left: `${selectedPosition.x}px`,
+                            top: `${selectedPosition.y}px`,
+                            width: '150px',
+                            height: '150px',
+                          }}
+                        >
+                          <div className="relative w-full h-full border-4 border-[#C07A45] border-dashed rounded-lg bg-[#C07A45]/10 animate-pulse">
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45] text-white px-3 py-1 rounded-full text-xs font-semibold">
+                              {pendingFurniture?.name}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Overlay de IA processando */}
                       {isProcessingAI && (
-                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black bg-opacity-50">
-                          <div className="flex flex-col items-center gap-4 rounded-lg bg-white p-6">
-                            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-                            <p className="text-lg font-medium">Processando com nano-banana AI...</p>
-                            <p className="text-sm text-gray-500">Aguarde alguns segundos</p>
-                            <p className="text-xs text-gray-400">Powered by Replicate</p>
+                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm">
+                          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-[#3e2626]/20">
+                            <Loader2 className="h-12 w-12 animate-spin text-[#C07A45]" />
+                            <p className="text-lg font-semibold text-[#3e2626]">Processando com nano-banana AI...</p>
+                            <p className="text-sm text-[#4f3a2f]/70">Aguarde alguns segundos</p>
+                            <p className="text-xs text-[#4f3a2f]/50">Powered by Replicate</p>
                           </div>
                         </div>
                       )}
@@ -928,16 +1133,16 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
             </div>
 
             {/* Coluna direita - Catálogo */}
-            <div className="flex w-96 flex-col border-l border-gray-200 bg-white animate-in slide-in-from-right duration-500">
-              <div className="border-b border-gray-200 p-4">
+            <div className="flex w-96 flex-col border-l border-[#3e2626]/10 bg-white animate-in slide-in-from-right duration-500">
+              <div className="border-b border-[#3e2626]/10 p-4 bg-white">
                 <div className="relative mb-4 animate-in fade-in slide-in-from-top duration-500 delay-100">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-[#4f3a2f]/50" />
                   <Input
                     type="text"
                     placeholder="Buscar produtos..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 border-[#3e2626]/20 focus:border-[#C07A45] focus:ring-[#C07A45]/20 bg-white"
                   />
                 </div>
 
@@ -948,7 +1153,11 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                       variant={selectedCategory === category ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setSelectedCategory(category)}
-                      className="text-xs"
+                      className={`text-xs ${
+                        selectedCategory === category
+                          ? 'bg-[#3e2626] hover:bg-[#4f3223] text-white'
+                          : 'border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10'
+                      }`}
                     >
                       {category !== 'Todos' && CATEGORY_ICONS[category]}
                       <span className={category !== 'Todos' ? 'ml-1' : ''}>{category}</span>
@@ -959,19 +1168,19 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
 
               <div className="flex-1 space-y-4 overflow-y-auto p-4">
                 {filteredProducts.length === 0 ? (
-                  <div className="py-8 text-center text-gray-500 animate-in fade-in duration-500">
+                  <div className="py-8 text-center text-[#4f3a2f]/60 animate-in fade-in duration-500">
                     <p>Nenhum produto encontrado</p>
                   </div>
                 ) : (
                   filteredProducts.map((product, index) => (
                     <Card
                       key={product.id}
-                      className="transition-shadow animate-in fade-in slide-in-from-right duration-300 hover:shadow-md"
+                      className="transition-all animate-in fade-in slide-in-from-right duration-300 hover:shadow-lg border-[#3e2626]/10 hover:border-[#C07A45]/30"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <CardContent className="p-4">
                         <div className="flex gap-4">
-                          <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-200">
+                          <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white border border-[#3e2626]/10">
                             {product.imageUrl ? (
                               <Image
                                 src={product.imageUrl}
@@ -982,15 +1191,15 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                               />
                             ) : (
                               <div className="flex items-center justify-center">
-                                {CATEGORY_ICONS[product.category] || <Sofa className="h-8 w-8 text-gray-400" />}
+                                {CATEGORY_ICONS[product.category] || <Sofa className="h-8 w-8 text-[#4f3a2f]/40" />}
                               </div>
                             )}
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <h3 className="mb-1 truncate text-sm font-semibold">{product.name}</h3>
-                            <p className="mb-2 text-xs text-gray-500">{product.category}</p>
-                            <p className="mb-3 text-lg font-bold text-blue-600">
+                            <h3 className="mb-1 truncate text-sm font-semibold text-[#3e2626]">{product.name}</h3>
+                            <p className="mb-2 text-xs text-[#4f3a2f]/70">{product.category}</p>
+                            <p className="mb-3 text-lg font-bold text-[#C07A45]">
                               R${' '}
                               {product.price.toLocaleString('pt-BR', {
                                 minimumFractionDigits: 2,
@@ -999,14 +1208,19 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                             </p>
                             <Button
                               size="sm"
-                              className="w-full"
-                              onClick={() => handleAddFurniture(product)}
-                              disabled={!uploadedImage || isProcessingAI || !isAuthenticated}
+                              className="w-full bg-[#3e2626] hover:bg-[#4f3223] text-white"
+                              onClick={() => handleStartAddFurniture(product)}
+                              disabled={!uploadedImage || isProcessingAI || isSelectingPosition || !isAuthenticated}
                             >
                               {isProcessingAI ? (
                                 <>
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                   Processando IA...
+                                </>
+                              ) : isSelectingPosition && pendingFurniture?.id === product.id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Selecionando posição...
                                 </>
                               ) : (
                                 <>
