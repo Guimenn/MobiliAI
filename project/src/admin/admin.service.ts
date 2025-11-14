@@ -1,9 +1,10 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole, ProductCategory, ProductStyle, MaterialType } from '@prisma/client';
+import { UserRole, ProductCategory, ProductStyle, MaterialType, MedicalCertificateType, MedicalCertificateStatus } from '@prisma/client';
 import { UploadService } from '../upload/upload.service';
 import { TrellisService } from '../trellis/trellis.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CreateMedicalCertificateDto } from './dto/create-medical-certificate.dto';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -2711,5 +2712,213 @@ export class AdminService {
     });
 
     return { message: 'Produto removido do estoque da loja com sucesso' };
+  }
+
+  // ==================== GESTÃO DE ATESTADOS MÉDICOS ====================
+
+  async createMedicalCertificate(adminId: string, createDto: CreateMedicalCertificateDto) {
+    // Verificar se o funcionário existe
+    const employee = await this.prisma.user.findUnique({
+      where: { id: createDto.employeeId },
+      include: { store: true }
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Funcionário não encontrado');
+    }
+
+    // Verificar se o funcionário é um funcionário (não cliente)
+    if (employee.role === UserRole.CUSTOMER) {
+      throw new BadRequestException('Não é possível registrar atestado para clientes');
+    }
+
+    // Validar datas
+    const startDate = new Date(createDto.startDate);
+    const endDate = new Date(createDto.endDate);
+    const now = new Date();
+
+    if (startDate > endDate) {
+      throw new BadRequestException('Data de início deve ser anterior à data de fim');
+    }
+
+    // Criar atestado e inativar funcionário em uma transação
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Criar o atestado
+      const certificate = await tx.medicalCertificate.create({
+        data: {
+          employeeId: createDto.employeeId,
+          startDate: startDate,
+          endDate: endDate,
+          type: createDto.type as MedicalCertificateType,
+          reason: createDto.reason,
+          doctorName: createDto.doctorName,
+          doctorCrm: createDto.doctorCrm,
+          clinicName: createDto.clinicName,
+          status: (createDto.status || MedicalCertificateStatus.APPROVED) as MedicalCertificateStatus,
+          notes: createDto.notes,
+          attachmentUrl: createDto.attachmentUrl,
+          registeredById: adminId,
+        },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              isActive: true,
+            }
+          },
+          registeredBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          }
+        }
+      });
+
+      // Inativar funcionário se o atestado estiver aprovado e ainda estiver no período
+      if (certificate.status === MedicalCertificateStatus.APPROVED) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endDateOnly = new Date(endDate);
+        endDateOnly.setHours(23, 59, 59, 999);
+
+        // Se o período do atestado ainda não terminou, inativar o funcionário
+        if (today <= endDateOnly) {
+          await tx.user.update({
+            where: { id: createDto.employeeId },
+            data: { isActive: false }
+          });
+        }
+      }
+
+      return certificate;
+    });
+
+    return result;
+  }
+
+  async getMedicalCertificates(employeeId?: string) {
+    const where = employeeId ? { employeeId } : {};
+    
+    return this.prisma.medicalCertificate.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          }
+        },
+        registeredBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+  }
+
+  async getMedicalCertificateById(id: string) {
+    const certificate = await this.prisma.medicalCertificate.findUnique({
+      where: { id },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            store: {
+              select: {
+                id: true,
+                name: true,
+              }
+            }
+          }
+        },
+        registeredBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        }
+      }
+    });
+
+    if (!certificate) {
+      throw new NotFoundException('Atestado não encontrado');
+    }
+
+    return certificate;
+  }
+
+  // Método para reativar funcionários quando o período do atestado expirar
+  async reactivateEmployeesWithExpiredCertificates() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Buscar atestados aprovados que expiraram hoje ou antes
+    const expiredCertificates = await this.prisma.medicalCertificate.findMany({
+      where: {
+        status: MedicalCertificateStatus.APPROVED,
+        endDate: {
+          lt: today
+        },
+        employee: {
+          isActive: false
+        }
+      },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            isActive: true,
+          }
+        }
+      }
+    });
+
+    // Reativar funcionários
+    const reactivatedIds: string[] = [];
+    for (const certificate of expiredCertificates) {
+      // Verificar se não há outros atestados ativos
+      const activeCertificates = await this.prisma.medicalCertificate.findFirst({
+        where: {
+          employeeId: certificate.employeeId,
+          status: MedicalCertificateStatus.APPROVED,
+          startDate: {
+            lte: today
+          },
+          endDate: {
+            gte: today
+          }
+        }
+      });
+
+      // Se não há atestados ativos, reativar o funcionário
+      if (!activeCertificates) {
+        await this.prisma.user.update({
+          where: { id: certificate.employeeId },
+          data: { isActive: true }
+        });
+        reactivatedIds.push(certificate.employeeId);
+      }
+    }
+
+    return {
+      message: `${reactivatedIds.length} funcionário(s) reativado(s)`,
+      reactivatedIds
+    };
   }
 }

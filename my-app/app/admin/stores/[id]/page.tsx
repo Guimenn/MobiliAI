@@ -346,12 +346,57 @@ export default function StoreDetailsPage() {
   const handleMedicalCertificate = async (certificateData: any) => {
     try {
       setIsProcessingMedical(true);
-      // Aqui você implementaria a chamada para a API de atestados
-      console.log('Processando atestado:', certificateData);
+      
+      // Preparar dados do atestado
+      const payload = {
+        employeeId: certificateData.employeeId,
+        startDate: certificateData.startDate,
+        endDate: certificateData.endDate,
+        type: certificateData.type,
+        reason: certificateData.reason,
+        doctorName: certificateData.doctorName,
+        doctorCrm: certificateData.doctorCrm,
+        clinicName: certificateData.clinicName,
+        status: certificateData.status || 'APPROVED',
+        notes: certificateData.notes || '',
+        attachmentUrl: certificateData.attachmentUrl || null
+      };
+
+      // Determinar o endpoint baseado no contexto (admin ou manager)
+      const { user } = useAppStore.getState();
+      const isAdmin = user?.role === 'ADMIN';
+      const endpoint = isAdmin 
+        ? `http://localhost:3001/api/admin/medical-certificates`
+        : `http://localhost:3001/api/manager/medical-certificates`;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao registrar atestado');
+      }
+
+      const result = await response.json();
+      console.log('Atestado registrado com sucesso:', result);
+      
+      // Recarregar funcionários para atualizar status
+      await loadEmployees();
+      
       setShowMedicalModal(false);
       setSelectedEmployee(null);
-    } catch (error) {
+      
+      // Mostrar mensagem de sucesso
+      alert('Atestado registrado com sucesso! O funcionário foi inativado durante o período do atestado.');
+    } catch (error: any) {
       console.error('Erro ao processar atestado:', error);
+      alert(`Erro ao registrar atestado: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setIsProcessingMedical(false);
     }

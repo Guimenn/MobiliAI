@@ -435,12 +435,12 @@ export default function ProductsPage() {
     return diff;
   }, []);
 
-  // Seleciona produto com oferta relâmpago ativa
+  // Seleciona produto com oferta relâmpago REALMENTE ativa (já começou)
   const pickFlashSaleProduct = useCallback(() => {
     if (!products || products.length === 0) return null;
     
-    // Buscar produtos com oferta relâmpago ativa
-    const flashSaleProducts = products.filter(p => isSaleActive(p) && p.isFlashSale);
+    // Buscar produtos com oferta relâmpago REALMENTE ativa (já começou)
+    const flashSaleProducts = products.filter(p => isFlashSaleActuallyActive(p) && p.isFlashSale);
     
     if (flashSaleProducts.length > 0) {
       // Selecionar aleatoriamente entre os produtos com oferta ativa
@@ -449,7 +449,7 @@ export default function ProductsPage() {
     }
     
     return null;
-  }, [products, isSaleActive]);
+  }, [products, isFlashSaleActuallyActive]);
 
   // Inicializa produto em destaque quando produtos carregarem
   useEffect(() => {
@@ -457,7 +457,13 @@ export default function ProductsPage() {
       // Debug: Verificar produtos com oferta relâmpago
       const flashSaleProducts = products.filter(p => p.isFlashSale);
       console.log('🔍 [PRODUTOS] Produtos com isFlashSale=true:', flashSaleProducts.length);
+      
+      // Verificar quais estão REALMENTE ativas (já começaram)
+      const actuallyActiveProducts = products.filter(p => isFlashSaleActuallyActive(p) && p.isFlashSale);
+      console.log('✅ [PRODUTOS] Produtos com oferta relâmpago REALMENTE ATIVA (já começou):', actuallyActiveProducts.length);
+      
       flashSaleProducts.forEach(p => {
+        const isActuallyActive = isFlashSaleActuallyActive(p);
         console.log(`  - ${p.name}:`, {
           id: p.id,
           isFlashSale: p.isFlashSale,
@@ -465,34 +471,63 @@ export default function ProductsPage() {
           flashSaleEndDate: p.flashSaleEndDate,
           flashSaleDiscountPercent: p.flashSaleDiscountPercent,
           flashSalePrice: p.flashSalePrice,
-          tipoFlashSaleStartDate: typeof p.flashSaleStartDate,
-          tipoFlashSaleEndDate: typeof p.flashSaleEndDate,
-          flashSaleStartDateValido: p.flashSaleStartDate ? !isNaN(new Date(p.flashSaleStartDate).getTime()) : false,
-          flashSaleEndDateValido: p.flashSaleEndDate ? !isNaN(new Date(p.flashSaleEndDate).getTime()) : false,
-          isActive: isSaleActive(p)
+          isActuallyActive: isActuallyActive,
+          isSaleActive: isSaleActive(p) // Para comparar
         });
       });
       
       const product = pickFlashSaleProduct();
-      console.log('✅ Produto selecionado para oferta relâmpago:', product?.name || 'Nenhum');
+      console.log('🎯 [PRODUTOS] Produto selecionado para oferta relâmpago:', product?.name || 'Nenhum');
+      
       if (product) {
         setSpecialOfferProduct(product);
         const timeRemaining = getTimeRemaining(product);
         setOfferSecondsLeft(timeRemaining > 0 ? timeRemaining : OFFER_DURATION);
+        console.log('✅ [PRODUTOS] Oferta relâmpago configurada para:', product.name);
       } else {
         // Se não houver oferta ativa, não mostrar nenhum produto
+        console.log('❌ [PRODUTOS] Nenhuma oferta relâmpago ativa encontrada');
         setSpecialOfferProduct(null);
         setOfferSecondsLeft(0);
       }
     }
-  }, [products]);
+  }, [products, isFlashSaleActuallyActive, pickFlashSaleProduct, getTimeRemaining, isSaleActive]);
 
   // Cronômetro da oferta relâmpago - atualiza baseado no tempo real restante
   useEffect(() => {
     if (!specialOfferProduct) return;
     
+    // Verificar se a oferta ainda está realmente ativa
+    if (!isFlashSaleActuallyActive(specialOfferProduct)) {
+      console.log('⏰ [PRODUTOS] Oferta expirou ou ainda não começou, buscando próxima...');
+      const nextProduct = pickFlashSaleProduct();
+      if (nextProduct) {
+        setSpecialOfferProduct(nextProduct);
+        const nextTimeRemaining = getTimeRemaining(nextProduct);
+        setOfferSecondsLeft(nextTimeRemaining > 0 ? nextTimeRemaining : 0);
+      } else {
+        setSpecialOfferProduct(null);
+        setOfferSecondsLeft(0);
+      }
+      return;
+    }
+    
     // Atualizar timer imediatamente
     const updateTimer = () => {
+      // Verificar novamente se ainda está ativa
+      if (!isFlashSaleActuallyActive(specialOfferProduct)) {
+        const nextProduct = pickFlashSaleProduct();
+        if (nextProduct) {
+          setSpecialOfferProduct(nextProduct);
+          const nextTimeRemaining = getTimeRemaining(nextProduct);
+          setOfferSecondsLeft(nextTimeRemaining > 0 ? nextTimeRemaining : 0);
+        } else {
+          setSpecialOfferProduct(null);
+          setOfferSecondsLeft(0);
+        }
+        return;
+      }
+      
       const timeRemaining = getTimeRemaining(specialOfferProduct);
       if (timeRemaining > 0) {
         setOfferSecondsLeft(timeRemaining);
@@ -518,7 +553,7 @@ export default function ProductsPage() {
     const intervalId = setInterval(updateTimer, 1000);
 
     return () => clearInterval(intervalId);
-  }, [specialOfferProduct, products]);
+  }, [specialOfferProduct, products, isFlashSaleActuallyActive, pickFlashSaleProduct, getTimeRemaining]);
 
   const formatTime = (totalSeconds: number) => {
     const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
@@ -661,8 +696,8 @@ export default function ProductsPage() {
 
           {/* Seção Principal: Oferta Relâmpago e Produtos Recentes */}
           {!searchTerm && (() => {
-            // Verificar se há oferta relâmpago ativa
-            const hasActiveFlashSale = specialOfferProduct && isSaleActive(specialOfferProduct) && specialOfferProduct.isFlashSale;
+            // Verificar se há oferta relâmpago REALMENTE ativa (já começou)
+            const hasActiveFlashSale = specialOfferProduct && isFlashSaleActuallyActive(specialOfferProduct) && specialOfferProduct.isFlashSale;
             
             return (
               <div className="mb-6 grid grid-cols-1 lg:grid-cols-12 gap-4">

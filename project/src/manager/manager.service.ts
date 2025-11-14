@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { UserRole, MedicalCertificateType, MedicalCertificateStatus } from '@prisma/client';
+import { CreateMedicalCertificateDto } from '../admin/dto/create-medical-certificate.dto';
 import * as bcrypt from 'bcryptjs';
 import { AdminService } from '../admin/admin.service';
 
@@ -1058,5 +1059,210 @@ export class ManagerService {
 
   async removeProductFromStore(storeId: string, productId: string) {
     return this.adminService.removeProductFromStore(storeId, productId);
+  }
+
+  // ==================== GESTÃO DE ATESTADOS MÉDICOS ====================
+
+  async createMedicalCertificate(managerId: string, createDto: CreateMedicalCertificateDto) {
+    // Verificar se o gerente tem uma loja atribuída
+    const manager = await this.prisma.user.findUnique({
+      where: { id: managerId },
+      include: { store: true }
+    });
+
+    if (!manager || !manager.store) {
+      throw new NotFoundException('Gerente não encontrado ou sem loja atribuída');
+    }
+
+    // Verificar se o funcionário existe e pertence à mesma loja
+    const employee = await this.prisma.user.findUnique({
+      where: { id: createDto.employeeId },
+      include: { store: true }
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Funcionário não encontrado');
+    }
+
+    // Verificar se o funcionário pertence à mesma loja do gerente
+    if (employee.storeId !== manager.store.id) {
+      throw new ForbiddenException('Você só pode registrar atestados para funcionários da sua própria loja');
+    }
+
+    // Verificar se o funcionário é um funcionário (não cliente)
+    if (employee.role === UserRole.CUSTOMER) {
+      throw new BadRequestException('Não é possível registrar atestado para clientes');
+    }
+
+    // Validar datas
+    const startDate = new Date(createDto.startDate);
+    const endDate = new Date(createDto.endDate);
+
+    if (startDate > endDate) {
+      throw new BadRequestException('Data de início deve ser anterior à data de fim');
+    }
+
+    // Criar atestado e inativar funcionário em uma transação
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Criar o atestado
+      const certificate = await tx.medicalCertificate.create({
+        data: {
+          employeeId: createDto.employeeId,
+          startDate: startDate,
+          endDate: endDate,
+          type: createDto.type as MedicalCertificateType,
+          reason: createDto.reason,
+          doctorName: createDto.doctorName,
+          doctorCrm: createDto.doctorCrm,
+          clinicName: createDto.clinicName,
+          status: (createDto.status || MedicalCertificateStatus.APPROVED) as MedicalCertificateStatus,
+          notes: createDto.notes,
+          attachmentUrl: createDto.attachmentUrl,
+          registeredById: managerId,
+        },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              isActive: true,
+            }
+          },
+          registeredBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          }
+        }
+      });
+
+      // Inativar funcionário se o atestado estiver aprovado e ainda estiver no período
+      if (certificate.status === MedicalCertificateStatus.APPROVED) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endDateOnly = new Date(endDate);
+        endDateOnly.setHours(23, 59, 59, 999);
+
+        // Se o período do atestado ainda não terminou, inativar o funcionário
+        if (today <= endDateOnly) {
+          await tx.user.update({
+            where: { id: createDto.employeeId },
+            data: { isActive: false }
+          });
+        }
+      }
+
+      return certificate;
+    });
+
+    return result;
+  }
+
+  async getMedicalCertificates(managerId: string, employeeId?: string) {
+    // Verificar se o gerente tem uma loja atribuída
+    const manager = await this.prisma.user.findUnique({
+      where: { id: managerId },
+      include: { store: true }
+    });
+
+    if (!manager || !manager.store) {
+      throw new NotFoundException('Gerente não encontrado ou sem loja atribuída');
+    }
+
+    const where: any = {
+      employee: {
+        storeId: manager.store.id
+      }
+    };
+
+    if (employeeId) {
+      // Verificar se o funcionário pertence à mesma loja
+      const employee = await this.prisma.user.findUnique({
+        where: { id: employeeId }
+      });
+
+      if (!employee || employee.storeId !== manager.store.id) {
+        throw new ForbiddenException('Funcionário não pertence à sua loja');
+      }
+
+      where.employeeId = employeeId;
+    }
+    
+    return this.prisma.medicalCertificate.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          }
+        },
+        registeredBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+  }
+
+  async getMedicalCertificateById(managerId: string, id: string) {
+    // Verificar se o gerente tem uma loja atribuída
+    const manager = await this.prisma.user.findUnique({
+      where: { id: managerId },
+      include: { store: true }
+    });
+
+    if (!manager || !manager.store) {
+      throw new NotFoundException('Gerente não encontrado ou sem loja atribuída');
+    }
+
+    const certificate = await this.prisma.medicalCertificate.findUnique({
+      where: { id },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            store: {
+              select: {
+                id: true,
+                name: true,
+              }
+            }
+          }
+        },
+        registeredBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        }
+      }
+    });
+
+    if (!certificate) {
+      throw new NotFoundException('Atestado não encontrado');
+    }
+
+    // Verificar se o funcionário pertence à mesma loja do gerente
+    if (certificate.employee.storeId !== manager.store.id) {
+      throw new ForbiddenException('Você só pode visualizar atestados de funcionários da sua própria loja');
+    }
+
+    return certificate;
   }
 }

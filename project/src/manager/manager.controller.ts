@@ -9,6 +9,7 @@ import { CreateUserDto } from '../admin/dto/create-user.dto';
 import { UpdateUserDto } from '../admin/dto/update-user.dto';
 import { CreateProductDto } from '../admin/dto/create-product.dto';
 import { ChangePasswordDto } from '../admin/dto/change-password.dto';
+import { CreateMedicalCertificateDto } from '../admin/dto/create-medical-certificate.dto';
 
 @Controller('manager')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -332,5 +333,31 @@ export class ManagerController {
       throw new Error('Usuário não está vinculado a uma loja');
     }
     return this.managerService.removeProductFromStore(userStoreId, productId);
+  }
+
+  // ==================== GESTÃO DE ATESTADOS MÉDICOS ====================
+
+  @Post('medical-certificates')
+  async createMedicalCertificate(
+    @Request() req,
+    @Body() createDto: CreateMedicalCertificateDto
+  ) {
+    return this.managerService.createMedicalCertificate(req.user.id, createDto);
+  }
+
+  @Get('medical-certificates')
+  async getMedicalCertificates(
+    @Request() req,
+    @Query('employeeId') employeeId?: string
+  ) {
+    return this.managerService.getMedicalCertificates(req.user.id, employeeId);
+  }
+
+  @Get('medical-certificates/:id')
+  async getMedicalCertificateById(
+    @Request() req,
+    @Param('id') id: string
+  ) {
+    return this.managerService.getMedicalCertificateById(req.user.id, id);
   }
 }

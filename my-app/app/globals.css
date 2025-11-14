@@ -197,6 +197,16 @@
   animation-play-state: paused;
 }
 
+/* Animação shimmer para efeito de brilho */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-12deg);
+  }
+}
+
 /* Classe para páginas com header fixo - adiciona padding-top para evitar sobreposição */
 .page-with-fixed-header {
   padding-top: 140px; /* Compensa altura do header (fita de benefícios ~40px + header ~100px) */

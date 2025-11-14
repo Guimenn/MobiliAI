@@ -45,6 +45,8 @@ model User {
   shippingAddresses ShippingAddress[]
   systemLogs        SystemLog[]
   timeClockRecords  TimeClock[]
+  medicalCertificates MedicalCertificate[] @relation("EmployeeMedicalCertificates")
+  registeredMedicalCertificates MedicalCertificate[] @relation("RegisteredMedicalCertificates")
   store             Store?              @relation(fields: [storeId], references: [id])
 
   @@map("users")
@@ -591,6 +593,28 @@ model ShippingAddress {
   @@map("shipping_addresses")
 }
 
+model MedicalCertificate {
+  id                String                @id @default(uuid())
+  employeeId        String
+  startDate         DateTime
+  endDate           DateTime
+  type              MedicalCertificateType
+  reason            String
+  doctorName        String
+  doctorCrm         String
+  clinicName        String
+  status            MedicalCertificateStatus @default(PENDING)
+  notes             String?
+  attachmentUrl     String?
+  registeredById    String
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  employee          User                  @relation("EmployeeMedicalCertificates", fields: [employeeId], references: [id], onDelete: Cascade)
+  registeredBy      User                  @relation("RegisteredMedicalCertificates", fields: [registeredById], references: [id])
+
+  @@map("medical_certificates")
+}
+
 enum UserRole {
   ADMIN
   STORE_MANAGER
@@ -677,4 +701,17 @@ enum NotificationType {
   EMPLOYEE_NEW_ASSIGNMENT
   EMPLOYEE_PROFILE_UPDATE
   EMPLOYEE_SALE_CREATED
+}
+
+enum MedicalCertificateType {
+  MEDICAL
+  DENTAL
+  PSYCHOLOGICAL
+  OTHER
+}
+
+enum MedicalCertificateStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

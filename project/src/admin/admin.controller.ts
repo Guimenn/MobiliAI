@@ -16,6 +16,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
+import { CreateMedicalCertificateDto } from './dto/create-medical-certificate.dto';
 import { TransformUserDataInterceptor } from './interceptors/transform-user-data.interceptor';
 
 @Controller('admin')
@@ -715,5 +716,32 @@ export class AdminController {
     @Param('productId') productId: string
   ) {
     return this.adminService.removeProductFromStore(storeId, productId);
+  }
+
+  // ==================== GESTÃO DE ATESTADOS MÉDICOS ====================
+
+  @Post('medical-certificates')
+  async createMedicalCertificate(
+    @Request() req,
+    @Body() createDto: CreateMedicalCertificateDto
+  ) {
+    return this.adminService.createMedicalCertificate(req.user.id, createDto);
+  }
+
+  @Get('medical-certificates')
+  async getMedicalCertificates(
+    @Query('employeeId') employeeId?: string
+  ) {
+    return this.adminService.getMedicalCertificates(employeeId);
+  }
+
+  @Get('medical-certificates/:id')
+  async getMedicalCertificateById(@Param('id') id: string) {
+    return this.adminService.getMedicalCertificateById(id);
+  }
+
+  @Post('medical-certificates/reactivate-expired')
+  async reactivateEmployeesWithExpiredCertificates() {
+    return this.adminService.reactivateEmployeesWithExpiredCertificates();
   }
 }

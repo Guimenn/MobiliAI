@@ -12,7 +12,6 @@ import {
   ArrowLeft, 
   User, 
   Mail,
-  Phone,
   MapPin,
   Building2,
   Shield,
@@ -43,6 +42,8 @@ interface Employee {
   emergencyPhone?: string;
   notes?: string;
   workingHours?: any;
+  storeId?: string;
+  createdAt?: string;
   store?: {
     id: string;
     name: string;
@@ -58,6 +59,8 @@ export default function EmployeePage() {
   const { token } = useAppStore();
   
   const [employee, setEmployee] = useState<Employee | null>(null);
+  const [storeName, setStoreName] = useState<string>('');
+  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -69,12 +72,8 @@ export default function EmployeePage() {
     state: '',
     zipCode: '',
     role: '',
+    storeId: '',
     isActive: true,
-    department: '',
-    position: '',
-    hireDate: '',
-    emergencyContact: '',
-    emergencyPhone: '',
     notes: ''
   });
   const [workingHours, setWorkingHours] = useState<any>(null);
@@ -86,8 +85,49 @@ export default function EmployeePage() {
       return;
     }
 
+    fetchStores();
     fetchEmployee();
   }, [employeeId, storeId, token]);
+
+  const fetchStores = async () => {
+    if (!token) return;
+    
+    try {
+      const response = await fetch('http://localhost:3001/api/admin/stores', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const storesData = await response.json();
+        setStores(storesData || []);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar lojas:', error);
+    }
+  };
+
+  const fetchStoreName = async (storeIdToFetch: string) => {
+    if (!storeIdToFetch || !token) return;
+    
+    try {
+      const response = await fetch(`http://localhost:3001/api/admin/stores/${storeIdToFetch}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const storeData = await response.json();
+        setStoreName(storeData.name || '');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar nome da loja:', error);
+    }
+  };
 
   const fetchEmployee = async () => {
     if (!employeeId || !token) return;
@@ -112,15 +152,20 @@ export default function EmployeePage() {
           state: data.state || '',
           zipCode: data.zipCode || '',
           role: data.role || '',
+          storeId: data.storeId || data.store?.id || '',
           isActive: data.isActive ?? true,
-          department: data.department || '',
-          position: data.position || '',
-          hireDate: data.hireDate || '',
-          emergencyContact: data.emergencyContact || '',
-          emergencyPhone: data.emergencyPhone || '',
           notes: data.notes || ''
         });
         setWorkingHours(data.workingHours || null);
+        
+        // Buscar nome da loja se não vier no employee
+        if (data.store?.name) {
+          setStoreName(data.store.name);
+        } else if (data.storeId) {
+          fetchStoreName(data.storeId);
+        } else if (storeId) {
+          fetchStoreName(storeId);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar funcionário:', error);
@@ -140,12 +185,18 @@ export default function EmployeePage() {
     setLoading(true);
 
     try {
-      const employeeData = {
-        ...formData,
-        ...(workingHours && { workingHours })
-      };
+      // Preparar dados para envio - apenas campos permitidos pelo UpdateUserDto
+      const employeeData: any = {};
+      
+      // Adicionar apenas campos que têm valor
+      if (formData.phone) employeeData.phone = formData.phone;
+      if (formData.address) employeeData.address = formData.address;
+      if (formData.role) employeeData.role = formData.role;
+      if (formData.storeId) employeeData.storeId = formData.storeId;
+      if (formData.isActive !== undefined) employeeData.isActive = formData.isActive;
+      if (workingHours) employeeData.workingHours = workingHours;
 
-      const response = await fetch(`http://localhost:3001/api/admin/employees/${employee.id}`, {
+      const response = await fetch(`http://localhost:3001/api/admin/users/${employee.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -157,6 +208,17 @@ export default function EmployeePage() {
       if (response.ok) {
         const updatedEmployee = await response.json();
         setEmployee(updatedEmployee);
+        
+        // Atualizar nome da loja após salvar
+        if (updatedEmployee.storeId) {
+          const selectedStore = stores.find(s => s.id === updatedEmployee.storeId);
+          if (selectedStore) {
+            setStoreName(selectedStore.name);
+          } else {
+            fetchStoreName(updatedEmployee.storeId);
+          }
+        }
+        
         setIsEditing(false);
         alert('Funcionário atualizado com sucesso!');
       } else {
@@ -259,6 +321,8 @@ export default function EmployeePage() {
                         id="name"
                         value={formData.name}
                         onChange={(e) => handleInputChange('name', e.target.value)}
+                        disabled
+                        className="cursor-not-allowed bg-gray-100"
                       />
                     ) : (
                       <div className="font-medium">{employee.name}</div>
@@ -273,6 +337,8 @@ export default function EmployeePage() {
                         type="email"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
+                        disabled
+                        className="cursor-not-allowed bg-gray-100"
                       />
                     ) : (
                       <div className="font-medium">{employee.email}</div>
@@ -289,24 +355,6 @@ export default function EmployeePage() {
                       />
                     ) : (
                       <div className="font-medium">{employee.phone || 'Não informado'}</div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Cargo</Label>
-                    {isEditing ? (
-                      <select
-                        id="role"
-                        value={formData.role}
-                        onChange={(e) => handleInputChange('role', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="CASHIER">Vendedor/Caixa</option>
-                        <option value="STORE_MANAGER">Gerente de Loja</option>
-                        <option value="EMPLOYEE">Funcionário</option>
-                      </select>
-                    ) : (
-                      <div className="font-medium">{employee.role}</div>
                     )}
                   </div>
                 </div>
@@ -389,43 +437,51 @@ export default function EmployeePage() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="department">Departamento</Label>
+                    <Label htmlFor="role">Cargo</Label>
                     {isEditing ? (
-                      <Input
-                        id="department"
-                        value={formData.department}
-                        onChange={(e) => handleInputChange('department', e.target.value)}
-                      />
+                      <select
+                        id="role"
+                        value={formData.role}
+                        onChange={(e) => handleInputChange('role', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="CASHIER">Vendedor/Caixa</option>
+                        <option value="STORE_MANAGER">Gerente de Loja</option>
+                        <option value="EMPLOYEE">Funcionário</option>
+                      </select>
                     ) : (
-                      <div className="font-medium">{employee.department || 'Não informado'}</div>
+                      <div className="font-medium">{employee.role}</div>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="position">Cargo</Label>
+                    <Label htmlFor="storeId">Nome da Loja</Label>
                     {isEditing ? (
-                      <Input
-                        id="position"
-                        value={formData.position}
-                        onChange={(e) => handleInputChange('position', e.target.value)}
-                      />
+                      <select
+                        id="storeId"
+                        value={formData.storeId}
+                        onChange={(e) => handleInputChange('storeId', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Selecione uma loja</option>
+                        {stores.map((store) => (
+                          <option key={store.id} value={store.id}>
+                            {store.name}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
-                      <div className="font-medium">{employee.position || 'Não informado'}</div>
+                      <div className="font-medium">
+                        {employee.store?.name || storeName || stores.find(s => s.id === employee.storeId)?.name || 'Não informado'}
+                      </div>
                     )}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="hireDate">Data de Admissão</Label>
-                    {isEditing ? (
-                      <Input
-                        id="hireDate"
-                        type="date"
-                        value={formData.hireDate}
-                        onChange={(e) => handleInputChange('hireDate', e.target.value)}
-                      />
-                    ) : (
-                      <div className="font-medium">{formatDate(employee.hireDate || '')}</div>
-                    )}
+                    <div className="font-medium">
+                      {formatDate(employee.createdAt || employee.hireDate || '')}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -456,44 +512,6 @@ export default function EmployeePage() {
               </CardContent>
             </Card>
 
-            {/* Contato de Emergência */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Phone className="h-5 w-5" />
-                  <span>Contato de Emergência</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="emergencyContact">Nome do Contato</Label>
-                    {isEditing ? (
-                      <Input
-                        id="emergencyContact"
-                        value={formData.emergencyContact}
-                        onChange={(e) => handleInputChange('emergencyContact', e.target.value)}
-                      />
-                    ) : (
-                      <div className="font-medium">{employee.emergencyContact || 'Não informado'}</div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="emergencyPhone">Telefone do Contato</Label>
-                    {isEditing ? (
-                      <Input
-                        id="emergencyPhone"
-                        value={formData.emergencyPhone}
-                        onChange={(e) => handleInputChange('emergencyPhone', e.target.value)}
-                      />
-                    ) : (
-                      <div className="font-medium">{employee.emergencyPhone || 'Não informado'}</div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Horários de Expediente */}
             {isEditing && (

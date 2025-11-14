@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { useProducts } from '@/lib/hooks/useProducts';
@@ -369,38 +369,319 @@ export default function HomePage() {
     setCurrentPage(1);
   };
 
-  // Seleciona produto aleatório para oferta especial
-  const pickRandomProduct = () => {
-    if (!allProducts || allProducts.length === 0) return null;
-    const randomIndex = Math.floor(Math.random() * allProducts.length);
-    return allProducts[randomIndex];
+  // Função para verificar se uma oferta relâmpago está ativa
+  const isFlashSaleActive = (product: any) => {
+    // Debug: log do produto para debug
+    if (product.isFlashSale) {
+      console.log('🔍 Verificando oferta relâmpago:', {
+        productId: product.id,
+        productName: product.name,
+        isFlashSale: product.isFlashSale,
+        flashSaleStartDate: product.flashSaleStartDate,
+        flashSaleEndDate: product.flashSaleEndDate,
+      });
+    }
+    
+    if (!product.isFlashSale) {
+      return false;
+    }
+    
+    const now = new Date();
+    
+    // Converter datas de string ISO para Date
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+    
+    if (product.flashSaleStartDate) {
+      try {
+        startDate = new Date(product.flashSaleStartDate);
+        if (isNaN(startDate.getTime())) {
+          console.warn('⚠️ Data de início inválida:', product.flashSaleStartDate);
+          startDate = null;
+        }
+      } catch (e) {
+        console.warn('⚠️ Erro ao converter data de início:', e);
+        startDate = null;
+      }
+    }
+    
+    if (product.flashSaleEndDate) {
+      try {
+        endDate = new Date(product.flashSaleEndDate);
+        if (isNaN(endDate.getTime())) {
+          console.warn('⚠️ Data de fim inválida:', product.flashSaleEndDate);
+          endDate = null;
+        }
+      } catch (e) {
+        console.warn('⚠️ Erro ao converter data de fim:', e);
+        endDate = null;
+      }
+    }
+    
+    // Se não tem datas, considera ativa se isFlashSale = true
+    if (!startDate && !endDate) {
+      console.log('✅ Oferta ativa (sem datas definidas)');
+      return true;
+    }
+    
+    // Verifica se está dentro do período
+    if (startDate && now < startDate) {
+      console.log('❌ Oferta ainda não começou:', {
+        agora: now.toISOString(),
+        inicio: startDate.toISOString(),
+      });
+      return false;
+    }
+    
+    if (endDate && now > endDate) {
+      console.log('❌ Oferta já expirou:', {
+        agora: now.toISOString(),
+        fim: endDate.toISOString(),
+      });
+      return false;
+    }
+    
+    console.log('✅ Oferta ativa e dentro do período válido');
+    return true;
   };
 
-  // Inicializa oferta e cronômetro quando produtos carregarem
-  useEffect(() => {
-    if (allProducts && allProducts.length > 0 && !specialOfferProduct) {
-      const product = pickRandomProduct();
-      setSpecialOfferProduct(product);
-      setOfferSecondsLeft(OFFER_DURATION);
+  // Calcula segundos restantes até o fim da oferta
+  const calculateSecondsLeft = (product: any) => {
+    if (!product.flashSaleEndDate) return OFFER_DURATION; // Fallback se não tiver data
+    
+    const now = new Date();
+    const endDate = new Date(product.flashSaleEndDate);
+    const diff = Math.max(0, Math.floor((endDate.getTime() - now.getTime()) / 1000));
+    
+    return diff > 0 ? diff : 0;
+  };
+
+  // Busca produtos com oferta relâmpago ativa (memoizado)
+  const activeFlashSaleProducts = useMemo(() => {
+    // Só calcula se os produtos não estão carregando
+    if (productsLoading || !allProducts || allProducts.length === 0) {
+      return [];
     }
-  }, [allProducts]);
+    
+    const activeProducts = allProducts.filter((product: any) => {
+      if (!product.isFlashSale) return false;
+      
+      const now = new Date();
+      let startDate: Date | null = null;
+      let endDate: Date | null = null;
+      
+      if (product.flashSaleStartDate) {
+        try {
+          startDate = new Date(product.flashSaleStartDate);
+          if (isNaN(startDate.getTime())) startDate = null;
+        } catch {
+          startDate = null;
+        }
+      }
+      
+      if (product.flashSaleEndDate) {
+        try {
+          endDate = new Date(product.flashSaleEndDate);
+          if (isNaN(endDate.getTime())) endDate = null;
+        } catch {
+          endDate = null;
+        }
+      }
+      
+      // Se não tem datas, considera ativa se isFlashSale = true
+      if (!startDate && !endDate) return true;
+      
+      // Verifica se está dentro do período
+      if (startDate && now < startDate) return false;
+      if (endDate && now > endDate) return false;
+      
+      return true;
+    });
+    
+    console.log('🔄 useMemo recalculou activeFlashSaleProducts:', activeProducts.length);
+    return activeProducts;
+  }, [allProducts, productsLoading]);
+
+  // Seleciona produto aleatório entre os que têm oferta relâmpago ativa
+  const pickRandomFlashSaleProduct = useCallback(() => {
+    if (activeFlashSaleProducts.length === 0) return null;
+    
+    const randomIndex = Math.floor(Math.random() * activeFlashSaleProducts.length);
+    return activeFlashSaleProducts[randomIndex];
+  }, [activeFlashSaleProducts]);
+
+  // Calcula o preço com desconto da oferta relâmpago
+  const getFlashSalePrice = (product: any) => {
+    // Se tem preço direto de flash sale, usa ele
+    if (product.flashSalePrice) {
+      return parseFloat(product.flashSalePrice.toString());
+    }
+    
+    // Se tem percentual de desconto, calcula
+    if (product.flashSaleDiscountPercent && product.price) {
+      const discount = parseFloat(product.flashSaleDiscountPercent.toString()) / 100;
+      return parseFloat(product.price.toString()) * (1 - discount);
+    }
+    
+    // Fallback: retorna o preço original
+    return product.price ? parseFloat(product.price.toString()) : 0;
+  };
+
+  // Calcula o percentual de desconto
+  const getFlashSaleDiscountPercent = (product: any) => {
+    if (product.flashSaleDiscountPercent) {
+      return parseInt(product.flashSaleDiscountPercent.toString());
+    }
+    
+    // Calcula baseado na diferença de preço
+    if (product.flashSalePrice && product.price) {
+      const originalPrice = parseFloat(product.price.toString());
+      const salePrice = parseFloat(product.flashSalePrice.toString());
+      const discount = ((originalPrice - salePrice) / originalPrice) * 100;
+      return Math.round(discount);
+    }
+    
+    return 0;
+  };
+
+  // Inicializa oferta quando produtos carregarem (só executa quando não está carregando)
+  useEffect(() => {
+    // Só executa quando os produtos terminaram de carregar
+    if (productsLoading) {
+      console.log('⏳ Produtos ainda carregando...');
+      return;
+    }
+
+    if (allProducts && allProducts.length > 0) {
+      console.log('📦 Total de produtos carregados:', allProducts.length);
+      
+      // Debug: verificar TODOS os campos do primeiro produto para ver estrutura
+      if (allProducts.length > 0) {
+        console.log('🔍 Estrutura do primeiro produto:', {
+          id: allProducts[0].id,
+          name: allProducts[0].name,
+          isFlashSale: allProducts[0].isFlashSale,
+          flashSalePrice: allProducts[0].flashSalePrice,
+          flashSaleDiscountPercent: allProducts[0].flashSaleDiscountPercent,
+          flashSaleStartDate: allProducts[0].flashSaleStartDate,
+          flashSaleEndDate: allProducts[0].flashSaleEndDate,
+          todasAsChaves: Object.keys(allProducts[0])
+        });
+      }
+      
+      // Debug: verificar produtos com isFlashSale
+      const productsWithFlashSale = allProducts.filter(p => p.isFlashSale);
+      console.log('⚡ Produtos com isFlashSale = true:', productsWithFlashSale.length);
+      if (productsWithFlashSale.length > 0) {
+        console.log('📋 Produtos com flash sale (detalhes completos):', productsWithFlashSale.map(p => ({
+          id: p.id,
+          name: p.name,
+          isFlashSale: p.isFlashSale,
+          flashSalePrice: p.flashSalePrice,
+          flashSaleDiscountPercent: p.flashSaleDiscountPercent,
+          flashSaleStartDate: p.flashSaleStartDate,
+          flashSaleEndDate: p.flashSaleEndDate,
+          tipoStartDate: typeof p.flashSaleStartDate,
+          tipoEndDate: typeof p.flashSaleEndDate,
+        })));
+      }
+      
+      console.log('✅ Produtos com oferta relâmpago ATIVA:', activeFlashSaleProducts.length);
+      if (activeFlashSaleProducts.length > 0) {
+        console.log('📋 Lista de ofertas ativas:', activeFlashSaleProducts.map(p => ({
+          id: p.id,
+          name: p.name,
+        })));
+      }
+      
+      if (activeFlashSaleProducts.length > 0) {
+        // Verificar se já temos um produto selecionado e se ele ainda está ativo
+        if (specialOfferProduct) {
+          const isCurrentProductStillActive = activeFlashSaleProducts.some(p => p.id === specialOfferProduct.id);
+          if (isCurrentProductStillActive) {
+            console.log('✅ Produto atual ainda está ativo, mantendo:', specialOfferProduct.name);
+            // Recalcula o tempo restante
+            const secondsLeft = calculateSecondsLeft(specialOfferProduct);
+            setOfferSecondsLeft(secondsLeft);
+            setFlashOfferActive(true);
+            return; // Não precisa fazer nada mais
+          }
+        }
+        
+        // Seleciona um novo produto
+        const flashSaleProduct = pickRandomFlashSaleProduct();
+        
+        if (flashSaleProduct) {
+          console.log('🎯 Produto selecionado para oferta:', {
+            id: flashSaleProduct.id,
+            name: flashSaleProduct.name,
+            price: flashSaleProduct.price,
+            flashSalePrice: flashSaleProduct.flashSalePrice,
+            flashSaleDiscountPercent: flashSaleProduct.flashSaleDiscountPercent,
+          });
+          setSpecialOfferProduct(flashSaleProduct);
+          const secondsLeft = calculateSecondsLeft(flashSaleProduct);
+          setOfferSecondsLeft(secondsLeft);
+          setFlashOfferActive(true);
+          console.log('✅ Estados atualizados:', {
+            flashOfferActive: true,
+            specialOfferProduct: flashSaleProduct.name,
+            secondsLeft
+          });
+        }
+      } else {
+        console.log('❌ Nenhuma oferta relâmpago ativa encontrada');
+        // Se não há ofertas ativas, limpa o produto e desativa
+        setSpecialOfferProduct(null);
+        setFlashOfferActive(false);
+      }
+    } else {
+      console.log('⚠️ Nenhum produto carregado ainda ou produtos vazios');
+      // Se não há produtos, limpa o estado
+      if (!productsLoading) {
+        setSpecialOfferProduct(null);
+        setFlashOfferActive(false);
+      }
+    }
+  }, [allProducts, activeFlashSaleProducts, pickRandomFlashSaleProduct, productsLoading, specialOfferProduct]);
 
   // Cronômetro da oferta
   useEffect(() => {
-    if (!specialOfferProduct) return;
+    if (!specialOfferProduct) {
+      setFlashOfferActive(false);
+      return;
+    }
+    
     const intervalId = setInterval(() => {
       setOfferSecondsLeft((prev) => {
         if (prev <= 1) {
-          const nextProduct = pickRandomProduct();
-          setSpecialOfferProduct(nextProduct);
-          return OFFER_DURATION; // reinicia
+          // Verifica se a oferta atual ainda está ativa
+          const isStillActive = activeFlashSaleProducts.some(p => p.id === specialOfferProduct.id);
+          
+          if (isStillActive) {
+            // Recalcula o tempo restante
+            return calculateSecondsLeft(specialOfferProduct);
+          } else {
+            // Busca outra oferta ativa
+            const nextProduct = pickRandomFlashSaleProduct();
+            if (nextProduct) {
+              setSpecialOfferProduct(nextProduct);
+              setFlashOfferActive(true);
+              return calculateSecondsLeft(nextProduct);
+            } else {
+              // Não há mais ofertas ativas
+              setSpecialOfferProduct(null);
+              setFlashOfferActive(false);
+              return 0;
+            }
+          }
         }
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [specialOfferProduct]);
+  }, [specialOfferProduct, activeFlashSaleProducts, pickRandomFlashSaleProduct]);
 
   const formatTime = (totalSeconds: number) => {
     const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
@@ -640,167 +921,256 @@ export default function HomePage() {
   );
   };
 
-  // Estado para controlar se a oferta relâmpago está ativa (será controlado pelo admin)
-  const [flashOfferActive, setFlashOfferActive] = useState(true); // Por padrão ativa, mas pode ser controlado pelo admin
+  // Estado para controlar se a oferta relâmpago está ativa (baseado em ofertas reais cadastradas)
+  const [flashOfferActive, setFlashOfferActive] = useState(false);
 
   return (
     <div className="min-h-screen ">
-      {/* Main Hero Section - Layout com foto escura e texto à esquerda */}
-      <div className="relative min-h-screen  flex items-center">
-        {/* Background Image com grayscale e escurecido */}
+      {/* Main Hero Section - Design Ultra Moderno e Apelativo */}
+      <div className="relative min-h-screen flex items-center overflow-hidden">
+        {/* Background Image com efeitos dinâmicos */}
         <div 
-          className="absolute  inset-0 bg-cover bg-center bg-no-repeat"
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-out"
           style={{ 
             backgroundImage: 'url(/hero-bg.png)',
-            filter: 'grayscale(100%) brightness(0.7)',
-            WebkitFilter: 'grayscale(100%) brightness(0.6)'
+            filter: 'sepia(40%) saturate(60%) brightness(0.5) contrast(1.1) hue-rotate(-10deg)',
+            WebkitFilter: 'sepia(40%) saturate(60%) brightness(0.5) contrast(1.1) hue-rotate(-10deg)',
+            transform: 'scale(1.1)'
           }}
         ></div>
         
-        {/* Overlay adicional para escurecer mais */}
-        <div className="absolute inset-0 bg-black/40"></div>
+        {/* Overlay gradiente marrom elegante */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#3e2626]/85 via-[#5a3a3a]/70 to-[#3e2626]/60"></div>
+        
+        {/* Overlay adicional para dar profundidade marrom */}
+        <div className="absolute inset-0 bg-[#3e2626]/30 mix-blend-multiply"></div>
+        
+        {/* Efeitos de luz animados com tons marrons */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#8B4513]/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#3e2626]/25 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        
+        {/* Grid pattern sutil com tons marrons */}
+        <div 
+          className="absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage: `linear-gradient(rgba(139, 69, 19, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 69, 19, 0.15) 1px, transparent 1px)`,
+            backgroundSize: '50px 50px'
+          }}
+        ></div>
         
         {/* Header */}
         <Header />
 
-        {/* Content Container */}
-        <div className="relative z-10 w-full container mx-auto px-4 sm:px-6 lg:px-8 pt-20">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[80vh]">
+        {/* Content Container - Layout mais compacto e impactante */}
+        <div className="relative z-10 w-full container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[90vh]">
             
-            {/* LADO ESQUERDO - Texto */}
-            <div className="text-white space-y-8">
-              {/* Badge/Status */}
-              <div className="flex items-center gap-4 mb-6">
-              
+            {/* LADO ESQUERDO - Conteúdo minimalista e impactante */}
+            <div className="text-white space-y-8 mt-10 animate-in fade-in slide-in-from-left duration-1000">
+
+              {/* Título ultra impactante - MENOS TEXTO */}
+              <div className="space-y-3">
+                <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold leading-[0.95] tracking-tight">
+                  <span className="block text-white mb-1 drop-shadow-2xl">
+                    Transforme
+                  </span>
+                  <span className="block text-transparent bg-clip-text bg-gradient-to-r from-white via-white/90 to-white/70">
+                    seu espaço
+                  </span>
+                  <span className="block mt-2 text-white drop-shadow-2xl">
+                    com IA.
+                  </span>
+                </h1>
               </div>
 
-              {/* Título Principal */}
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-light leading-tight tracking-wide">
-                <span className="block text-white/95">
-                  Atmosferas autorais criadas com
-                </span>
-                <span className="block mt-2 font-normal text-white">
-                  precisão cromática.
-                </span>
-              </h1>
-
-              {/* Descrição */}
-              <p className="text-lg md:text-xl text-white/80 leading-relaxed max-w-xl">
-                A MobiliAI combina curadoria humana e machine learning proprietário para transformar fotos do seu ambiente em um roteiro visual completo, com texturas, paletas e mobiliário já prontos para o uso.
+              {/* Descrição MUITO curta e direta */}
+              <p className="text-xl md:text-2xl text-white/90 leading-tight max-w-lg font-light">
+                Visualize móveis e cores no seu ambiente <span className="font-semibold text-white">em segundos</span>.
               </p>
 
-              {/* Botões de Ação */}
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              {/* Botões ULTRA chamativos e apelativos */}
+              <div className="flex flex-col sm:flex-row gap-4 pt-2">
                 <Button 
                   onClick={() => router.push('/products')}
-                  className="bg-white text-[#3e2626] hover:bg-white/90 rounded-full px-8 py-6 text-base font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+                  className="group relative bg-gradient-to-r from-white to-white/95 text-[#3e2626] hover:from-white hover:to-white rounded-full px-8 py-6 text-lg font-bold transition-all duration-300 shadow-[0_20px_60px_rgba(0,0,0,0.5)] hover:shadow-[0_25px_80px_rgba(0,0,0,0.6)] hover:scale-110 active:scale-95 overflow-hidden border-2 border-white/20"
                 >
-                  EXPLORAR VISUALIZAÇÃO
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                  <span className="relative flex items-center gap-3">
+                    <Camera className="h-6 w-6 group-hover:scale-125 transition-transform duration-300" />
+                    <span>EXPERIMENTAR AGORA</span>
+                    <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
+                  </span>
                 </Button>
                 <Button 
-                  variant="outline"
-                  className="border-2 border-white/30 text-white hover:bg-white/10 rounded-full px-8 py-6 text-base font-semibold backdrop-blur-sm transition-all duration-300"
+                  onClick={() => router.push('/products')}
+                  className="group relative bg-transparent border-3 border-white/60 text-white hover:bg-white/20 hover:border-white rounded-full px-8 py-6 text-lg font-bold backdrop-blur-xl transition-all duration-300 hover:scale-110 active:scale-95 shadow-lg"
                 >
-                  SAIBA MAIS
+                  <span className="flex items-center gap-3">
+                    <Play className="h-5 w-5 group-hover:scale-125 transition-transform duration-300" />
+                    <span>VER DEMO</span>
+                  </span>
                 </Button>
               </div>
 
-              
+              {/* Features visuais - apenas ícones grandes */}
+              <div className="flex items-center gap-8 pt-6">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
+                    <Zap className="h-6 w-6 text-white" />
+                  </div>
+                  <span className="text-xs text-white/80 font-medium">Instantâneo</span>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
+                    <Wand2 className="h-6 w-6 text-white" />
+                  </div>
+                  <span className="text-xs text-white/80 font-medium">IA Avançada</span>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
+                    <Award className="h-6 w-6 text-white" />
+                  </div>
+                  <span className="text-xs text-white/80 font-medium">Premium</span>
+                </div>
+              </div>
             </div>
 
             {/* LADO DIREITO - Oferta Relâmpago (Condicional) */}
-            {flashOfferActive && specialOfferProduct && (
-              <div className="relative group w-full">
-                <div className="relative bg-white/10 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border-2 border-white/30 overflow-hidden">
+            {(() => {
+              console.log('🎨 Renderizando oferta relâmpago:', {
+                flashOfferActive,
+                hasSpecialOfferProduct: !!specialOfferProduct,
+                specialOfferProductName: specialOfferProduct?.name,
+                activeFlashSaleProductsCount: activeFlashSaleProducts.length
+              });
+              return flashOfferActive && specialOfferProduct;
+            })() && (
+              <div className="relative group w-full animate-in fade-in slide-in-from-right duration-700">
+                <div className="relative bg-gradient-to-br from-white/15 h-[550px] via-white/10 to-white/5 backdrop-blur-2xl rounded-3xl p-5 md:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)] border-2 border-white/40 overflow-hidden transition-all duration-500 hover:shadow-[0_25px_80px_rgba(0,0,0,0.4)] hover:border-white/50 hover:scale-[1.01]">
+                  {/* Efeito de brilho animado no fundo */}
+                  <div className="absolute inset-0 opacity-30">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-out"></div>
+                  </div>
+                  
                   {/* Padrão decorativo sutil de fundo */}
-                  <div className="absolute inset-0 opacity-[0.05]" style={{
-                    backgroundImage: `radial-gradient(circle at 2px 2px, #3e2626 1px, transparent 0)`,
-                    backgroundSize: '16px 16px'
+                  <div className="absolute inset-0 opacity-[0.08]" style={{
+                    backgroundImage: `radial-gradient(circle at 2px 2px, #ffffff 1px, transparent 0)`,
+                    backgroundSize: '20px 20px'
                   }}></div>
                   
+                  {/* Efeito de brilho pulsante no timer */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/20 rounded-full blur-3xl animate-pulse"></div>
+                  
                   {/* Badge Oferta Relâmpago */}
-                  <div className="relative z-10 flex items-center gap-2 mb-4">
-                    <div className="relative overflow-hidden bg-[#3e2626] text-white rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-lg">
-                      <Zap className="h-3.5 w-3.5 fill-white" />
-                      <span className="text-xs font-light tracking-wide">Oferta Relâmpago</span>
+                  <div className="relative z-10 flex items-center gap-3 mb-5">
+                    <div className="relative overflow-hidden bg-gradient-to-r from-[#3e2626] to-[#2a1f1f] text-white rounded-full px-4 py-2 flex items-center gap-2 shadow-[0_4px_15px_rgba(62,38,38,0.5)] group/badge hover:shadow-[0_6px_20px_rgba(62,38,38,0.7)] transition-all duration-300">
+                      <Zap className="h-4 w-4 fill-white animate-pulse" />
+                      <span className="text-xs font-semibold tracking-wider">Oferta Relâmpago</span>
                     </div>
-                    <div className="bg-red-500 text-white rounded-full px-3 py-1 flex items-center gap-1.5 shadow-lg">
-                      <Clock className="h-3 w-3" />
-                      <span className="text-[10px] font-bold tabular-nums">{formatTime(offerSecondsLeft)}</span>
+                    <div className="relative bg-[#3e2626] text-white rounded-full px-4 py-2 flex items-center gap-2  animate-pulse">
+                      <Clock className="h-3.5 w-3.5 relative z-10" />
+                      <span className="text-xs font-bold tabular-nums relative z-10">{formatTime(offerSecondsLeft)}</span>
                     </div>
                   </div>
 
                   {/* Layout: Imagem à esquerda, Conteúdo à direita */}
-                  <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* Imagem do Produto - Formato Quadrado à Esquerda */}
                     {specialOfferProduct.imageUrl && (
-                      <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-gray-100 group/image">
+                      <div className="relative w-full h-[430px] rounded-2xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 group/image shadow-xl">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent z-10"></div>
                         <Image
                           src={specialOfferProduct.imageUrl}
                           alt={specialOfferProduct.name}
                           width={300}
                           height={300}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-105"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover/image:scale-110"
                           unoptimized
                         />
                         
-                        {/* Badge de Desconto */}
-                        <div className="absolute top-3 right-3 bg-[#3e2626] text-white rounded-lg px-3 py-2 shadow-xl">
-                          <div className="text-xl font-black leading-none">30%</div>
-                          <div className="text-[8px] font-bold uppercase tracking-wider">OFF</div>
-                        </div>
+                        {/* Badge de Desconto melhorado */}
+                        {(() => {
+                          const discountPercent = getFlashSaleDiscountPercent(specialOfferProduct);
+                          return discountPercent > 0 ? (
+                            <div className="absolute top-4 right-4 bg-gradient-to-br from-[#3e2626] to-[#2a1f1f] text-white rounded-xl px-4 py-3 shadow-[0_8px_25px_rgba(62,38,38,0.6)] z-20 transform hover:scale-110 transition-transform duration-300">
+                              <div className="text-2xl font-black leading-none">{discountPercent}%</div>
+                              <div className="text-[9px] font-bold uppercase tracking-widest mt-0.5">OFF</div>
+                            </div>
+                          ) : null;
+                        })()}
+                        
+                        {/* Efeito de brilho na imagem */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 translate-x-[-100%] group-hover/image:translate-x-[200%] transition-transform duration-1000 ease-out z-10"></div>
                       </div>
                     )}
 
                     {/* Informações do Produto - À Direita */}
-                    <div className="flex flex-col justify-between space-y-3">
+                    <div className="flex flex-col justify-between space-y-4">
                       <div>
-                        <h3 className="text-base md:text-lg font-light text-white leading-tight tracking-[0.08em] mb-2">
+                        <h3 className="text-xl md:text-4xl font-medium text-white leading-tight tracking-[0.05em] mb-3 drop-shadow-lg">
                           {specialOfferProduct.name}
                         </h3>
+                        <p className="text-sm md:text-base text-white/80 font-light tracking-wide mb-3">  
+                        {specialOfferProduct.description}
+                        </p>
                         
-                        {/* Preço */}
-                        <div className="space-y-1">
-                          <div className="text-xs text-white/70 font-light">Por apenas</div>
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-sm font-light text-white">R$</span>
-                            <span className="text-2xl md:text-3xl font-light text-white tracking-tight">
-                              {(specialOfferProduct.price ? specialOfferProduct.price * 0.7 : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                          {specialOfferProduct.price && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm text-white/60 line-through font-light">
-                                R$ {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </span>
-                              <span className="text-[10px] bg-red-500/20 text-red-200 px-2 py-0.5 rounded-full font-light border border-red-500/30">
-                                Economize R$ {(specialOfferProduct.price * 0.3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </span>
+                        {/* Preço melhorado */}
+                        {(() => {
+                          const originalPrice = specialOfferProduct.price ? parseFloat(specialOfferProduct.price.toString()) : 0;
+                          const salePrice = getFlashSalePrice(specialOfferProduct);
+                          const savings = originalPrice - salePrice;
+                          
+                          return (
+                            <div className="space-y-2">
+                              <div className="text-xs text-white/80 font-light tracking-wide">Por apenas</div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-lg font-medium text-white/90">R$</span>
+                                <span className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
+                                  {salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              {originalPrice > salePrice && (
+                                <div className="flex items-center gap-3 flex-wrap pt-1">
+                                  <span className="text-sm text-white/50 line-through font-light">
+                                    R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                  {savings > 0 && (
+                                    <span className="text-xs bg-[#3e2626] text-white px-3 py-1.5 rounded-full font-semibold border border-white backdrop-blur-sm shadow-lg">
+                                      Economize R$ {savings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+                          );
+                        })()}
                       </div>
 
-                      <div className="space-y-2">
-                        {/* Botão de Ação */}
+                      <div className="space-y-3">
+                        {/* Botão de Ação melhorado */}
                         <Button 
                           onClick={() => addToCart(specialOfferProduct.id)}
-                          className="relative w-full bg-white text-[#3e2626] hover:bg-white/90 rounded-full px-6 py-3 text-sm font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                          className="relative w-full bg-gradient-to-r from-white to-white/95 text-[#3e2626] hover:from-white hover:to-white rounded-full px-6 py-4 text-sm font-semibold tracking-wide transition-all duration-300 shadow-[0_8px_25px_rgba(255,255,255,0.3)] hover:shadow-[0_12px_35px_rgba(255,255,255,0.4)] hover:scale-[1.03] active:scale-[0.97] group/button overflow-hidden"
                         >
-                          <span className="flex items-center justify-center gap-2">
-                            <ShoppingCart className="h-4 w-4" />
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 translate-x-[-100%] group-hover/button:translate-x-[200%] transition-transform duration-700"></div>
+                          <span className="flex items-center justify-center gap-2 relative z-10">
+                            <ShoppingCart className="h-4 w-4 group-hover/button:scale-110 transition-transform duration-300" />
                             Adicionar ao Carrinho
                           </span>
                         </Button>
                         
-                        {/* Garantia */}
-                        <div className="flex items-center justify-center gap-1.5 text-[10px] text-white/60 font-light">
-                          <Shield className="h-3 w-3" />
+                        {/* Garantia melhorada */}
+                        <div className="flex items-center justify-center gap-2 text-xs text-white/70 font-light">
+                          <Shield className="h-3.5 w-3.5 text-white/80" />
                           <span>Compra segura e garantida</span>
                         </div>
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Decoração flutuante */}
+                  <div className="absolute top-8 right-8 w-24 h-24 bg-white/5 rounded-full blur-2xl"></div>
+                  <div className="absolute bottom-8 left-8 w-16 h-16 bg-white/5 rounded-full blur-xl"></div>
                 </div>
               </div>
             )}

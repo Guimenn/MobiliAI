@@ -179,6 +179,8 @@ export default function EditUserModal({ isOpen, onClose, user, onSave }: EditUse
                   onChange={handleInputChange}
                   placeholder="Ex: João Silva"
                   required
+                  disabled
+                  className="cursor-not-allowed bg-gray-100"
                 />
               </div>
 
@@ -192,6 +194,8 @@ export default function EditUserModal({ isOpen, onClose, user, onSave }: EditUse
                   onChange={handleInputChange}
                   placeholder="joao@empresa.com"
                   required
+                  disabled
+                  className="cursor-not-allowed bg-gray-100"
                 />
               </div>
 

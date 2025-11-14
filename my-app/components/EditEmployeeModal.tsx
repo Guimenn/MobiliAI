@@ -181,7 +181,8 @@ export default function EditEmployeeModal({
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  className={errors.name ? 'border-red-500' : ''}
+                  className={`${errors.name ? 'border-red-500' : ''} cursor-not-allowed bg-gray-100`}
+                  disabled
                 />
                 {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
               </div>
@@ -193,7 +194,8 @@ export default function EditEmployeeModal({
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className={errors.email ? 'border-red-500' : ''}
+                  className={`${errors.email ? 'border-red-500' : ''} cursor-not-allowed bg-gray-100`}
+                  disabled
                 />
                 {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
               </div>
