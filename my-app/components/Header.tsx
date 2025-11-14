@@ -1066,7 +1066,9 @@ export default function Header() {
               <nav className="flex flex-col space-y-4">
                 <Link href="/" className={`font-medium ${isHomePage ? 'text-white' : 'text-white'}`}>Início</Link>
                 <Link href="/products" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Produtos</Link>
+                <Link href="/teste-ia-landing" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>IA de Decoração</Link>
                 <Link href="/furniture-visualizer" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Visualizador IA</Link>
+                <Link href="/teste" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Teste IA</Link>
                 <Link href="/about" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Sobre</Link>
                 <Link href="/contact" className={`hover:opacity-90 ${isHomePage ? 'text-white/80 hover:text-white' : 'text-white/80 hover:text-white'}`}>Contato</Link>
               </nav>

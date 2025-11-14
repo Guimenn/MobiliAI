@@ -42,7 +42,22 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-}
+  --animate-aurora: aurora 60s linear infinite;
+  @keyframes aurora {
+  from {
+    backgroundPosition: 50% 50%, 50% 50%;
+    }
+  to {
+    backgroundPosition: 350% 50%, 350% 50%;
+    }
+  }
+  --animate-spin: spin 2s linear infinite
+;
+  @keyframes aurora {
+  from {
+    backgroundPosition: 50% 50%, 50% 50%;}
+  to {
+    backgroundPosition: 350% 50%, 350% 50%;}}}
 
 :root {
   --radius: 0.625rem;
@@ -180,5 +195,14 @@
 @media (max-width: 768px) {
   .page-with-fixed-header {
     padding-top: 130px; /* Ajuste para mobile */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }
