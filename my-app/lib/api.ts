@@ -645,6 +645,18 @@ export const adminAPI = {
     return response.data;
   },
 
+  getCustomerByCpf: async (cpf: string) => {
+    // Remove caracteres não numéricos e garante que seja apenas números
+    const cleanCpf = cpf.replace(/\D/g, '');
+    if (!cleanCpf || cleanCpf.length !== 11) {
+      throw new Error('CPF inválido. Deve conter 11 dígitos.');
+    }
+    // Encode o CPF para a URL
+    const encodedCpf = encodeURIComponent(cleanCpf);
+    const response = await api.get(`/admin/customers/cpf/${encodedCpf}`);
+    return response.data;
+  },
+
 
   // Reports
   getSalesReport: async (startDate?: string, endDate?: string, storeId?: string) => {

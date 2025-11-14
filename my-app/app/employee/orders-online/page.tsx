@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { employeeAPI } from '@/lib/api';
+import { employeeAPI, paymentAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'sonner';
 import {
@@ -44,6 +44,7 @@ export default function EmployeeOrdersOnlinePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [trackingCode, setTrackingCode] = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
 
   useEffect(() => {
     loadOrders();
@@ -107,6 +108,49 @@ export default function EmployeeOrdersOnlinePage() {
       });
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleSimulatePixPayment = async (orderId: string) => {
+    try {
+      setIsSimulatingPayment(true);
+      await paymentAPI.simulatePixPayment(orderId);
+      toast.success('Pagamento PIX simulado com sucesso!', {
+        description: 'O status do pedido foi atualizado para pago.'
+      });
+      setIsModalOpen(false);
+      loadOrders();
+    } catch (error: any) {
+      toast.error('Erro ao simular pagamento PIX', {
+        description: error.message || 'Tente novamente mais tarde.'
+      });
+    } finally {
+      setIsSimulatingPayment(false);
+    }
+  };
+
+  const handleSimulateStripePayment = async (order: any) => {
+    try {
+      if (!order.paymentReference) {
+        toast.error('Erro', {
+          description: 'Pedido não possui referência de pagamento Stripe.'
+        });
+        return;
+      }
+
+      setIsSimulatingPayment(true);
+      await paymentAPI.confirmStripePayment(order.paymentReference);
+      toast.success('Pagamento Stripe confirmado com sucesso!', {
+        description: 'O status do pedido foi atualizado para pago.'
+      });
+      setIsModalOpen(false);
+      loadOrders();
+    } catch (error: any) {
+      toast.error('Erro ao confirmar pagamento Stripe', {
+        description: error.message || 'Tente novamente mais tarde.'
+      });
+    } finally {
+      setIsSimulatingPayment(false);
     }
   };
 
@@ -438,15 +482,38 @@ export default function EmployeeOrdersOnlinePage() {
                     Criado em {formatDate(selectedOrder.createdAt)}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {selectedOrder.status === 'PENDING' && (
-                    <Button
-                      onClick={() => handleUpdateStatus(selectedOrder.id, 'PREPARING')}
-                      disabled={isUpdatingStatus}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      Marcar como Preparando
-                    </Button>
+                    <>
+                      <Button
+                        onClick={() => handleUpdateStatus(selectedOrder.id, 'PREPARING')}
+                        disabled={isUpdatingStatus || isSimulatingPayment}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        Marcar como Preparando
+                      </Button>
+                      {/* Botões de Simulação de Pagamento */}
+                      {selectedOrder.paymentMethod === 'PIX' && (
+                        <Button
+                          onClick={() => handleSimulatePixPayment(selectedOrder.id)}
+                          disabled={isSimulatingPayment || isUpdatingStatus}
+                          className="bg-green-600 hover:bg-green-700"
+                          variant="outline"
+                        >
+                          Simular PIX
+                        </Button>
+                      )}
+                      {(selectedOrder.paymentMethod === 'CREDIT_CARD' || selectedOrder.paymentMethod === 'DEBIT_CARD') && (
+                        <Button
+                          onClick={() => handleSimulateStripePayment(selectedOrder)}
+                          disabled={isSimulatingPayment || isUpdatingStatus || !selectedOrder.paymentReference}
+                          className="bg-indigo-600 hover:bg-indigo-700"
+                          variant="outline"
+                        >
+                          Simular Stripe
+                        </Button>
+                      )}
+                    </>
                   )}
                   {selectedOrder.status === 'PREPARING' && (
                     <div className="flex flex-col gap-2">

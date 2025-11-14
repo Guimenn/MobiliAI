@@ -1276,6 +1276,60 @@ export class AdminService {
     };
   }
 
+  async getCustomerByCpf(cpf: string) {
+    console.log('📋 Service - CPF recebido:', cpf);
+    // Remover caracteres não numéricos do CPF
+    const cleanCpf = cpf.replace(/\D/g, '');
+    console.log('📋 Service - CPF limpo:', cleanCpf);
+    
+    if (cleanCpf.length !== 11) {
+      throw new BadRequestException('CPF inválido. Deve conter 11 dígitos');
+    }
+
+    console.log('🔍 Service - Buscando no banco de dados...');
+    const customer = await this.prisma.user.findUnique({
+      where: { 
+        cpf: cleanCpf,
+        role: UserRole.CUSTOMER 
+      },
+      include: {
+        _count: {
+          select: {
+            purchases: true,
+            favorites: true,
+            reviews: true
+          }
+        },
+        purchases: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            saleNumber: true,
+            totalAmount: true,
+            status: true,
+            createdAt: true,
+            notes: true,
+            isOnlineOrder: true,
+          },
+          where: {
+            OR: [
+              { status: 'PENDING' },
+              { status: 'PREPARING' },
+              { status: 'COMPLETED' }
+            ]
+          }
+        }
+      }
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Cliente não encontrado');
+    }
+
+    return customer;
+  }
+
   async getCustomerById(id: string) {
     const customer = await this.prisma.user.findUnique({
       where: { 

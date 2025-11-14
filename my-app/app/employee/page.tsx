@@ -528,7 +528,7 @@ export default function EmployeeDashboard() {
                         Registre uma nova venda rapidamente
                       </p>
                       <Button
-                        onClick={() => router.push('/employee/sales')}
+                        onClick={() => router.push('/employee/pdv')}
                         className="bg-white text-[#3e2626] hover:bg-white/90 w-full font-semibold mb-2"
                       >
                         Criar Venda

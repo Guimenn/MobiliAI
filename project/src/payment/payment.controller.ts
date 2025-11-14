@@ -18,7 +18,7 @@ export class PaymentController {
    * Cria um pagamento PIX para uma venda
    */
   @Post('pix/create')
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.CASHIER, UserRole.STORE_MANAGER)
   async createPixPayment(
     @Request() req,
     @Body() data: {
@@ -56,8 +56,13 @@ export class PaymentController {
         hasPaymentReference: !!sale.paymentReference,
       });
 
-      // Verificar se a venda pertence ao usuário (exceto admin)
-      if (req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+      // Verificar se a venda pertence ao usuário (exceto admin, funcionários e gerentes)
+      const isEmployeeOrManager = req.user.role === UserRole.ADMIN || 
+                                   req.user.role === UserRole.EMPLOYEE || 
+                                   req.user.role === UserRole.CASHIER || 
+                                   req.user.role === UserRole.STORE_MANAGER;
+      
+      if (!isEmployeeOrManager && sale.customerId !== req.user.id) {
         console.error('Venda não pertence ao usuário:', {
           saleCustomerId: sale.customerId,
           userId: req.user.id,
@@ -85,7 +90,7 @@ export class PaymentController {
    * Verifica o status de um pagamento PIX
    */
   @Get('pix/status/:saleId')
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.CASHIER, UserRole.STORE_MANAGER)
   async checkPaymentStatus(@Request() req, @Param('saleId') saleId: string) {
     // Buscar a venda para verificar se pertence ao usuário
     const sale = await this.prisma.sale.findUnique({
@@ -97,8 +102,13 @@ export class PaymentController {
       throw new BadRequestException('Venda não encontrada');
     }
 
-    // Verificar se a venda pertence ao usuário (exceto admin)
-    if (req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+    // Verificar se a venda pertence ao usuário (exceto admin, funcionários e gerentes)
+    const isEmployeeOrManager = req.user.role === UserRole.ADMIN || 
+                                 req.user.role === UserRole.EMPLOYEE || 
+                                 req.user.role === UserRole.CASHIER || 
+                                 req.user.role === UserRole.STORE_MANAGER;
+    
+    if (!isEmployeeOrManager && sale.customerId !== req.user.id) {
       throw new ForbiddenException('Venda não pertence ao usuário');
     }
 
@@ -109,7 +119,7 @@ export class PaymentController {
    * Simula o pagamento de um QR Code PIX (apenas ambientes não produtivos)
    */
   @Post('pix/simulate')
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.CASHIER, UserRole.STORE_MANAGER)
   async simulatePixPayment(
     @Request() req,
     @Body() data: { saleId: string },
@@ -127,7 +137,12 @@ export class PaymentController {
       throw new BadRequestException('Venda não encontrada');
     }
 
-    if (req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+    const isEmployeeOrManager = req.user.role === UserRole.ADMIN || 
+                                 req.user.role === UserRole.EMPLOYEE || 
+                                 req.user.role === UserRole.CASHIER || 
+                                 req.user.role === UserRole.STORE_MANAGER;
+    
+    if (!isEmployeeOrManager && sale.customerId !== req.user.id) {
       throw new ForbiddenException('Venda não pertence ao usuário');
     }
 
@@ -138,7 +153,7 @@ export class PaymentController {
    * Cria pagamento por Cartão de Crédito (checkout AbacatePay)
    */
   @Post('card/create')
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.CASHIER, UserRole.STORE_MANAGER)
   async createCardPayment(
     @Request() req,
     @Body() data: {
@@ -165,7 +180,12 @@ export class PaymentController {
       throw new BadRequestException(`Venda com ID ${data.saleId} não encontrada`);
     }
 
-    if (req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+    const isEmployeeOrManager = req.user.role === UserRole.ADMIN || 
+                                 req.user.role === UserRole.EMPLOYEE || 
+                                 req.user.role === UserRole.CASHIER || 
+                                 req.user.role === UserRole.STORE_MANAGER;
+    
+    if (!isEmployeeOrManager && sale.customerId !== req.user.id) {
       throw new ForbiddenException('Venda não pertence ao usuário');
     }
 
@@ -181,7 +201,7 @@ export class PaymentController {
    * Cria um PaymentIntent do Stripe para pagamento com cartão
    */
   @Post('stripe/create-intent')
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.CASHIER, UserRole.STORE_MANAGER)
   async createStripePaymentIntent(
     @Request() req,
     @Body() data: {
@@ -217,7 +237,12 @@ export class PaymentController {
       throw new BadRequestException(`Venda com ID ${data.saleId} não encontrada. Verifique se o pedido foi criado corretamente.`);
     }
 
-    if (req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+    const isEmployeeOrManager = req.user.role === UserRole.ADMIN || 
+                                 req.user.role === UserRole.EMPLOYEE || 
+                                 req.user.role === UserRole.CASHIER || 
+                                 req.user.role === UserRole.STORE_MANAGER;
+    
+    if (!isEmployeeOrManager && sale.customerId !== req.user.id) {
       throw new ForbiddenException('Venda não pertence ao usuário');
     }
 
@@ -232,7 +257,7 @@ export class PaymentController {
    * Confirma o pagamento do Stripe após confirmação no frontend
    */
   @Post('stripe/confirm')
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.CASHIER, UserRole.STORE_MANAGER)
   async confirmStripePayment(
     @Request() req,
     @Body() data: { paymentIntentId: string }
@@ -250,7 +275,12 @@ export class PaymentController {
         select: { customerId: true },
       });
 
-      if (sale && req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+      const isEmployeeOrManager = req.user.role === UserRole.ADMIN || 
+                                   req.user.role === UserRole.EMPLOYEE || 
+                                   req.user.role === UserRole.CASHIER || 
+                                   req.user.role === UserRole.STORE_MANAGER;
+      
+      if (sale && !isEmployeeOrManager && sale.customerId !== req.user.id) {
         throw new ForbiddenException('Pagamento não pertence ao usuário');
       }
     }
@@ -262,7 +292,7 @@ export class PaymentController {
    * Verifica o status de um pagamento Stripe
    */
   @Get('stripe/status/:paymentIntentId')
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.CASHIER, UserRole.STORE_MANAGER)
   async checkStripePaymentStatus(
     @Request() req,
     @Param('paymentIntentId') paymentIntentId: string
@@ -276,7 +306,12 @@ export class PaymentController {
         select: { customerId: true },
       });
 
-      if (sale && req.user.role !== UserRole.ADMIN && sale.customerId !== req.user.id) {
+      const isEmployeeOrManager = req.user.role === UserRole.ADMIN || 
+                                   req.user.role === UserRole.EMPLOYEE || 
+                                   req.user.role === UserRole.CASHIER || 
+                                   req.user.role === UserRole.STORE_MANAGER;
+      
+      if (sale && !isEmployeeOrManager && sale.customerId !== req.user.id) {
         throw new ForbiddenException('Pagamento não pertence ao usuário');
       }
     }
