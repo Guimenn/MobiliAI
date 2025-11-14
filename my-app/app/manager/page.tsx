@@ -199,7 +199,7 @@ export default function ManagerDashboard() {
           className="space-y-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <TabsList className="grid w-full max-w-2xl grid-cols-5">
+            <TabsList className="grid w-full max-w-3xl grid-cols-5">
               <TabsTrigger value="overview">Visão Geral</TabsTrigger>
               <TabsTrigger value="users">Funcionários</TabsTrigger>
               <TabsTrigger value="products">Estoque</TabsTrigger>
@@ -284,30 +284,33 @@ export default function ManagerDashboard() {
               </Card>
             </div>
 
-            {/* Quick Actions */}
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Settings className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Ações Rápidas
-                </CardTitle>
-                <CardDescription>Acesse rapidamente as principais funcionalidades</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button
-                    variant="outline"
-                    className="h-auto p-6 flex flex-col items-center space-y-3 hover:shadow-lg transition-shadow"
-                    onClick={() => router.push('/manager/orders-online')}
-                  >
-                    <div className="w-12 h-12 bg-indigo-500 rounded-lg flex items-center justify-center">
-                      <Truck className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="text-center">
-                      <p className="font-medium text-gray-900">Pedidos Online</p>
-                      <p className="text-xs text-gray-500">Gerenciar pedidos online</p>
-                    </div>
-                  </Button>
+            {/* Ação Rápida - Nova Venda */}
+            <Card className="bg-[#3e2626] text-white border-0 shadow-xl">
+              <CardContent className="p-6">
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto">
+                    <ShoppingCart className="h-8 w-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold mb-2">Nova Venda</h3>
+                    <p className="text-sm text-white/90 mb-4">
+                      Registre uma nova venda rapidamente
+                    </p>
+                    <Button
+                      onClick={() => router.push('/manager/pdv')}
+                      className="bg-white text-[#3e2626] hover:bg-white/90 w-full font-semibold mb-2"
+                    >
+                      Criar Venda
+                    </Button>
+                    <Button
+                      onClick={() => router.push('/manager/orders-online')}
+                      variant="outline"
+                      className="bg-white/10 text-white border-white/30 hover:bg-white/20 w-full font-semibold"
+                    >
+                      <Truck className="h-4 w-4 mr-2" />
+                      Pedidos Online
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -345,6 +348,7 @@ export default function ManagerDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
 
           <TabsContent value="users" className="space-y-6">
             <div className="flex justify-between items-center">

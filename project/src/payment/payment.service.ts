@@ -447,10 +447,24 @@ export class PaymentService {
 
     try {
       const paymentStatus = await this.checkPixPaymentStatus(sale.paymentReference);
+      let finalSaleStatus = sale.status;
+
+      // Se o pagamento foi confirmado, atualizar o status da venda
+      if (paymentStatus.status === 'PAID' && sale.status !== 'COMPLETED') {
+        await this.prisma.sale.update({
+          where: { id: saleId },
+          data: {
+            status: 'COMPLETED' as any,
+          },
+        });
+        finalSaleStatus = 'COMPLETED';
+      }
 
       return {
-        ...paymentStatus,
-        saleStatus: sale.status,
+        status: paymentStatus.status,
+        saleStatus: finalSaleStatus,
+        paidAt: paymentStatus.paidAt,
+        amount: paymentStatus.amount,
       };
     } catch (error: any) {
       const notFoundMessage = 'Pix QRCode not found';

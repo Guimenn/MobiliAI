@@ -76,15 +76,25 @@ export default function CustomersPage() {
           // Tentar buscar vendas para calcular total gasto
           try {
             const sales = await adminAPI.getSales();
-            if (Array.isArray(sales)) {
+            console.log('Vendas recebidas:', sales?.length || 0);
+            if (Array.isArray(sales) && sales.length > 0) {
               customers.forEach((customer: any) => {
                 const customerSales = sales.filter((sale: any) => sale.customerId === customer.id);
-                const customerTotal = customerSales.reduce((sum: number, sale: any) => sum + (sale.total || 0), 0);
+                // Usar totalAmount em vez de total
+                const customerTotal = customerSales.reduce((sum: number, sale: any) => {
+                  // Verificar diferentes campos possíveis
+                  const saleAmount = sale.totalAmount ?? sale.total ?? sale.totalValue ?? 0;
+                  const amount = Number(saleAmount) || 0;
+                  return sum + amount;
+                }, 0);
                 totalSpent += customerTotal;
               });
+              console.log('Total gasto calculado:', totalSpent);
+            } else {
+              console.log('Nenhuma venda encontrada ou formato inválido');
             }
           } catch (salesError) {
-            console.log('Não foi possível calcular total gasto:', salesError);
+            console.error('Erro ao calcular total gasto:', salesError);
           }
         }
         
@@ -128,15 +138,25 @@ export default function CustomersPage() {
       if (customersData.length > 0) {
         try {
           const sales = await adminAPI.getSales();
-          if (Array.isArray(sales)) {
+          console.log('Vendas recebidas (fallback):', sales?.length || 0);
+          if (Array.isArray(sales) && sales.length > 0) {
             customersData.forEach((customer: any) => {
               const customerSales = sales.filter((sale: any) => sale.customerId === customer.id);
-              const customerTotal = customerSales.reduce((sum: number, sale: any) => sum + (sale.total || 0), 0);
+              // Usar totalAmount em vez de total
+              const customerTotal = customerSales.reduce((sum: number, sale: any) => {
+                // Verificar diferentes campos possíveis
+                const saleAmount = sale.totalAmount ?? sale.total ?? sale.totalValue ?? 0;
+                const amount = Number(saleAmount) || 0;
+                return sum + amount;
+              }, 0);
               totalSpent += customerTotal;
             });
+            console.log('Total gasto calculado (fallback):', totalSpent);
+          } else {
+            console.log('Nenhuma venda encontrada ou formato inválido (fallback)');
           }
         } catch (salesError) {
-          console.log('Não foi possível calcular total gasto:', salesError);
+          console.error('Erro ao calcular total gasto (fallback):', salesError);
         }
       }
       

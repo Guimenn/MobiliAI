@@ -35,9 +35,10 @@ import {
   X,
   ShoppingCart,
   DollarSign,
-  Headphones
+  Headphones,
+  Store
 } from 'lucide-react';
-import { customerAPI, authAPI } from '@/lib/api';
+import { customerAPI, authAPI, storesAPI } from '@/lib/api';
 import { env } from '@/lib/env';
 import { showAlert, showConfirm } from '@/lib/alerts';
 import {
@@ -230,8 +231,11 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState('');
 
   // Opções de entrega
-  const [selectedShipping, setSelectedShipping] = useState<'standard' | 'express'>('standard');
+  const [selectedShipping, setSelectedShipping] = useState<'standard' | 'express' | 'pickup'>('standard');
   const [shippingInsurance, setShippingInsurance] = useState(true);
+  const [stores, setStores] = useState<any[]>([]);
+  const [selectedStore, setSelectedStore] = useState<string>('');
+  const [isLoadingStores, setIsLoadingStores] = useState(false);
 
   // Produtos recomendados
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
@@ -293,6 +297,8 @@ export default function CheckoutPage() {
   }, [checkoutItems]);
 
   const shippingCost = useMemo(() => {
+    // Retirada na loja é sempre grátis
+    if (selectedShipping === 'pickup') return 0;
     if (subtotal >= 500) return 0;
     return selectedShipping === 'express' ? 49.90 : 29.90;
   }, [subtotal, selectedShipping]);
@@ -371,6 +377,53 @@ export default function CheckoutPage() {
     // Se não encontrar nenhum padrão, retornar o endereço completo sem número
     return { address: fullAddress, number: '', complement: '' };
   };
+
+  // Carregar lojas disponíveis
+  useEffect(() => {
+    const loadStores = async () => {
+      setIsLoadingStores(true);
+      try {
+        const storesData = await storesAPI.getAll();
+        
+        // Filtrar lojas que têm os produtos do checkout em estoque
+        if (checkoutItems.length > 0) {
+          const availableStores = storesData.filter((store: any) => {
+            // Se a loja tem algum dos produtos, considerar disponível
+            return checkoutItems.some((item: any) => {
+              const productStoreId = item.product?.storeId || (item.product as any)?.store?.id;
+              return productStoreId === store.id;
+            });
+          });
+          
+          // Se não encontrou lojas específicas, mostrar todas
+          setStores(availableStores.length > 0 ? availableStores : storesData);
+          
+          // Selecionar automaticamente a primeira loja que tem os produtos ou a mais próxima
+          // Apenas se ainda não tiver uma loja selecionada
+          setSelectedStore((current) => {
+            if (current) return current; // Manter seleção atual se já existir
+            if (availableStores.length > 0) return availableStores[0].id;
+            if (storesData.length > 0) return storesData[0].id;
+            return '';
+          });
+        } else {
+          setStores(storesData);
+          setSelectedStore((current) => {
+            if (current) return current;
+            if (storesData.length > 0) return storesData[0].id;
+            return '';
+          });
+        }
+      } catch (error: any) {
+        console.error('Erro ao carregar lojas:', error);
+        showAlert('warning', 'Não foi possível carregar as lojas. Continuando sem seleção.');
+      } finally {
+        setIsLoadingStores(false);
+      }
+    };
+    
+    loadStores();
+  }, [checkoutItems]);
 
   // Carregar dados do usuário
   useEffect(() => {
@@ -791,6 +844,28 @@ export default function CheckoutPage() {
 
   // Validar formulário
   const validateAddress = (address: ShippingAddress = shippingAddress) => {
+    // Se for retirada na loja, apenas validar nome, telefone e CPF
+    if (selectedShipping === 'pickup') {
+      if (!address.name?.trim()) {
+        showAlert('warning', 'Por favor, informe seu nome');
+        return false;
+      }
+      if (!address.phone?.trim()) {
+        showAlert('warning', 'Por favor, informe seu telefone');
+        return false;
+      }
+      if (!address.cpf?.trim()) {
+        showAlert('warning', 'Por favor, informe seu CPF');
+        return false;
+      }
+      if (!selectedStore) {
+        showAlert('warning', 'Por favor, selecione uma loja para retirada');
+        return false;
+      }
+      return true;
+    }
+    
+    // Para entrega, validar todos os campos
     const required = ['name', 'phone', 'cpf', 'address', 'number', 'neighborhood', 'city', 'state', 'zipCode'];
     const missing = required.filter(field => !address[field as keyof ShippingAddress]?.trim());
     
@@ -865,11 +940,17 @@ export default function CheckoutPage() {
 
       console.log('Carrinho sincronizado:', backendCart.items.length, 'itens no backend');
 
-      // Agrupar por loja (assumindo que todos os produtos são da mesma loja ou primeiro)
-      const storeId = checkoutItems[0]?.product?.storeId || 'default';
+      // Determinar loja (retirada na loja usa a loja selecionada, entrega usa a loja dos produtos)
+      const firstProduct = checkoutItems[0]?.product;
+      const productStoreId = firstProduct?.storeId || (firstProduct as any)?.store?.id;
+      const storeId = selectedShipping === 'pickup' && selectedStore 
+        ? selectedStore 
+        : productStoreId || 'default';
       
       console.log('Dados do checkout:', {
         storeId,
+        selectedShipping,
+        selectedStore,
         itemsCount: checkoutItems.length,
         backendCartItemsCount: backendCart.items?.length || 0,
         shippingAddress,
@@ -880,19 +961,40 @@ export default function CheckoutPage() {
         discount,
       });
       
+      // Preparar notas do pedido
+      let notes = 'Pedido via checkout web. ';
+      if (selectedShipping === 'pickup') {
+        const selectedStoreData = stores.find((s: any) => s.id === selectedStore);
+        notes += `Retirada na loja: ${selectedStoreData?.name || 'Loja selecionada'}. `;
+      } else {
+        notes += `Frete: ${selectedShipping === 'express' ? 'Expresso' : 'Padrão'}. `;
+        notes += shippingInsurance ? 'Com seguro de envio. ' : 'Sem seguro. ';
+      }
+      if (appliedCoupon) {
+        notes += `Cupom aplicado: ${appliedCoupon.code}.`;
+      }
+      
       // Criar a venda no backend (usuário já está autenticado neste ponto)
       const saleResponse = await customerAPI.checkout({
         storeId,
-        shippingAddress: `${shippingAddress.address}, ${shippingAddress.number}${shippingAddress.complement ? ` - ${shippingAddress.complement}` : ''}`,
-        shippingCity: shippingAddress.city,
-        shippingState: shippingAddress.state,
-        shippingZipCode: shippingAddress.zipCode,
+        shippingAddress: selectedShipping === 'pickup' 
+          ? (stores.find((s: any) => s.id === selectedStore)?.address || 'Retirada na loja')
+          : `${shippingAddress.address}, ${shippingAddress.number}${shippingAddress.complement ? ` - ${shippingAddress.complement}` : ''}`,
+        shippingCity: selectedShipping === 'pickup'
+          ? (stores.find((s: any) => s.id === selectedStore)?.city || '')
+          : shippingAddress.city,
+        shippingState: selectedShipping === 'pickup'
+          ? (stores.find((s: any) => s.id === selectedStore)?.state || '')
+          : shippingAddress.state,
+        shippingZipCode: selectedShipping === 'pickup'
+          ? (stores.find((s: any) => s.id === selectedStore)?.zipCode || '')
+          : shippingAddress.zipCode,
         shippingPhone: shippingAddress.phone,
         shippingCost: shippingCost,
         insuranceCost: insuranceCost,
         tax: tax,
         discount: discount,
-        notes: `Pedido via checkout web. Frete: ${selectedShipping === 'express' ? 'Expresso' : 'Padrão'}. ${shippingInsurance ? 'Com seguro de envio' : 'Sem seguro'}.${appliedCoupon ? ` Cupom aplicado: ${appliedCoupon.code}` : ''}`,
+        notes: notes,
       });
 
       // Redirecionar para a página de pagamento apropriada
@@ -1414,19 +1516,79 @@ export default function CheckoutPage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Opção de Retirar na Loja */}
+                      <div
+                        className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                          selectedShipping === 'pickup'
+                            ? 'border-[#3e2626] bg-[#3e2626]/5'
+                            : 'border-gray-200 hover:border-[#3e2626]/50'
+                        }`}
+                        onClick={() => setSelectedShipping('pickup')}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3 flex-1">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              selectedShipping === 'pickup' ? 'border-[#3e2626] bg-[#3e2626]' : 'border-gray-300'
+                            }`}>
+                              {selectedShipping === 'pickup' && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-[#3e2626] flex items-center gap-2">
+                                <Store className="h-4 w-4" />
+                                Retirar na Loja
+                              </div>
+                              <div className="text-sm text-green-600 font-semibold mt-1">Grátis</div>
+                              <div className="text-xs text-gray-500 mt-1">Retire seu pedido na loja escolhida</div>
+                              
+                              {/* Seletor de loja quando retirada estiver selecionada */}
+                              {selectedShipping === 'pickup' && (
+                                <div className="mt-3">
+                                  <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                                    Selecione a loja para retirada:
+                                  </Label>
+                                  {isLoadingStores ? (
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      Carregando lojas...
+                                    </div>
+                                  ) : stores.length > 0 ? (
+                                    <select
+                                      value={selectedStore}
+                                      onChange={(e) => setSelectedStore(e.target.value)}
+                                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 transition-all text-sm"
+                                    >
+                                      {stores.map((store: any) => (
+                                        <option key={store.id} value={store.id}>
+                                          {store.name} - {store.address}, {store.city} - {store.state}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <p className="text-sm text-red-500">Nenhuma loja disponível</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="mt-4 flex items-center space-x-2">
-                      <Checkbox
-                        id="insurance"
-                        checked={shippingInsurance}
-                        onCheckedChange={(checked) => setShippingInsurance(checked === true)}
-                      />
-                      <Label htmlFor="insurance" className="cursor-pointer">
-                        <span className="font-semibold">Seguro de envio</span>
-                        <span className="text-gray-600 ml-2">(R$ 5,00) - Reenvio gratuito se o item for perdido ou danificado</span>
-                      </Label>
-                    </div>
+                    {/* Seguro de envio apenas para entregas */}
+                    {selectedShipping !== 'pickup' && (
+                      <div className="mt-4 flex items-center space-x-2">
+                        <Checkbox
+                          id="insurance"
+                          checked={shippingInsurance}
+                          onCheckedChange={(checked) => setShippingInsurance(checked === true)}
+                        />
+                        <Label htmlFor="insurance" className="cursor-pointer">
+                          <span className="font-semibold">Seguro de envio</span>
+                          <span className="text-gray-600 ml-2">(R$ 5,00) - Reenvio gratuito se o item for perdido ou danificado</span>
+                        </Label>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-between pt-6">

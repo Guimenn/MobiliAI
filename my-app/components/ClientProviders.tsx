@@ -9,8 +9,16 @@ export default function ClientProviders({ children }: { children: React.ReactNod
 
   useEffect(() => {
     // Carregar carrinho do backend quando a página inicia e o usuário está autenticado
-    // Mas apenas uma vez por sessão, não a cada render
+    // Mas apenas para clientes (CUSTOMER role), não para funcionários ou gerentes
     if (isAuthenticated && user && token && typeof window !== 'undefined') {
+      // Verificar se o usuário é um cliente
+      const isCustomer = user.role === 'CUSTOMER' || user.role === 'customer';
+      
+      if (!isCustomer) {
+        // Se não é cliente, não tentar carregar carrinho
+        return;
+      }
+
       // Verificar se o carrinho já foi carregado (tem itens com IDs do backend)
       const hasBackendItems = cart.some(item => item.id);
       

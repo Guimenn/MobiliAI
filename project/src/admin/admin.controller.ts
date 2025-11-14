@@ -112,6 +112,23 @@ export class AdminController {
     );
   }
 
+  // IMPORTANTE: Esta rota deve vir ANTES de 'customers/:id' para evitar interceptação
+  @Get('customers/cpf/:cpf')
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER, UserRole.EMPLOYEE, UserRole.CASHIER)
+  async getCustomerByCpf(@Param('cpf') cpf: string, @Request() req) {
+    console.log('🔍 [Controller] Rota getCustomerByCpf chamada');
+    console.log('🔍 [Controller] CPF recebido:', cpf);
+    console.log('👤 [Controller] Usuário solicitante:', req.user?.id, req.user?.role);
+    try {
+      const customer = await this.adminService.getCustomerByCpf(cpf);
+      console.log('✅ [Controller] Cliente encontrado:', customer.id);
+      return customer;
+    } catch (error) {
+      console.error('❌ [Controller] Erro ao buscar cliente:', error);
+      throw error;
+    }
+  }
+
   @Get('customers/:id')
   async getCustomerById(@Param('id') id: string) {
     return this.adminService.getCustomerById(id);

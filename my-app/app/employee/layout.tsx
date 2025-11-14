@@ -21,6 +21,8 @@ import {
   Search,
   Grid3x3,
   List,
+  Receipt,
+  Monitor,
 } from 'lucide-react';
 
 function ProductsHeaderComponent({ 
@@ -54,7 +56,7 @@ function ProductsHeaderComponent({
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-white">
-                {pathname === '/employee/sales' ? 'Vendas' : pathname === '/employee/timeclock' ? 'Ponto' : 'Dashboard'}
+                {pathname.startsWith('/employee/pdv') ? 'Ponto de Venda' : pathname === '/employee/sales' ? 'Vendas' : pathname === '/employee/timeclock' ? 'Ponto' : 'Dashboard'}
               </h1>
             </div>
           </div>
@@ -260,8 +262,9 @@ export default function EmployeeLayout({
 
   const navigation = [
     { name: 'Início', href: '/employee', icon: Home, current: pathname === '/employee' },
+    { name: 'PDV', href: '/employee/pdv', icon: ShoppingCart, current: pathname.startsWith('/employee/pdv') },
     { name: 'Produtos', href: '/employee/products', icon: Package, current: pathname.startsWith('/employee/products') },
-    { name: 'Vendas', href: '/employee/sales', icon: ShoppingCart, current: pathname.startsWith('/employee/sales') },
+    { name: 'Vendas', href: '/employee/sales', icon: Receipt, current: pathname.startsWith('/employee/sales') },
     { name: 'Ponto', href: '/employee/timeclock', icon: Clock, current: pathname.startsWith('/employee/timeclock') },
   ];
 
@@ -414,7 +417,7 @@ export default function EmployeeLayout({
         )}
 
         {/* Page Content */}
-        <main className={`${pathname === '/employee' ? 'p-8 bg-white' : 'p-8 bg-gray-50'} min-h-screen`}>
+        <main className={`${pathname === '/employee' ? 'p-8 bg-white' : pathname.startsWith('/employee/pdv') ? 'p-0 bg-white overflow-hidden' : 'p-8 bg-gray-50'} ${pathname.startsWith('/employee/pdv') ? 'h-screen' : 'min-h-screen'}`}>
           {children}
         </main>
       </div>
