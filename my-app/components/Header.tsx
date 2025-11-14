@@ -87,8 +87,8 @@ export default function Header() {
     // Estados locais para favoritos e carrinho
     const [favoritesCount, setFavoritesCount] = useState(0);
     
-    // Calcular total de itens no carrinho (soma das quantidades)
-    const cartItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
+    // Calcular número de produtos únicos no carrinho
+    const cartItemsCount = cart.length;
     
     // Estados locais
     const [searchOpen, setSearchOpen] = useState(false);
@@ -185,11 +185,11 @@ export default function Header() {
             const wordSet = new Set<string>();
             
             // Extrair palavras dos produtos que começam com o termo digitado
-            allProducts.forEach(product => {
+            allProducts.forEach((product: any) => {
                 // Palavras do nome
                 if (product.name) {
-                    const words = product.name.toLowerCase().split(/\s+/);
-                    words.forEach(word => {
+                    const words: string[] = product.name.toLowerCase().split(/\s+/);
+                    words.forEach((word: string) => {
                         if (word.startsWith(term) && word.length > term.length) {
                             wordSet.add(word);
                         }
@@ -198,8 +198,8 @@ export default function Header() {
                 
                 // Palavras da descrição
                 if (product.description) {
-                    const words = product.description.toLowerCase().split(/\s+/);
-                    words.forEach(word => {
+                    const words: string[] = product.description.toLowerCase().split(/\s+/);
+                    words.forEach((word: string) => {
                         if (word.startsWith(term) && word.length > term.length) {
                             wordSet.add(word);
                         }
@@ -320,6 +320,7 @@ export default function Header() {
             setUserDropdownOpen(false);
             
             // Executar logout do store
+            // NOTA: O carrinho é mantido no backend para que o usuário possa recuperá-lo ao fazer login novamente
             logout();
             
             // Limpar dados do localStorage manualmente para garantir

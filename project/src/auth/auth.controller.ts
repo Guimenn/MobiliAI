@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Get, UseGuards, Request, Patch } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, ChangePasswordDto, CheckEmailDto, ForgotPasswordDto, ResetPasswordDto, VerifyResetCodeDto } from '../dto/auth.dto';
+import { RegisterDto, LoginDto, ChangePasswordDto, CheckEmailDto, ForgotPasswordDto, ResetPasswordDto, VerifyResetCodeDto, GoogleLoginDto } from '../dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 
@@ -50,5 +50,10 @@ export class AuthController {
   @Post('reset-password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  @Post('google')
+  async loginWithGoogle(@Body() googleLoginDto: GoogleLoginDto) {
+    return this.authService.loginWithGoogle(googleLoginDto.idToken);
   }
 }

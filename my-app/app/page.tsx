@@ -13,6 +13,7 @@ import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import { BackendStatus } from '@/components/BackendStatus';
 import FavoriteTooltip from '@/components/FavoriteTooltip';
+import { showAlert } from '@/lib/alerts';
 import { 
   Search,
   ShoppingCart,
@@ -132,21 +133,13 @@ export default function HomePage() {
     const product = allProducts.find(p => p.id === productId);
     if (product) {
       try {
-        // Adicionar ao store local (sempre funciona)
-        useAppStore.getState().addToCart(product, 1);
+        // addToCart do store já gerencia backend automaticamente quando autenticado
+        await useAppStore.getState().addToCart(product, 1);
         setCartItems(prev => [...prev, productId]);
         
-        // Se estiver autenticado, também adicionar ao backend
+        // Disparar evento para atualizar notificações
         if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
-          try {
-            const { customerAPI } = await import('@/lib/api');
-            await customerAPI.addToCart(product.id, 1);
-            // Disparar evento para atualizar notificações imediatamente
-            window.dispatchEvent(new CustomEvent('notification:cart-added'));
-          } catch (apiError) {
-            console.error('Erro ao adicionar ao carrinho no backend:', apiError);
-            // Mesmo com erro na API, o item já está no store local
-          }
+          window.dispatchEvent(new CustomEvent('notification:cart-added'));
         }
         
         // Mostrar mensagem de sucesso
@@ -180,10 +173,10 @@ export default function HomePage() {
   // Função para abrir carrinho
   const handleCartClick = () => {
     if (cartItems.length > 0) {
-      alert(`Você tem ${cartItems.length} item(s) no carrinho`);
+      showAlert('info', `Você tem ${cartItems.length} item(s) no carrinho`);
       // Aqui você pode implementar lógica para mostrar modal do carrinho ou redirecionar
     } else {
-      alert('Seu carrinho está vazio. Adicione alguns produtos!');
+      showAlert('warning', 'Seu carrinho está vazio. Adicione alguns produtos!');
     }
   };
 
@@ -376,148 +369,43 @@ export default function HomePage() {
     setCurrentPage(1);
   };
 
-  // Função para verificar se uma oferta relâmpago está ativa
-  const isFlashSaleActive = (product: any): boolean => {
-    if (!product.isFlashSale) {
-      return false;
-    }
-    
-    if (!product.flashSaleStartDate || !product.flashSaleEndDate) {
-      return false;
-    }
-    
-    const now = new Date();
-    const start = new Date(product.flashSaleStartDate);
-    const end = new Date(product.flashSaleEndDate);
-    
-    // Verificar se as datas são válidas
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return false;
-    }
-    
-    return now >= start && now <= end;
+  // Seleciona produto aleatório para oferta especial
+  const pickRandomProduct = () => {
+    if (!allProducts || allProducts.length === 0) return null;
+    const randomIndex = Math.floor(Math.random() * allProducts.length);
+    return allProducts[randomIndex];
   };
 
-  // Função para calcular tempo restante da oferta relâmpago
-  const getTimeRemaining = (product: any): number => {
-    if (!product.flashSaleEndDate) return 0;
-    const now = new Date();
-    const end = new Date(product.flashSaleEndDate);
-    const diff = Math.max(0, Math.floor((end.getTime() - now.getTime()) / 1000));
-    return diff;
-  };
-
-  // Função para obter preço com desconto - APENAS se a oferta estiver ATIVA
-  const getFlashSalePrice = (product: any): number => {
-    // Verificar se a oferta está ativa
-    const isActive = isFlashSaleActive(product);
-    
-    if (!isActive || !product.isFlashSale) {
-      return product.price; // Oferta não está ativa - retornar preço normal
-    }
-    
-    // Oferta está ativa - aplicar desconto
-    if (product.flashSalePrice) {
-      return product.flashSalePrice;
-    }
-    if (product.flashSaleDiscountPercent && product.price) {
-      const discount = (product.price * product.flashSaleDiscountPercent) / 100;
-      return product.price - discount;
-    }
-    return product.price;
-  };
-
-  // Função para obter percentual de desconto - APENAS se a oferta estiver ATIVA
-  const getDiscountPercent = (product: any): number => {
-    // Verificar se a oferta está ativa
-    const isActive = isFlashSaleActive(product);
-    
-    if (!isActive || !product.isFlashSale) {
-      return 0; // Oferta não está ativa - sem desconto
-    }
-    
-    // Oferta está ativa - calcular desconto
-    if (product.flashSaleDiscountPercent) {
-      return product.flashSaleDiscountPercent;
-    }
-    if (product.flashSalePrice && product.price) {
-      return Math.round(((product.price - product.flashSalePrice) / product.price) * 100);
-    }
-    return 0;
-  };
-
-  // Seleciona produto com oferta relâmpago ativa
-  const pickFlashSaleProduct = () => {
-    if (!allProducts || allProducts.length === 0) {
-      return null;
-    }
-    
-    // Buscar produtos com oferta relâmpago ativa
-    const flashSaleProducts = allProducts.filter(p => isFlashSaleActive(p));
-    
-    if (flashSaleProducts.length > 0) {
-      // Selecionar aleatoriamente entre os produtos com oferta ativa
-      const randomIndex = Math.floor(Math.random() * flashSaleProducts.length);
-      return flashSaleProducts[randomIndex];
-    }
-    
-    return null;
-  };
-
-  // Inicializa oferta relâmpago quando produtos carregarem
+  // Inicializa oferta e cronômetro quando produtos carregarem
   useEffect(() => {
-    if (allProducts && allProducts.length > 0) {
-      const product = pickFlashSaleProduct();
-      if (product) {
-        setSpecialOfferProduct(product);
-        const timeRemaining = getTimeRemaining(product);
-        setOfferSecondsLeft(timeRemaining > 0 ? timeRemaining : OFFER_DURATION);
-      } else {
-        // Se não houver oferta ativa, ainda assim mostrar um produto com oferta configurada
-        const productsWithFlashSale = allProducts.filter(p => p.isFlashSale);
-        if (productsWithFlashSale.length > 0) {
-          setSpecialOfferProduct(productsWithFlashSale[0]);
-          setOfferSecondsLeft(0);
-        }
-      }
+    if (allProducts && allProducts.length > 0 && !specialOfferProduct) {
+      const product = pickRandomProduct();
+      setSpecialOfferProduct(product);
+      setOfferSecondsLeft(OFFER_DURATION);
     }
   }, [allProducts]);
 
-  // Cronômetro da oferta relâmpago - atualiza baseado no tempo real restante
+  // Cronômetro da oferta
   useEffect(() => {
     if (!specialOfferProduct) return;
-    
-    // Atualizar timer imediatamente
-    const updateTimer = () => {
-      const timeRemaining = getTimeRemaining(specialOfferProduct);
-      if (timeRemaining > 0) {
-        setOfferSecondsLeft(timeRemaining);
-      } else {
-        // Se a oferta expirou, buscar próximo produto
-        const nextProduct = pickFlashSaleProduct();
-        if (nextProduct) {
+    const intervalId = setInterval(() => {
+      setOfferSecondsLeft((prev) => {
+        if (prev <= 1) {
+          const nextProduct = pickRandomProduct();
           setSpecialOfferProduct(nextProduct);
-          const nextTimeRemaining = getTimeRemaining(nextProduct);
-          setOfferSecondsLeft(nextTimeRemaining > 0 ? nextTimeRemaining : 0);
-        } else {
-          setOfferSecondsLeft(0);
+          return OFFER_DURATION; // reinicia
         }
-      }
-    };
-    
-    // Atualizar imediatamente
-    updateTimer();
-    
-    // Atualizar a cada segundo
-    const intervalId = setInterval(updateTimer, 1000);
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [specialOfferProduct, allProducts]);
+  }, [specialOfferProduct]);
 
   const formatTime = (totalSeconds: number) => {
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+    const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    return `${h}h ${m}m`;
   };
 
   const testimonials = [
@@ -564,6 +452,33 @@ export default function HomePage() {
       icon: Award,
       title: 'Qualidade Garantida',
       description: 'Móveis premium com garantia de satisfação'
+    }
+  ];
+
+  const boutiqueHighlights = [
+    {
+      icon: Wand2,
+      title: 'Curadoria Personalizada',
+      description: 'Cada projeto é desenvolvido através de conversas profundas sobre suas referências afetivas e estilo de vida.',
+      badge: 'PROCESSO AUTORAL'
+    },
+    {
+      icon: Layers,
+      title: 'Renderização em Tempo Real',
+      description: 'Visualize seu ambiente transformado com ajustes de iluminação natural e texturas reais antes da produção.',
+      badge: 'TECNOLOGIA AVANÇADA'
+    },
+    {
+      icon: Palette,
+      title: 'Paletas Exclusivas',
+      description: 'Desenvolvidas em parceria com artistas convidados, utilizando dados precisos de iluminação do seu espaço.',
+      badge: 'ARTE APLICADA'
+    },
+    {
+      icon: Brush,
+      title: 'Aprovação Tátil',
+      description: 'Receba amostras físicas de texturas e materiais para aprovação antes da produção final do seu projeto.',
+      badge: 'QUALIDADE PREMIUM'
     }
   ];
 
@@ -725,295 +640,178 @@ export default function HomePage() {
   );
   };
 
+  // Estado para controlar se a oferta relâmpago está ativa (será controlado pelo admin)
+  const [flashOfferActive, setFlashOfferActive] = useState(true); // Por padrão ativa, mas pode ser controlado pelo admin
+
   return (
-    <div className="min-h-screen">
-      {/* Hero Background Container */}
-      <div className="relative min-h-screen">
-        {/* Background Image */}
+    <div className="min-h-screen ">
+      {/* Main Hero Section - Layout com foto escura e texto à esquerda */}
+      <div className="relative min-h-screen  flex items-center">
+        {/* Background Image com grayscale e escurecido */}
         <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: 'url(/hero-bg.png)' }}
+          className="absolute  inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ 
+            backgroundImage: 'url(/hero-bg.png)',
+            filter: 'grayscale(100%) brightness(0.7)',
+            WebkitFilter: 'grayscale(100%) brightness(0.6)'
+          }}
         ></div>
         
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-[#3e2626]/60"></div>
+        {/* Overlay adicional para escurecer mais */}
+        <div className="absolute inset-0 bg-black/40"></div>
         
         {/* Header */}
         <Header />
 
-        {/* Hero Section */}
-        <section className="relative flex items-center justify-center overflow-visible h-full mt-10">
-          {/* Content */}
-          <div className="relative z-10 w-full max-w-5xl px-4 sm:px-6 lg:px-8 text-center mt-30">
-            <div className="max-w-5xl mx-auto pt-10">
-              {/* Main Heading */}
-              <h1 className="text-3xl md:text-5xl lg:text-7xl font-thin leading-tight tracking-wider">
-                <span className="block font-thin" style={{ 
-                  background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%, #ffffff 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text'
-                }}>
-                  Decore seu espaço com
+        {/* Content Container */}
+        <div className="relative z-10 w-full container mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[80vh]">
+            
+            {/* LADO ESQUERDO - Texto */}
+            <div className="text-white space-y-8">
+              {/* Badge/Status */}
+              <div className="flex items-center gap-4 mb-6">
+              
+              </div>
+
+              {/* Título Principal */}
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-light leading-tight tracking-wide">
+                <span className="block text-white/95">
+                  Atmosferas autorais criadas com
                 </span>
-                <span className="block font-thin mt-3 text-3xl md:text-5xl lg:text-7xl" style={{ 
-                  background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%, #ffffff 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text'
-                }}>
-                  móveis estilosos
+                <span className="block mt-2 font-normal text-white">
+                  precisão cromática.
                 </span>
               </h1>
+
+              {/* Descrição */}
+              <p className="text-lg md:text-xl text-white/80 leading-relaxed max-w-xl">
+                A MobiliAI combina curadoria humana e machine learning proprietário para transformar fotos do seu ambiente em um roteiro visual completo, com texturas, paletas e mobiliário já prontos para o uso.
+              </p>
+
+              {/* Botões de Ação */}
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                <Button 
+                  onClick={() => router.push('/products')}
+                  className="bg-white text-[#3e2626] hover:bg-white/90 rounded-full px-8 py-6 text-base font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+                >
+                  EXPLORAR VISUALIZAÇÃO
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="border-2 border-white/30 text-white hover:bg-white/10 rounded-full px-8 py-6 text-base font-semibold backdrop-blur-sm transition-all duration-300"
+                >
+                  SAIBA MAIS
+                </Button>
+              </div>
+
+              
             </div>
-          </div>
-      {/* Card de transição entre Hero e Categorias (metade sobre o hero, metade abaixo) */}
-      <div className="absolute inset-x-0 bottom-0 translate-y-[150%] sm:translate-y-[150%] md:translate-y-[150%] lg:translate-y-[170%] z-20">
-        <div className="w-[60%] mx-auto ">
-          <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_rgba(0,0,0,0.18)] ring-1 ring-black/5">
-              {/* Decor e fundo */}
-              <div className="absolute inset-0 bg-gray-100" />
-              <div className="absolute -top-24 -left-20 w-80 h-80 bg-black/5 rounded-full blur-3xl" />
-              <div className="absolute inset-0 opacity-[0.02]" style={{
-                backgroundImage: `radial-gradient(circle at 2px 2px, #000 1px, transparent 0)`,
-                backgroundSize: '20px 20px'
-              }} />
 
-             
+            {/* LADO DIREITO - Oferta Relâmpago (Condicional) */}
+            {flashOfferActive && specialOfferProduct && (
+              <div className="relative group w-full">
+                <div className="relative bg-white/10 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border-2 border-white/30 overflow-hidden">
+                  {/* Padrão decorativo sutil de fundo */}
+                  <div className="absolute inset-0 opacity-[0.05]" style={{
+                    backgroundImage: `radial-gradient(circle at 2px 2px, #3e2626 1px, transparent 0)`,
+                    backgroundSize: '16px 16px'
+                  }}></div>
+                  
+                  {/* Badge Oferta Relâmpago */}
+                  <div className="relative z-10 flex items-center gap-2 mb-4">
+                    <div className="relative overflow-hidden bg-[#3e2626] text-white rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-lg">
+                      <Zap className="h-3.5 w-3.5 fill-white" />
+                      <span className="text-xs font-light tracking-wide">Oferta Relâmpago</span>
+                    </div>
+                    <div className="bg-red-500 text-white rounded-full px-3 py-1 flex items-center gap-1.5 shadow-lg">
+                      <Clock className="h-3 w-3" />
+                      <span className="text-[10px] font-bold tabular-nums">{formatTime(offerSecondsLeft)}</span>
+                    </div>
+                  </div>
 
-              <div className="relative px-6 py-8 md:px-12 md:py-12 min-h-[260px] md:min-h-[320px] lg:min-h-[360px]">
-              {/* Conteúdo: Oferta Especial com cronômetro */}
-              {specialOfferProduct ? (
-              <div className="flex flex-col md:flex-row items-stretch gap-10">
-                {/* LADO ESQUERDO - Foto do produto */}
-                <div className="relative w-full md:w-[420px] lg:w-[500px] flex-shrink-0">
-                  {/* Mancha de tinta decorativa orgânica */}
-                  <div className="absolute -top-8 -left-8 w-32 h-32 bg-gray-100/40 rounded-full blur-3xl hidden md:block"></div>
-                  <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-gray-200/30 rounded-full blur-2xl hidden md:block"></div>
-
-                  <div className="w-full h-56 md:h-64 lg:h-72 rounded-3xl overflow-hidden relative shadow-lg border-2 border-gray-200/60 bg-white" style={{ borderRadius: '24px 48px 32px 40px' }}>
-                    {/* Product Image - if available */}
-                    {(() => {
-                      const imageUrl = specialOfferProduct.imageUrls && specialOfferProduct.imageUrls.length > 0 
-                        ? specialOfferProduct.imageUrls[0] 
-                        : specialOfferProduct.imageUrl;
-                      
-                      return imageUrl ? (
+                  {/* Layout: Imagem à esquerda, Conteúdo à direita */}
+                  <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Imagem do Produto - Formato Quadrado à Esquerda */}
+                    {specialOfferProduct.imageUrl && (
+                      <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-gray-100 group/image">
                         <Image
-                          src={imageUrl}
+                          src={specialOfferProduct.imageUrl}
                           alt={specialOfferProduct.name}
-                          width={800}
-                          height={600}
-                          className="w-full h-full object-cover"
+                          width={300}
+                          height={300}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-105"
                           unoptimized
                         />
-                      ) : (
-                        <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent" />
-                      );
-                    })()}
-
-                    {/* Selo de desconto - estilo mais artesanal */}
-                    {(() => {
-                      const discountPercent = getDiscountPercent(specialOfferProduct);
-                      if (discountPercent > 0) {
-                        return (
-                          <div className="absolute -right-2 top-4 transform rotate-3">
-                            <div className="bg-[#3e2626] text-white shadow-lg px-4 py-3 rounded-2xl" style={{ borderRadius: '12px 16px 20px 8px' }}>
-                              <div className="text-2xl font-black leading-none transform -rotate-1">{discountPercent}%</div>
-                              <div className="text-[9px] tracking-widest font-bold uppercase mt-0.5 transform rotate-1">OFF</div>
-                              {/* Rabisco decorativo */}
-                              <svg className="absolute -top-1 -right-1 w-4 h-4 text-gray-400" viewBox="0 0 20 20" fill="none">
-                                <path d="M2 5c3 2 6 1 8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                              </svg>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    {/* Oferta relâmpago - estilo mais orgânico e humano */}
-                    <div className="absolute left-4 top-4 z-20 transform -rotate-1">
-                      <div className="relative inline-flex items-center gap-2 bg-[#3e2626] text-white rounded-2xl px-4 py-2 shadow-lg" style={{ borderRadius: '16px 8px 20px 12px' }}>
-                        <Zap className="h-4 w-4 fill-white transform rotate-12" />
-                        <span className="text-xs md:text-sm font-bold tracking-tight">Oferta relâmpago</span>
-                      </div>
-                    </div>
-
-                    {/* Anotação com estilo de post-it rabiscado */}
-                    <div className="absolute left-4 top-20 bg-gray-50/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md text-[#3e2626] text-xs font-medium flex items-center gap-2 transform rotate-[-2deg] border border-gray-200">
-                      <Sofa className="h-3.5 w-3.5" /> 
-                      <span className="italic">Conforto premium</span>
-                      {/* Pequeno rabisco decorativo */}
-                      <svg className="absolute -right-1 -bottom-1 w-3 h-3 text-gray-300" viewBox="0 0 10 10">
-                        <path d="M2 8 Q5 6 8 8" stroke="currentColor" strokeWidth="1" fill="none"/>
-                      </svg>
-                    </div>
-
-                    {/* Rabisco decorativo orgânico no canto */}
-                    <svg className="absolute -right-8 bottom-12 w-20 h-20 text-gray-200/60 transform rotate-12" viewBox="0 0 100 100" fill="none">
-                      <path d="M10 50 Q30 20, 50 40 T90 50" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-                      <path d="M15 55 Q35 25, 55 45 T95 55" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
-                    </svg>
-
-                    {/* Timer no rodapé - estilo mais casual */}
-                    {offerSecondsLeft > 0 && (
-                      <div className="absolute bottom-4 right-4 z-10 transform rotate-1">
-                        <span className="inline-flex items-center gap-2 bg-[#3e2626]/95 backdrop-blur-sm text-white rounded-2xl px-4 py-2.5 text-sm font-bold shadow-lg" style={{ borderRadius: '12px 20px 16px 8px' }}>
-                          <Clock className="h-4 w-4" />
-                          {formatTime(offerSecondsLeft)}
-                        </span>
+                        
+                        {/* Badge de Desconto */}
+                        <div className="absolute top-3 right-3 bg-[#3e2626] text-white rounded-lg px-3 py-2 shadow-xl">
+                          <div className="text-xl font-black leading-none">30%</div>
+                          <div className="text-[8px] font-bold uppercase tracking-wider">OFF</div>
+                        </div>
                       </div>
                     )}
-                  </div>
-                </div>
 
-                {/* LADO DIREITO - Informações empilhadas verticalmente */}
-                <div className="flex-1 flex flex-col gap-6">
-                  {/* Título com estilo mais humano */}
-                  <div>
-                    <h3 className="text-3xl md:text-4xl font-bold text-[#3e2626] leading-relaxed tracking-normal" style={{ fontFamily: 'inherit' }}>
-                      {specialOfferProduct.name}
-                    </h3>
-                  </div>
-
-                  {/* Descrição do produto - estilo mais conversacional */}
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3 group">
-                      <div className="h-8 w-8 rounded-full bg-gray-100 text-[#3e2626] flex items-center justify-center flex-shrink-0 shadow-sm border border-gray-200 transform group-hover:rotate-6 transition-transform">
-                        <Shield className="h-4 w-4" />
-                      </div>
+                    {/* Informações do Produto - À Direita */}
+                    <div className="flex flex-col justify-between space-y-3">
                       <div>
-                        <div className="text-base font-bold text-[#3e2626] mb-1">Qualidade garantida</div>
-                        <div className="text-sm text-gray-600 leading-relaxed">
-                          {(() => {
-                            const discountPercent = getDiscountPercent(specialOfferProduct);
-                            if (discountPercent > 0) {
-                              return (
-                                <>Peças selecionadas com <span className="font-semibold text-[#3e2626]">{discountPercent}% de desconto</span> - uma oportunidade imperdível!</>
-                              );
-                            }
-                            return <>Peças selecionadas com desconto especial - uma oportunidade imperdível!</>;
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 group">
-                      <div className="h-8 w-8 rounded-full bg-gray-100 text-[#3e2626] flex items-center justify-center flex-shrink-0 shadow-sm border border-gray-200 transform group-hover:-rotate-6 transition-transform">
-                        <Truck className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="text-base font-bold text-[#3e2626] mb-1">Entrega rápida</div>
-                        <div className="text-sm text-gray-600 leading-relaxed">Enviamos para as principais cidades em <span className="font-semibold">poucos dias</span>. Rápido e seguro!</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Preços - estilo mais destacado e humano */}
-                  {(() => {
-                    const originalFlashPrice = Number(specialOfferProduct.price);
-                    const isActive = isFlashSaleActive(specialOfferProduct);
-                    let currentFlashPrice = originalFlashPrice;
-                    let flashDiscountPercent = 0;
-                    
-                    // Calcular desconto se houver oferta relâmpago configurada
-                    if (specialOfferProduct.isFlashSale) {
-                      if (specialOfferProduct.flashSaleDiscountPercent && specialOfferProduct.flashSaleDiscountPercent > 0) {
-                        flashDiscountPercent = specialOfferProduct.flashSaleDiscountPercent;
-                        // SEMPRE calcular o preço com desconto para visualização
-                        const discount = (originalFlashPrice * flashDiscountPercent) / 100;
-                        currentFlashPrice = originalFlashPrice - discount;
-                      } else if (specialOfferProduct.flashSalePrice) {
-                        const flashPrice = Number(specialOfferProduct.flashSalePrice);
-                        // SEMPRE usar o preço de oferta para visualização
-                        currentFlashPrice = flashPrice;
-                        // Calcular percentual de desconto baseado no flashSalePrice
-                        if (flashPrice < originalFlashPrice) {
-                          flashDiscountPercent = Math.round(((originalFlashPrice - flashPrice) / originalFlashPrice) * 100);
-                        }
-                      }
-                    }
-                    
-                    // Sempre mostrar desconto se houver oferta configurada
-                    const hasDiscount = flashDiscountPercent > 0 && currentFlashPrice < originalFlashPrice;
-                    
-                    return (
-                      <div className="flex flex-wrap items-end gap-3 pt-2">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-base font-bold text-[#3e2626]">R$</span>
-                          <span className="text-4xl md:text-5xl font-black text-[#3e2626] leading-none tracking-tight">
-                            {currentFlashPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        {hasDiscount && (
-                          <>
-                            <div className="flex items-baseline gap-1 text-gray-400">
-                              <span className="text-sm line-through font-medium">R$</span>
-                              <span className="text-xl md:text-2xl line-through font-semibold">
-                                {originalFlashPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <h3 className="text-base md:text-lg font-light text-white leading-tight tracking-[0.08em] mb-2">
+                          {specialOfferProduct.name}
+                        </h3>
+                        
+                        {/* Preço */}
+                        <div className="space-y-1">
+                          <div className="text-xs text-white/70 font-light">Por apenas</div>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-sm font-light text-white">R$</span>
+                            <span className="text-2xl md:text-3xl font-light text-white tracking-tight">
+                              {(specialOfferProduct.price ? specialOfferProduct.price * 0.7 : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          {specialOfferProduct.price && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm text-white/60 line-through font-light">
+                                R$ {specialOfferProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[10px] bg-red-500/20 text-red-200 px-2 py-0.5 rounded-full font-light border border-red-500/30">
+                                Economize R$ {(specialOfferProduct.price * 0.3).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                               </span>
                             </div>
-                            <span className="ml-2 inline-flex items-center px-3 py-1.5 rounded-xl bg-[#3e2626] text-white text-sm font-bold shadow-md transform -rotate-1" style={{ borderRadius: '8px 12px 10px 6px' }}>
-                              -{flashDiscountPercent}%
-                            </span>
-                          </>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    );
-                  })()}
 
-                  {/* Ações - Botões com estilo mais orgânico */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
-                    <Button 
-                      onClick={() => addToCart(specialOfferProduct.id)} 
-                      className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-2xl px-8 py-4 shadow-lg hover:shadow-xl transition-all w-full sm:w-auto text-base font-bold transform hover:scale-[1.02] active:scale-[0.98]"
-                      style={{ borderRadius: '16px 20px 18px 14px' }}
-                    >
-                      🛒 Adicionar ao carrinho
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => router.push(`/products?highlight=${specialOfferProduct.id}`)} 
-                      className="rounded-2xl border-2 border-[#3e2626]/40 text-[#3e2626] hover:bg-[#3e2626] hover:text-white hover:border-[#3e2626] px-8 py-4 w-full sm:w-auto text-base font-bold transition-all transform hover:scale-[1.02] active:scale-[0.98]"
-                      style={{ borderRadius: '18px 14px 16px 20px' }}
-                    >
-                      Ver coleção completa →
-                    </Button>
+                      <div className="space-y-2">
+                        {/* Botão de Ação */}
+                        <Button 
+                          onClick={() => addToCart(specialOfferProduct.id)}
+                          className="relative w-full bg-white text-[#3e2626] hover:bg-white/90 rounded-full px-6 py-3 text-sm font-light tracking-wide transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <span className="flex items-center justify-center gap-2">
+                            <ShoppingCart className="h-4 w-4" />
+                            Adicionar ao Carrinho
+                          </span>
+                        </Button>
+                        
+                        {/* Garantia */}
+                        <div className="flex items-center justify-center gap-1.5 text-[10px] text-white/60 font-light">
+                          <Shield className="h-3 w-3" />
+                          <span>Compra segura e garantida</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center justify-between gap-6">
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-semibold text-[#3e2626]">Oferta especial</h3>
-                  <p className="text-gray-600 mt-2">
-                    {allProducts.length > 0 
-                      ? 'Nenhum produto com oferta relâmpago ativa no momento' 
-                      : 'Carregando produtos...'}
-                  </p>
-                  {allProducts.length > 0 && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Total de produtos: {allProducts.length} | 
-                      Produtos com oferta configurada: {allProducts.filter(p => p.isFlashSale).length}
-                    </p>
-                  )}
-                </div>
-                {allProducts.length === 0 && (
-                  <div className="w-10 h-10 border-4 border-[#3e2626]/20 border-t-[#3e2626] rounded-full animate-spin" />
-                )}
-              </div>
             )}
-            </div>
           </div>
         </div>
-      </div>
-        </section>
       </div>
 
      
 
       {/* Categories Section */}
-      <section id="categories-anchor" className="pt-40 md:pt-44 lg:pt-80 pb-20 bg-gradient-to-br from-gray-50 to-white">
+      <section id="categories-anchor" className="pt-20 md:pt-24 pb-20 bg-gradient-to-br from-gray-50 to-white">
         <div className="container mx-auto  mt-10">
          
 
@@ -1038,12 +836,16 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 
                 {/* Conteúdo Principal */}
-                <div className="relative z-10 p-6 md:p-8 h-full flex flex-col justify-between">
-                  {/* Selo de categoria - Card Grande */}
-                  <div className="absolute top-5 left-5 md:top-6 md:left-6 z-20">
-                    <span className="inline-flex items-center px-5 py-2.5 md:px-6 md:py-3 rounded-2xl bg-black/60 backdrop-blur-md text-white text-xl md:text-3xl lg:text-4xl font-bold tracking-tight shadow-xl border border-white/30">
-                      {categories[0].name}
-                    </span>
+                <div className="relative z-10 p-8 h-full flex flex-col justify-between">
+                  <div>
+                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
+                      <h3 className="text-4xl md:text-5xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                        {categories[0].name}
+                      </h3>
+                      <p className="text-sm text-black font-light tracking-[0.02em]">
+                        {categories[0].description}
+                      </p>
+                    </div>
                   </div>
                 </div>
                 
@@ -1061,19 +863,30 @@ export default function HomePage() {
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.33]"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.4]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[5].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[5].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-4 md:p-6 h-full">
-                  {/* Selo de categoria - Card Médio 2x2 */}
-                  <div className="absolute top-4 left-4 md:top-5 md:left-5 z-20">
-                    <span className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 rounded-xl bg-black/60 backdrop-blur-md text-white text-base md:text-xl lg:text-2xl font-bold tracking-tight shadow-lg border border-white/30">
-                      {categories[5].name}
-                    </span>
+                <div className="relative z-10 p-6 h-full flex flex-col justify-start">
+                  <div>
+                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
+                      <h4 className="text-2xl md:text-3xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                        {categories[5].name}
+                      </h4>
+                      <p className="text-sm text-black  tracking-[0.02em]">
+                        {categories[5].description}
+                      </p>
+                    </div>
                   </div>
                 </div>
+
+                 {/* Efeito de brilho animado */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                
+                {/* Decoração flutuante */}
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/20 rounded-2xl transition-all duration-300"></div>
               </div>
@@ -1089,14 +902,24 @@ export default function HomePage() {
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-3 md:p-4 h-full">
-                  {/* Selo de categoria - Card Estreito 1x2 */}
-                  <div className="absolute top-3 left-3 md:top-4 md:left-4 z-20">
-                    <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-black/60 backdrop-blur-md text-white text-sm md:text-base lg:text-lg font-bold tracking-tight shadow-md border border-white/30">
-                      {categories[2].name}
-                    </span>
+                <div className="relative z-10 p-4 h-full flex flex-col justify-end items-center">
+                  <div className="text-center">
+                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                        {categories[2].name}
+                      </h4>
+                      <p className="text-xs text-black  tracking-[0.02em]">
+                        {categories[2].description}
+                      </p>
+                    </div>
                   </div>
                 </div>
+                 {/* Efeito de brilho animado */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                
+                {/* Decoração flutuante */}
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
               </div>
@@ -1112,14 +935,24 @@ export default function HomePage() {
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[1].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-4 md:p-6 h-full">
-                  {/* Selo de categoria - Card Médio 2x2 */}
-                  <div className="absolute top-4 left-4 md:top-5 md:left-5 z-20">
-                    <span className="inline-flex items-center px-4 py-2 md:px-5 md:py-2.5 rounded-xl bg-black/60 backdrop-blur-md text-white text-base md:text-xl lg:text-2xl font-bold tracking-tight shadow-lg border border-white/30">
-                      {categories[1].name}
-                    </span>
+                <div className="relative z-10 p-6 h-full flex flex-col justify-start">
+                  <div>
+                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-2xl md:text-3xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                        {categories[1].name}
+                      </h4>
+                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                        {categories[1].description}
+                      </p>
+                    </div>
                   </div>
                 </div>
+                 {/* Efeito de brilho animado */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                
+                {/* Decoração flutuante */}
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/20 rounded-2xl transition-all duration-300"></div>
               </div>
@@ -1135,14 +968,25 @@ export default function HomePage() {
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[4].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-3 md:p-4 h-full">
-                  {/* Selo de categoria - Card Horizontal 2x1 */}
-                  <div className="absolute top-3 left-3 md:top-4 md:left-4 z-20">
-                    <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-black/60 backdrop-blur-md text-white text-sm md:text-base lg:text-lg font-bold tracking-tight shadow-md border border-white/30">
-                      {categories[4].name}
-                    </span>
+                <div className="relative z-10 p-4 h-full flex flex-col justify-end">
+                  <div className="text-left">
+                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                        {categories[4].name}
+                      </h4>
+                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                        {categories[4].description}
+                      </p>
+                    </div>
                   </div>
                 </div>
+
+                 {/* Efeito de brilho animado */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                
+                {/* Decoração flutuante */}
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
               </div>
@@ -1158,14 +1002,25 @@ export default function HomePage() {
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-3 md:p-4 h-full">
-                  {/* Selo de categoria - Card Horizontal 2x1 */}
-                  <div className="absolute top-3 left-3 md:top-4 md:left-4 z-20">
-                    <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-black/60 backdrop-blur-md text-white text-sm md:text-base lg:text-lg font-bold tracking-tight shadow-md border border-white/30">
-                      {categories[6].name}
-                    </span>
+                <div className="relative z-10 p-4 h-full flex flex-col justify-end">
+                  <div className="text-left">
+                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
+                      <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                        {categories[6].name}
+                      </h4>
+                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                        {categories[6].description}
+                      </p>
+                    </div>
                   </div>
                 </div>
+
+                 {/* Efeito de brilho animado */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                
+                {/* Decoração flutuante */}
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/10 rounded-xl transition-all duration-300"></div>
               </div>
@@ -1183,14 +1038,25 @@ export default function HomePage() {
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[7].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-3 md:p-4 h-full">
-                  {/* Selo de categoria - Card Horizontal 2x1 */}
-                  <div className="absolute top-3 left-3 md:top-4 md:left-4 z-20">
-                    <span className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-lg bg-black/60 backdrop-blur-md text-white text-sm md:text-base lg:text-lg font-bold tracking-tight shadow-md border border-white/30">
-                      {categories[7].name}
-                    </span>
+                <div className="relative z-10 p-4 h-full flex flex-col justify-end">
+                  <div className="text-left">
+                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                        {categories[7].name}
+                      </h4>
+                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                        {categories[7].description}
+                      </p>
+                    </div>
                   </div>
                 </div>
+
+                 {/* Efeito de brilho animado */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                
+                {/* Decoração flutuante */}
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/15 rounded-2xl transition-all duration-300"></div>
               </div>
@@ -1206,14 +1072,25 @@ export default function HomePage() {
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[8].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
                 
-                <div className="relative z-10 p-2.5 md:p-3 h-full">
-                  {/* Selo de categoria - Card Pequeno 1x1 */}
-                  <div className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-20">
-                    <span className="inline-flex items-center px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg bg-black/60 backdrop-blur-md text-white text-xs md:text-sm lg:text-base font-bold tracking-tight shadow-md border border-white/30">
-                      {categories[8].name}
-                    </span>
+                <div className="relative z-10 p-3 h-full flex flex-col justify-end items-center">
+                  <div className="text-center">
+                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-base md:text-lg font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                        {categories[8].name}
+                      </h4>
+                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                        {categories[8].description}
+                      </p>
+                    </div>
                   </div>
                 </div>
+
+                 {/* Efeito de brilho animado */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                
+                {/* Decoração flutuante */}
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/10 rounded-xl transition-all duration-300"></div>
               </div>
@@ -1228,6 +1105,12 @@ export default function HomePage() {
                   <ArrowRight className="h-8 w-8 text-white group-hover:translate-x-2 transition-all duration-300 group-hover:scale-110" />
                 </div>
                 
+                 {/* Efeito de brilho animado */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                
+                {/* Decoração flutuante */}
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/20 rounded-xl transition-all duration-300"></div>
               </div>
             </Link>
@@ -1298,6 +1181,69 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+
+      {/* Experiência Boutique Section */}
+      <section className="relative overflow-hidden bg-[#3e2626] py-28 text-white">
+       
+        <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-16 lg:grid-cols-5">
+            <div className="space-y-8 lg:col-span-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white bg-[#3e2626] backdrop-blur-sm px-6 py-2 text-xs font-light uppercase tracking-[0.4em] text-white">
+                experiência boutique
+              </span>
+              <h2 className="text-3xl md:text-5xl font-light leading-tight tracking-[0.08em] text-white">
+                Curadoria feita à mão para ambientes que contam histórias únicas.
+              </h2>
+              <p className="text-lg leading-relaxed text-white/80 font-light tracking-[0.02em]">
+                Unimos leitura sensorial, inteligência artificial e olhar autoral para transformar fotografias reais em cenas que você consegue sentir. Cada projeto nasce de conversas profundas, referências afetivas e uma seleção criteriosa de materiais.
+              </p>
+              <div className="space-y-4 text-sm text-white/70 font-light">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <Sparkles className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="leading-relaxed">Paletas desenvolvidas com artistas convidados e dados de iluminação do ambiente.</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <Brush className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="leading-relaxed">Texturas físicas enviadas para aprovação tátil antes da produção final.</span>
+                </div>
+              </div>
+            </div>
+            <div className="lg:col-span-3 grid gap-6 sm:grid-cols-2">
+              {boutiqueHighlights.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.title}
+                      className="group relative overflow-hidden rounded-3xl border border-white bg-[#3e2626] backdrop-blur-sm p-8 shadow-[0_24px_70px_rgba(62,38,38,0.4)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_32px_80px_rgba(62,38,38,0.6)] hover:border-white"
+                    >
+                    {/* Efeito de brilho no hover */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/0 group-hover:from-white/10 group-hover:to-white/5 transition-all duration-500"></div>
+                    
+                    <div className="relative z-10">
+                      <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-white/30 to-white/20 border border-white/30 text-white mb-6 group-hover:scale-110 transition-transform duration-300">
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <div className="space-y-3">
+                        <h3 className="text-lg font-light text-white tracking-[0.08em]">{item.title}</h3>
+                        <p className="text-sm leading-relaxed text-white/70 font-light tracking-[0.02em]">{item.description}</p>
+                      </div>
+                      <span className="mt-6 inline-flex text-xs font-light uppercase tracking-[0.35em] text-white">
+                        {item.badge}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       {/* Featured Products Section */}
       <section className="py-20 bg-gray-50">
@@ -1447,18 +1393,27 @@ export default function HomePage() {
                   <div className="relative overflow-hidden">
                     <div className="aspect-[4/3] flex items-center justify-center relative bg-gray-100">
                       {/* Product Image - if available */}
-                      {product.imageUrl ? (
-                        <Image
-                          src={product.imageUrl}
-                          alt={product.name}
-                          width={600}
-                          height={450}
-                          className="w-full h-full object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="text-center text-gray-400">Sem imagem</div>
-                      )}
+                      {(() => {
+                        const imageUrl = product.imageUrls && product.imageUrls.length > 0 
+                          ? product.imageUrls[0] 
+                          : product.imageUrl;
+                        
+                        return imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={product.name}
+                            width={600}
+                            height={450}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                            onError={(e) => {
+                              console.error('Erro ao carregar imagem:', imageUrl);
+                            }}
+                          />
+                        ) : (
+                          <div className="text-center text-gray-400">Sem imagem</div>
+                        );
+                      })()}
                     </div>
 
                     {/* Favorite Tooltip */}

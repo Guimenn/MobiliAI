@@ -240,7 +240,7 @@ export default function OrdersOnlinePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
         {/* Header fixo */}
-        <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-6 px-6 shadow-lg sticky top-0 z-10">
+        <div className="bg-[#3e2626] text-white py-6 px-6 shadow-lg sticky top-0 z-10">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
             <div className="flex items-center space-x-3">
               <Button
@@ -452,13 +452,22 @@ export default function OrdersOnlinePage() {
                 <div className="space-y-3">
                   {selectedOrder.items?.map((item: any) => (
                     <div key={item.id} className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-100">
-                      {item.product?.imageUrl && (
-                        <img
-                          src={item.product.imageUrl}
-                          alt={item.product.name}
-                          className="w-20 h-20 object-cover rounded-lg border-2 border-gray-100"
-                        />
-                      )}
+                      {(() => {
+                        const imageUrl = (item.product?.imageUrls && item.product.imageUrls.length > 0) 
+                          ? item.product.imageUrls[0] 
+                          : item.product?.imageUrl;
+                        return imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={item.product.name}
+                            className="w-20 h-20 object-cover rounded-lg border-2 border-gray-100"
+                            onError={(e) => {
+                              console.error('Erro ao carregar imagem:', imageUrl);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : null;
+                      })()}
                       <div className="flex-1">
                         <p className="font-semibold text-gray-800">{item.product?.name || 'Produto não encontrado'}</p>
                         <p className="text-sm text-gray-600 mt-1">
@@ -493,7 +502,7 @@ export default function OrdersOnlinePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
+        <div className="bg-[#3e2626] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-4">
             <div className="flex items-center space-x-3">

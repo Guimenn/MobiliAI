@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import ClientProviders from "@/components/ClientProviders";
+import ConfirmDialogProvider from "@/components/ConfirmDialogProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,8 +31,11 @@ export default function RootLayout({
         className={`${inter.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        {children}
+        <ClientProviders>
+          {children}
+        </ClientProviders>
         <Toaster />
+        <ConfirmDialogProvider />
       </body>
     </html>
   );

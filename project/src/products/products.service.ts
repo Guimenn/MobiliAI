@@ -32,10 +32,12 @@ export class ProductsService {
     const hasSaleFields = 
       dto.isOnSale !== undefined || 
       dto.salePrice !== undefined || 
+      dto.saleDiscountPercent !== undefined ||
       dto.saleStartDate !== undefined || 
       dto.saleEndDate !== undefined ||
       dto.isFlashSale !== undefined || 
       dto.flashSalePrice !== undefined || 
+      dto.flashSaleDiscountPercent !== undefined ||
       dto.flashSaleStartDate !== undefined || 
       dto.flashSaleEndDate !== undefined;
 

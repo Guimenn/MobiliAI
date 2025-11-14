@@ -128,8 +128,8 @@ export default function FavoritesPage() {
       
       const mappedCategory = categoryMap[product.category] || 'mesa_centro';
       
-      // Adicionar ao store local
-      addToCartStore({
+      // addToCartStore já gerencia backend automaticamente quando autenticado
+      await addToCartStore({
         id: product.id,
         name: product.name,
         description: product.description,
@@ -141,14 +141,9 @@ export default function FavoritesPage() {
         storeId: product.store.id || '',
       }, 1);
 
-      // Adicionar ao backend se autenticado
+      // Disparar evento para atualizar notificações
       if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
-        try {
-          await customerAPI.addToCart(product.id, 1);
-          window.dispatchEvent(new CustomEvent('notification:cart-added'));
-        } catch (apiError) {
-          console.error('Erro ao adicionar ao carrinho no backend:', apiError);
-        }
+        window.dispatchEvent(new CustomEvent('notification:cart-added'));
       }
 
       toast.success('Produto adicionado ao carrinho!');
@@ -298,10 +293,15 @@ export default function FavoritesPage() {
                         >
                           <div className="relative w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-gray-100">
                             <Image
-                              src={favorite.product.imageUrls[0] || '/image.png'}
+                              src={(favorite.product.imageUrls && favorite.product.imageUrls.length > 0) 
+                                ? favorite.product.imageUrls[0] 
+                                : (favorite.product.imageUrl || '/image.png')}
                               alt={favorite.product.name}
                               fill
                               className="object-cover"
+                              onError={(e) => {
+                                console.error('Erro ao carregar imagem do favorito:', favorite.product.name);
+                              }}
                             />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -399,10 +399,15 @@ export default function FavoritesPage() {
                     {/* Imagem com Badges */}
                     <div className="relative aspect-square overflow-hidden bg-gray-100">
                       <Image
-                        src={favorite.product.imageUrls[0] || '/image.png'}
+                        src={(favorite.product.imageUrls && favorite.product.imageUrls.length > 0) 
+                          ? favorite.product.imageUrls[0] 
+                          : (favorite.product.imageUrl || '/image.png')}
                         alt={favorite.product.name}
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          console.error('Erro ao carregar imagem do favorito:', favorite.product.name);
+                        }}
                       />
                       
                       {/* Badges - Estilo Pichau */}
@@ -476,10 +481,15 @@ export default function FavoritesPage() {
                       {/* Imagem - Estilo Mercado Livre */}
                       <div className="relative w-full sm:w-48 h-48 sm:h-auto flex-shrink-0 overflow-hidden bg-gray-100">
                         <Image
-                          src={favorite.product.imageUrls[0] || '/image.png'}
+                          src={(favorite.product.imageUrls && favorite.product.imageUrls.length > 0) 
+                            ? favorite.product.imageUrls[0] 
+                            : (favorite.product.imageUrl || '/image.png')}
                           alt={favorite.product.name}
                           fill
                           className="object-cover"
+                          onError={(e) => {
+                            console.error('Erro ao carregar imagem do favorito:', favorite.product.name);
+                          }}
                         />
                       </div>
 

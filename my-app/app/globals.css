@@ -6,7 +6,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: "Neue Montreal", var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: "Neue Montreal", var(--font-inter), system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
@@ -95,11 +95,11 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: #3e2626;
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: #3e2626;
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: #3e2626;
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
@@ -118,7 +118,7 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: #3e2626;
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -153,8 +153,18 @@
   }
   body {
     @apply font-sans bg-background text-foreground;
+    font-weight: 300; /* font-light equivalente */
+    letter-spacing: 0.02em; /* tracking sutil para melhor legibilidade */
   }
-  h1,h2,h3,h4,h5,h6 { @apply font-heading; }
+  h1,h2,h3,h4,h5,h6 { 
+    @apply font-heading;
+    font-weight: 300; /* font-light */
+    letter-spacing: 0.08em; /* tracking similar à seção boutique */
+  }
+  p {
+    letter-spacing: 0.02em; /* tracking sutil para parágrafos */
+    font-weight: 300; /* font-light */
+  }
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { AdminService } from './admin.service';
 import { AdminCategoriesService } from './admin-categories.service';
@@ -347,11 +347,21 @@ export class AdminController {
     return this.adminService.createProduct(productData as any);
   }
 
+  @Patch('products/:id')
+  async patchProduct(
+    @Param('id') id: string,
+    @Body() productData: any
+  ) {
+    console.log('🔵 PATCH /admin/products/:id chamado', { id, productData });
+    return this.adminService.updateProduct(id, productData);
+  }
+
   @Put('products/:id')
   async updateProduct(
     @Param('id') id: string,
     @Body() productData: any
   ) {
+    console.log('🟢 PUT /admin/products/:id chamado', { id, productData });
     return this.adminService.updateProduct(id, productData);
   }
 

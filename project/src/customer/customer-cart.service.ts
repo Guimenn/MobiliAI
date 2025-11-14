@@ -108,7 +108,15 @@ export class CustomerCartService {
             category: true,
             brand: true,
             colorName: true,
-            colorHex: true
+            colorHex: true,
+            storeId: true,
+            store: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
           }
         }
       },
@@ -353,12 +361,38 @@ export class CustomerCartService {
       });
     });
 
+    // Armazenar informações dos produtos para verificação posterior
+    const productsToCheck: Array<{ id: string; name: string; stock: number; minStock: number; storeName?: string }> = [];
+
     // Atualizar estoque dos produtos (com retry)
     for (const item of validation.validItems) {
       await this.prisma.executeWithRetry(async () => {
-        return await this.prisma.product.update({
+        // Buscar produto antes de atualizar
+        const product = await this.prisma.product.findUnique({
           where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } }
+          include: { store: { select: { name: true } } }
+        });
+
+        if (!product) {
+          return;
+        }
+
+        // Calcular novo estoque
+        const newStock = product.stock - item.quantity;
+
+        // Atualizar estoque
+        await this.prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: newStock }
+        });
+
+        // Armazenar informações do produto para verificação posterior
+        productsToCheck.push({
+          id: product.id,
+          name: product.name,
+          stock: newStock,
+          minStock: product.minStock || 0,
+          storeName: product.store?.name
         });
       });
     }
@@ -366,7 +400,7 @@ export class CustomerCartService {
     // Limpar carrinho
     await this.clearCart(customerId);
 
-    // Criar notificação de pedido criado
+    // Criar notificação de pedido criado para o cliente
     try {
       await this.notificationsService.notifyOrderCreated(
         customerId,
@@ -378,6 +412,55 @@ export class CustomerCartService {
       console.error('Erro ao criar notificação de pedido:', error);
       // Não falhar a operação se a notificação falhar
     }
+
+    // Se for pedido online, notificar usuários relevantes (assíncrono, não bloqueia a resposta)
+    if (isOnlineOrder) {
+      const customer = await this.prisma.user.findUnique({
+        where: { id: customerId },
+        select: { name: true }
+      });
+
+      this.notificationsService.notifyRelevantUsersNewOrderOnline(
+        sale.id,
+        sale.saleNumber,
+        Number(sale.totalAmount),
+        validStoreId,
+        customer?.name,
+        sale.store?.name
+      ).catch(error => {
+        console.error('Erro ao notificar usuários sobre novo pedido online:', error);
+      });
+    }
+
+    // Verificar estoque dos produtos após a venda e notificar usuários relevantes se necessário (assíncrono)
+    setImmediate(async () => {
+      try {
+        for (const productInfo of productsToCheck) {
+          // Se o estoque zerou após a venda
+          if (productInfo.stock === 0) {
+            await this.notificationsService.notifyRelevantUsersOutOfStock(
+              productInfo.id,
+              productInfo.name,
+              validStoreId,
+              productInfo.storeName
+            );
+          }
+          // Se o estoque está abaixo do mínimo
+          else if (productInfo.stock > 0 && productInfo.stock <= productInfo.minStock) {
+            await this.notificationsService.notifyRelevantUsersLowStock(
+              productInfo.id,
+              productInfo.name,
+              productInfo.stock,
+              productInfo.minStock,
+              validStoreId,
+              productInfo.storeName
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar estoque após checkout:', error);
+      }
+    });
 
     return sale;
   }

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { X, Eye, Edit, Save, DollarSign, Package, Tag, Hash, Palette, Building, Ruler, Weight, Brush, Trash2, Zap, Percent, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { showConfirm } from '@/lib/alerts';
 import ImageUpload from './ImageUpload';
 import ImageCarousel from './ImageCarousel';
 import { uploadMultipleProductImages, supabase } from '@/lib/supabase';
@@ -52,6 +53,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
         // Campos de oferta
         isOnSale: false,
         salePrice: undefined,
+        saleDiscountPercent: undefined,
         saleStartDate: '',
         saleEndDate: '',
         isFlashSale: false,
@@ -195,9 +197,29 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
         if (canManageSales) {
           if (editedProduct.isOnSale) {
             productData.isOnSale = true;
-            if (editedProduct.salePrice) productData.salePrice = Number(editedProduct.salePrice);
-            if (editedProduct.saleStartDate) productData.saleStartDate = editedProduct.saleStartDate;
-            if (editedProduct.saleEndDate) productData.saleEndDate = editedProduct.saleEndDate;
+            // Salvar percentual de desconto se houver
+            if (editedProduct.saleDiscountPercent) {
+              productData.saleDiscountPercent = Number(editedProduct.saleDiscountPercent);
+              // Calcular preço baseado no percentual
+              if (editedProduct.price) {
+                const discount = (editedProduct.price * editedProduct.saleDiscountPercent) / 100;
+                productData.salePrice = editedProduct.price - discount;
+              }
+            } else if (editedProduct.salePrice) {
+              productData.salePrice = Number(editedProduct.salePrice);
+            }
+            if (editedProduct.saleStartDate) {
+              const startDate = new Date(editedProduct.saleStartDate);
+              if (!isNaN(startDate.getTime())) {
+                productData.saleStartDate = startDate.toISOString();
+              }
+            }
+            if (editedProduct.saleEndDate) {
+              const endDate = new Date(editedProduct.saleEndDate);
+              if (!isNaN(endDate.getTime())) {
+                productData.saleEndDate = endDate.toISOString();
+              }
+            }
           } else {
             productData.isOnSale = false;
           }
@@ -393,6 +415,9 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
             // Adicionar campos de oferta no FormData
             if (canManageSales) {
               formData.append('isOnSale', productData.isOnSale ? 'true' : 'false');
+              if (productData.saleDiscountPercent) {
+                formData.append('saleDiscountPercent', productData.saleDiscountPercent.toString());
+              }
               if (productData.salePrice) formData.append('salePrice', productData.salePrice.toString());
               if (productData.saleStartDate) formData.append('saleStartDate', productData.saleStartDate);
               if (productData.saleEndDate) formData.append('saleEndDate', productData.saleEndDate);
@@ -567,9 +592,29 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
           // Adicionar campos de oferta apenas se o usuário tiver permissão
           if (canManageSales) {
             updateData.isOnSale = editedProduct.isOnSale || false;
-            if (editedProduct.salePrice) updateData.salePrice = Number(editedProduct.salePrice);
-            if (editedProduct.saleStartDate) updateData.saleStartDate = editedProduct.saleStartDate;
-            if (editedProduct.saleEndDate) updateData.saleEndDate = editedProduct.saleEndDate;
+            // Salvar percentual de desconto se houver
+            if (editedProduct.saleDiscountPercent) {
+              updateData.saleDiscountPercent = Number(editedProduct.saleDiscountPercent);
+              // Calcular preço baseado no percentual
+              if (editedProduct.price) {
+                const discount = (editedProduct.price * editedProduct.saleDiscountPercent) / 100;
+                updateData.salePrice = editedProduct.price - discount;
+              }
+            } else if (editedProduct.salePrice) {
+              updateData.salePrice = Number(editedProduct.salePrice);
+            }
+            if (editedProduct.saleStartDate) {
+              const startDate = new Date(editedProduct.saleStartDate);
+              if (!isNaN(startDate.getTime())) {
+                updateData.saleStartDate = startDate.toISOString();
+              }
+            }
+            if (editedProduct.saleEndDate) {
+              const endDate = new Date(editedProduct.saleEndDate);
+              if (!isNaN(endDate.getTime())) {
+                updateData.saleEndDate = endDate.toISOString();
+              }
+            }
             updateData.isFlashSale = editedProduct.isFlashSale || false;
             // Salvar percentual de desconto se houver
             if (editedProduct.flashSaleDiscountPercent) {
@@ -662,7 +707,8 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
   const handleDelete = async () => {
     if (!product) return;
 
-    if (!confirm(`Tem certeza que deseja excluir o produto "${product?.name}"? Esta ação não pode ser desfeita.`)) {
+    const confirmed = await showConfirm(`Tem certeza que deseja excluir o produto "${product?.name}"? Esta ação não pode ser desfeita.`);
+    if (!confirmed) {
       return;
     }
 
@@ -1140,26 +1186,39 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       {((isEditing && editedProduct?.isOnSale) || (!isEditing && product?.isOnSale)) && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <Label htmlFor="salePrice" className="text-sm font-medium text-gray-700">
-                              Preço de Oferta
+                            <Label htmlFor="saleDiscountPercent" className="text-sm font-medium text-gray-700">
+                              Desconto (%)
                             </Label>
                             {isEditing ? (
                               <div className="relative mt-1">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
                                 <Input
-                                  id="salePrice"
+                                  id="saleDiscountPercent"
                                   type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={editedProduct?.salePrice || ''}
-                                  onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, salePrice: parseFloat(e.target.value) || undefined } : null)}
-                                  placeholder="0.00"
-                                  className="pl-10"
+                                  step="1"
+                                  min="1"
+                                  max="99"
+                                  value={editedProduct?.saleDiscountPercent ?? ''}
+                                  onChange={(e) => {
+                                    const percent = parseInt(e.target.value) || undefined;
+                                    setEditedProduct((prev: any) => {
+                                      if (!prev) return null;
+                                      const newProduct = { ...prev, saleDiscountPercent: percent };
+                                      // Calcular preço de oferta baseado no percentual
+                                      if (percent && prev.price) {
+                                        const discount = (prev.price * percent) / 100;
+                                        newProduct.salePrice = prev.price - discount;
+                                      }
+                                      return newProduct;
+                                    });
+                                  }}
+                                  placeholder="Ex: 30"
+                                  className="pr-12 h-12 text-base font-semibold px-4 bg-gray-50 rounded-md"
                                 />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-gray-600 font-semibold pointer-events-none">%</span>
                               </div>
                             ) : (
-                              <p className="mt-1 text-lg font-semibold text-[#3e2626]">
-                                {product?.salePrice ? formatPrice(product.salePrice) : '-'}
+                              <p className="mt-1 text-lg font-semibold text-green-600">
+                                {product?.saleDiscountPercent ? `${product.saleDiscountPercent}% OFF` : product?.salePrice ? formatPrice(product.salePrice) : '-'}
                               </p>
                             )}
                           </div>
@@ -1170,33 +1229,25 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                             {isEditing ? (
                               <Input
                                 id="saleStartDate"
-                                type="datetime-local"
+                                type="date"
                                 value={editedProduct?.saleStartDate 
                                   ? (typeof editedProduct.saleStartDate === 'string' 
-                                      ? editedProduct.saleStartDate.slice(0, 16)
-                                      : new Date(editedProduct.saleStartDate).toISOString().slice(0, 16))
+                                      ? editedProduct.saleStartDate.slice(0, 10)
+                                      : new Date(editedProduct.saleStartDate).toISOString().slice(0, 10))
                                   : ''}
-                                onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, saleStartDate: e.target.value } : null)}
-                                className="mt-1"
+                                onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, saleStartDate: e.target.value ? `${e.target.value}T00:00:00` : '' } : null)}
+                                className="mt-1 h-12 text-base bg-gray-50 rounded-md"
                               />
                             ) : (
                               <div className="mt-1">
                                 {product?.saleStartDate ? (
-                                  <div className="flex flex-col">
-                                    <p className="text-gray-900 font-medium">
-                                      {new Date(product.saleStartDate).toLocaleDateString('pt-BR', { 
-                                        day: '2-digit', 
-                                        month: '2-digit', 
-                                        year: 'numeric' 
-                                      })}
-                                    </p>
-                                    <p className="text-sm text-gray-500">
-                                      {new Date(product.saleStartDate).toLocaleTimeString('pt-BR', { 
-                                        hour: '2-digit', 
-                                        minute: '2-digit' 
-                                      })}
-                                    </p>
-                                  </div>
+                                  <p className="text-gray-900 font-medium">
+                                    {new Date(product.saleStartDate).toLocaleDateString('pt-BR', { 
+                                      day: '2-digit', 
+                                      month: '2-digit', 
+                                      year: 'numeric' 
+                                    })}
+                                  </p>
                                 ) : (
                                   <p className="text-gray-400 italic">Não definida</p>
                                 )}
@@ -1210,33 +1261,25 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                             {isEditing ? (
                               <Input
                                 id="saleEndDate"
-                                type="datetime-local"
+                                type="date"
                                 value={editedProduct?.saleEndDate 
                                   ? (typeof editedProduct.saleEndDate === 'string' 
-                                      ? editedProduct.saleEndDate.slice(0, 16)
-                                      : new Date(editedProduct.saleEndDate).toISOString().slice(0, 16))
+                                      ? editedProduct.saleEndDate.slice(0, 10)
+                                      : new Date(editedProduct.saleEndDate).toISOString().slice(0, 10))
                                   : ''}
-                                onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, saleEndDate: e.target.value } : null)}
-                                className="mt-1"
+                                onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, saleEndDate: e.target.value ? `${e.target.value}T23:59:59` : '' } : null)}
+                                className="mt-1 h-12 text-base bg-gray-50 rounded-md"
                               />
                             ) : (
                               <div className="mt-1">
                                 {product?.saleEndDate ? (
-                                  <div className="flex flex-col">
-                                    <p className="text-gray-900 font-medium">
-                                      {new Date(product.saleEndDate).toLocaleDateString('pt-BR', { 
-                                        day: '2-digit', 
-                                        month: '2-digit', 
-                                        year: 'numeric' 
-                                      })}
-                                    </p>
-                                    <p className="text-sm text-gray-500">
-                                      {new Date(product.saleEndDate).toLocaleTimeString('pt-BR', { 
-                                        hour: '2-digit', 
-                                        minute: '2-digit' 
-                                      })}
-                                    </p>
-                                  </div>
+                                  <p className="text-gray-900 font-medium">
+                                    {new Date(product.saleEndDate).toLocaleDateString('pt-BR', { 
+                                      day: '2-digit', 
+                                      month: '2-digit', 
+                                      year: 'numeric' 
+                                    })}
+                                  </p>
                                 ) : (
                                   <p className="text-gray-400 italic">Não definida</p>
                                 )}

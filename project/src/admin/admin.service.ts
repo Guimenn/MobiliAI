@@ -1,8 +1,9 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole, ProductCategory, ProductStyle, MaterialType } from '@prisma/client';
 import { UploadService } from '../upload/upload.service';
 import { TrellisService } from '../trellis/trellis.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -10,68 +11,95 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private uploadService: UploadService,
-    private trellisService: TrellisService
+    private trellisService: TrellisService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   // ==================== DASHBOARD E ESTATÍSTICAS ====================
   
   async getDashboardStats() {
-    const [
-      totalStores,
-      totalUsers,
-      totalProducts,
-      totalSales,
-      monthlyRevenue,
-      activeStores
-    ] = await Promise.all([
-      this.prisma.store.count(),
-      this.prisma.user.count(),
-      this.prisma.product.count(),
-      this.prisma.sale.count(),
-      this.getMonthlyRevenue(),
-      this.prisma.store.count({ where: { isActive: true } })
-    ]);
-
-    const recentSales = await this.prisma.sale.findMany({
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-        include: {
-          customer: { select: { name: true, email: true } },
-          store: { select: { name: true } },
-          items: {
-            include: {
-              product: { select: { name: true, price: true } }
+    try {
+      // Agrupar contagens em uma única conexão para reduzir erros de pool
+      const [
+        counts,
+        recentSales,
+        topProducts,
+      ] = await Promise.all([
+        this.prisma.$transaction([
+          this.prisma.store.count(),
+          this.prisma.user.count(),
+          this.prisma.product.count(),
+          this.prisma.sale.count(),
+          this.prisma.store.count({ where: { isActive: true } }),
+        ]),
+        this.prisma.sale.findMany({
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            customer: { select: { name: true, email: true } },
+            store: { select: { name: true } },
+            items: {
+              include: {
+                product: { select: { name: true, price: true } }
+              }
             }
           }
-        }
-    });
+        }),
+        this.prisma.product.findMany({
+          take: 5,
+          orderBy: { rating: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            rating: true,
+            reviewCount: true,
+            stock: true,
+            store: { select: { name: true } }
+          }
+        })
+      ]);
 
-    const topProducts = await this.prisma.product.findMany({
-      take: 5,
-      orderBy: { rating: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        rating: true,
-        reviewCount: true,
-        stock: true,
-        store: { select: { name: true } }
+      const [totalStores, totalUsers, totalProducts, totalSales, activeStores] = counts as unknown as number[];
+
+      // Receita mensal separada e protegida
+      let monthlyRevenue = 0;
+      try {
+        monthlyRevenue = await this.getMonthlyRevenue();
+      } catch (revenueError) {
+        console.error('Erro ao calcular receita mensal:', revenueError);
+        monthlyRevenue = 0;
       }
-    });
 
-    return {
-      overview: {
-        totalStores,
-        totalUsers,
-        totalProducts,
-        totalSales,
-        monthlyRevenue,
-        activeStores
-      },
-      recentSales,
-      topProducts
-    };
+      return {
+        overview: {
+          totalStores,
+          totalUsers,
+          totalProducts,
+          totalSales,
+          monthlyRevenue,
+          activeStores
+        },
+        recentSales,
+        topProducts
+      };
+    } catch (error) {
+      // Fallback seguro para não quebrar o frontend quando houver problema de conexão
+      console.error('Erro ao obter estatísticas do dashboard:', error);
+      return {
+        overview: {
+          totalStores: 0,
+          totalUsers: 0,
+          totalProducts: 0,
+          totalSales: 0,
+          monthlyRevenue: 0,
+          activeStores: 0
+        },
+        recentSales: [],
+        topProducts: []
+      };
+    }
   }
 
   private async getMonthlyRevenue() {
@@ -231,6 +259,17 @@ export class AdminService {
         }
       });
 
+      // Notificar usuários relevantes sobre novo usuário (assíncrono, não bloqueia a resposta)
+      this.notificationsService.notifyRelevantUsersNewUser(
+        user.id,
+        user.name,
+        userData.role,
+        user.storeId || undefined,
+        user.store?.name
+      ).catch(error => {
+        console.error('Erro ao notificar usuários sobre novo usuário:', error);
+      });
+
     return user;
   }
 
@@ -280,6 +319,26 @@ export class AdminService {
         store: { select: { id: true, name: true } }
       }
     });
+
+    // Detectar mudanças significativas e notificar admins
+    const changes: string[] = [];
+    if (userData.name && userData.name !== user.name) changes.push('nome');
+    if (userData.email && userData.email !== user.email) changes.push('email');
+    if (userData.role && userData.role !== user.role) changes.push('função');
+    if (userData.isActive !== undefined && userData.isActive !== user.isActive) {
+      changes.push(userData.isActive ? 'ativado' : 'desativado');
+    }
+
+    // Notificar admins sobre atualização de usuário (apenas se houver mudanças significativas)
+    if (changes.length > 0) {
+      this.notificationsService.notifyAdminsUserUpdate(
+        updatedUser.id,
+        updatedUser.name,
+        changes
+      ).catch(error => {
+        console.error('Erro ao notificar admins sobre atualização de usuário:', error);
+      });
+    }
 
     return updatedUser;
   }
@@ -359,7 +418,14 @@ export class AdminService {
   // ==================== GESTÃO DE LOJAS ====================
 
   async getAllStores() {
-    const stores = await this.prisma.store.findMany({
+    try {
+      // Garantir conexão antes de executar queries
+      await this.prisma.$connect().catch(() => {
+        // Ignorar erro se já estiver conectado
+      });
+
+      // Buscar lojas
+      const stores = await this.prisma.store.findMany({
         include: {
           _count: {
             select: {
@@ -368,29 +434,80 @@ export class AdminService {
             }
           }
         },
-      orderBy: { createdAt: 'desc' }
-    });
+        orderBy: { createdAt: 'desc' }
+      });
 
-    // Adicionar contagem de produtos no estoque (StoreInventory) para cada loja
-    const storesWithInventoryCount = await Promise.all(
-      stores.map(async (store) => {
-        // Contar produtos que estão no estoque desta loja
-        const inventoryCount = await this.prisma.storeInventory.count({
-          where: { storeId: store.id }
+      if (stores.length === 0) {
+        return [];
+      }
+
+      // Buscar contagens de estoque em uma única query agregada (mais eficiente)
+      try {
+        const inventoryCounts = await this.prisma.storeInventory.groupBy({
+          by: ['storeId'],
+          _count: {
+            id: true
+          },
+          where: {
+            storeId: {
+              in: stores.map(s => s.id)
+            }
+          }
         });
 
-        return {
+        // Criar um mapa de storeId -> count para acesso rápido
+        const inventoryCountMap = new Map(
+          inventoryCounts.map(item => [item.storeId, item._count.id])
+        );
+
+        // Combinar dados das lojas com contagens de estoque
+        return stores.map((store) => ({
           ...store,
           _count: {
             ...store._count,
-            products: inventoryCount, // Substituir pela contagem do estoque
-            inventoryProducts: inventoryCount // Manter compatibilidade
+            products: inventoryCountMap.get(store.id) || store._count.products || 0,
+            inventoryProducts: inventoryCountMap.get(store.id) || 0
           }
-        };
-      })
-    );
+        }));
+      } catch (inventoryError: any) {
+        // Se houver erro ao contar estoque, retornar lojas com contagem padrão
+        console.error('Erro ao contar estoque das lojas:', inventoryError);
+        
+        // Verificar se é um erro de conexão
+        if (
+          inventoryError.message?.includes('shutdown') ||
+          inventoryError.message?.includes('db_termination') ||
+          inventoryError.message?.includes('not connected')
+        ) {
+          console.warn('Conexão com banco perdida, retornando lojas sem contagem de estoque');
+        }
 
-    return storesWithInventoryCount;
+        return stores.map((store) => ({
+          ...store,
+          _count: {
+            ...store._count,
+            products: store._count.products || 0,
+            inventoryProducts: 0
+          }
+        }));
+      }
+    } catch (error: any) {
+      console.error('Erro ao buscar lojas:', error);
+      
+      // Verificar se é um erro de conexão
+      if (
+        error.message?.includes('shutdown') ||
+        error.message?.includes('db_termination') ||
+        error.message?.includes('not connected') ||
+        error.code === 'P1017'
+      ) {
+        console.error('❌ Erro de conexão com o banco de dados');
+        console.error('💡 Verifique se o PostgreSQL está em execução');
+        throw new Error('Não foi possível conectar ao banco de dados. Verifique se o PostgreSQL está em execução.');
+      }
+
+      throw error;
+    }
   }
 
   async getStoreById(id: string) {
@@ -479,6 +596,16 @@ export class AdminService {
       });
     }
 
+    // Notificar admins sobre nova loja (assíncrono, não bloqueia a resposta)
+    this.notificationsService.notifyAdminsNewStore(
+      store.id,
+      store.name,
+      store.city,
+      store.state
+    ).catch(error => {
+      console.error('Erro ao notificar admins sobre nova loja:', error);
+    });
+
     return store;
   }
 
@@ -497,10 +624,31 @@ export class AdminService {
       throw new NotFoundException('Loja não encontrada');
     }
 
-    return this.prisma.store.update({
+    const updatedStore = await this.prisma.store.update({
       where: { id },
       data: storeData
     });
+
+    // Detectar mudanças significativas e notificar admins
+    const changes: string[] = [];
+    if (storeData.name && storeData.name !== store.name) changes.push('nome');
+    if (storeData.address && storeData.address !== store.address) changes.push('endereço');
+    if (storeData.isActive !== undefined && storeData.isActive !== store.isActive) {
+      changes.push(storeData.isActive ? 'ativada' : 'desativada');
+    }
+
+    // Notificar admins sobre atualização de loja (apenas se houver mudanças significativas)
+    if (changes.length > 0) {
+      this.notificationsService.notifyAdminsStoreUpdate(
+        updatedStore.id,
+        updatedStore.name,
+        changes
+      ).catch(error => {
+        console.error('Erro ao notificar admins sobre atualização de loja:', error);
+      });
+    }
+
+    return updatedStore;
   }
 
   async deleteStore(id: string) {
@@ -633,6 +781,15 @@ export class AdminService {
       }
     });
 
+    // Notificar admins sobre novo produto (assíncrono, não bloqueia a resposta)
+    this.notificationsService.notifyAdminsNewProduct(
+      product.id,
+      product.name,
+      product.store?.name
+    ).catch(error => {
+      console.error('Erro ao notificar admins sobre novo produto:', error);
+    });
+
     return product;
   }
 
@@ -753,14 +910,163 @@ export class AdminService {
       throw new NotFoundException('Produto não encontrado');
     }
 
-    return this.prisma.product.update({
+    // Preparar dados para atualização
+    const data: any = { ...productData };
+
+    // Converter datas de string ISO para Date se necessário
+    if (data.saleStartDate) {
+      data.saleStartDate = typeof data.saleStartDate === 'string' 
+        ? new Date(data.saleStartDate) 
+        : data.saleStartDate;
+    }
+    if (data.saleEndDate) {
+      data.saleEndDate = typeof data.saleEndDate === 'string' 
+        ? new Date(data.saleEndDate) 
+        : data.saleEndDate;
+    }
+    if (data.flashSaleStartDate) {
+      data.flashSaleStartDate = typeof data.flashSaleStartDate === 'string' 
+        ? new Date(data.flashSaleStartDate) 
+        : data.flashSaleStartDate;
+    }
+    if (data.flashSaleEndDate) {
+      data.flashSaleEndDate = typeof data.flashSaleEndDate === 'string' 
+        ? new Date(data.flashSaleEndDate) 
+        : data.flashSaleEndDate;
+    }
+
+    // Se está ativando uma oferta relâmpago, desativar todas as outras ofertas relâmpago ativas
+    if (data.isFlashSale === true && data.flashSaleStartDate && data.flashSaleEndDate) {
+      const now = new Date();
+      const startDate = typeof data.flashSaleStartDate === 'string' 
+        ? new Date(data.flashSaleStartDate) 
+        : data.flashSaleStartDate;
+      const endDate = typeof data.flashSaleEndDate === 'string' 
+        ? new Date(data.flashSaleEndDate) 
+        : data.flashSaleEndDate;
+
+      // Verificar se a nova oferta vai estar ativa agora ou no futuro
+      if (startDate <= endDate) {
+        // Buscar produtos com ofertas relâmpago ativas ou que vão estar ativas no período da nova oferta
+        const activeFlashSales = await this.prisma.product.findMany({
+          where: {
+            id: { not: id }, // Excluir o produto atual
+            isFlashSale: true,
+            flashSaleStartDate: { not: null },
+            flashSaleEndDate: { not: null },
+            OR: [
+              // Ofertas que já estão ativas
+              {
+                AND: [
+                  { flashSaleStartDate: { lte: now } },
+                  { flashSaleEndDate: { gte: now } }
+                ]
+              },
+              // Ofertas que vão estar ativas no período da nova oferta
+              {
+                AND: [
+                  { flashSaleStartDate: { lte: endDate } },
+                  { flashSaleEndDate: { gte: startDate } }
+                ]
+              }
+            ]
+          },
+          select: { id: true, name: true }
+        });
+
+        // Desativar todas as outras ofertas relâmpago
+        if (activeFlashSales.length > 0) {
+          console.log(`🔄 Desativando ${activeFlashSales.length} oferta(s) relâmpago existente(s)`);
+          await this.prisma.product.updateMany({
+            where: {
+              id: { in: activeFlashSales.map(p => p.id) }
+            },
+            data: {
+              isFlashSale: false,
+              flashSaleDiscountPercent: null,
+              flashSalePrice: null,
+              flashSaleStartDate: null,
+              flashSaleEndDate: null
+            }
+          });
+        }
+      }
+    }
+
+    // Converter valores null explícitos para undefined (Prisma trata null como remoção)
+    if (data.flashSaleDiscountPercent === null) data.flashSaleDiscountPercent = null;
+    if (data.flashSalePrice === null) data.flashSalePrice = null;
+    if (data.flashSaleStartDate === null) data.flashSaleStartDate = null;
+    if (data.flashSaleEndDate === null) data.flashSaleEndDate = null;
+    if (data.saleDiscountPercent === null) data.saleDiscountPercent = null;
+    if (data.salePrice === null) data.salePrice = null;
+    if (data.saleStartDate === null) data.saleStartDate = null;
+    if (data.saleEndDate === null) data.saleEndDate = null;
+
+    // Log dos dados que serão salvos
+    console.log('💾 Salvando produto com oferta relâmpago:', {
+      id,
+      isFlashSale: data.isFlashSale,
+      flashSaleDiscountPercent: data.flashSaleDiscountPercent,
+      flashSalePrice: data.flashSalePrice,
+      flashSaleStartDate: data.flashSaleStartDate,
+      flashSaleEndDate: data.flashSaleEndDate,
+    });
+
+    const updatedProduct = await this.prisma.product.update({
       where: { id },
-      data: productData,
+      data,
       include: {
         store: { select: { id: true, name: true } },
         supplier: { select: { id: true, name: true } }
       }
     });
+
+    // Log do produto atualizado
+    console.log('✅ Produto atualizado:', {
+      id: updatedProduct.id,
+      name: updatedProduct.name,
+      isFlashSale: updatedProduct.isFlashSale,
+      flashSaleDiscountPercent: updatedProduct.flashSaleDiscountPercent,
+      flashSalePrice: updatedProduct.flashSalePrice,
+      flashSaleStartDate: updatedProduct.flashSaleStartDate,
+      flashSaleEndDate: updatedProduct.flashSaleEndDate,
+    });
+
+    // Verificar estoque e notificar usuários relevantes se necessário (assíncrono, não bloqueia a resposta)
+    if (data.stock !== undefined || productData.stock !== undefined) {
+      const newStock = updatedProduct.stock;
+      const minStock = updatedProduct.minStock || 0;
+      const storeId = updatedProduct.storeId;
+      const storeName = updatedProduct.store?.name;
+
+      // Se o estoque zerou, notificar usuários relevantes
+      if (newStock === 0 && storeId) {
+        this.notificationsService.notifyRelevantUsersOutOfStock(
+          updatedProduct.id,
+          updatedProduct.name,
+          storeId,
+          storeName
+        ).catch(error => {
+          console.error('Erro ao notificar usuários sobre estoque zerado:', error);
+        });
+      }
+      // Se o estoque está abaixo do mínimo, notificar usuários relevantes
+      else if (newStock > 0 && newStock <= minStock && storeId) {
+        this.notificationsService.notifyRelevantUsersLowStock(
+          updatedProduct.id,
+          updatedProduct.name,
+          newStock,
+          minStock,
+          storeId,
+          storeName
+        ).catch(error => {
+          console.error('Erro ao notificar usuários sobre estoque baixo:', error);
+        });
+      }
+    }
+
+    return updatedProduct;
   }
 
   async generate3DForProduct(id: string, image?: Express.Multer.File) {

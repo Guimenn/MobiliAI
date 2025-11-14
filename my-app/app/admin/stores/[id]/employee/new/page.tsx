@@ -48,6 +48,26 @@ export default function NewEmployeePage() {
     }));
   };
 
+  // Função para filtrar apenas campos permitidos pelo DTO do backend
+  const filterAllowedFields = (data: any) => {
+    const allowedFields = [
+      'name', 'email', 'phone', 'address', 'city', 'state', 'zipCode', 
+      'role', 'isActive', 'cpf', 'workingHours', 'storeId', 'password'
+    ];
+    
+    const filtered: any = {};
+    allowedFields.forEach(field => {
+      if (data[field] !== undefined && data[field] !== null) {
+        // Remover campos vazios (strings vazias)
+        if (typeof data[field] === 'string' && data[field].trim() === '') {
+          return; // Não incluir campos vazios
+        }
+        filtered[field] = data[field];
+      }
+    });
+    return filtered;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -59,11 +79,10 @@ export default function NewEmployeePage() {
     setIsLoading(true);
     
     try {
-      const employeeData = {
+      const employeeData = filterAllowedFields({
         ...formData,
-        storeId,
-        salary: formData.salary ? parseFloat(formData.salary) : null
-      };
+        storeId
+      });
 
       await adminAPI.createEmployee(employeeData, token);
       

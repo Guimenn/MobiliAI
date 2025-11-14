@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import ImageUpload from '@/components/ImageUpload';
 import { uploadMultipleProductImages } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { showConfirm } from '@/lib/alerts';
 import { 
   Package, 
   Plus,
@@ -287,7 +288,8 @@ export default function EmployeeProductsPage() {
   };
 
   const handleDeleteProduct = async (product: Product) => {
-    if (!confirm(`Tem certeza que deseja excluir o produto "${product.name}"? Esta ação não pode ser desfeita.`)) {
+    const confirmed = await showConfirm(`Tem certeza que deseja excluir o produto "${product.name}"? Esta ação não pode ser desfeita.`);
+    if (!confirmed) {
       return;
     }
 

@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { customerAPI } from '@/lib/api';
 import { toast } from 'sonner';
+import { showAlert } from '@/lib/alerts';
 
 // Mapeamento de categorias para ícones
 const categoryIcons: Record<string, any> = {
@@ -145,47 +146,143 @@ export default function ProductsPage() {
     
     // Verificar oferta relâmpago primeiro (tem prioridade)
     if (product.isFlashSale && product.flashSaleStartDate && product.flashSaleEndDate) {
-      const start = new Date(product.flashSaleStartDate);
-      const end = new Date(product.flashSaleEndDate);
-      if (now >= start && now <= end) {
-        return true;
+      try {
+        const start = new Date(product.flashSaleStartDate);
+        const end = new Date(product.flashSaleEndDate);
+        
+        // Verificar se as datas são válidas
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          console.warn('⚠️ Datas inválidas para produto:', product.name, {
+            start: product.flashSaleStartDate,
+            end: product.flashSaleEndDate
+          });
+          return false;
+        }
+        
+        // Verificar se a oferta já expirou
+        if (now > end) {
+          return false;
+        }
+        
+        // Verificar se a oferta está ativa (já começou) OU vai começar nas próximas 24 horas
+        const timeUntilStart = start.getTime() - now.getTime();
+        const hoursUntilStart = timeUntilStart / (1000 * 60 * 60);
+        const isActive = now >= start && now <= end;
+        const startsWithin24Hours = timeUntilStart > 0 && timeUntilStart <= (24 * 60 * 60 * 1000); // 24 horas
+        
+        // Considerar ativa se já está ativa OU se vai começar nas próximas 24 horas
+        const shouldShow = isActive || startsWithin24Hours;
+        
+        // Log detalhado para debug
+        const timeUntilEnd = end.getTime() - now.getTime();
+        
+        console.log('🔍 [PRODUTOS] Verificando oferta relâmpago:', {
+          produto: product.name,
+          produtoId: product.id,
+          agora: now.toISOString(),
+          inicio: start.toISOString(),
+          fim: end.toISOString(),
+          inicioOriginal: product.flashSaleStartDate,
+          fimOriginal: product.flashSaleEndDate,
+          tempoAteInicio: timeUntilStart > 0 ? `${Math.round(timeUntilStart / 1000 / 60)} minutos` : timeUntilStart < 0 ? `há ${Math.round(Math.abs(timeUntilStart) / 1000 / 60)} minutos` : 'agora',
+          tempoAteFim: timeUntilEnd > 0 ? `${Math.round(timeUntilEnd / 1000 / 60)} minutos` : timeUntilEnd < 0 ? `há ${Math.round(Math.abs(timeUntilEnd) / 1000 / 60)} minutos` : 'agora',
+          horasAteInicio: Math.round(hoursUntilStart * 10) / 10,
+          isActive: isActive,
+          startsWithin24Hours: startsWithin24Hours,
+          shouldShow: shouldShow,
+          condicao1: now >= start ? '✅ já começou' : `⏳ começa em ${Math.round(hoursUntilStart * 10) / 10}h`,
+          condicao2: now <= end ? '✅ ainda não expirou' : '❌ já expirou'
+        });
+        
+        if (shouldShow) {
+          if (isActive) {
+            console.log('✅ [PRODUTOS] Oferta relâmpago ATIVA para:', product.name);
+          } else {
+            console.log('⏳ [PRODUTOS] Oferta relâmpago COMEÇANDO EM BREVE para:', product.name, `(em ${Math.round(hoursUntilStart * 10) / 10} horas)`);
+          }
+        }
+        
+        return shouldShow;
+      } catch (error) {
+        console.error('❌ Erro ao verificar oferta relâmpago:', error, product);
+        return false;
       }
     }
     
     // Verificar oferta normal
     if (product.isOnSale && product.saleStartDate && product.saleEndDate) {
-      const start = new Date(product.saleStartDate);
-      const end = new Date(product.saleEndDate);
-      if (now >= start && now <= end) {
-        return true;
+      try {
+        const start = new Date(product.saleStartDate);
+        const end = new Date(product.saleEndDate);
+        
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          return false;
+        }
+        
+        return now >= start && now <= end;
+      } catch (error) {
+        console.error('❌ Erro ao verificar oferta normal:', error, product);
+        return false;
       }
     }
     
     return false;
   }, []);
 
+  // Função para verificar se a oferta relâmpago está REALMENTE ativa (já começou)
+  const isFlashSaleActuallyActive = useCallback((product: Product): boolean => {
+    if (!product.isFlashSale || !product.flashSaleStartDate || !product.flashSaleEndDate) {
+      return false;
+    }
+    try {
+      const now = new Date();
+      const start = new Date(product.flashSaleStartDate);
+      const end = new Date(product.flashSaleEndDate);
+      return now >= start && now <= end;
+    } catch {
+      return false;
+    }
+  }, []);
+
   // Função para obter o preço atual (com oferta se ativa)
   const getCurrentPrice = useCallback((product: Product): number => {
-    if (isSaleActive(product)) {
-      // Prioridade para oferta relâmpago
-      if (product.isFlashSale) {
-        // Se tem flashSalePrice, usar ele
-        if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
-          return Number(product.flashSalePrice);
-        }
-        // Se não tem flashSalePrice mas tem flashSaleDiscountPercent, calcular
-        if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && product.price) {
-          const discount = (Number(product.price) * Number(product.flashSaleDiscountPercent)) / 100;
-          return Number(product.price) - discount;
-        }
+    // Prioridade para oferta relâmpago - APENAS se estiver REALMENTE ativa (já começou)
+    if (product.isFlashSale && isFlashSaleActuallyActive(product)) {
+      // Se tem flashSalePrice, usar ele
+      if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+        return Number(product.flashSalePrice);
       }
-      // Depois oferta normal
-      if (product.isOnSale && product.salePrice) {
-        return Number(product.salePrice);
+      // Se não tem flashSalePrice mas tem flashSaleDiscountPercent, calcular
+      if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && product.price) {
+        const discount = (Number(product.price) * Number(product.flashSaleDiscountPercent)) / 100;
+        return Number(product.price) - discount;
       }
     }
+    
+    // Depois oferta normal - APENAS se estiver ativa
+    if (product.isOnSale && product.saleStartDate && product.saleEndDate) {
+      try {
+        const now = new Date();
+        const start = new Date(product.saleStartDate);
+        const end = new Date(product.saleEndDate);
+        if (now >= start && now <= end) {
+          // Se tem saleDiscountPercent, calcular baseado no percentual
+          if (product.saleDiscountPercent !== undefined && product.saleDiscountPercent !== null && product.price) {
+            const discount = (Number(product.price) * Number(product.saleDiscountPercent)) / 100;
+            return Number(product.price) - discount;
+          }
+          // Se não tem percentual mas tem salePrice, usar ele
+          if (product.salePrice) {
+            return Number(product.salePrice);
+          }
+        }
+      } catch {
+        // Erro ao verificar datas, usar preço normal
+      }
+    }
+    
     return Number(product.price);
-  }, [isSaleActive]);
+  }, [isFlashSaleActuallyActive]);
 
   const filteredProducts = useMemo(() => {
     const term = debouncedTerm.trim().toLowerCase();
@@ -254,7 +351,7 @@ export default function ProductsPage() {
     
     // Validar se min <= max se ambos estiverem preenchidos
     if (min !== '' && max !== '' && min > max) {
-      alert('O preço mínimo não pode ser maior que o preço máximo');
+      showAlert('error', 'O preço mínimo não pode ser maior que o preço máximo');
       return;
     }
     
@@ -265,19 +362,12 @@ export default function ProductsPage() {
 
   const handleAddToCart = async (product: Product) => {
     try {
-      // Adicionar ao store local (sempre funciona)
-      addToCart(product, 1);
+      // addToCart do store já gerencia backend automaticamente quando autenticado
+      await addToCart(product, 1);
       
-      // Se estiver autenticado, também adicionar ao backend
+      // Disparar evento para atualizar notificações imediatamente
       if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
-        try {
-          await customerAPI.addToCart(product.id, 1);
-          // Disparar evento para atualizar notificações imediatamente
-          window.dispatchEvent(new CustomEvent('notification:cart-added'));
-        } catch (apiError) {
-          console.error('Erro ao adicionar ao carrinho no backend:', apiError);
-          // Mesmo com erro na API, o item já está no store local
-        }
+        window.dispatchEvent(new CustomEvent('notification:cart-added'));
       }
       
       // Mostrar mensagem de sucesso
@@ -332,6 +422,15 @@ export default function ProductsPage() {
     if (!product.flashSaleEndDate) return 0;
     const now = new Date();
     const end = new Date(product.flashSaleEndDate);
+    const start = product.flashSaleStartDate ? new Date(product.flashSaleStartDate) : null;
+    
+    // Se a oferta ainda não começou, calcular tempo até o início
+    if (start && now < start) {
+      const diff = Math.max(0, Math.floor((start.getTime() - now.getTime()) / 1000));
+      return diff;
+    }
+    
+    // Se a oferta já começou, calcular tempo até o fim
     const diff = Math.max(0, Math.floor((end.getTime() - now.getTime()) / 1000));
     return diff;
   }, []);
@@ -355,21 +454,38 @@ export default function ProductsPage() {
   // Inicializa produto em destaque quando produtos carregarem
   useEffect(() => {
     if (products && products.length > 0) {
+      // Debug: Verificar produtos com oferta relâmpago
+      const flashSaleProducts = products.filter(p => p.isFlashSale);
+      console.log('🔍 [PRODUTOS] Produtos com isFlashSale=true:', flashSaleProducts.length);
+      flashSaleProducts.forEach(p => {
+        console.log(`  - ${p.name}:`, {
+          id: p.id,
+          isFlashSale: p.isFlashSale,
+          flashSaleStartDate: p.flashSaleStartDate,
+          flashSaleEndDate: p.flashSaleEndDate,
+          flashSaleDiscountPercent: p.flashSaleDiscountPercent,
+          flashSalePrice: p.flashSalePrice,
+          tipoFlashSaleStartDate: typeof p.flashSaleStartDate,
+          tipoFlashSaleEndDate: typeof p.flashSaleEndDate,
+          flashSaleStartDateValido: p.flashSaleStartDate ? !isNaN(new Date(p.flashSaleStartDate).getTime()) : false,
+          flashSaleEndDateValido: p.flashSaleEndDate ? !isNaN(new Date(p.flashSaleEndDate).getTime()) : false,
+          isActive: isSaleActive(p)
+        });
+      });
+      
       const product = pickFlashSaleProduct();
+      console.log('✅ Produto selecionado para oferta relâmpago:', product?.name || 'Nenhum');
       if (product) {
         setSpecialOfferProduct(product);
         const timeRemaining = getTimeRemaining(product);
         setOfferSecondsLeft(timeRemaining > 0 ? timeRemaining : OFFER_DURATION);
       } else {
-        // Se não houver oferta ativa, ainda assim mostrar um produto com oferta configurada (para debug)
-        const productsWithFlashSale = products.filter(p => p.isFlashSale);
-        if (productsWithFlashSale.length > 0) {
-          setSpecialOfferProduct(productsWithFlashSale[0]);
-          setOfferSecondsLeft(0);
-        }
+        // Se não houver oferta ativa, não mostrar nenhum produto
+        setSpecialOfferProduct(null);
+        setOfferSecondsLeft(0);
       }
     }
-  }, [products, pickFlashSaleProduct, getTimeRemaining]);
+  }, [products]);
 
   // Cronômetro da oferta relâmpago - atualiza baseado no tempo real restante
   useEffect(() => {
@@ -388,6 +504,8 @@ export default function ProductsPage() {
           const nextTimeRemaining = getTimeRemaining(nextProduct);
           setOfferSecondsLeft(nextTimeRemaining > 0 ? nextTimeRemaining : 0);
         } else {
+          // Se não houver mais ofertas ativas, remover o produto e ocultar o card
+          setSpecialOfferProduct(null);
           setOfferSecondsLeft(0);
         }
       }
@@ -400,12 +518,12 @@ export default function ProductsPage() {
     const intervalId = setInterval(updateTimer, 1000);
 
     return () => clearInterval(intervalId);
-  }, [specialOfferProduct, pickFlashSaleProduct, getTimeRemaining]);
+  }, [specialOfferProduct, products]);
 
   const formatTime = (totalSeconds: number) => {
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+    const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    return `${h}h ${m}m`;
   };
 
   return (
@@ -542,11 +660,15 @@ export default function ProductsPage() {
           </div>
 
           {/* Seção Principal: Oferta Relâmpago e Produtos Recentes */}
-          {!searchTerm && (
-            <div className="mb-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
-              
-              {/* Card de Oferta Relâmpago */}
-              {specialOfferProduct && (() => {
+          {!searchTerm && (() => {
+            // Verificar se há oferta relâmpago ativa
+            const hasActiveFlashSale = specialOfferProduct && isSaleActive(specialOfferProduct) && specialOfferProduct.isFlashSale;
+            
+            return (
+              <div className="mb-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
+                
+                {/* Card de Oferta Relâmpago - só mostra se houver oferta ativa */}
+                {hasActiveFlashSale && specialOfferProduct && (() => {
                 const originalFlashPrice = Number(specialOfferProduct.price);
                 const isFlashActive = isSaleActive(specialOfferProduct) && specialOfferProduct.isFlashSale;
                 let currentFlashPrice: number;
@@ -615,9 +737,7 @@ export default function ProductsPage() {
                       {/* Seção da Imagem - Esquerda */}
                       <div className="flex-shrink-0 w-40 h-48 items-center justify-center overflow-hidden">
                         {(() => {
-                          const imageUrl = specialOfferProduct.imageUrls && specialOfferProduct.imageUrls.length > 0 
-                            ? specialOfferProduct.imageUrls[0] 
-                            : specialOfferProduct.imageUrl;
+                          const imageUrl = specialOfferProduct.imageUrl;
                           
                           return imageUrl ? (
                             <img
@@ -685,9 +805,11 @@ export default function ProductsPage() {
                 );
               })()}
 
-              {/* Banner de Produtos Recentes */}
+              {/* Banner de Produtos Recentes - expande quando não há oferta relâmpago */}
               {recentProducts.length > 0 && (
-                <div className="lg:col-span-9 relative bg-gradient-to-br from-white to-brand-50/20 border-2 border-brand-200 rounded-xl shadow-md overflow-hidden h-72">
+                <div className={`relative bg-gradient-to-br from-white to-brand-50/20 border-2 border-brand-200 rounded-xl shadow-md overflow-hidden h-72 ${
+                  hasActiveFlashSale ? 'lg:col-span-9' : 'lg:col-span-12'
+                }`}>
                   <div 
                     className="relative w-full h-full bg-cover bg-top"
                     style={{
@@ -706,7 +828,7 @@ export default function ProductsPage() {
                       <div className="flex flex-col items-center gap-4 flex-1">
                         <div className="flex-shrink-0">
                           <img
-                            src="/logoCompleta.svg"
+                            src="/logotipos/8.svg"
                             alt="MobiliAI"
                             className="h-38 w-auto"
                           />
@@ -735,17 +857,31 @@ export default function ProductsPage() {
                             onClick={() => router.push(`/products/${product.id}`)}
                           >
                             <div className="w-48 h-48 rounded-lg overflow-hidden border-2 border-white bg-white shadow-lg hover:shadow-xl hover:border-brand-300 hover:-translate-y-1 transition-all duration-300">
-                              {product.imageUrl ? (
-                                <img
-                                  src={product.imageUrl}
-                                  alt={product.name}
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                                  <Package className="h-4 w-4 text-gray-400" />
-                                </div>
-                              )}
+                              {(() => {
+                                const imageUrl = product.imageUrls && product.imageUrls.length > 0 
+                                  ? product.imageUrls[0] 
+                                  : product.imageUrl;
+                                
+                                return imageUrl ? (
+                                  <img
+                                    src={imageUrl}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                    onError={(e) => {
+                                      console.error('Erro ao carregar imagem:', imageUrl);
+                                      e.currentTarget.style.display = 'none';
+                                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                                    <Package className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                );
+                              })()}
+                              <div className="hidden w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                                <Package className="h-4 w-4 text-gray-400" />
+                              </div>
                             </div>
                             {idx < recentProducts.length - 1 && (
                               <div className="absolute -right-1 top-1/2 -translate-y-1/2 translate-x-1/2 w-1.5 h-1.5 bg-brand-600 rounded-full border border-white shadow-sm"></div>
@@ -758,8 +894,9 @@ export default function ProductsPage() {
                 </div>
               )}
               
-            </div>
-          )}
+              </div>
+            );
+          })()}
 
           {/* Ordenação */}
           <div className="flex items-center justify-end mt-4 mb-4">
@@ -999,6 +1136,8 @@ export default function ProductsPage() {
                     // Usar percentual de desconto se disponível, senão calcular
                     const discountPercent = isFlashSaleActive && product.flashSaleDiscountPercent
                       ? product.flashSaleDiscountPercent
+                      : isNormalSaleActive && product.saleDiscountPercent
+                      ? product.saleDiscountPercent
                       : hasActiveSale && originalPrice > currentPrice
                       ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
                       : 0;
@@ -1017,17 +1156,31 @@ export default function ProductsPage() {
                       >
                         {/* Imagem do produto */}
                         <div className="relative aspect-square bg-gray-100 overflow-hidden group">
-                        {product.imageUrl ? (
+                        {(() => {
+                          const imageUrl = product.imageUrls && product.imageUrls.length > 0 
+                            ? product.imageUrls[0] 
+                            : product.imageUrl;
+                          
+                          return imageUrl ? (
                             <img
-                              src={product.imageUrl}
+                              src={imageUrl}
                               alt={product.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                console.error('Erro ao carregar imagem:', imageUrl);
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                              }}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
                               Sem imagem
                             </div>
-                          )}
+                          );
+                        })()}
+                        <div className="hidden w-full h-full flex items-center justify-center text-gray-400">
+                          Erro ao carregar imagem
+                        </div>
                           {/* Badge de Oferta Relâmpago */}
                           {isFlashSaleActive && (
                             <div className="absolute top-2 left-2 z-10">

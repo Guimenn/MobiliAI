@@ -30,6 +30,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { showConfirm } from '@/lib/alerts';
 
 enum PaymentMethod {
   PIX = 'pix',
@@ -241,7 +242,7 @@ export default function CreateSalePage() {
 
     // Se não houver cliente selecionado, criar uma venda sem cliente
     if (!selectedCustomer) {
-      const confirmVenda = confirm('Deseja continuar com a venda sem cliente?');
+      const confirmVenda = await showConfirm('Deseja continuar com a venda sem cliente?');
       if (!confirmVenda) {
         return;
       }

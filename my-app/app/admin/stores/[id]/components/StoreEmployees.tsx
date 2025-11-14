@@ -69,13 +69,33 @@ export default function StoreEmployees({ storeId }: StoreEmployeesProps) {
     }
   };
 
+  // Função para filtrar apenas campos permitidos pelo DTO do backend
+  const filterAllowedFields = (data: any) => {
+    const allowedFields = [
+      'name', 'email', 'phone', 'address', 'city', 'state', 'zipCode', 
+      'role', 'isActive', 'cpf', 'workingHours', 'storeId', 'password'
+    ];
+    
+    const filtered: any = {};
+    allowedFields.forEach(field => {
+      if (data[field] !== undefined && data[field] !== null) {
+        // Remover campos vazios (strings vazias)
+        if (typeof data[field] === 'string' && data[field].trim() === '') {
+          return; // Não incluir campos vazios
+        }
+        filtered[field] = data[field];
+      }
+    });
+    return filtered;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       if (editingEmployee) {
-        await adminAPI.updateEmployee(editingEmployee.id, formData);
+        await adminAPI.updateEmployee(editingEmployee.id, filterAllowedFields(formData));
       } else {
-        await adminAPI.createEmployee({ ...formData, storeId });
+        await adminAPI.createEmployee(filterAllowedFields({ ...formData, storeId }));
       }
       await loadEmployees();
       setIsDialogOpen(false);
