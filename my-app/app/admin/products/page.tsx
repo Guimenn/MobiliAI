@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { adminAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import ClientOnly from '@/components/ClientOnly';
@@ -80,7 +81,7 @@ import ProductViewer3D from '@/components/ProductViewer3D';
 import ProductViewer3DAdvanced from '@/components/ProductViewer3DAdvanced';
 import PhotoTo3DConverter from '@/components/PhotoTo3DConverter';
 import Direct3DUploader from '@/components/Direct3DUploader';
-import FlashSaleModal from '@/components/FlashSaleModal';
+import FlashSalePanel from '@/components/FlashSalePanel';
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -122,8 +123,11 @@ export default function ProductsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // Estado para o modal de oferta relâmpago
-  const [isFlashSaleModalOpen, setIsFlashSaleModalOpen] = useState(false);
+  // Estado para o painel de oferta relâmpago
+  const [showFlashSalePanel, setShowFlashSalePanel] = useState(false);
+  
+  // Estado para controlar a aba ativa
+  const [activeTab, setActiveTab] = useState<'all' | 'on-sale'>('all');
 
   // Removido useEffect que estava causando recarregamentos constantes
   // Os filtros agora são gerenciados no componente ProductsSection
@@ -287,28 +291,151 @@ export default function ProductsPage() {
     setProductToDelete(null);
   };
 
+  // Função para recarregar produtos após atualização
+  const onProductsChange = () => {
+    loadProductsData(currentPage, pageLimit);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
-      <ProductsSection 
-        products={products}
-        isLoading={isLoading}
-        token={token}
-        onProductsChange={() => loadProductsData(currentPage, pageLimit)}
-        onDeleteProduct={handleDeleteProduct}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalProducts={totalProducts}
-        pageLimit={pageLimit}
-        onPageChange={(page: number) => {
-          setCurrentPage(page);
-          loadProductsData(page, pageLimit);
-        }}
-        onLimitChange={(limit: number) => {
-          setPageLimit(limit);
-          setCurrentPage(1);
-          loadProductsData(1, limit);
-        }}
-      />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Hero Section - sempre visível */}
+      <div className="bg-[#3e2626] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
+        <div className="w-full">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Package className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-left">
+                  <h1 className="text-3xl font-bold">Gestão de Produtos</h1>
+                  <p className="text-white/80 text-lg">Gerencie o catálogo de produtos da empresa</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex space-x-3 flex-wrap gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => setShowFlashSalePanel(!showFlashSalePanel)}
+                className={`border-2 border-yellow-500 font-semibold shadow-lg ${
+                  showFlashSalePanel 
+                    ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                    : 'text-yellow-600 hover:bg-yellow-500 hover:text-white'
+                }`}
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                {showFlashSalePanel ? 'Voltar para Produtos' : 'Oferta Relâmpago'}
+              </Button>
+              {!showFlashSalePanel && (
+                <>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setIsPhotoTo3DOpen(true)}
+                    className="border-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    Foto para 3D
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setIsDirect3DUploadOpen(true)}
+                    className="border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload 3D
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setSelectedProduct(null);
+                      setModalMode('create');
+                      setIsModalOpen(true);
+                    }}
+                    className="bg-[#3e2626] hover:bg-[#8B4513]"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Produto
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Renderização condicional: Painel de Oferta Relâmpago ou conteúdo normal */}
+      {showFlashSalePanel ? (
+        <div className="px-6 pb-6">
+          <FlashSalePanel
+            products={products}
+            onProductUpdated={onProductsChange}
+            onClose={() => setShowFlashSalePanel(false)}
+            token={token || ''}
+          />
+        </div>
+      ) : (
+        <div className="px-6 pb-6">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'all' | 'on-sale')} className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Todos os Produtos
+              </TabsTrigger>
+              <TabsTrigger value="on-sale" className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Produtos em Oferta
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="all" className="mt-0">
+              <ProductsSection 
+                products={products}
+                isLoading={isLoading}
+                token={token}
+                onProductsChange={onProductsChange}
+                onDeleteProduct={handleDeleteProduct}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalProducts={totalProducts}
+                pageLimit={pageLimit}
+                onPageChange={(page: number) => {
+                  setCurrentPage(page);
+                  loadProductsData(page, pageLimit);
+                }}
+                onLimitChange={(limit: number) => {
+                  setPageLimit(limit);
+                  setCurrentPage(1);
+                  loadProductsData(1, limit);
+                }}
+                showOnlyOnSale={false}
+              />
+            </TabsContent>
+
+            <TabsContent value="on-sale" className="mt-0">
+              <ProductsSection 
+                products={products}
+                isLoading={isLoading}
+                token={token}
+                onProductsChange={onProductsChange}
+                onDeleteProduct={handleDeleteProduct}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalProducts={totalProducts}
+                pageLimit={pageLimit}
+                onPageChange={(page: number) => {
+                  setCurrentPage(page);
+                  loadProductsData(page, pageLimit);
+                }}
+                onLimitChange={(limit: number) => {
+                  setPageLimit(limit);
+                  setCurrentPage(1);
+                  loadProductsData(1, limit);
+                }}
+                showOnlyOnSale={true}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
 
       {/* Modal de Confirmação de Exclusão */}
       <DeleteProductConfirmDialog
@@ -319,6 +446,63 @@ export default function ProductsPage() {
         productCategory={productToDelete?.category}
         isLoading={isDeleting}
       />
+
+      {/* Modal de Produto */}
+      <AdminProductModal
+        product={selectedProduct}
+        isOpen={isModalOpen}
+        mode={modalMode}
+        onClose={handleCloseModal}
+        onProductUpdated={handleProductUpdated}
+        onProductDeleted={handleProductDeleted}
+      />
+
+      {/* Visualizador 3D */}
+      {productFor3D && (
+        <>
+          {viewerMode === 'basic' ? (
+            <ProductViewer3D
+              product={productFor3D}
+              isOpen={is3DViewerOpen}
+              onClose={() => {
+                setIs3DViewerOpen(false);
+                setProductFor3D(null);
+              }}
+            />
+          ) : (
+            <ProductViewer3DAdvanced
+              product={productFor3D}
+              isOpen={is3DViewerOpen}
+              onClose={() => {
+                setIs3DViewerOpen(false);
+                setProductFor3D(null);
+              }}
+            />
+          )}
+        </>
+      )}
+
+      {/* Conversor de Foto para 3D */}
+      {isPhotoTo3DOpen && (
+        <PhotoTo3DConverter
+          onConverted={(model3D) => {
+            onProductsChange();
+            setIsPhotoTo3DOpen(false);
+          }}
+          onClose={() => setIsPhotoTo3DOpen(false)}
+        />
+      )}
+
+      {/* Upload Direto de 3D */}
+      {isDirect3DUploadOpen && (
+        <Direct3DUploader
+          onUploaded={(model3D) => {
+            onProductsChange();
+            setIsDirect3DUploadOpen(false);
+          }}
+          onClose={() => setIsDirect3DUploadOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -335,10 +519,9 @@ function ProductsSection({
   totalProducts = 0,
   pageLimit = 50,
   onPageChange,
-  onLimitChange
+  onLimitChange,
+  showOnlyOnSale = false
 }: any) {
-  // Estado para o modal de oferta relâmpago
-  const [isFlashSaleModalOpen, setIsFlashSaleModalOpen] = useState(false);
   // Estados para filtros
   const [productFilters, setProductFilters] = useState({
     category: 'all',
@@ -383,12 +566,30 @@ function ProductsSection({
   // }
 
 
-  // Função para filtrar produtos
+  // Função para verificar se um produto está em oferta relâmpago ativa
+  const isFlashSaleActive = (product: any) => {
+    if (!product.isFlashSale || !product.flashSaleStartDate || !product.flashSaleEndDate) {
+      return false;
+    }
+    const now = new Date();
+    const start = new Date(product.flashSaleStartDate);
+    const end = new Date(product.flashSaleEndDate);
+    return now >= start && now <= end;
+  };
+
+   // Função para filtrar produtos
   const getFilteredProducts = () => {
     if (!Array.isArray(products)) return [];
     
     return products
       .filter((product: any) => {
+        // Filtro por oferta relâmpago ativa
+        if (showOnlyOnSale) {
+          if (!isFlashSaleActive(product)) {
+            return false;
+          }
+        }
+        
         // Filtro por categoria
         if (productFilters.category !== 'all' && product.category !== productFilters.category) {
           return false;
@@ -408,7 +609,17 @@ function ProductsSection({
         
         return true;
       })
-      .sort((a: any, b: any) => a.name.localeCompare(b.name));
+      .sort((a: any, b: any) => {
+        // Se estiver mostrando apenas ofertas, ordenar por desconto (maior primeiro)
+        if (showOnlyOnSale) {
+          const discountA = a.flashSaleDiscountPercent || 0;
+          const discountB = b.flashSaleDiscountPercent || 0;
+          if (discountB !== discountA) {
+            return discountB - discountA;
+          }
+        }
+        return a.name.localeCompare(b.name);
+      });
   };
 
   const formatPrice = (price: number) => {
@@ -568,129 +779,161 @@ function ProductsSection({
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100"> 
-      {/* Hero Section */}
-      <div className="bg-[#3e2626] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
-        <div className="w-full">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Package className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-left">
-                  <h1 className="text-3xl font-bold">Gestão de Produtos</h1>
-                  <p className="text-white/80 text-lg">Gerencie o catálogo de produtos da empresa</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex space-x-3 flex-wrap gap-2">
-              <Button 
-                variant="outline"
-                onClick={() => setIsFlashSaleModalOpen(true)}
-                className="border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white font-semibold shadow-lg"
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                Oferta Relâmpago
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => setIsPhotoTo3DOpen(true)}
-                className="border-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
-              >
-                <Camera className="h-4 w-4 mr-2" />
-                Foto para 3D
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => setIsDirect3DUploadOpen(true)}
-                className="border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload 3D
-              </Button>
-              <Button 
-                onClick={handleCreateProduct}
-                className="bg-[#3e2626] hover:bg-[#8B4513]"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Produto
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+  // Calcular produtos em oferta
+  const productsOnSale = products.filter((p: any) => isFlashSaleActive(p));
+  const filteredProductsList = getFilteredProducts();
 
+  return (
+    <div className="px-6 pb-6">
       {/* Stats Cards - Brand Colors */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg hover:shadow-xl hover:border-[#3e2626]/30 transition-all duration-300">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total</p>
-                <p className="text-3xl font-bold text-[#3e2626]">
-                  {totalProducts > 0 ? totalProducts : products.length}
-                </p>
-                <p className="text-xs text-[#3e2626]/70">Produtos cadastrados</p>
-              </div>
-              <div className="w-12 h-12 bg-[#3e2626]/10 rounded-xl flex items-center justify-center">
-                <Package className="h-6 w-6 text-[#3e2626]" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {showOnlyOnSale ? (
+          <>
+            <Card className="bg-gradient-to-br from-yellow-500/5 to-yellow-500/10 border-2 border-yellow-500/20 shadow-lg hover:shadow-xl hover:border-yellow-500/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-yellow-600 uppercase tracking-wide">Produtos em Oferta</p>
+                    <p className="text-3xl font-bold text-yellow-600">
+                      {filteredProductsList.length}
+                    </p>
+                    <p className="text-xs text-yellow-600/70">Ofertas ativas</p>
+                  </div>
+                  <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center">
+                    <Zap className="h-6 w-6 text-yellow-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-green-500/5 to-green-500/10 border-2 border-green-500/20 shadow-lg hover:shadow-xl hover:border-green-500/30 transition-all duration-300">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-green-600 uppercase tracking-wide">Ativos</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {products.filter((p: any) => p.isActive).length}
-                </p>
-                <p className="text-xs text-green-600/70">Em estoque</p>
-              </div>
-              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-gradient-to-br from-red-500/5 to-red-500/10 border-2 border-red-500/20 shadow-lg hover:shadow-xl hover:border-red-500/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-red-600 uppercase tracking-wide">Desconto Médio</p>
+                    <p className="text-3xl font-bold text-red-600">
+                      {filteredProductsList.length > 0 
+                        ? `${Math.round(filteredProductsList.reduce((sum: number, p: any) => sum + (p.flashSaleDiscountPercent || 0), 0) / filteredProductsList.length)}%`
+                        : '0%'}
+                    </p>
+                    <p className="text-xs text-red-600/70">Desconto médio</p>
+                  </div>
+                  <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center">
+                    <TrendingDown className="h-6 w-6 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-yellow-500/5 to-yellow-500/10 border-2 border-yellow-500/20 shadow-lg hover:shadow-xl hover:border-yellow-500/30 transition-all duration-300">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-yellow-600 uppercase tracking-wide">Estoque Baixo</p>
-                <p className="text-3xl font-bold text-yellow-600">
-                  {products.filter((p: any) => p.stock < 10).length}
-                </p>
-                <p className="text-xs text-yellow-600/70">Atenção</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center">
-                <TrendingDown className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-gradient-to-br from-green-500/5 to-green-500/10 border-2 border-green-500/20 shadow-lg hover:shadow-xl hover:border-green-500/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-green-600 uppercase tracking-wide">Valor Economizado</p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {formatPrice(filteredProductsList.reduce((sum: number, p: any) => {
+                        const originalPrice = p.price || 0;
+                        const salePrice = p.flashSalePrice || originalPrice;
+                        return sum + (originalPrice - salePrice);
+                      }, 0))}
+                    </p>
+                    <p className="text-xs text-green-600/70">Total em descontos</p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
+                    <DollarSign className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-2 border-purple-500/20 shadow-lg hover:shadow-xl hover:border-purple-500/30 transition-all duration-300">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-purple-600 uppercase tracking-wide">Valor Total</p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {formatPrice(products.reduce((sum: number, p: any) => sum + (p.price * p.stock), 0))}
-                </p>
-                <p className="text-xs text-purple-600/70">Em estoque</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-2 border-purple-500/20 shadow-lg hover:shadow-xl hover:border-purple-500/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-purple-600 uppercase tracking-wide">Valor Total</p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {formatPrice(filteredProductsList.reduce((sum: number, p: any) => sum + ((p.flashSalePrice || p.price) * p.stock), 0))}
+                    </p>
+                    <p className="text-xs text-purple-600/70">Com desconto</p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
+                    <Package className="h-6 w-6 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg hover:shadow-xl hover:border-[#3e2626]/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Total</p>
+                    <p className="text-3xl font-bold text-[#3e2626]">
+                      {totalProducts > 0 ? totalProducts : products.length}
+                    </p>
+                    <p className="text-xs text-[#3e2626]/70">Produtos cadastrados</p>
+                  </div>
+                  <div className="w-12 h-12 bg-[#3e2626]/10 rounded-xl flex items-center justify-center">
+                    <Package className="h-6 w-6 text-[#3e2626]" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-green-500/5 to-green-500/10 border-2 border-green-500/20 shadow-lg hover:shadow-xl hover:border-green-500/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-green-600 uppercase tracking-wide">Ativos</p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {products.filter((p: any) => p.isActive).length}
+                    </p>
+                    <p className="text-xs text-green-600/70">Em estoque</p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-yellow-500/5 to-yellow-500/10 border-2 border-yellow-500/20 shadow-lg hover:shadow-xl hover:border-yellow-500/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-yellow-600 uppercase tracking-wide">Em Oferta</p>
+                    <p className="text-3xl font-bold text-yellow-600">
+                      {productsOnSale.length}
+                    </p>
+                    <p className="text-xs text-yellow-600/70">Ofertas ativas</p>
+                  </div>
+                  <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center">
+                    <Zap className="h-6 w-6 text-yellow-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-2 border-purple-500/20 shadow-lg hover:shadow-xl hover:border-purple-500/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-purple-600 uppercase tracking-wide">Valor Total</p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {formatPrice(products.reduce((sum: number, p: any) => sum + (p.price * p.stock), 0))}
+                    </p>
+                    <p className="text-xs text-purple-600/70">Em estoque</p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
+                    <DollarSign className="h-6 w-6 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Filtros e Controles */}
@@ -771,10 +1014,14 @@ function ProductsSection({
       <div className="space-y-6">
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {getFilteredProducts().map((product: any) => {
+            {filteredProductsList.map((product: any) => {
               const stockStatus = getStockStatus(product.stock);
+              const isOnSale = isFlashSaleActive(product);
+              const salePrice = product.flashSalePrice || product.price;
+              const originalPrice = product.price;
+              
               return (
-                <Card key={product.id} className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 overflow-hidden">
+                <Card key={product.id} className={`bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 overflow-hidden ${isOnSale ? 'ring-2 ring-yellow-400 ring-opacity-50' : ''}`}>
                   <CardContent className="p-0">
                     {/* Imagem do produto */}
                     {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) && (
@@ -784,6 +1031,12 @@ function ProductsSection({
                           alt={product.name}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                         />
+                        {isOnSale && (
+                          <div className="absolute top-2 left-2 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
+                            <Zap className="h-3 w-3" />
+                            OFERTA RELÂMPAGO
+                          </div>
+                        )}
                         {product.imageUrls && product.imageUrls.length > 1 && (
                           <div className="absolute bottom-2 right-2 text-white text-xs px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(62, 38, 38, 0.7)' }}>
                             +{product.imageUrls.length - 1} mais
@@ -791,10 +1044,14 @@ function ProductsSection({
                         )}
                       </div>
                     )}
-                    <div className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 p-6">
+                    <div className={`bg-gradient-to-r ${isOnSale ? 'from-yellow-50 to-orange-50' : 'from-[#3e2626]/5 to-[#3e2626]/10'} p-6`}>
                       <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-[#3e2626] rounded-xl flex items-center justify-center">
-                          <Package className="h-6 w-6 text-white" />
+                        <div className={`w-12 h-12 ${isOnSale ? 'bg-yellow-500' : 'bg-[#3e2626]'} rounded-xl flex items-center justify-center`}>
+                          {isOnSale ? (
+                            <Zap className="h-6 w-6 text-white" />
+                          ) : (
+                            <Package className="h-6 w-6 text-white" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-lg font-semibold text-gray-900 truncate">
@@ -803,7 +1060,7 @@ function ProductsSection({
                           <p className="text-sm text-gray-600 truncate">
                             {product.category}
                           </p>
-                          <div className="flex items-center space-x-2 mt-1">
+                          <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
                             <Badge 
                               variant="outline"
                               className="text-xs"
@@ -816,6 +1073,11 @@ function ProductsSection({
                             >
                               {product.isActive ? 'Ativo' : 'Inativo'}
                             </Badge>
+                            {isOnSale && product.flashSaleDiscountPercent && (
+                              <Badge className="bg-red-500 text-white text-xs font-bold">
+                                -{product.flashSaleDiscountPercent}%
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -825,9 +1087,20 @@ function ProductsSection({
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2 text-sm text-gray-600">
                           <DollarSign className="h-4 w-4" />
-                          <span className="text-2xl font-bold text-[#3e2626]">
-                            {formatPrice(product.price)}
-                          </span>
+                          {isOnSale ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl font-bold text-green-600">
+                                {formatPrice(salePrice)}
+                              </span>
+                              <span className="text-lg text-gray-400 line-through">
+                                {formatPrice(originalPrice)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-2xl font-bold text-[#3e2626]">
+                              {formatPrice(originalPrice)}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center space-x-2 text-sm text-gray-600">
                           <Package className="h-4 w-4" />
@@ -919,18 +1192,37 @@ function ProductsSection({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {getFilteredProducts().map((product: any) => {
+                    {filteredProductsList.map((product: any) => {
                       const stockStatus = getStockStatus(product.stock);
+                      const isOnSale = isFlashSaleActive(product);
+                      const salePrice = product.flashSalePrice || product.price;
+                      const originalPrice = product.price;
+                      
                       return (
-                        <tr key={product.id} className="hover:bg-gray-50">
+                        <tr 
+                          key={product.id} 
+                          className={`hover:bg-gray-50 ${isOnSale ? 'bg-yellow-50/50' : ''}`}
+                        >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="w-10 h-10 bg-[#3e2626] rounded-lg flex items-center justify-center mr-3">
-                                <Package className="h-5 w-5 text-white" />
+                              <div className={`w-10 h-10 ${isOnSale ? 'bg-yellow-500' : 'bg-[#3e2626]'} rounded-lg flex items-center justify-center mr-3`}>
+                                {isOnSale ? (
+                                  <Zap className="h-5 w-5 text-white" />
+                                ) : (
+                                  <Package className="h-5 w-5 text-white" />
+                                )}
                               </div>
                               <div>
-                                <div className="text-sm font-medium text-gray-900">
-                                  {product.name}
+                                <div className="flex items-center gap-2">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {product.name}
+                                  </div>
+                                  {isOnSale && (
+                                    <Badge className="bg-yellow-500 text-white text-xs font-bold animate-pulse">
+                                      <Zap className="h-3 w-3 mr-1" />
+                                      OFERTA
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="text-sm text-gray-500">
                                   {product.sku || 'Sem SKU'}
@@ -939,12 +1231,32 @@ function ProductsSection({
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge variant="outline">
-                              {product.category}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">
+                                {product.category}
+                              </Badge>
+                              {isOnSale && product.flashSaleDiscountPercent && (
+                                <Badge className="bg-red-500 text-white text-xs font-bold">
+                                  -{product.flashSaleDiscountPercent}%
+                                </Badge>
+                              )}
+                            </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatPrice(product.price)}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {isOnSale ? (
+                              <div className="flex flex-col">
+                                <span className="font-bold text-green-600">
+                                  {formatPrice(salePrice)}
+                                </span>
+                                <span className="text-xs text-gray-400 line-through">
+                                  {formatPrice(originalPrice)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-900">
+                                {formatPrice(originalPrice)}
+                              </span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center space-x-2">
@@ -1088,60 +1400,6 @@ function ProductsSection({
           </CardContent>
         </Card>
       )}
-
-      {/* Modal de Produto */}
-      <AdminProductModal
-        product={selectedProduct}
-        isOpen={isModalOpen}
-        mode={modalMode}
-        onClose={handleCloseModal}
-        onProductUpdated={handleProductUpdated}
-        onProductDeleted={handleProductDeleted}
-      />
-
-      {/* Visualizador 3D */}
-      {productFor3D && (
-        <>
-          {viewerMode === 'basic' ? (
-            <ProductViewer3D
-              product={productFor3D}
-              isOpen={is3DViewerOpen}
-              onClose={handleClose3DViewer}
-            />
-          ) : (
-            <ProductViewer3DAdvanced
-              product={productFor3D}
-              isOpen={is3DViewerOpen}
-              onClose={handleClose3DViewer}
-            />
-          )}
-        </>
-      )}
-
-      {/* Conversor de Foto para 3D */}
-      {isPhotoTo3DOpen && (
-        <PhotoTo3DConverter
-          onConverted={handlePhotoTo3DConverted}
-          onClose={() => setIsPhotoTo3DOpen(false)}
-        />
-      )}
-
-      {/* Upload Direto de 3D */}
-      {isDirect3DUploadOpen && (
-        <Direct3DUploader
-          onUploaded={handleDirect3DUploaded}
-          onClose={() => setIsDirect3DUploadOpen(false)}
-        />
-      )}
-
-      {/* Modal de Oferta Relâmpago */}
-      <FlashSaleModal
-        isOpen={isFlashSaleModalOpen}
-        onClose={() => setIsFlashSaleModalOpen(false)}
-        products={products}
-        onProductUpdated={onProductsChange}
-        token={token || ''}
-      />
     </div>
   );
 }

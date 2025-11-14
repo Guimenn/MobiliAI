@@ -5,6 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { X, Zap, Search, Clock, Percent, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminAPI } from '@/lib/api';
@@ -98,8 +106,6 @@ export default function FlashSaleModal({
       }
     }
   }, [selectedProduct]);
-
-  if (!isOpen) return null;
 
   // Filtrar produtos
   const filteredProducts = products.filter((product: any) => {
@@ -425,26 +431,34 @@ export default function FlashSaleModal({
   const endDateTime = calculateEndDateTime();
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-orange-50">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl w-[calc(100vw-2rem)] max-h-[90vh] h-auto flex flex-col p-0 gap-0 [&>button]:hidden">
+        <DialogHeader className="p-6 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-orange-50 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3 flex-1">
+              <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center shrink-0">
               <Zap className="h-6 w-6 text-white fill-white" />
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Oferta Relâmpago</h2>
-              <p className="text-sm text-gray-600">Configure ofertas relâmpago para produtos</p>
+              <div className="flex-1">
+                <DialogTitle className="text-2xl font-bold text-gray-900">Oferta Relâmpago</DialogTitle>
+                <DialogDescription className="text-sm text-gray-600">
+                  Configure ofertas relâmpago para produtos
+                </DialogDescription>
+              </div>
             </div>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onClose}
+              className="h-8 w-8 p-0 shrink-0"
+            >
             <X className="h-4 w-4" />
           </Button>
         </div>
+        </DialogHeader>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
           {/* Aviso sobre produto com oferta ativa */}
           {activeFlashSaleProduct && activeFlashSaleProduct.id !== selectedProduct?.id && (
             <Card className="border-2 border-orange-300 bg-orange-50">
@@ -762,14 +776,15 @@ export default function FlashSaleModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>
+        <DialogFooter className="p-6 border-t border-gray-200 bg-gray-50 gap-3 shrink-0">
+          <Button variant="outline" onClick={onClose} disabled={isSaving} type="button">
             Cancelar
           </Button>
           <Button
             onClick={handleSave}
             disabled={isSaving || !selectedProduct || discountPercent <= 0 || !startDate || !startTime}
             className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold"
+            type="button"
           >
             {isSaving ? (
               <>
@@ -786,9 +801,10 @@ export default function FlashSaleModal({
               </>
             )}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
+
 

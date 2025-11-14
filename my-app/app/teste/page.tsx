@@ -276,7 +276,7 @@ export default function TestAIPage() {
           throw new Error(`Erro ao carregar imagem: ${response.status} ${response.statusText}`);
         }
         
-        const blob = await response.blob();
+            const blob = await response.blob();
         
         // Verificar se é uma imagem válida
         if (!blob.type.startsWith('image/')) {
@@ -287,9 +287,9 @@ export default function TestAIPage() {
           type: blob.type || 'image/jpeg' 
         });
         
-        productFiles.push(productFile);
+            productFiles.push(productFile);
         console.log('✅ Imagem do produto carregada com sucesso:', productFile.name, productFile.size, 'bytes');
-      } catch (err) {
+        } catch (err) {
         console.error('❌ Erro ao carregar imagem do produto:', err);
         throw new Error(`Não foi possível carregar a imagem do produto ${furniture.name}. Verifique se a URL da imagem está acessível.`);
       }
@@ -1091,7 +1091,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                           <div className="relative w-full h-full border-2 border-[#C07A45] border-dashed rounded-lg bg-[#C07A45]/5">
                             <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45]/80 text-white px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
                               {pendingFurniture?.name}
-                            </div>
+                                </div>
                           </div>
                         </div>
                       )}
@@ -1105,13 +1105,13 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                             top: `${selectedPosition.y}px`,
                             width: '150px',
                             height: '150px',
-                          }}
-                        >
+                                  }}
+                                >
                           <div className="relative w-full h-full border-4 border-[#C07A45] border-dashed rounded-lg bg-[#C07A45]/10 animate-pulse">
                             <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45] text-white px-3 py-1 rounded-full text-xs font-semibold">
                               {pendingFurniture?.name}
-                            </div>
                           </div>
+                        </div>
                         </div>
                       )}
 
