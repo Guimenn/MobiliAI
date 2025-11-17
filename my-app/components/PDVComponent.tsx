@@ -54,10 +54,11 @@ type PaymentMethod = 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'PIX';
 
 interface PDVComponentProps {
   initialCustomer?: any;
+  pickupOrders?: any[];
   onReset?: () => void;
 }
 
-export default function PDVComponent({ initialCustomer, onReset }: PDVComponentProps = {}) {
+export default function PDVComponent({ initialCustomer, pickupOrders = [], onReset }: PDVComponentProps = {}) {
   const { user } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
@@ -77,6 +78,8 @@ export default function PDVComponent({ initialCustomer, onReset }: PDVComponentP
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerCpf, setCustomerCpf] = useState('');
   const [foundCustomer, setFoundCustomer] = useState<any>(initialCustomer || null);
+  const [pendingPickupOrders, setPendingPickupOrders] = useState<any[]>(pickupOrders || []);
+  const [markingAsPickedUp, setMarkingAsPickedUp] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -400,10 +403,107 @@ export default function PDVComponent({ initialCustomer, onReset }: PDVComponentP
     }
   };
 
+  // Função para marcar pedido como retirado
+  const handleMarkAsPickedUp = async (orderId: string) => {
+    try {
+      setMarkingAsPickedUp(orderId);
+      await salesAPI.update(orderId, {
+        status: 'COMPLETED',
+      });
+      // Atualizar a lista removendo o pedido retirado
+      setPendingPickupOrders(prev => prev.filter(order => order.id !== orderId));
+      showAlert('success', 'Pedido marcado como retirado com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao marcar pedido como retirado:', error);
+      showAlert('error', 'Erro ao marcar pedido como retirado. Tente novamente.');
+    } finally {
+      setMarkingAsPickedUp(null);
+    }
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-      {/* Coluna Esquerda - Busca e Produtos */}
-      <div className="lg:col-span-2 space-y-4">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Seção de Pedidos para Retirada */}
+      {pendingPickupOrders.length > 0 && (
+        <Card className="mb-4 border-2 border-yellow-200 bg-yellow-50 shadow-lg flex-shrink-0">
+          <CardHeader className="bg-yellow-500 text-white rounded-t-lg">
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Package className="h-5 w-5" />
+              Pedidos para Retirada ({pendingPickupOrders.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {pendingPickupOrders.map((order: any) => (
+                <div
+                  key={order.id}
+                  className="bg-white rounded-lg p-4 border-2 border-yellow-200 shadow-sm"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="font-semibold text-gray-900">
+                          Pedido #{order.saleNumber}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {order.status === 'PENDING' ? 'Pendente' : 'Preparando'}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <p>
+                          <span className="font-medium">Valor:</span> R${' '}
+                          {Number(order.totalAmount).toLocaleString('pt-BR', {
+                            minimumFractionDigits: 2,
+                          })}
+                        </p>
+                        {order.items && order.items.length > 0 && (
+                          <div className="mt-2">
+                            <p className="font-medium text-xs text-gray-500 mb-1">Itens do pedido:</p>
+                            <div className="space-y-1">
+                              {order.items.slice(0, 3).map((item: any, idx: number) => (
+                                <p key={idx} className="text-xs text-gray-600">
+                                  • {item.product?.name || 'Produto'} - Qtd: {item.quantity}
+                                </p>
+                              ))}
+                              {order.items.length > 3 && (
+                                <p className="text-xs text-gray-500">
+                                  + {order.items.length - 3} outro(s) item(ns)
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => handleMarkAsPickedUp(order.id)}
+                      disabled={markingAsPickedUp === order.id}
+                      className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
+                      size="sm"
+                    >
+                      {markingAsPickedUp === order.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Marcar como Retirado
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
+        {/* Coluna Esquerda - Busca e Produtos */}
+        <div className="lg:col-span-2 space-y-4 overflow-y-auto">
         {/* Busca de Produtos */}
         <Card className="shadow-lg border-2 border-[#3e2626]/10">
           <CardContent className="p-4">
@@ -836,6 +936,7 @@ export default function PDVComponent({ initialCustomer, onReset }: PDVComponentP
             )}
           </CardContent>
         </Card>
+        </div>
       </div>
 
       {/* Modal de Pagamento */}

@@ -250,9 +250,18 @@ export class SalesService {
     }
 
     const oldStatus = String(sale.status).toUpperCase();
+    
+    // Preparar dados para atualização
+    const updateData: any = { ...updateSaleDto };
+    
+    // Se está marcando como COMPLETED e é pedido online, definir deliveredAt
+    if (updateSaleDto.status && String(updateSaleDto.status).toUpperCase() === 'COMPLETED' && sale.isOnlineOrder) {
+      updateData.deliveredAt = new Date();
+    }
+    
     await this.prisma.sale.update({
       where: { id },
-      data: updateSaleDto as any,
+      data: updateData,
     });
 
     const updatedSale = await this.findOne(id, currentUser);

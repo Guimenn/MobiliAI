@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import ClientProviders from "@/components/ClientProviders";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider";
+import SupportChatbot from "@/components/SupportChatbot";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -36,6 +37,7 @@ export default function RootLayout({
         </ClientProviders>
         <Toaster />
         <ConfirmDialogProvider />
+        <SupportChatbot />
       </body>
     </html>
   );

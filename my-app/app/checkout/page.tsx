@@ -122,6 +122,54 @@ const formatPhone = (value: string): string => {
   return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
 };
 
+// Função para calcular distância entre duas coordenadas (Haversine)
+const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371; // Raio da Terra em km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distância em km
+};
+
+// Função para geocodificar endereço (converter endereço em coordenadas)
+const geocodeAddress = async (address: string, city: string, state: string, zipCode: string): Promise<{ lat: number; lng: number } | null> => {
+  try {
+    const fullAddress = `${address}, ${city}, ${state}, ${zipCode}, Brasil`;
+    const encodedAddress = encodeURIComponent(fullAddress);
+    
+    // Usar Nominatim (OpenStreetMap) - API gratuita
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`,
+      {
+        headers: {
+          'User-Agent': 'PintAi/1.0' // Nominatim requer User-Agent
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error('Erro ao geocodificar endereço');
+    }
+    
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon)
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Erro ao geocodificar:', error);
+    return null;
+  }
+};
+
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -236,6 +284,9 @@ export default function CheckoutPage() {
   const [stores, setStores] = useState<any[]>([]);
   const [selectedStore, setSelectedStore] = useState<string>('');
   const [isLoadingStores, setIsLoadingStores] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [storesWithDistance, setStoresWithDistance] = useState<any[]>([]);
 
   // Produtos recomendados
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
@@ -378,52 +429,225 @@ export default function CheckoutPage() {
     return { address: fullAddress, number: '', complement: '' };
   };
 
-  // Carregar lojas disponíveis
+  // Obter localização do usuário
+  useEffect(() => {
+    const getUserLocation = () => {
+      if (!navigator.geolocation) {
+        console.log('Geolocalização não suportada pelo navegador');
+        return;
+      }
+
+      setIsLoadingLocation(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setIsLoadingLocation(false);
+        },
+        (error) => {
+          console.error('Erro ao obter localização:', error);
+          setIsLoadingLocation(false);
+          // Se o usuário negar, tentar usar o endereço do perfil como fallback
+          if (shippingAddress.city && shippingAddress.state) {
+            // Tentar geocodificar o endereço do usuário
+            geocodeAddress(
+              shippingAddress.address || '',
+              shippingAddress.city,
+              shippingAddress.state,
+              shippingAddress.zipCode || ''
+            ).then(coords => {
+              if (coords) {
+                setUserLocation(coords);
+              }
+            });
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    };
+
+    // Só tentar obter localização se o usuário estiver na etapa de endereço ou pagamento
+    if (currentStep === 'address' || currentStep === 'payment') {
+      getUserLocation();
+    }
+  }, [currentStep, shippingAddress]);
+
+  // Carregar lojas disponíveis e calcular distâncias
   useEffect(() => {
     const loadStores = async () => {
       setIsLoadingStores(true);
       try {
-        const storesData = await storesAPI.getAll();
+        console.log('🛒 Carregando lojas...');
+        console.log('👤 Usuário atual:', user);
+        console.log('👤 Role do usuário:', user?.role);
+        console.log('🔑 Token:', token ? 'Presente' : 'Ausente');
+        console.log('🔐 Autenticado:', isAuthenticated);
         
-        // Filtrar lojas que têm os produtos do checkout em estoque
+        const storesData = await storesAPI.getAll();
+        console.log('📦 Dados recebidos da API:', storesData);
+        console.log('📊 Tipo de dados:', typeof storesData);
+        console.log('📊 É array?', Array.isArray(storesData));
+        console.log('📊 Quantidade:', storesData?.length);
+        
+        // Verificar se recebeu dados válidos
+        if (!storesData || !Array.isArray(storesData)) {
+          console.error('❌ Dados de lojas inválidos:', storesData);
+          setStores([]);
+          setStoresWithDistance([]);
+          setIsLoadingStores(false);
+          return;
+        }
+
+        // Filtrar apenas lojas ativas (se isActive for false, excluir; caso contrário, incluir)
+        let availableStores = storesData.filter((store: any) => {
+          // Se isActive é explicitamente false, excluir
+          // Caso contrário (true, undefined, null), incluir
+          const isActive = store.isActive !== false;
+          console.log(`🏪 Loja ${store.name}: isActive=${store.isActive}, será incluída=${isActive}`);
+          return isActive;
+        });
+        
+        console.log(`✅ Lojas ativas encontradas: ${availableStores.length} de ${storesData.length}`);
+        
+        // SEMPRE filtrar lojas que têm os produtos do checkout
         if (checkoutItems.length > 0) {
-          const availableStores = storesData.filter((store: any) => {
-            // Se a loja tem algum dos produtos, considerar disponível
-            return checkoutItems.some((item: any) => {
-              const productStoreId = item.product?.storeId || (item.product as any)?.store?.id;
-              return productStoreId === store.id;
-            });
+          // Extrair todos os storeIds únicos dos produtos no carrinho
+          const productStoreIds = new Set<string>();
+          checkoutItems.forEach((item: any) => {
+            const productStoreId = item.product?.storeId || (item.product as any)?.store?.id || (item.product as any)?.storeId;
+            if (productStoreId) {
+              productStoreIds.add(productStoreId);
+            }
           });
           
-          // Se não encontrou lojas específicas, mostrar todas
-          setStores(availableStores.length > 0 ? availableStores : storesData);
+          console.log(`🛍️ StoreIds dos produtos no carrinho:`, Array.from(productStoreIds));
+          console.log(`🛍️ Produtos no carrinho:`, checkoutItems.map((item: any) => ({
+            productId: item.product?.id,
+            productName: item.product?.name,
+            storeId: item.product?.storeId || (item.product as any)?.store?.id || (item.product as any)?.storeId
+          })));
           
-          // Selecionar automaticamente a primeira loja que tem os produtos ou a mais próxima
-          // Apenas se ainda não tiver uma loja selecionada
+          // Filtrar apenas lojas que têm pelo menos um produto do carrinho
+          const storesWithProducts = availableStores.filter((store: any) => {
+            return productStoreIds.has(store.id);
+          });
+          
+          console.log(`🛍️ Lojas com produtos do carrinho: ${storesWithProducts.length}`);
+          
+          // SEMPRE usar apenas as lojas com produtos (não mostrar todas se não houver produtos)
+          if (storesWithProducts.length > 0) {
+            availableStores = storesWithProducts;
+          } else {
+            // Se nenhuma loja tem os produtos, mostrar array vazio
+            availableStores = [];
+            console.warn('⚠️ Nenhuma loja encontrada com os produtos do carrinho');
+          }
+        } else {
+          // Se não há produtos no carrinho, não mostrar lojas
+          availableStores = [];
+          console.log('ℹ️ Nenhum produto no carrinho, não exibindo lojas');
+        }
+        
+        console.log(`📍 Lojas finais disponíveis: ${availableStores.length}`);
+        
+        // Se não há lojas, mostrar mensagem informativa
+        if (availableStores.length === 0) {
+          console.warn('⚠️ Nenhuma loja disponível. Possíveis causas:');
+          console.warn('  1. Não há lojas cadastradas no sistema');
+          console.warn('  2. Todas as lojas estão inativas (isActive: false)');
+          console.warn('  3. O usuário não tem permissão para ver lojas');
+          console.warn('  4. Erro na consulta ao banco de dados');
+        }
+        
+        // Se temos localização do usuário, calcular distâncias e ordenar
+        if (userLocation && availableStores.length > 0) {
+          console.log('🌍 Calculando distâncias com localização do usuário...');
+          // Processar lojas sequencialmente com delay para não sobrecarregar a API
+          const storesWithCoords = [];
+          for (let i = 0; i < availableStores.length; i++) {
+            const store = availableStores[i];
+            // Adicionar delay de 1 segundo entre requisições (Nominatim tem limite de rate)
+            if (i > 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            try {
+              const coords = await geocodeAddress(
+                store.address,
+                store.city,
+                store.state,
+                store.zipCode
+              );
+              
+              if (coords) {
+                const distance = calculateDistance(
+                  userLocation.lat,
+                  userLocation.lng,
+                  coords.lat,
+                  coords.lng
+                );
+                storesWithCoords.push({ ...store, distance, coordinates: coords });
+              } else {
+                storesWithCoords.push({ ...store, distance: null, coordinates: null });
+              }
+            } catch (error) {
+              console.error(`Erro ao geocodificar loja ${store.name}:`, error);
+              storesWithCoords.push({ ...store, distance: null, coordinates: null });
+            }
+          }
+          
+          // Ordenar por distância (lojas sem distância vão para o final)
+          const sortedStores = storesWithCoords.sort((a, b) => {
+            if (a.distance === null) return 1;
+            if (b.distance === null) return -1;
+            return a.distance - b.distance;
+          });
+          
+          console.log(`✅ Lojas ordenadas por distância: ${sortedStores.length}`);
+          setStoresWithDistance(sortedStores);
+          setStores(sortedStores);
+          
+          // Selecionar automaticamente a loja mais próxima
           setSelectedStore((current) => {
             if (current) return current; // Manter seleção atual se já existir
-            if (availableStores.length > 0) return availableStores[0].id;
-            if (storesData.length > 0) return storesData[0].id;
+            const nearestStore = sortedStores.find((s: any) => s.distance !== null);
+            if (nearestStore) return nearestStore.id;
+            if (sortedStores.length > 0) return sortedStores[0].id;
             return '';
           });
         } else {
-          setStores(storesData);
+          // Sem localização, apenas definir as lojas
+          console.log('📍 Sem localização, exibindo todas as lojas ativas');
+          setStoresWithDistance(availableStores.map((s: any) => ({ ...s, distance: null })));
+          setStores(availableStores);
+          
           setSelectedStore((current) => {
             if (current) return current;
-            if (storesData.length > 0) return storesData[0].id;
+            if (availableStores.length > 0) return availableStores[0].id;
             return '';
           });
         }
       } catch (error: any) {
-        console.error('Erro ao carregar lojas:', error);
-        showAlert('warning', 'Não foi possível carregar as lojas. Continuando sem seleção.');
+        console.error('❌ Erro ao carregar lojas:', error);
+        console.error('Detalhes do erro:', error.response?.data || error.message);
+        showAlert('warning', 'Não foi possível carregar as lojas. Verifique sua conexão e tente novamente.');
+        setStores([]);
+        setStoresWithDistance([]);
       } finally {
         setIsLoadingStores(false);
+        console.log('🏁 Carregamento de lojas finalizado');
       }
     };
     
+    // Sempre carregar lojas (elas serão usadas quando pickup for selecionado)
     loadStores();
-  }, [checkoutItems]);
+  }, [checkoutItems, userLocation]);
 
   // Carregar dados do usuário
   useEffect(() => {
@@ -1564,26 +1788,79 @@ export default function CheckoutPage() {
                                 <div className="mt-3">
                                   <Label className="text-sm font-medium text-gray-700 mb-2 block">
                                     Selecione a loja para retirada:
+                                    {isLoadingLocation && (
+                                      <span className="ml-2 text-xs text-gray-500">
+                                        (Buscando sua localização...)
+                                      </span>
+                                    )}
                                   </Label>
                                   {isLoadingStores ? (
                                     <div className="flex items-center gap-2 text-sm text-gray-500">
                                       <Loader2 className="h-4 w-4 animate-spin" />
                                       Carregando lojas...
                                     </div>
-                                  ) : stores.length > 0 ? (
-                                    <select
-                                      value={selectedStore}
-                                      onChange={(e) => setSelectedStore(e.target.value)}
-                                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 transition-all text-sm"
-                                    >
+                                  ) : stores && stores.length > 0 ? (
+                                    <div className="space-y-2">
                                       {stores.map((store: any) => (
-                                        <option key={store.id} value={store.id}>
-                                          {store.name} - {store.address}, {store.city} - {store.state}
-                                        </option>
+                                        <div
+                                          key={store.id}
+                                          className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
+                                            selectedStore === store.id
+                                              ? 'border-[#3e2626] bg-[#3e2626]/5'
+                                              : 'border-gray-200 hover:border-[#3e2626]/50'
+                                          }`}
+                                          onClick={() => setSelectedStore(store.id)}
+                                        >
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                                  selectedStore === store.id
+                                                    ? 'border-[#3e2626] bg-[#3e2626]'
+                                                    : 'border-gray-300'
+                                                }`}>
+                                                  {selectedStore === store.id && (
+                                                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                                                  )}
+                                                </div>
+                                                <div className="flex-1">
+                                                  <p className="font-semibold text-[#3e2626]">{store.name}</p>
+                                                  <p className="text-sm text-gray-600">
+                                                    {store.address}, {store.city} - {store.state}
+                                                  </p>
+                                                  {store.phone && (
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                      📞 {store.phone}
+                                                    </p>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+                                            {store.distance !== null && store.distance !== undefined && (
+                                              <div className="ml-3 text-right">
+                                                <div className="flex items-center gap-1 text-sm font-semibold text-[#3e2626]">
+                                                  <MapPin className="h-4 w-4" />
+                                                  {store.distance < 1
+                                                    ? `${Math.round(store.distance * 1000)}m`
+                                                    : `${store.distance.toFixed(1)} km`}
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">distância</p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
                                       ))}
-                                    </select>
+                                    </div>
                                   ) : (
-                                    <p className="text-sm text-red-500">Nenhuma loja disponível</p>
+                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                      <p className="text-sm text-yellow-800 font-semibold mb-2">
+                                        ⚠️ Nenhuma loja disponível
+                                      </p>
+                                      <p className="text-xs text-yellow-700">
+                                        Não há lojas cadastradas ou ativas no momento. 
+                                        Entre em contato com o suporte para mais informações.
+                                      </p>
+                                    </div>
                                   )}
                                 </div>
                               )}
@@ -1702,10 +1979,12 @@ export default function CheckoutPage() {
                       ))}
                     </div>
 
-                    {/* Endereço de Entrega */}
+                    {/* Endereço de Entrega ou Retirada na Loja */}
                     <div className="pt-4 border-t border-gray-200">
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-lg text-[#3e2626]">Endereço de Entrega</h3>
+                        <h3 className="font-semibold text-lg text-[#3e2626]">
+                          {selectedShipping === 'pickup' ? 'Retirada na Loja' : 'Endereço de Entrega'}
+                        </h3>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1717,16 +1996,56 @@ export default function CheckoutPage() {
                         </Button>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="font-semibold">{shippingAddress.name}</p>
-                        <p className="text-sm text-gray-600">
-                          {shippingAddress.address}, {shippingAddress.number}
-                          {shippingAddress.complement && ` - ${shippingAddress.complement}`}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {shippingAddress.neighborhood}, {shippingAddress.city} - {shippingAddress.state}
-                        </p>
-                        <p className="text-sm text-gray-600">CEP: {shippingAddress.zipCode}</p>
-                        <p className="text-sm text-gray-600">Telefone: {shippingAddress.phone}</p>
+                        {selectedShipping === 'pickup' ? (
+                          <>
+                            {selectedStore && stores.find((s: any) => s.id === selectedStore) ? (
+                              <>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Store className="h-5 w-5 text-[#3e2626]" />
+                                  <p className="font-semibold text-lg">
+                                    {stores.find((s: any) => s.id === selectedStore)?.name}
+                                  </p>
+                                </div>
+                                <p className="text-sm text-gray-600">
+                                  {stores.find((s: any) => s.id === selectedStore)?.address}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  {stores.find((s: any) => s.id === selectedStore)?.neighborhood && 
+                                    `${stores.find((s: any) => s.id === selectedStore)?.neighborhood}, `}
+                                  {stores.find((s: any) => s.id === selectedStore)?.city} - {stores.find((s: any) => s.id === selectedStore)?.state}
+                                </p>
+                                {stores.find((s: any) => s.id === selectedStore)?.zipCode && (
+                                  <p className="text-sm text-gray-600">
+                                    CEP: {stores.find((s: any) => s.id === selectedStore)?.zipCode}
+                                  </p>
+                                )}
+                                {stores.find((s: any) => s.id === selectedStore)?.phone && (
+                                  <p className="text-sm text-gray-600">
+                                    Telefone: {stores.find((s: any) => s.id === selectedStore)?.phone}
+                                  </p>
+                                )}
+                                <p className="text-sm text-[#3e2626] font-semibold mt-2">
+                                  Retire seu pedido nesta loja
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-sm text-red-500">Nenhuma loja selecionada</p>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-semibold">{shippingAddress.name}</p>
+                            <p className="text-sm text-gray-600">
+                              {shippingAddress.address}, {shippingAddress.number}
+                              {shippingAddress.complement && ` - ${shippingAddress.complement}`}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {shippingAddress.neighborhood}, {shippingAddress.city} - {shippingAddress.state}
+                            </p>
+                            <p className="text-sm text-gray-600">CEP: {shippingAddress.zipCode}</p>
+                            <p className="text-sm text-gray-600">Telefone: {shippingAddress.phone}</p>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -1774,7 +2093,9 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Frete</span>
+                    <span className="text-gray-600">
+                      {selectedShipping === 'pickup' ? 'Retirada na Loja' : 'Frete'}
+                    </span>
                     <span className="font-semibold">
                       {shippingCost === 0 ? (
                         <span className="text-green-600 flex items-center space-x-1">

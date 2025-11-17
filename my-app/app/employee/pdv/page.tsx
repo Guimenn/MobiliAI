@@ -44,6 +44,27 @@ export default function PDVPage() {
     };
   }, []);
 
+  // Função auxiliar para verificar pedidos de retirada
+  const getPickupOrdersFromCustomer = (customer: any) => {
+    if (!customer?.purchases) return [];
+    return customer.purchases.filter((purchase: any) => {
+      // Verificar se é pedido online com retirada na loja
+      const isPickup = purchase.notes && (
+        purchase.notes.toLowerCase().includes('retirada') || 
+        purchase.notes.toLowerCase().includes('pickup') ||
+        purchase.notes.toLowerCase().includes('retirar')
+      );
+      // Verificar se está pendente ou preparando
+      const isPending = purchase.status === 'PENDING' || purchase.status === 'PREPARING';
+      // Verificar se é pedido online (pode ter shippingAddress vazio para retirada)
+      const isOnline = purchase.isOnlineOrder === true;
+      // Se não tem endereço de entrega, provavelmente é retirada
+      const noShipping = !purchase.shippingAddress || purchase.shippingAddress.trim() === '';
+      
+      return isOnline && isPending && (isPickup || noShipping);
+    });
+  };
+
   const handleSearchCustomer = async () => {
     if (!customerSearchCpf.trim()) {
       showAlert('error', 'Digite um CPF para buscar');
@@ -57,18 +78,25 @@ export default function PDVPage() {
 
     try {
       setSearchingCustomer(true);
-      console.log('🔍 Buscando cliente com CPF:', customerSearchCpf);
       const customer = await adminAPI.getCustomerByCpf(customerSearchCpf);
-      console.log('✅ Cliente encontrado:', customer);
       setFoundCustomer(customer);
-      showAlert('success', `Cliente encontrado: ${customer.name}`);
+      
+      // Verificar automaticamente se tem produtos para retirar
+      const pickupOrders = getPickupOrdersFromCustomer(customer);
+      const hasPickup = pickupOrders.length > 0;
+      
+      if (hasPickup) {
+        // Se tem produtos para retirar, mostrar informações e aguardar confirmação
+        showAlert('info', `Cliente encontrado: ${customer.name}. Há ${pickupOrders.length} pedido(s) para retirada.`);
+      } else {
+        // Se não tem produtos para retirar, entrar automaticamente no PDV
+        showAlert('success', `Cliente encontrado: ${customer.name}. Iniciando PDV...`);
+        // Pequeno delay para mostrar a mensagem
+        setTimeout(() => {
+          setShowPDV(true);
+        }, 500);
+      }
     } catch (error: any) {
-      console.error('❌ Erro ao buscar cliente:', error);
-      console.error('❌ Detalhes do erro:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
-      });
       const errorMessage = error.response?.data?.message || error.message || 'Cliente não encontrado';
       if (error.response?.status === 404 || error.message?.includes('404')) {
         showAlert('warning', 'Cliente não encontrado. Você pode continuar sem cliente cadastrado.');
@@ -83,17 +111,8 @@ export default function PDVPage() {
 
   // Verificar se tem pedidos pendentes de retirada
   const getPickupOrders = () => {
-    if (!foundCustomer?.purchases) return [];
-    return foundCustomer.purchases.filter((purchase: any) => {
-      // Verificar se é pedido online com retirada na loja (baseado nas notas)
-      const isPickup = purchase.notes && (
-        purchase.notes.toLowerCase().includes('retirada') || 
-        purchase.notes.toLowerCase().includes('pickup')
-      );
-      // Verificar se está pendente ou preparando
-      const isPending = purchase.status === 'PENDING' || purchase.status === 'PREPARING';
-      return isPickup && isPending && purchase.isOnlineOrder;
-    });
+    if (!foundCustomer) return [];
+    return getPickupOrdersFromCustomer(foundCustomer);
   };
 
   const pickupOrders = getPickupOrders();
@@ -147,6 +166,7 @@ export default function PDVPage() {
       <div className="h-full">
         <PDVComponent 
           initialCustomer={foundCustomer || undefined}
+          pickupOrders={pickupOrders}
           onReset={() => {
             setShowPDV(false);
             setFoundCustomer(null);
