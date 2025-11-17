@@ -125,11 +125,31 @@ export default function NewUserPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar campos obrigatórios
+    if (!formData.name || !formData.email || !formData.password) {
+      alert('Por favor, preencha todos os campos obrigatórios (Nome, E-mail e Senha).');
+      return;
+    }
+
+    // Validar role
+    const validRoles = ['ADMIN', 'STORE_MANAGER', 'CASHIER', 'CUSTOMER', 'EMPLOYEE'];
+    if (!formData.role || !validRoles.includes(formData.role)) {
+      alert('Por favor, selecione um role válido.');
+      return;
+    }
+
     setLoading(true);
 
-    // Preparar dados para envio
-    const userData = {
-      ...formData,
+    // Preparar dados para envio - remover campos vazios
+    const userData: any = {
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      role: formData.role,
+      ...(formData.phone && { phone: formData.phone }),
+      ...(formData.address && { address: formData.address }),
+      ...(formData.storeId && { storeId: formData.storeId }),
       ...(workingHours && { workingHours })
     };
 

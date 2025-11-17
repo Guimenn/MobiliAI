@@ -465,8 +465,10 @@ export class AdminService {
         return stores.map((store) => ({
           ...store,
           _count: {
+            // Manter products como a contagem de produtos do catálogo da loja,
+            // e expor inventoryProducts como a contagem de itens no inventário.
             ...store._count,
-            products: inventoryCountMap.get(store.id) || store._count.products || 0,
+            products: store._count?.products || 0,
             inventoryProducts: inventoryCountMap.get(store.id) || 0
           }
         }));
@@ -515,6 +517,12 @@ export class AdminService {
     const store = await this.prisma.store.findUnique({
       where: { id },
       include: {
+        _count: {
+          select: {
+            products: true,
+            sales: true
+          }
+        },
         // users: {
         //   select: {
         //     id: true,
@@ -2476,12 +2484,24 @@ export class AdminService {
 
   async getAvailableProductsForStore(storeId: string, search?: string) {
     // Verificar se a loja existe
-    const store = await this.prisma.store.findUnique({
-      where: { id: storeId }
-    });
-
+    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
     if (!store) {
       throw new NotFoundException('Loja não encontrada');
+    }
+
+    // Catálogo da loja: produtos cujo storeId = storeId
+    const catalogProducts = await this.prisma.product.findMany({
+      where: { storeId },
+      select: { id: true }
+    });
+    const catalogProductIds = catalogProducts.map(p => p.id);
+
+    console.log(`[getAvailableProductsForStore] Loja ${storeId}: ${catalogProductIds.length} produtos no catálogo`);
+
+    // Se o catálogo estiver vazio, não há produtos disponíveis para adicionar
+    if (catalogProductIds.length === 0) {
+      console.log(`[getAvailableProductsForStore] Catálogo vazio para loja ${storeId}`);
+      return [];
     }
 
     // Buscar produtos que já estão no estoque da loja
@@ -2491,15 +2511,23 @@ export class AdminService {
     });
 
     const existingProductIds = existingInventory.map(inv => inv.productId);
+    console.log(`[getAvailableProductsForStore] ${existingProductIds.length} produtos já no estoque`);
 
     // Buscar produtos que não estão no estoque
+    // IDs efetivamente permitidos = catálogo da loja - já no inventário
+    const allowedIds = catalogProductIds.filter(id => !existingProductIds.includes(id));
+    console.log(`[getAvailableProductsForStore] ${allowedIds.length} produtos disponíveis para adicionar ao estoque`);
+
+    // Se não há itens elegíveis, retornar lista vazia
+    if (allowedIds.length === 0) {
+      return [];
+    }
+
     const whereClause: any = {
+      id: { in: allowedIds },
+      storeId: storeId, // GARANTIR que só busca produtos desta loja
       isActive: true
     };
-
-    if (existingProductIds.length > 0) {
-      whereClause.id = { notIn: existingProductIds };
-    }
 
     if (search) {
       whereClause.OR = [
@@ -2527,11 +2555,14 @@ export class AdminService {
         colorHex: true,
         isActive: true,
         isAvailable: true,
-        stock: true
+        stock: true,
+        storeId: true
       },
       take: 50,
       orderBy: { name: 'asc' }
     });
+
+    console.log(`[getAvailableProductsForStore] Retornando ${products.length} produtos`);
 
     // Calcular estoque disponível para cada produto
     const productsWithStock = await Promise.all(
@@ -2555,6 +2586,118 @@ export class AdminService {
     );
 
     return productsWithStock;
+  }
+
+  // Buscar produtos globais (todos os produtos) excluindo os que já estão no catálogo da loja
+  async getGlobalProductsForCatalog(storeId: string, search?: string, page = 1, limit = 50) {
+    // Verificar se a loja existe
+    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    if (!store) {
+      throw new NotFoundException('Loja não encontrada');
+    }
+
+    // Buscar produtos que já estão no catálogo desta loja
+    const catalogProducts = await this.prisma.product.findMany({
+      where: { storeId },
+      select: { id: true }
+    });
+    const catalogProductIds = catalogProducts.map(p => p.id);
+
+    console.log(`[getGlobalProductsForCatalog] Loja ${storeId}: ${catalogProductIds.length} produtos já no catálogo`);
+
+    const whereClause: any = {
+      isActive: true,
+      // Excluir produtos que já estão no catálogo desta loja
+      ...(catalogProductIds.length > 0 && { id: { notIn: catalogProductIds } })
+    };
+
+    if (search) {
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+        { barcode: { contains: search, mode: 'insensitive' } },
+        { brand: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [products, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          category: true,
+          price: true,
+          sku: true,
+          barcode: true,
+          imageUrl: true,
+          imageUrls: true,
+          brand: true,
+          colorName: true,
+          colorHex: true,
+          isActive: true,
+          isAvailable: true,
+          stock: true,
+          storeId: true
+        },
+        orderBy: { name: 'asc' }
+      }),
+      this.prisma.product.count({ where: whereClause })
+    ]);
+
+    console.log(`[getGlobalProductsForCatalog] Retornando ${products.length} produtos (total: ${total})`);
+
+    return {
+      items: products,
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit)
+    };
+  }
+
+  // Adicionar produto ao catálogo da loja (atualizar storeId)
+  async addProductToStoreCatalog(storeId: string, productId: string) {
+    // Verificar se a loja existe
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId }
+    });
+
+    if (!store) {
+      throw new NotFoundException('Loja não encontrada');
+    }
+
+    // Verificar se o produto existe
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId }
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produto não encontrado');
+    }
+
+    // Verificar se o produto já está no catálogo desta loja
+    if (product.storeId === storeId) {
+      throw new BadRequestException('Produto já está no catálogo desta loja');
+    }
+
+    // Atualizar o storeId do produto para adicioná-lo ao catálogo da loja
+    const updatedProduct = await this.prisma.product.update({
+      where: { id: productId },
+      data: { storeId },
+      include: {
+        store: { select: { id: true, name: true } }
+      }
+    });
+
+    console.log(`[addProductToStoreCatalog] Produto ${productId} adicionado ao catálogo da loja ${storeId}`);
+
+    return updatedProduct;
   }
 
   async updateStoreInventory(storeId: string, productId: string, inventoryData: {

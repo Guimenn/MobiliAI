@@ -15,14 +15,17 @@ import {
   MapPin, 
   Phone, 
   Mail,
-  Settings
+  Settings,
+  User
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api';
 import { formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function NewStorePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [createManager, setCreateManager] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -51,15 +54,60 @@ export default function NewStorePage() {
       customerRegistrationRequired: false
     }
   });
+  const [managerData, setManagerData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'STORE_MANAGER' as 'ADMIN' | 'STORE_MANAGER' | 'CASHIER' | 'CUSTOMER' | 'EMPLOYEE'
+  });
+
+  const handleManagerChange = (field: string, value: any) => {
+    setManagerData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar se o gerente foi solicitado mas os campos não foram preenchidos
+    if (createManager) {
+      if (!managerData.name || !managerData.email || !managerData.password) {
+        alert('Por favor, preencha todos os campos do gerente (Nome, Email e Senha) ou desmarque a opção de criar gerente.');
+        return;
+      }
+      
+      if (managerData.password.length < 6) {
+        alert('A senha deve ter no mínimo 6 caracteres.');
+        return;
+      }
+    }
+    
     try {
       setIsLoading(true);
+      
+      // Criar a loja primeiro
       const newStore = await adminAPI.createStore(formData);
+      
+      // Se o usuário optou por criar um gerente, criar o usuário
+      if (createManager && managerData.name && managerData.email && managerData.password) {
+        try {
+          await adminAPI.createUser({
+            ...managerData,
+            storeId: newStore.id
+          });
+        } catch (userError: any) {
+          console.error('Erro ao criar gerente:', userError);
+          alert(`Erro ao criar gerente: ${userError.message || 'Erro desconhecido'}`);
+          // Continuar mesmo se houver erro ao criar o gerente
+        }
+      }
+      
       router.push(`/admin/stores/${newStore.id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao criar loja:', error);
+      alert(`Erro ao criar loja: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setIsLoading(false);
     }
@@ -333,6 +381,89 @@ export default function NewStorePage() {
                   )}
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          {/* Manager Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <User className="h-5 w-5 mr-2" />
+                Gerente da Loja
+              </CardTitle>
+              <CardDescription>
+                Opcional: Cadastre um gerente para esta loja
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="createManager"
+                  checked={createManager}
+                  onCheckedChange={setCreateManager}
+                />
+                <Label htmlFor="createManager">Criar gerente para esta loja</Label>
+              </div>
+
+              {createManager && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="managerName">Nome do Gerente *</Label>
+                      <Input
+                        id="managerName"
+                        value={managerData.name}
+                        onChange={(e) => handleManagerChange('name', formatName(e.target.value))}
+                        placeholder="Nome completo"
+                        required={createManager}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="managerEmail">Email do Gerente *</Label>
+                      <Input
+                        id="managerEmail"
+                        type="email"
+                        value={managerData.email}
+                        onChange={(e) => handleManagerChange('email', formatEmail(e.target.value))}
+                        placeholder="gerente@loja.com"
+                        required={createManager}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="managerPassword">Senha *</Label>
+                      <Input
+                        id="managerPassword"
+                        type="password"
+                        value={managerData.password}
+                        onChange={(e) => handleManagerChange('password', e.target.value)}
+                        placeholder="Mínimo 6 caracteres"
+                        required={createManager}
+                        minLength={6}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">A senha deve ter no mínimo 6 caracteres</p>
+                    </div>
+                    <div>
+                      <Label htmlFor="managerRole">Função *</Label>
+                      <Select
+                        value={managerData.role}
+                        onValueChange={(value: any) => handleManagerChange('role', value)}
+                      >
+                        <SelectTrigger id="managerRole">
+                          <SelectValue placeholder="Selecione a função" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="STORE_MANAGER">Gerente de Loja</SelectItem>
+                          <SelectItem value="CASHIER">Caixa</SelectItem>
+                          <SelectItem value="EMPLOYEE">Funcionário</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

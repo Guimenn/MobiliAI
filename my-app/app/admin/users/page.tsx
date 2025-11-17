@@ -332,9 +332,20 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
 
   // Função para criar novo usuário
   const handleCreateUser = async () => {
+    // Validar campos obrigatórios
     if (!newUser.name || !newUser.email || !newUser.password) {
       toast.error('Campos obrigatórios', {
         description: 'Nome, e-mail e senha são obrigatórios.',
+        duration: 3000,
+      });
+      return;
+    }
+
+    // Validar role
+    const validRoles = ['ADMIN', 'STORE_MANAGER', 'CASHIER', 'CUSTOMER', 'EMPLOYEE'];
+    if (!newUser.role || !validRoles.includes(newUser.role)) {
+      toast.error('Role inválido', {
+        description: 'Selecione um role válido (ADMIN, STORE_MANAGER, CASHIER, CUSTOMER ou EMPLOYEE).',
         duration: 3000,
       });
       return;
@@ -351,14 +362,14 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
          password: newUser.password,
          role: newUser.role,
          isActive: newUser.isActive,
-         cpf: newUser.cpf,
-         phone: newUser.phone,
-         address: newUser.address,
-         city: newUser.city,
-         state: newUser.state,
-         zipCode: newUser.zipCode,
-         storeId: newUser.storeId || null,
-         avatarUrl: newUser.avatarUrl
+         cpf: newUser.cpf || undefined,
+         phone: newUser.phone || undefined,
+         address: newUser.address || undefined,
+         city: newUser.city || undefined,
+         state: newUser.state || undefined,
+         zipCode: newUser.zipCode || undefined,
+         storeId: newUser.storeId || undefined,
+         avatarUrl: newUser.avatarUrl || undefined
        };
 
       console.log('Dados do usuário a serem enviados:', userData);

@@ -89,7 +89,15 @@ export class MedicalCertificateCronService {
         message: `${reactivatedIds.length} funcionário(s) reativado(s)`,
         reactivatedIds
       };
-    } catch (error) {
+    } catch (error: any) {
+      // Se a tabela não existe ainda (P2021), apenas logar e não quebrar a aplicação
+      if (error?.code === 'P2021' && error?.meta?.table === 'public.medical_certificates') {
+        this.logger.warn('Tabela medical_certificates ainda não existe no banco de dados. Execute a migration primeiro.');
+        return {
+          message: 'Tabela não existe ainda. Execute a migration primeiro.',
+          reactivatedIds: []
+        };
+      }
       this.logger.error('Erro ao reativar funcionários com atestados expirados:', error);
       throw error;
     }

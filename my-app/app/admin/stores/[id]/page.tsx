@@ -121,11 +121,13 @@ export default function StoreDetailsPage() {
     return hierarchy[role as keyof typeof hierarchy] || 99;
   };
 
-  const sortedEmployees = employees.sort((a, b) => {
+  const sortedEmployees = (employees || []).sort((a, b) => {
     const orderA = getHierarchyOrder(a.role);
     const orderB = getHierarchyOrder(b.role);
     if (orderA !== orderB) return orderA - orderB;
-    return a.name.localeCompare(b.name);
+    const nameA = a.name || '';
+    const nameB = b.name || '';
+    return nameA.localeCompare(nameB);
   });
 
   useEffect(() => {
@@ -1190,12 +1192,12 @@ export default function StoreDetailsPage() {
                               <div className="flex items-center space-x-3">
                                 <div className="w-8 h-8 bg-[#3e2626] rounded-full flex items-center justify-center">
                                   <span className="text-white font-medium text-xs">
-                              {employee.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                              {employee.name ? employee.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'N/A'}
                             </span>
                           </div>
                           <div>
-                                  <div className="font-medium text-gray-900">{employee.name}</div>
-                                  <div className="text-sm text-gray-500">ID: {employee.id.slice(0, 8)}...</div>
+                                  <div className="font-medium text-gray-900">{employee.name || 'Nome não disponível'}</div>
+                                  <div className="text-sm text-gray-500">ID: {employee.id ? employee.id.slice(0, 8) + '...' : 'N/A'}</div>
                           </div>
                         </div>
                             </TableCell>
@@ -1274,10 +1276,7 @@ export default function StoreDetailsPage() {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => {
-                                setSelectedEmployee(employee);
-                                setShowMedicalModal(true);
-                              }}
+                              onClick={() => router.push(`/admin/stores/${storeId}/medical-certificates?employeeId=${employee.id}`)}
                               title="Atestado médico"
                               className="text-green-600 hover:text-green-700"
                             >

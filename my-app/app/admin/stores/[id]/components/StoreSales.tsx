@@ -33,14 +33,15 @@ interface Sale {
   customer: {
     name: string;
     email: string;
-  };
+  } | null;
   employee: {
     name: string;
-  };
+  } | null;
   items: Array<{
     product: {
+      id?: string;
       name: string;
-    };
+    } | null;
     quantity: number;
     price: number;
   }>;
@@ -72,9 +73,12 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
     try {
       setIsLoading(true);
       const data = await adminAPI.getStoreSales(storeId);
-      setSales(data);
+      // Garantir que os dados sejam um array e validar estrutura
+      const validSales = Array.isArray(data) ? data : [];
+      setSales(validSales);
     } catch (error) {
       console.error('Erro ao carregar vendas:', error);
+      setSales([]); // Garantir que sempre seja um array
     } finally {
       setIsLoading(false);
     }
@@ -83,23 +87,46 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
   const loadSalesStats = async () => {
     try {
       const stats = await adminAPI.getStoreSalesStats(storeId);
-      setSalesStats(stats);
+      // Garantir que os valores numéricos sejam válidos
+      setSalesStats({
+        totalRevenue: Number(stats?.totalRevenue) || 0,
+        totalSales: Number(stats?.totalSales) || 0,
+        averageTicket: Number(stats?.averageTicket) || 0,
+        growthRate: Number(stats?.growthRate) || 0
+      });
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
+      // Manter valores padrão em caso de erro
     }
   };
 
   const filteredSales = sales.filter(sale => {
-    const matchesSearch = sale.saleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sale.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sale.customer.email.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!sale || !sale.saleNumber) return false;
+    
+    const matchesSearch = !searchTerm || 
+      sale.saleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (sale.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (sale.customer?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     
     const matchesStatus = statusFilter === 'all' || sale.status === statusFilter;
     
-    const matchesDate = dateFilter === 'all' || 
-      (dateFilter === 'today' && isToday(new Date(sale.createdAt))) ||
-      (dateFilter === 'week' && isThisWeek(new Date(sale.createdAt))) ||
-      (dateFilter === 'month' && isThisMonth(new Date(sale.createdAt)));
+    let matchesDate = true;
+    if (dateFilter !== 'all' && sale.createdAt) {
+      try {
+        const saleDate = new Date(sale.createdAt);
+        if (isNaN(saleDate.getTime())) {
+          matchesDate = false;
+        } else if (dateFilter === 'today') {
+          matchesDate = isToday(saleDate);
+        } else if (dateFilter === 'week') {
+          matchesDate = isThisWeek(saleDate);
+        } else if (dateFilter === 'month') {
+          matchesDate = isThisMonth(saleDate);
+        }
+      } catch (error) {
+        matchesDate = false;
+      }
+    }
     
     return matchesSearch && matchesStatus && matchesDate;
   });
@@ -111,8 +138,13 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
 
   const isThisWeek = (date: Date) => {
     const now = new Date();
-    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-    const endOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 6));
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayOfWeek = today.getDay();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - dayOfWeek);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
     return date >= startOfWeek && date <= endOfWeek;
   };
 
@@ -158,22 +190,16 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Vendas da Loja</h2>
-          <p className="text-gray-600">Histórico de vendas e transações</p>
-        </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
-          <Button variant="outline" size="sm">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Relatório
-          </Button>
-        </div>
+      {/* Actions */}
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm">
+          <Download className="h-4 w-4 mr-2" />
+          Exportar
+        </Button>
+        <Button variant="outline" size="sm">
+          <BarChart3 className="h-4 w-4 mr-2" />
+          Relatório
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -293,15 +319,21 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
                 <div className="flex-1">
                   <div className="flex items-center space-x-4 mb-3">
                     <div>
-                      <h3 className="font-semibold text-gray-900">#{sale.saleNumber}</h3>
+                      <h3 className="font-semibold text-gray-900">#{sale.saleNumber || 'N/A'}</h3>
                       <p className="text-sm text-gray-600">
-                        {new Date(sale.createdAt).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                        {sale.createdAt ? (() => {
+                          try {
+                            return new Date(sale.createdAt).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            });
+                          } catch {
+                            return 'Data inválida';
+                          }
+                        })() : 'Data não disponível'}
                       </p>
                     </div>
                     <div className="flex space-x-2">
@@ -313,31 +345,33 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div>
                       <p className="text-gray-500">Cliente</p>
-                      <p className="font-medium">{sale.customer.name}</p>
-                      <p className="text-gray-600">{sale.customer.email}</p>
+                      <p className="font-medium">{sale.customer?.name ?? 'Cliente não identificado'}</p>
+                      <p className="text-gray-600">{sale.customer?.email ?? '-'}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Funcionário</p>
-                      <p className="font-medium">{sale.employee.name}</p>
+                      <p className="font-medium">{sale.employee?.name ?? 'Funcionário não identificado'}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Valor Total</p>
                       <p className="font-bold text-lg text-green-600">
-                        R$ {sale.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {Number(sale.totalAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>
 
-                  <div className="mt-3">
-                    <p className="text-sm text-gray-500 mb-2">Produtos:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {sale.items.map((item, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {item.product.name} x{item.quantity}
-                        </Badge>
-                      ))}
+                  {sale.items && sale.items.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-sm text-gray-500 mb-2">Produtos:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {sale.items.map((item, index) => (
+                          <Badge key={item.product?.id || index} variant="outline" className="text-xs">
+                            {item.product?.name || 'Produto não identificado'} x{item.quantity || 0}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                 
                 <div className="ml-4">

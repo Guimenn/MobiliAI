@@ -1259,7 +1259,7 @@ export class ManagerService {
     }
 
     // Verificar se o funcionário pertence à mesma loja do gerente
-    if (certificate.employee.storeId !== manager.store.id) {
+    if (certificate.employee.store?.id !== manager.store.id) {
       throw new ForbiddenException('Você só pode visualizar atestados de funcionários da sua própria loja');
     }
 

@@ -562,6 +562,16 @@ export const adminAPI = {
     return response.data;
   },
 
+  getStoreSales: async (storeId: string) => {
+    const response = await api.get(`/admin/stores/${storeId}/sales`);
+    return response.data;
+  },
+
+  getStoreSalesStats: async (storeId: string) => {
+    const response = await api.get(`/admin/stores/${storeId}/sales/stats`);
+    return response.data;
+  },
+
   // Products
   getProducts: async (page: number = 1, limit: number = 50, search?: string, category?: string) => {
     const params = new URLSearchParams({
@@ -613,6 +623,21 @@ export const adminAPI = {
   },
 
   createUser: async (userData: any) => {
+    // Validação dos campos obrigatórios antes de enviar
+    if (!userData.password || !userData.role) {
+      const missingFields = [];
+      if (!userData.password) missingFields.push('password');
+      if (!userData.role) missingFields.push('role');
+      
+      throw new Error(`Campos obrigatórios faltando: ${missingFields.join(', ')}. Por favor, preencha todos os campos obrigatórios antes de criar o usuário.`);
+    }
+
+    // Validar role
+    const validRoles = ['ADMIN', 'STORE_MANAGER', 'CASHIER', 'CUSTOMER', 'EMPLOYEE'];
+    if (!validRoles.includes(userData.role)) {
+      throw new Error(`Role inválido: ${userData.role}. Role deve ser um dos seguintes valores: ${validRoles.join(', ')}`);
+    }
+
     const response = await api.post('/admin/users', userData);
     return response.data;
   },
@@ -736,6 +761,23 @@ export const adminAPI = {
       ? `/admin/stores/${storeId}/inventory/available-products?search=${encodeURIComponent(search)}`
       : `/admin/stores/${storeId}/inventory/available-products`;
     const response = await api.get(url);
+    return response.data;
+  },
+
+  getGlobalProductsForCatalog: async (storeId: string, search?: string, page = 1, limit = 50) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    if (search) {
+      params.append('search', search);
+    }
+    const response = await api.get(`/admin/stores/${storeId}/catalog/global-products?${params.toString()}`);
+    return response.data;
+  },
+
+  addProductToStoreCatalog: async (storeId: string, productId: string) => {
+    const response = await api.post(`/admin/stores/${storeId}/catalog/${productId}`);
     return response.data;
   },
 };

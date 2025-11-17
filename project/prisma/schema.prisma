@@ -45,8 +45,8 @@ model User {
   shippingAddresses ShippingAddress[]
   systemLogs        SystemLog[]
   timeClockRecords  TimeClock[]
-  medicalCertificates MedicalCertificate[] @relation("EmployeeMedicalCertificates")
-  registeredMedicalCertificates MedicalCertificate[] @relation("RegisteredMedicalCertificates")
+  medicalCertificates MedicalCertificate[] @relation("EmployeeCertificates")
+  registeredCertificates MedicalCertificate[] @relation("RegisteredByCertificates")
   store             Store?              @relation(fields: [storeId], references: [id])
 
   @@map("users")
@@ -85,71 +85,69 @@ model Store {
 }
 
 model Product {
-  id                 String                 @id @default(uuid())
-  name               String
-  description        String?
-  shortDescription   String?
-  category           ProductCategory        @default(SOFA)
-  price              Decimal                @db.Decimal(10, 2)
-  costPrice          Decimal?               @db.Decimal(10, 2)
-  stock              Int                    @default(0)
-  minStock           Int                    @default(0)
-  style              ProductStyle?
-  material           MaterialType?
-  colorHex           String?
-  colorName          String?
-  customColor        String?
-  width              Decimal?               @db.Decimal(8, 2)
-  height             Decimal?               @db.Decimal(8, 2)
-  depth              Decimal?               @db.Decimal(8, 2)
-  weight             Decimal?               @db.Decimal(8, 2)
-  brand              String?
-  model              String?
-  sku                String?                @unique
-  barcode            String?                @unique
-  imageUrl           String?
-  imageUrls          String[]
-  videoUrl           String?
-  tags               String[]
-  keywords           String[]
-  isFeatured         Boolean                @default(false)
-  isNew              Boolean                @default(false)
-  isBestSeller       Boolean                @default(false)
-  rating             Decimal?               @db.Decimal(3, 2)
-  reviewCount        Int                    @default(0)
-  isActive           Boolean                @default(true)
-  isAvailable        Boolean                @default(true)
-  // Campos de Oferta Normal
-  isOnSale           Boolean                @default(false)
-  salePrice          Decimal?               @db.Decimal(10, 2)
-  saleDiscountPercent Int?                  // Percentual de desconto (1-99)
-  saleStartDate      DateTime?
-  saleEndDate        DateTime?
-  // Campos de Oferta Relâmpago
-  isFlashSale             Boolean                @default(false)
-  flashSalePrice          Decimal?               @db.Decimal(10, 2)
-  flashSaleDiscountPercent Int?                  // Percentual de desconto (1-99)
-  flashSaleStartDate      DateTime?
-  flashSaleEndDate        DateTime?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-  storeId            String
-  collectionId       String?
-  supplierId         String?
-  model3DUrl         String?
-  cartItems          CartItem[]
-  comparisons        Comparison[]
-  favorites          Favorite[]
-  moodboardItems     MoodboardItem[]
-  compatibleProducts ProductCompatibility[] @relation("CompatibleProducts")
-  compatibility      ProductCompatibility[]
-  reviews            ProductReview[]
-  variants           ProductVariant[]
-  collection         Collection?            @relation(fields: [collectionId], references: [id])
-  store              Store                  @relation(fields: [storeId], references: [id])
-  supplier           Supplier?              @relation(fields: [supplierId], references: [id])
-  saleItems          SaleItem[]
-  storeInventory     StoreInventory[]
+  id                       String                 @id @default(uuid())
+  name                     String
+  description              String?
+  shortDescription         String?
+  category                 ProductCategory        @default(SOFA)
+  price                    Decimal                @db.Decimal(10, 2)
+  costPrice                Decimal?               @db.Decimal(10, 2)
+  stock                    Int                    @default(0)
+  minStock                 Int                    @default(0)
+  style                    ProductStyle?
+  material                 MaterialType?
+  colorHex                 String?
+  colorName                String?
+  customColor              String?
+  width                    Decimal?               @db.Decimal(8, 2)
+  height                   Decimal?               @db.Decimal(8, 2)
+  depth                    Decimal?               @db.Decimal(8, 2)
+  weight                   Decimal?               @db.Decimal(8, 2)
+  brand                    String?
+  model                    String?
+  sku                      String?                @unique
+  barcode                  String?                @unique
+  imageUrl                 String?
+  imageUrls                String[]
+  videoUrl                 String?
+  tags                     String[]
+  keywords                 String[]
+  isFeatured               Boolean                @default(false)
+  isNew                    Boolean                @default(false)
+  isBestSeller             Boolean                @default(false)
+  rating                   Decimal?               @db.Decimal(3, 2)
+  reviewCount              Int                    @default(0)
+  isActive                 Boolean                @default(true)
+  isAvailable              Boolean                @default(true)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  storeId                  String
+  collectionId             String?
+  supplierId               String?
+  model3DUrl               String?
+  flashSaleEndDate         DateTime?
+  flashSalePrice           Decimal?               @db.Decimal(10, 2)
+  flashSaleStartDate       DateTime?
+  isFlashSale              Boolean                @default(false)
+  isOnSale                 Boolean                @default(false)
+  saleEndDate              DateTime?
+  salePrice                Decimal?               @db.Decimal(10, 2)
+  saleStartDate            DateTime?
+  flashSaleDiscountPercent Int?
+  saleDiscountPercent      Int?
+  cartItems                CartItem[]
+  comparisons              Comparison[]
+  favorites                Favorite[]
+  moodboardItems           MoodboardItem[]
+  compatibleProducts       ProductCompatibility[] @relation("CompatibleProducts")
+  compatibility            ProductCompatibility[]
+  reviews                  ProductReview[]
+  variants                 ProductVariant[]
+  collection               Collection?            @relation(fields: [collectionId], references: [id])
+  store                    Store                  @relation(fields: [storeId], references: [id])
+  supplier                 Supplier?              @relation(fields: [supplierId], references: [id])
+  saleItems                SaleItem[]
+  storeInventory           StoreInventory[]
 
   @@map("products")
 }
@@ -555,6 +553,28 @@ model PasswordReset {
   @@map("password_resets")
 }
 
+model MedicalCertificate {
+  id              String                   @id @default(uuid())
+  employeeId      String
+  startDate       DateTime
+  endDate         DateTime
+  type            MedicalCertificateType
+  reason          String
+  doctorName      String
+  doctorCrm       String
+  clinicName      String
+  status          MedicalCertificateStatus @default(PENDING)
+  notes           String?
+  attachmentUrl   String?
+  registeredById  String
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  employee        User                     @relation("EmployeeCertificates", fields: [employeeId], references: [id], onDelete: Cascade)
+  registeredBy    User                     @relation("RegisteredByCertificates", fields: [registeredById], references: [id])
+
+  @@map("medical_certificates")
+}
+
 model Notification {
   id        String           @id @default(uuid())
   type      NotificationType
@@ -591,28 +611,6 @@ model ShippingAddress {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("shipping_addresses")
-}
-
-model MedicalCertificate {
-  id                String                @id @default(uuid())
-  employeeId        String
-  startDate         DateTime
-  endDate           DateTime
-  type              MedicalCertificateType
-  reason            String
-  doctorName        String
-  doctorCrm         String
-  clinicName        String
-  status            MedicalCertificateStatus @default(PENDING)
-  notes             String?
-  attachmentUrl     String?
-  registeredById    String
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  employee          User                  @relation("EmployeeMedicalCertificates", fields: [employeeId], references: [id], onDelete: Cascade)
-  registeredBy      User                  @relation("RegisteredMedicalCertificates", fields: [registeredById], references: [id])
-
-  @@map("medical_certificates")
 }
 
 enum UserRole {

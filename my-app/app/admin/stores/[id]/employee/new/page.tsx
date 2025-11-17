@@ -23,8 +23,10 @@ export default function NewEmployeePage() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    password: '',
     phone: '',
     position: '',
+    role: 'EMPLOYEE' as 'ADMIN' | 'STORE_MANAGER' | 'CASHIER' | 'CUSTOMER' | 'EMPLOYEE',
     salary: '',
     hireDate: '',
     address: '',
@@ -71,6 +73,22 @@ export default function NewEmployeePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validação dos campos obrigatórios
+    if (!formData.name || !formData.email || !formData.password) {
+      alert('Por favor, preencha todos os campos obrigatórios (Nome, E-mail e Senha).');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      alert('A senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+
+    if (!formData.position) {
+      alert('Por favor, selecione o cargo do funcionário.');
+      return;
+    }
+    
     if (!token) {
       alert('Token de autenticação não encontrado');
       return;
@@ -79,8 +97,18 @@ export default function NewEmployeePage() {
     setIsLoading(true);
     
     try {
+      // Mapear position para role se necessário
+      const roleMap: { [key: string]: 'ADMIN' | 'STORE_MANAGER' | 'CASHIER' | 'CUSTOMER' | 'EMPLOYEE' } = {
+        'GERENTE': 'STORE_MANAGER',
+        'CAIXA': 'CASHIER',
+        'VENDEDOR': 'EMPLOYEE',
+        'ESTOQUISTA': 'EMPLOYEE',
+        'ATENDENTE': 'EMPLOYEE'
+      };
+
       const employeeData = filterAllowedFields({
         ...formData,
+        role: roleMap[formData.position] || formData.role,
         storeId
       });
 
@@ -88,9 +116,9 @@ export default function NewEmployeePage() {
       
       alert('Funcionário criado com sucesso!');
       router.push(`/admin/stores/${storeId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao criar funcionário:', error);
-      alert('Erro ao criar funcionário. Tente novamente.');
+      alert(`Erro ao criar funcionário: ${error.message || 'Tente novamente.'}`);
     } finally {
       setIsLoading(false);
     }
@@ -147,6 +175,20 @@ export default function NewEmployeePage() {
                   placeholder="Digite o e-mail"
                   required
                 />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="password">Senha *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  required
+                  minLength={6}
+                />
+                <p className="text-xs text-gray-500">A senha deve ter no mínimo 6 caracteres</p>
               </div>
               
               <div className="space-y-2">

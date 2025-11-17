@@ -61,6 +61,16 @@ export class AdminController {
   @UseInterceptors(TransformUserDataInterceptor)
   async createUser(@Body() userData: CreateUserDto) {
     try {
+      // Log para debug - verificar dados recebidos
+      console.log('📝 [AdminController] Dados recebidos para criar usuário:', {
+        name: userData.name,
+        email: userData.email,
+        hasPassword: !!userData.password,
+        hasRole: !!userData.role,
+        role: userData.role,
+        storeId: userData.storeId
+      });
+      
       return await this.adminService.createUser(userData);
     } catch (error) {
       console.error('Erro ao criar usuário:', error);
@@ -693,6 +703,31 @@ export class AdminController {
     @Query('search') search?: string
   ) {
     return this.adminService.getAvailableProductsForStore(storeId, search);
+  }
+
+  @Get('stores/:id/catalog/global-products')
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
+  async getGlobalProductsForCatalog(
+    @Param('id') storeId: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string
+  ) {
+    return this.adminService.getGlobalProductsForCatalog(
+      storeId,
+      search,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50
+    );
+  }
+
+  @Post('stores/:id/catalog/:productId')
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
+  async addProductToStoreCatalog(
+    @Param('id') storeId: string,
+    @Param('productId') productId: string
+  ) {
+    return this.adminService.addProductToStoreCatalog(storeId, productId);
   }
 
   @Put('stores/:id/inventory/:productId')

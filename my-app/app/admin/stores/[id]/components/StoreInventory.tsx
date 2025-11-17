@@ -19,6 +19,8 @@ import {
   MapPin
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api';
+import { adminAPI as adminApiAuth } from '@/lib/api-admin';
+import { useAppStore } from '@/lib/store';
 import {
   Dialog,
   DialogContent,
@@ -68,6 +70,7 @@ interface InventoryItem {
 
 export default function StoreInventory({ storeId }: StoreInventoryProps) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [totalProducts, setTotalProducts] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -87,11 +90,35 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
     initialQuantity: 0,
     minStock: 0
   });
+  const [catalogCount, setCatalogCount] = useState<number>(0);
   const [itemToRemove, setItemToRemove] = useState<InventoryItem | null>(null);
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
+  const [isAddCatalogOpen, setIsAddCatalogOpen] = useState(false);
+  const [searchGlobal, setSearchGlobal] = useState('');
+  const [globalProducts, setGlobalProducts] = useState<any[]>([]);
+  const [selectedGlobal, setSelectedGlobal] = useState<any | null>(null);
+
+  // Carregar catálogo global ao abrir o modal e ao alterar a busca
+  const loadGlobalProducts = async () => {
+    try {
+      const data = await adminAPI.getGlobalProductsForCatalog(storeId, searchGlobal || undefined, 1, 50);
+      setGlobalProducts(Array.isArray(data?.items) ? data.items : []);
+    } catch (e) {
+      console.error('Erro ao carregar catálogo global:', e);
+      setGlobalProducts([]);
+    }
+  };
+
+  useEffect(() => {
+    if (isAddCatalogOpen) {
+      const t = setTimeout(() => loadGlobalProducts(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [isAddCatalogOpen, searchGlobal]);
 
   useEffect(() => {
     loadInventory();
+    loadStoreProductsCount();
   }, [storeId]);
 
   const loadInventory = async () => {
@@ -103,6 +130,31 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
       console.error('Erro ao carregar estoque:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadStoreProductsCount = async () => {
+    try {
+      // 1) Buscar lista de lojas e usar o mesmo contador exibido no card (fonte da verdade do catálogo)
+      const storesList = await adminAPI.getStores();
+      const fromList = Array.isArray(storesList)
+        ? storesList.find((s: any) => s.id === storeId)
+        : (storesList?.stores || []).find((s: any) => s.id === storeId);
+      if (fromList && typeof fromList?._count?.products === 'number') {
+        setTotalProducts(fromList._count.products);
+        return;
+      }
+
+      // 2) Fallback: Buscar a loja diretamente e contar products/_count.products.
+      const store = await adminAPI.getStoreById(storeId);
+      const fallbackCount =
+        (typeof store?._count?.products === 'number' && store._count.products) ||
+        (Array.isArray(store?.products) ? store.products.length : 0);
+
+      setTotalProducts(fallbackCount);
+    } catch (error) {
+      console.error('Erro ao carregar total de produtos da loja:', error);
+      setTotalProducts(0);
     }
   };
 
@@ -148,6 +200,11 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
     try {
       const data = await adminAPI.getAvailableProductsForStore(storeId, searchAvailable || undefined);
       setAvailableProducts(data);
+      // Informar quantos estão disponíveis e quantos existem no catálogo
+      const store = await adminAPI.getStoreById(storeId);
+      const count = (typeof store?._count?.products === 'number' && store._count.products) ||
+        (Array.isArray(store?.products) ? store.products.length : 0);
+      setCatalogCount(count);
     } catch (error) {
       console.error('Erro ao carregar produtos disponíveis:', error);
     }
@@ -161,6 +218,8 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
       return () => clearTimeout(timeout);
     }
   }, [searchAvailable, isAddDialogOpen]);
+
+
 
   const handleAddProduct = async () => {
     if (!selectedProduct) return;
@@ -227,7 +286,10 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Estoque da Loja</h3>
-          <p className="text-sm text-gray-600">Gerencie os produtos e estoque desta loja</p>
+          <p className="text-sm text-gray-600">
+            O total de produtos abaixo refere-se ao catálogo vinculado a esta loja. 
+            Para vender, distribua produtos ao estoque da loja.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:max-w-xs">
@@ -245,7 +307,17 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
             className="bg-[#3e2626] hover:bg-[#2d1c1c] text-white"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Adicionar Produto
+            Adicionar ao Estoque
+          </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              setIsAddCatalogOpen(true);
+              await loadGlobalProducts();
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar ao Catálogo
           </Button>
         </div>
       </div>
@@ -254,10 +326,28 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total de Produtos</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Total de Produtos (Catálogo)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">{totalProducts}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Produtos no Estoque (SKUs)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">{inventory.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Unidades em Estoque</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">
+              {inventory.reduce((sum, item) => sum + (item.quantity || 0), 0)}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -543,10 +633,13 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
           <DialogHeader>
             <DialogTitle>Adicionar Produto ao Estoque</DialogTitle>
             <DialogDescription>
-              Selecione um produto para adicionar ao estoque desta loja
+              Selecione um SKU do catálogo desta loja para distribuir ao estoque.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="text-xs text-gray-600">
+              Catálogo desta loja: {catalogCount} itens • Disponíveis para adicionar: {availableProducts.length}
+            </div>
             <div className="space-y-2">
               <Label>Buscar Produto</Label>
               <Input
@@ -693,6 +786,107 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
               className="bg-[#3e2626] hover:bg-[#2d1c1c] text-white"
             >
               Adicionar ao Estoque
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add to Catalog Dialog */}
+      <Dialog open={isAddCatalogOpen} onOpenChange={setIsAddCatalogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Adicionar Produto ao Catálogo</DialogTitle>
+            <DialogDescription>
+              Selecione um produto do catálogo global para vincular a esta loja.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Buscar Produto (global)</Label>
+              <Input
+                placeholder="Digite o nome, SKU ou código de barras..."
+                value={searchGlobal}
+                onChange={(e) => setSearchGlobal(e.target.value)}
+              />
+            </div>
+            <div className="border rounded-lg max-h-64 overflow-y-auto">
+              {globalProducts.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  {searchGlobal ? 'Nenhum produto encontrado' : 'Digite para buscar produtos'}
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {globalProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      className={`p-3 cursor-pointer hover:bg-gray-50 ${
+                        selectedGlobal?.id === product.id ? 'bg-[#3e2626]/10 border-l-4 border-[#3e2626]' : ''
+                      }`}
+                      onClick={() => setSelectedGlobal(product)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {(() => {
+                          const imageUrl = (product.imageUrls && product.imageUrls.length > 0) 
+                            ? product.imageUrls[0] 
+                            : product.imageUrl;
+                          return imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={product.name}
+                              className="w-12 h-12 rounded object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null;
+                        })()}
+                        <div className="hidden w-12 h-12 rounded bg-gray-100 flex items-center justify-center">
+                          <Package className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{product.name}</div>
+                          <div className="text-sm text-gray-500">
+                            {product.sku && `SKU: ${product.sku} • `}
+                            {product.brand && `${product.brand} • `}
+                            R$ {Number(product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsAddCatalogOpen(false);
+              setSelectedGlobal(null);
+              setSearchGlobal('');
+            }}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!selectedGlobal) return;
+                try {
+                  // Adiciona o produto ao catálogo da loja (atualiza storeId)
+                  await adminAPI.addProductToStoreCatalog(storeId, selectedGlobal.id);
+                  setIsAddCatalogOpen(false);
+                  setSelectedGlobal(null);
+                  setSearchGlobal('');
+                  await loadStoreProductsCount();
+                  await loadGlobalProducts(); // Recarregar lista para remover o produto adicionado
+                  alert('Produto adicionado ao catálogo com sucesso!');
+                } catch (e: any) {
+                  alert(e?.response?.data?.message || e?.message || 'Erro ao adicionar produto ao catálogo');
+                }
+              }}
+              disabled={!selectedGlobal}
+              className="bg-[#3e2626] hover:bg-[#2d1c1c] text-white"
+            >
+              Adicionar ao Catálogo
             </Button>
           </DialogFooter>
         </DialogContent>
