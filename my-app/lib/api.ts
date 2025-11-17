@@ -780,6 +780,34 @@ export const adminAPI = {
     const response = await api.post(`/admin/stores/${storeId}/catalog/${productId}`);
     return response.data;
   },
+
+  // Coupons
+  getCoupons: async (storeId?: string) => {
+    const response = await api.get('/coupons', {
+      params: storeId ? { storeId } : {},
+    });
+    return response.data;
+  },
+
+  createCoupon: async (couponData: any) => {
+    const response = await api.post('/coupons', couponData);
+    return response.data;
+  },
+
+  updateCoupon: async (couponId: string, couponData: any) => {
+    const response = await api.patch(`/coupons/${couponId}`, couponData);
+    return response.data;
+  },
+
+  deleteCoupon: async (couponId: string) => {
+    const response = await api.delete(`/coupons/${couponId}`);
+    return response.data;
+  },
+
+  getCoupon: async (couponId: string) => {
+    const response = await api.get(`/coupons/${couponId}`);
+    return response.data;
+  },
 };
 
 // Manager API
@@ -1048,6 +1076,17 @@ export const customerAPI = {
   },
 
   // Checkout
+  validateCoupon: async (code: string, totalAmount: number, productId?: string, categoryId?: string, storeId?: string) => {
+    const response = await api.post('/coupons/validate', {
+      code,
+      totalAmount,
+      productId,
+      categoryId,
+      storeId,
+    });
+    return response.data;
+  },
+
   checkout: async (checkoutData: {
     storeId: string;
     shippingAddress?: string;
@@ -1059,6 +1098,7 @@ export const customerAPI = {
     insuranceCost?: number;
     tax?: number;
     discount?: number;
+    couponCode?: string;
     notes?: string;
   }) => {
     const response = await api.post('/customer/cart/checkout', checkoutData);

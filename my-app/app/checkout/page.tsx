@@ -811,27 +811,44 @@ export default function CheckoutPage() {
   }, [checkoutItems.length, cart.length, isLoadingProducts, router]);
 
   // Aplicar cupom
-  const handleApplyCoupon = () => {
+  const handleApplyCoupon = async () => {
     setCouponError('');
     if (!couponCode.trim()) {
       setCouponError('Digite um código de cupom');
       return;
     }
 
-    // Simular validação de cupom
-    const validCoupons: { [key: string]: number } = {
-      'BEMVINDO10': 10,
-      'PRIMEIRA20': 20,
-      'FRETE15': 15,
-    };
+    try {
+      const upperCode = couponCode.toUpperCase().trim();
+      
+      // Buscar informações dos produtos para validação
+      const firstProduct = checkoutItems[0]?.product;
+      const categoryId = firstProduct?.category;
+      const productId = checkoutItems.length === 1 ? checkoutItems[0].product.id : undefined;
+      
+      // Validar cupom via API
+      const validation = await customerAPI.validateCoupon(
+        upperCode,
+        subtotal,
+        productId,
+        categoryId,
+        selectedStore || undefined
+      );
 
-    const upperCode = couponCode.toUpperCase().trim();
-    if (validCoupons[upperCode]) {
-      const discountAmount = (subtotal * validCoupons[upperCode]) / 100;
-      setAppliedCoupon({ code: upperCode, discount: discountAmount });
-      setCouponError('');
-    } else {
-      setCouponError('Cupom inválido ou expirado');
+      if (validation.valid) {
+        setAppliedCoupon({
+          code: validation.coupon.code,
+          discount: validation.discount,
+        });
+        setCouponError('');
+        showAlert('success', `Cupom ${validation.coupon.code} aplicado com sucesso!`);
+      } else {
+        setCouponError('Cupom inválido ou expirado');
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Erro ao validar cupom';
+      setCouponError(errorMessage);
+      showAlert('error', errorMessage);
     }
   };
 
@@ -994,6 +1011,7 @@ export default function CheckoutPage() {
         insuranceCost: insuranceCost,
         tax: tax,
         discount: discount,
+        couponCode: appliedCoupon?.code,
         notes: notes,
       });
 

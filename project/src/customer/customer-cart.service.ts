@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CouponsService } from '../coupons/coupons.service';
 
 @Injectable()
 export class CustomerCartService {
@@ -8,6 +9,7 @@ export class CustomerCartService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
+    private couponsService: CouponsService,
   ) {}
 
   // ==================== CARRINHO DE COMPRAS ====================
@@ -252,6 +254,7 @@ export class CustomerCartService {
       insuranceCost?: number;
       tax?: number;
       discount?: number;
+      couponCode?: string;
       notes?: string;
     }
   ) {
@@ -311,12 +314,38 @@ export class CustomerCartService {
       }
     }
 
+    // Validar e aplicar cupom se fornecido
+    let couponDiscount = 0;
+    let couponId: string | undefined;
+    
+    if (additionalCosts?.couponCode) {
+      try {
+        // Buscar informações dos produtos para validação do cupom
+        const firstProduct = validation.validItems[0]?.product;
+        const categoryId = firstProduct?.category;
+        
+        const couponValidation = await this.couponsService.validate({
+          code: additionalCosts.couponCode,
+          totalAmount: validation.totalPrice,
+          productId: validation.validItems.length === 1 ? validation.validItems[0].productId : undefined,
+          categoryId: categoryId,
+          storeId: validStoreId,
+        }, customerId);
+        
+        couponDiscount = couponValidation.discount;
+        couponId = couponValidation.coupon.id;
+      } catch (error: any) {
+        throw new BadRequestException(`Erro ao validar cupom: ${error.message}`);
+      }
+    }
+    
     // Calcular total incluindo custos adicionais
     const subtotal = validation.totalPrice;
     const shippingCost = additionalCosts?.shippingCost || 0;
     const insuranceCost = additionalCosts?.insuranceCost || 0;
     const tax = additionalCosts?.tax || 0;
-    const discount = additionalCosts?.discount || 0;
+    const manualDiscount = additionalCosts?.discount || 0;
+    const discount = couponDiscount + manualDiscount;
     const totalAmount = subtotal + shippingCost + insuranceCost + tax - discount;
     
     const isOnlineOrder = !!shippingInfo;
@@ -360,6 +389,16 @@ export class CustomerCartService {
         }
       });
     });
+
+    // Marcar cupom como usado se foi aplicado
+    if (couponId) {
+      try {
+        await this.couponsService.markAsUsed(couponId, customerId, sale.id);
+      } catch (error) {
+        console.error('Erro ao marcar cupom como usado:', error);
+        // Não falhar o checkout se houver erro ao marcar cupom como usado
+      }
+    }
 
     // Armazenar informações dos produtos para verificação posterior
     const productsToCheck: Array<{ id: string; name: string; stock: number; minStock: number; storeName?: string }> = [];

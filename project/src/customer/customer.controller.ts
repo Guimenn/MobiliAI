@@ -169,6 +169,7 @@ export class CustomerController {
       insuranceCost?: number;
       tax?: number;
       discount?: number;
+      couponCode?: string;
       notes?: string;
     }
   ) {
@@ -190,6 +191,7 @@ export class CustomerController {
           insuranceCost: data.insuranceCost || 0,
           tax: data.tax || 0,
           discount: data.discount || 0,
+          couponCode: data.couponCode,
           notes: data.notes,
         }
       );

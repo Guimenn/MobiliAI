@@ -22,6 +22,7 @@ import {
   Truck,
   Check,
   ArrowRight,
+  Ticket,
 } from 'lucide-react';
 
 type UserNotification = {
@@ -258,6 +259,12 @@ export default function AdminLayout({
             href: '/admin/orders-online',
             icon: Truck,
             current: pathname.startsWith('/admin/orders-online'),
+          },
+          {
+            name: 'Cupons',
+            href: '/admin/coupons',
+            icon: Ticket,
+            current: pathname.startsWith('/admin/coupons'),
           },
         ],
       },

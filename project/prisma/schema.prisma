@@ -47,6 +47,8 @@ model User {
   timeClockRecords  TimeClock[]
   medicalCertificates MedicalCertificate[] @relation("EmployeeCertificates")
   registeredCertificates MedicalCertificate[] @relation("RegisteredByCertificates")
+  createdCoupons    Coupon[]              @relation("CouponCreator")
+  couponUsages      CouponUsage[]
   store             Store?              @relation(fields: [storeId], references: [id])
 
   @@map("users")
@@ -80,6 +82,7 @@ model Store {
   sales        Sale[]
   inventory    StoreInventory[]
   employees    User[]
+  coupons      Coupon[]
 
   @@map("stores")
 }
@@ -611,6 +614,58 @@ model ShippingAddress {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("shipping_addresses")
+}
+
+model Coupon {
+  id                String        @id @default(uuid())
+  code              String         @unique
+  description       String?
+  discountType      CouponDiscountType
+  discountValue     Decimal        @db.Decimal(10, 2)
+  minimumPurchase   Decimal?       @db.Decimal(10, 2)
+  maximumDiscount   Decimal?       @db.Decimal(10, 2)
+  usageLimit        Int?
+  usedCount         Int            @default(0)
+  isActive          Boolean        @default(true)
+  validFrom         DateTime
+  validUntil        DateTime
+  applicableTo      CouponApplicableTo @default(ALL)
+  categoryId        String?
+  productId         String?
+  storeId           String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  createdBy         String
+  creator           User           @relation("CouponCreator", fields: [createdBy], references: [id])
+  store             Store?         @relation(fields: [storeId], references: [id])
+  couponUsages      CouponUsage[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id        String   @id @default(uuid())
+  couponId  String
+  userId    String
+  saleId    String?
+  usedAt    DateTime @default(now())
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([couponId, userId, saleId])
+  @@map("coupon_usages")
+}
+
+enum CouponDiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum CouponApplicableTo {
+  ALL
+  CATEGORY
+  PRODUCT
+  STORE
 }
 
 enum UserRole {
