@@ -1320,6 +1320,22 @@ export class AdminService {
             createdAt: true,
             notes: true,
             isOnlineOrder: true,
+            shippingAddress: true,
+            items: {
+              select: {
+                id: true,
+                quantity: true,
+                unitPrice: true,
+                totalPrice: true,
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    imageUrl: true,
+                  }
+                }
+              }
+            }
           },
           where: {
             OR: [

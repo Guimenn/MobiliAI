@@ -20,7 +20,18 @@ export class StoresService {
   }
 
   async findAll(currentUser: User): Promise<Store[]> {
-    // Se não for admin, retornar apenas a loja do usuário
+    // Clientes podem ver todas as lojas ativas (para escolher onde retirar pedidos)
+    if (currentUser.role === UserRole.CUSTOMER) {
+      // Buscar todas as lojas e filtrar no código (mais permissivo)
+      const allStores = await this.prisma.store.findMany({
+        orderBy: { name: 'asc' },
+      });
+      // Filtrar apenas lojas que não estão explicitamente inativas
+      const stores = allStores.filter(store => store.isActive !== false);
+      return stores;
+    }
+
+    // Se não for admin, retornar apenas a loja do usuário (MANAGER/EMPLOYEE)
     if (currentUser.role !== UserRole.ADMIN) {
       if (!currentUser.storeId) {
         return [];
@@ -34,6 +45,7 @@ export class StoresService {
       return store ? [store] : [];
     }
 
+    // Admin vê todas as lojas
     return this.prisma.store.findMany({
       include: {
         employees: true,
@@ -56,7 +68,15 @@ export class StoresService {
       throw new NotFoundException('Loja não encontrada');
     }
 
-    // Verificar se o usuário tem acesso à loja
+    // Clientes podem ver qualquer loja ativa
+    if (currentUser.role === UserRole.CUSTOMER) {
+      if (!store.isActive) {
+        throw new ForbiddenException('Loja não está ativa');
+      }
+      return store;
+    }
+
+    // Verificar se o usuário tem acesso à loja (MANAGER/EMPLOYEE só vê sua loja)
     if (currentUser.role !== UserRole.ADMIN && currentUser.storeId !== id) {
       throw new ForbiddenException('Acesso negado');
     }
