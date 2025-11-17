@@ -1,9 +1,13 @@
-import { Controller, Get, Query, Param } from '@nestjs/common';
+import { Controller, Get, Query, Param, Post, Body } from '@nestjs/common';
 import { PublicProductsService } from './public-products.service';
+import { PublicSupportService } from './public-support.service';
 
 @Controller('public')
 export class PublicController {
-  constructor(private readonly publicProductsService: PublicProductsService) {}
+  constructor(
+    private readonly publicProductsService: PublicProductsService,
+    private readonly publicSupportService: PublicSupportService,
+  ) {}
 
   @Get('products')
   async getProducts(
@@ -52,5 +56,22 @@ export class PublicController {
     @Query('limit') limit: string = '10'
   ) {
     return this.publicProductsService.getProductReviews(productId, parseInt(page), parseInt(limit));
+  }
+
+  // Endpoints para n8n - Webhook de atendimento
+  @Post('support/webhook')
+  async supportWebhook(@Body() body: any) {
+    // Endpoint que o n8n pode chamar para obter dados do sistema
+    return this.publicSupportService.handleWebhook(body);
+  }
+
+  @Get('support/stores')
+  async getStores() {
+    return this.publicSupportService.getStores();
+  }
+
+  @Get('support/products/search')
+  async searchProducts(@Query('q') query: string) {
+    return this.publicSupportService.searchProducts(query);
   }
 }
