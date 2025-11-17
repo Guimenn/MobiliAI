@@ -1370,7 +1370,7 @@ function ProductsSection({
                 </Button>
                 
                 <div className="flex items-center gap-1 px-4">
-                  <span className="text-sm text-gray-700">
+                  <span className="text-sm text-gboray-700">
                     Página {currentPage} de {totalPages}
                   </span>
                 </div>

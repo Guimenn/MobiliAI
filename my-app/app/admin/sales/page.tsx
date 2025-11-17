@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { salesAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import SaleDetailsModal from '@/components/SaleDetailsModal';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -24,8 +23,6 @@ export default function SalesPage() {
   const { user: currentUser, token } = useAppStore();
   const [sales, setSales] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [stats, setStats] = useState({
     totalSales: 0,
     totalRevenue: 0,
@@ -128,13 +125,18 @@ export default function SalesPage() {
   };
 
   const handleViewSale = (saleId: string) => {
-    setSelectedSaleId(saleId);
-    setIsModalOpen(true);
+    router.push(`/admin/sales/${saleId}`);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedSaleId(null);
+  const getStatusConfig = (status: string | undefined) => {
+    const map: Record<string, { label: string; className: string }> = {
+      COMPLETED: { label: 'Concluída', className: 'bg-green-100 text-green-800' },
+      PENDING: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' },
+      DELIVERED: { label: 'Entregue', className: 'bg-blue-100 text-blue-800' },
+      CANCELLED: { label: 'Cancelada', className: 'bg-red-100 text-red-800' },
+      REFUNDED: { label: 'Reembolsada', className: 'bg-gray-200 text-gray-800' },
+    };
+    return map[status || 'PENDING'] || map.PENDING;
   };
 
   return (
@@ -230,8 +232,8 @@ export default function SalesPage() {
                             <p className="font-medium text-gray-900">
                               R$ {sale.totalAmount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                             </p>
-                            <Badge variant={sale.status === 'COMPLETED' ? 'default' : 'secondary'}>
-                              {sale.status === 'COMPLETED' ? 'Concluída' : sale.status || 'Pendente'}
+                            <Badge className={getStatusConfig(sale.status).className}>
+                              {getStatusConfig(sale.status).label}
                             </Badge>
                         </div>
                           {/* O item inteiro é clicável agora */}
@@ -242,13 +244,6 @@ export default function SalesPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* Modal de Detalhes da Venda */}
-        <SaleDetailsModal
-          saleId={selectedSaleId}
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-        />
     </div>
   );
 }

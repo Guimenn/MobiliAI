@@ -273,7 +273,7 @@ export default function TestIALandingPage() {
                 transition={{ duration: 0.8, delay: 0.6 }}
                 className="flex flex-col gap-4 sm:flex-row sm:items-center"
               >
-                <Link href="/teste">
+                <Link href="/IA-demo">
                   <TextRevealButton
                     text="Experimentar agora"
                     icon={<Rocket className="h-6 w-6" />}
@@ -1107,7 +1107,7 @@ export default function TestIALandingPage() {
                 className="h-14 rounded-full bg-white px-10 text-base font-semibold text-[#3e2626] transition hover:bg-white/90"
               asChild
             >
-              <Link href="/teste">
+              <Link href="/IA-demo">
                 <Rocket className="mr-2 h-5 w-5" />
                   Entrar no simulador
               </Link>

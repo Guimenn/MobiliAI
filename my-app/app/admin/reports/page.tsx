@@ -32,6 +32,7 @@ export default function ReportsPage() {
   const [currentReport, setCurrentReport] = useState<any | null>(null);
   const [salesByPeriod, setSalesByPeriod] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [dailyReports, setDailyReports] = useState<any[]>([]);
 
   useEffect(() => {
     loadReportsData();
@@ -44,6 +45,23 @@ export default function ReportsPage() {
       // Verificar se existe relatório do dia atual
       const savedReports = await adminAPI.getReports();
       const reportsArray = Array.isArray(savedReports) ? savedReports : [];
+
+      const sortedDailyReports = [...reportsArray]
+        .filter((report) => report.type === 'daily')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      const processedDailyReports = sortedDailyReports.slice(0, 7).map((report) => {
+        if (typeof report.data === 'string') {
+          try {
+            return { ...report, data: JSON.parse(report.data) };
+          } catch {
+            return report;
+          }
+        }
+        return report;
+      });
+
+      setDailyReports(processedDailyReports);
 
       const today = new Date().toISOString().split('T')[0];
       let currentReport = reportsArray.find((r: any) => r.period === today && r.type === 'daily');
@@ -64,44 +82,12 @@ export default function ReportsPage() {
         }
       }
 
-      // Parsear data se for string JSON
-      if (currentReport && typeof currentReport.data === 'string') {
-        try {
-          currentReport.data = JSON.parse(currentReport.data);
-        } catch (e) {
-          console.error('Erro ao parsear dados do relatório:', e);
-        }
-      }
-
-      // Garantir que o summary tenha valores calculados
-      if (currentReport && currentReport.data) {
-        const calculatedSummary = calculateSummaryFromData(currentReport);
-        if (calculatedSummary) {
-          currentReport.data.summary = {
-            ...(currentReport.data.summary || {}),
-            ...calculatedSummary
-          };
-        }
-      }
-
-      setCurrentReport(currentReport);
-
-      // Usar dados do relatório para gráficos (já processados no backend)
-      const reportData = currentReport?.data || {};
-      if (reportData.charts) {
-        if (reportData.charts.salesByPeriod && Array.isArray(reportData.charts.salesByPeriod)) {
-          setSalesByPeriod(reportData.charts.salesByPeriod);
-        }
-        if (reportData.charts.topProductsChart && Array.isArray(reportData.charts.topProductsChart)) {
-          setTopProducts(reportData.charts.topProductsChart);
-        }
+      if (currentReport) {
+        await hydrateReport(currentReport);
       } else {
-        // Fallback: processar dados se não vierem do backend
-        const sales = await adminAPI.getSales();
-        const salesArray = Array.isArray(sales) ? sales : [];
-        setSalesData(salesArray);
-        processSalesByPeriod(salesArray);
-        processTopProducts(salesArray);
+        setCurrentReport(null);
+        setSalesByPeriod([]);
+        setTopProducts([]);
       }
 
     } catch (error) {
@@ -171,6 +157,59 @@ export default function ReportsPage() {
     return sortedProducts;
   };
 
+  const hydrateReport = async (report: any) => {
+    if (!report) return;
+
+    const processedReport = { ...report };
+
+    if (typeof processedReport.data === 'string') {
+      try {
+        processedReport.data = JSON.parse(processedReport.data);
+      } catch (e) {
+        console.error('Erro ao parsear dados do relatório:', e);
+        processedReport.data = {};
+      }
+    }
+
+    const calculatedSummary = calculateSummaryFromData(processedReport);
+    if (calculatedSummary) {
+      processedReport.data = processedReport.data || {};
+      processedReport.data.summary = {
+        ...(processedReport.data.summary || {}),
+        ...calculatedSummary,
+      };
+    }
+
+    setCurrentReport(processedReport);
+
+    const reportData = processedReport.data || {};
+    if (reportData.charts) {
+      if (reportData.charts.salesByPeriod && Array.isArray(reportData.charts.salesByPeriod)) {
+        setSalesByPeriod(reportData.charts.salesByPeriod);
+      }
+      if (reportData.charts.topProductsChart && Array.isArray(reportData.charts.topProductsChart)) {
+        setTopProducts(reportData.charts.topProductsChart);
+      }
+    } else {
+      const fallbackSales = reportData.sales
+        ? (Array.isArray(reportData.sales) ? reportData.sales : [])
+        : await fetchSalesFallback();
+      setSalesData(fallbackSales);
+      processSalesByPeriod(fallbackSales);
+      processTopProducts(fallbackSales);
+    }
+  };
+
+  const fetchSalesFallback = async () => {
+    try {
+      const sales = await adminAPI.getSales();
+      return Array.isArray(sales) ? sales : [];
+    } catch (error) {
+      console.error('Erro ao buscar vendas para fallback:', error);
+      return [];
+    }
+  };
+
   const handleDownloadReport = () => {
     if (!currentReport) return;
     
@@ -233,35 +272,8 @@ export default function ReportsPage() {
       const report = await adminAPI.generateDailyReport();
       
       if (report) {
-        // Parsear data se for string JSON
-        if (typeof report.data === 'string') {
-          try {
-            report.data = JSON.parse(report.data);
-          } catch (e) {
-            console.error('Erro ao parsear dados do relatório:', e);
-          }
-        }
-
-        // Garantir que o summary tenha valores calculados
-        const calculatedSummary = calculateSummaryFromData(report);
-        if (calculatedSummary) {
-          report.data.summary = {
-            ...(report.data.summary || {}),
-            ...calculatedSummary
-          };
-        }
-        
-        setCurrentReport(report);
-        // Usar dados do relatório para gráficos (já processados no backend)
-        const reportDataCharts = report.data?.charts;
-        if (reportDataCharts) {
-          if (reportDataCharts.salesByPeriod && Array.isArray(reportDataCharts.salesByPeriod)) {
-            setSalesByPeriod(reportDataCharts.salesByPeriod);
-          }
-          if (reportDataCharts.topProductsChart && Array.isArray(reportDataCharts.topProductsChart)) {
-            setTopProducts(reportDataCharts.topProductsChart);
-          }
-        }
+        await hydrateReport(report);
+        await loadReportsData();
       }
     } catch (error) {
       console.error('Erro ao gerar relatório diário:', error);
@@ -269,6 +281,23 @@ export default function ReportsPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSelectReport = async (report: any) => {
+    try {
+      setIsLoading(true);
+      await hydrateReport(report);
+    } catch (error) {
+      console.error('Erro ao carregar relatório selecionado:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getReportSummary = (report: any) => {
+    const summary = report?.data?.summary;
+    if (summary) return summary;
+    return calculateSummaryFromData(report) || {};
   };
 
     return (
@@ -369,6 +398,71 @@ export default function ReportsPage() {
           </Card>
         ) : (
           <div className="space-y-6">
+            {dailyReports.length > 0 && (
+              <Card className="border-0 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold text-gray-900">Relatórios Diários Recentes</CardTitle>
+                  <CardDescription className="text-sm text-gray-600">
+                    Acesse rapidamente os relatórios gerados nos últimos dias
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {dailyReports.map((report) => {
+                      const summary = getReportSummary(report);
+                      const isActive = currentReport?.id === report.id;
+                      return (
+                        <div
+                          key={report.id}
+                          className={`p-4 rounded-xl border transition-all ${
+                            isActive
+                              ? 'border-[#3e2626] bg-[#3e2626]/5 shadow-md'
+                              : 'border-gray-200 bg-white hover:border-[#3e2626]/50'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">
+                                {new Date(report.period || report.createdAt).toLocaleDateString('pt-BR', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </p>
+                              <p className="text-xs text-gray-500 capitalize">{report.type || 'daily'}</p>
+                            </div>
+                            <span className="text-xs text-gray-400">
+                              {new Date(report.createdAt).toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                          <div className="mt-4 space-y-1">
+                            <p className="text-sm text-gray-600">Receita</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                              R$ {Number(summary.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {summary.totalSales || 0} vendas • Ticket médio:{' '}
+                              R$ {Number(summary.averageTicket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <Button
+                            onClick={() => handleSelectReport(report)}
+                            variant={isActive ? 'default' : 'outline'}
+                            className={`mt-4 w-full ${isActive ? 'bg-[#3e2626] hover:bg-[#2d1c1c]' : 'border-[#3e2626] text-[#3e2626]'}`}
+                          >
+                            {isActive ? 'Visualizando' : 'Ver relatório'}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Cards de Resumo Geral - Estilo Horizon */}
             {(() => {
               // Calcular summary se não existir ou estiver vazio
