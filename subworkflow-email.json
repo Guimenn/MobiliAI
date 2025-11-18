@@ -1,0 +1,98 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "name": "Enviar_Mensagem_Humano",
+        "description": "Use esta ferramenta quando o cliente precisar falar com um atendente humano, tiver uma dúvida muito complexa que você não consegue resolver, ou quando o cliente explicitamente solicitar falar com uma pessoa. Sempre colete nome, email e uma descrição detalhada da dúvida ou problema antes de usar esta ferramenta.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "GH8YryH27j3FhCpR"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "route",
+              "stringValue": "message"
+            }
+          ]
+        },
+        "specifyInputSchema": true,
+        "jsonSchemaExample": "{\n  \"email\": \"email do cliente\",\n  \"name\": \"nome completo do cliente\",\n  \"message\": \"descrição detalhada da dúvida ou problema do cliente\",\n  \"subject\": \"assunto da mensagem\"\n}"
+      },
+      "id": "5907b213-3620-47c8-8475-1dcef90d8a32",
+      "name": "Send Message",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        464,
+        -224
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "9461348b-0396-462b-87a8-9f21a0d1ebc6",
+      "typeVersion": 1.1,
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        80,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.email || 'noreply@mobiliai.com' }}",
+        "toEmail": "men.guilherme5@gmail.com",
+        "subject": "={{ $json.subject || 'Solicitação de Atendimento Humano - MobiliAI' }}",
+        "html": "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:linear-gradient(135deg,#2b2b2b,#444);color:white;padding:20px;text-align:center;border-radius:8px 8px 0 0}.content{background:#f9f9f9;padding:30px;border-radius:0 0 8px 8px}.info-box{background:white;padding:15px;margin:15px 0;border-left:4px solid #2b2b2b;border-radius:4px}.label{font-weight:bold;color:#555}.value{margin-top:5px;color:#333}</style></head><body><div class='container'><div class='header'><h1>Nova Solicitação de Atendimento Humano</h1><p>MobiliAI - Sistema de Suporte</p></div><div class='content'><p>Você recebeu uma nova solicitação de atendimento humano através do chatbot.</p><div class='info-box'><div class='label'>Nome do Cliente:</div><div class='value'>\\\\\\\" + ($json.name || 'Não informado') + \\\\\\\"</div></div><div class='info-box'><div class='label'>Email do Cliente:</div><div class='value'>\\\\\\\" + ($json.email || 'Não informado') + \\\\\\\"</div></div><div class='info-box'><div class='label'>Assunto:</div><div class='value'>\\\\\\\" + ($json.subject || 'Não especificado') + \\\\\\\"</div></div><div class='info-box'><div class='label'>Mensagem:</div><div class='value'>\\\\\\\" + ($json.message || 'Nenhuma mensagem fornecida') + \\\\\\\"</div></div><p style='margin-top:30px;padding-top:20px;border-top:1px solid #ddd;color:#666;font-size:12px'>Esta mensagem foi gerada automaticamente pelo sistema de chatbot da MobiliAI.</p></div></div></body></html>",
+        "options": {}
+      },
+      "id": "6f1a3ea0-e86c-4011-8101-40259bf7640e",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        304,
+        -32
+      ],
+      "typeVersion": 2.1,
+      "webhookId": "26204ae1-520a-475a-a2b0-3eebacaaa71a",
+      "credentials": {
+        "smtp": {
+          "id": "n32UwuxakmnITBF4",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Send Message": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0b71e8c8686d2a5bf3befc391e55ef400b74189864d87707e143aca40b0491c1"
+  }
+}
