@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import {
   Loader2
 } from 'lucide-react';
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Aceitar tanto orderId quanto saleId para compatibilidade
@@ -205,6 +205,21 @@ export default function CheckoutSuccessPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white page-with-fixed-header flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-[#3e2626] mx-auto mb-4" />
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    }>
+      <CheckoutSuccessContent />
+    </Suspense>
   );
 }
 

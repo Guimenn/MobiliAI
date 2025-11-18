@@ -1409,4 +1409,133 @@ export const employeeAPI = {
   },
 };
 
+// Payment API
+export const paymentAPI = {
+  // Pagamento PIX
+  createPixPayment: async (saleId: string, customerInfo?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    cpf?: string;
+  }) => {
+    const response = await api.post('/payment/pix/create', {
+      saleId,
+      customerInfo,
+    });
+    return response.data;
+  },
+
+  checkPixPaymentStatus: async (saleId: string) => {
+    const response = await api.get(`/payment/pix/status/${saleId}`);
+    return response.data;
+  },
+
+  simulatePixPayment: async (saleId: string) => {
+    const response = await api.post('/payment/pix/simulate', { saleId });
+    return response.data;
+  },
+
+  // Pagamento Cartão (Checkout AbacatePay)
+  createCardPayment: async (
+    saleId: string,
+    data?: {
+      customerInfo?: {
+        name?: string;
+        email?: string;
+        phone?: string;
+        cpf?: string;
+      };
+      installments?: number;
+    },
+  ) => {
+    const payload: Record<string, any> = { saleId };
+    if (data?.customerInfo) {
+      payload.customerInfo = data.customerInfo;
+    }
+    if (data?.installments) {
+      payload.installments = data.installments;
+    }
+    const response = await api.post('/payment/card/create', payload);
+    return response.data;
+  },
+
+  // Pagamento Stripe
+  createStripePaymentIntent: async (
+    saleId: string,
+    customerInfo?: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      cpf?: string;
+    }
+  ) => {
+    const response = await api.post('/payment/stripe/create-intent', {
+      saleId,
+      customerInfo,
+    });
+    return response.data;
+  },
+
+  confirmStripePayment: async (paymentIntentId: string) => {
+    const response = await api.post('/payment/stripe/confirm', {
+      paymentIntentId,
+    });
+    return response.data;
+  },
+
+  checkStripePaymentStatus: async (paymentIntentId: string) => {
+    const response = await api.get(`/payment/stripe/status/${paymentIntentId}`);
+    return response.data;
+  },
+};
+
+// Financial API
+export const financialAPI = {
+  // Cash Flow
+  createCashFlow: async (cashFlowData: {
+    type: 'INCOME' | 'EXPENSE';
+    amount: number;
+    description: string;
+    category?: string;
+    date?: string;
+  }) => {
+    const response = await api.post('/financial/cash-flow', cashFlowData);
+    return response.data;
+  },
+
+  getCashFlow: async (startDate?: string, endDate?: string) => {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get('/financial/cash-flow', { params });
+    return response.data;
+  },
+
+  getCashFlowReport: async (startDate: string, endDate: string) => {
+    const response = await api.get('/financial/cash-flow/report', {
+      params: { startDate, endDate }
+    });
+    return response.data;
+  },
+
+  // Cash Expenses
+  createCashExpense: async (expenseData: {
+    amount: number;
+    description: string;
+    category?: string;
+    date?: string;
+  }) => {
+    const response = await api.post('/financial/expenses', expenseData);
+    return response.data;
+  },
+
+  getCashExpenses: async (startDate?: string, endDate?: string) => {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get('/financial/expenses', { params });
+    return response.data;
+  },
+};
+
 export default api;

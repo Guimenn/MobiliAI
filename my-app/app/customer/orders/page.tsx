@@ -32,15 +32,16 @@ import {
 import { toast } from 'sonner';
 
 const getStatusConfig = (status: string) => {
+  const statusUpper = String(status).toUpperCase();
   const configs: { [key: string]: { label: string; color: string; icon: any } } = {
-    PENDING: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Clock },
+    PENDING: { label: 'Pendente', color: 'bg-[#3e2626]/10 text-[#3e2626] border-[#3e2626]/30', icon: Clock },
     PREPARING: { label: 'Preparando', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: Package },
     SHIPPED: { label: 'Enviado', color: 'bg-purple-100 text-purple-800 border-purple-300', icon: Truck },
     DELIVERED: { label: 'Entregue', color: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle },
     CANCELLED: { label: 'Cancelado', color: 'bg-red-100 text-red-800 border-red-300', icon: XCircle },
     COMPLETED: { label: 'Concluído', color: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle },
   };
-  return configs[status] || { label: status, color: 'bg-gray-100 text-gray-800 border-gray-300', icon: Package };
+  return configs[statusUpper] || { label: status, color: 'bg-gray-100 text-gray-800 border-gray-300', icon: Package };
 };
 
 const formatPrice = (price: number | string) => {
@@ -85,6 +86,17 @@ export default function CustomerOrdersPage() {
       loadOrders();
     }
   }, [currentPage, pageLimit, statusFilter, isAuthenticated, token]);
+
+  // Recarregar quando o termo de busca mudar (após um pequeno delay para evitar muitas requisições)
+  useEffect(() => {
+    if (isAuthenticated && user && token) {
+      const timeoutId = setTimeout(() => {
+        loadOrders();
+      }, 300); // Debounce de 300ms
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchTerm]);
 
   const loadOrders = async () => {
     if (!token) return;
@@ -281,38 +293,45 @@ export default function CustomerOrdersPage() {
 
                         {/* Timeline do Status */}
                         <div className="mt-4 pt-4 border-t border-gray-200">
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <div className={`flex items-center gap-2 ${order.status !== 'CANCELLED' && ['PENDING', 'PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) ? 'text-green-600' : ''}`}>
-                              <CheckCircle className="h-3 w-3" />
-                              <span>Pedido Realizado</span>
-                            </div>
-                            {!['PENDING', 'CANCELLED'].includes(order.status) && (
-                              <>
-                                <div className="h-1 w-1 bg-gray-300 rounded-full" />
-                                <div className={`flex items-center gap-2 ${['PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) ? 'text-green-600' : ''}`}>
-                                  <CheckCircle className="h-3 w-3" />
-                                  <span>Preparando</span>
-                                </div>
-                              </>
-                            )}
-                            {['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) && (
-                              <>
-                                <div className="h-1 w-1 bg-gray-300 rounded-full" />
-                                <div className={`flex items-center gap-2 ${['DELIVERED', 'COMPLETED'].includes(order.status) ? 'text-green-600' : ''}`}>
-                                  <Truck className="h-3 w-3" />
-                                  <span>Enviado</span>
-                                </div>
-                              </>
-                            )}
-                            {['DELIVERED', 'COMPLETED'].includes(order.status) && (
-                              <>
-                                <div className="h-1 w-1 bg-gray-300 rounded-full" />
-                                <div className="flex items-center gap-2 text-green-600">
-                                  <CheckCircle className="h-3 w-3" />
-                                  <span>Entregue</span>
-                                </div>
-                              </>
-                            )}
+                          <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                            {(() => {
+                              const statusUpper = String(order.status).toUpperCase();
+                              return (
+                                <>
+                                  <div className={`flex items-center gap-2 ${statusUpper !== 'CANCELLED' && ['PENDING', 'PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(statusUpper) ? 'text-green-600' : ''}`}>
+                                    <CheckCircle className="h-3 w-3" />
+                                    <span>Pedido Realizado</span>
+                                  </div>
+                                  {!['PENDING', 'CANCELLED'].includes(statusUpper) && (
+                                    <>
+                                      <div className="h-1 w-1 bg-gray-300 rounded-full" />
+                                      <div className={`flex items-center gap-2 ${['PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(statusUpper) ? 'text-green-600' : ''}`}>
+                                        <CheckCircle className="h-3 w-3" />
+                                        <span>Preparando</span>
+                                      </div>
+                                    </>
+                                  )}
+                                  {['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(statusUpper) && (
+                                    <>
+                                      <div className="h-1 w-1 bg-gray-300 rounded-full" />
+                                      <div className={`flex items-center gap-2 ${['DELIVERED', 'COMPLETED'].includes(statusUpper) ? 'text-green-600' : ''}`}>
+                                        <Truck className="h-3 w-3" />
+                                        <span>Enviado</span>
+                                      </div>
+                                    </>
+                                  )}
+                                  {['DELIVERED', 'COMPLETED'].includes(statusUpper) && (
+                                    <>
+                                      <div className="h-1 w-1 bg-gray-300 rounded-full" />
+                                      <div className="flex items-center gap-2 text-green-600">
+                                        <CheckCircle className="h-3 w-3" />
+                                        <span>Entregue</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>

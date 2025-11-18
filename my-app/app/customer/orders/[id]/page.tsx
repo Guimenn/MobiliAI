@@ -30,10 +30,11 @@ import { toast } from 'sonner';
 import ProductReviewModal from '@/components/ProductReviewModal';
 
 const getStatusConfig = (status: string) => {
+  const statusUpper = String(status).toUpperCase();
   const configs: { [key: string]: { label: string; color: string; icon: any; description: string } } = {
     PENDING: { 
       label: 'Pendente', 
-      color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      color: 'bg-[#3e2626]/10 text-[#3e2626] border-[#3e2626]/30',
       icon: Clock,
       description: 'Seu pedido está aguardando confirmação'
     },
@@ -68,7 +69,7 @@ const getStatusConfig = (status: string) => {
       description: 'Pedido finalizado com sucesso'
     },
   };
-  return configs[status] || { 
+  return configs[statusUpper] || { 
     label: status, 
     color: 'bg-gray-100 text-gray-800 border-gray-300',
     icon: Package,
@@ -95,6 +96,7 @@ const formatDate = (date: string | Date) => {
 };
 
 const getStatusTimeline = (status: string, createdAt: Date, shippedAt?: Date | null, deliveredAt?: Date | null) => {
+  const statusUpper = String(status).toUpperCase();
   const timeline = [
     {
       step: 'PENDING',
@@ -106,27 +108,27 @@ const getStatusTimeline = (status: string, createdAt: Date, shippedAt?: Date | n
     {
       step: 'PREPARING',
       label: 'Preparando',
-      completed: ['PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(status),
+      completed: ['PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(statusUpper),
       date: createdAt,
       icon: Package
     },
     {
       step: 'SHIPPED',
       label: 'Enviado',
-      completed: ['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(status),
+      completed: ['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(statusUpper),
       date: shippedAt || null,
       icon: Truck
     },
     {
       step: 'DELIVERED',
       label: 'Entregue',
-      completed: ['DELIVERED', 'COMPLETED'].includes(status),
+      completed: ['DELIVERED', 'COMPLETED'].includes(statusUpper),
       date: deliveredAt || null,
       icon: CheckCircle
     }
   ];
 
-  if (status === 'CANCELLED') {
+  if (statusUpper === 'CANCELLED') {
     timeline.forEach(item => {
       if (item.step !== 'PENDING') {
         item.completed = false;
@@ -495,58 +497,74 @@ export default function OrderDetailsPage() {
             {/* Itens do Pedido */}
             <Card>
               <CardHeader>
-                <CardTitle>Itens do Pedido</CardTitle>
+                <CardTitle className="text-xl font-bold text-[#3e2626]">Itens do Pedido</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {order.items?.map((item: any) => {
                     const isReviewed = isProductReviewed(item.productId);
+                    const imageUrl = (item.product?.imageUrls && item.product.imageUrls.length > 0) 
+                      ? item.product.imageUrls[0] 
+                      : item.product?.imageUrl;
+                    
                     return (
                       <div 
                         key={item.id} 
-                        className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                        onClick={(e) => {
-                          // Só navegar se não clicar em botões
-                          if ((e.target as HTMLElement).closest('button')) return;
-                          if (item.productId) {
-                            router.push(`/products/${item.productId}`);
-                          }
-                        }}
+                        className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-[#3e2626]/30 hover:shadow-md transition-all"
                       >
-                        {(() => {
-                          const imageUrl = (item.product?.imageUrls && item.product.imageUrls.length > 0) 
-                            ? item.product.imageUrls[0] 
-                            : item.product?.imageUrl;
-                          return imageUrl ? (
+                        {/* Imagem do Produto */}
+                        <div className="flex-shrink-0">
+                          {imageUrl ? (
                             <img
                               src={imageUrl}
-                              alt={item.product.name}
+                              alt={item.product?.name || 'Produto'}
+                              className="w-32 h-32 sm:w-40 sm:h-40 object-cover rounded-lg border-2 border-gray-200"
                               onError={(e) => {
                                 console.error('Erro ao carregar imagem:', imageUrl);
-                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.src = '/placeholder-product.png';
+                                e.currentTarget.onerror = null;
                               }}
                             />
-                          ) : null;
-                        })()}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-gray-800 hover:text-[#3e2626] transition-colors">
-                              {item.product?.name || 'Produto não encontrado'}
-                            </p>
+                          ) : (
+                            <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center">
+                              <Package className="h-12 w-12 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Informações do Produto */}
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-bold text-lg text-[#3e2626] mb-1 line-clamp-2">
+                                {item.product?.name || 'Produto não encontrado'}
+                              </h3>
+                              {item.product?.brand && (
+                                <p className="text-sm text-gray-600 mb-2">
+                                  Marca: <span className="font-semibold">{item.product.brand}</span>
+                                </p>
+                              )}
+                            </div>
                             {isReviewed && (order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
-                              <Badge className="bg-green-100 text-green-800 border-green-300 flex items-center gap-1">
+                              <Badge className="bg-green-100 text-green-800 border-green-300 flex items-center gap-1 flex-shrink-0">
                                 <Star className="h-3 w-3 fill-green-600 text-green-600" />
                                 Avaliado
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {item.quantity} x {formatPrice(item.unitPrice)}
-                          </p>
-                          {item.product?.brand && (
-                            <p className="text-xs text-gray-500 mt-1">Marca: {item.product.brand}</p>
-                          )}
-                          <div className="flex items-center gap-2 mt-2">
+
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <span className="font-medium">
+                                Qtd: <span className="text-[#3e2626] font-bold">{item.quantity}</span>
+                              </span>
+                              <span className="font-medium">
+                                Unit: <span className="text-[#3e2626] font-bold">{formatPrice(item.unitPrice)}</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-2">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -556,7 +574,7 @@ export default function OrderDetailsPage() {
                                   router.push(`/products/${item.productId}`);
                                 }
                               }}
-                              className="text-[#3e2626] hover:text-[#5a3a3a] hover:bg-[#3e2626]/10 h-7 px-2 text-xs"
+                              className="text-[#3e2626] hover:text-[#5a3a3a] hover:bg-[#3e2626]/10"
                             >
                               Ver Produto
                             </Button>
@@ -568,17 +586,20 @@ export default function OrderDetailsPage() {
                                   e.stopPropagation();
                                   handleOpenReview(item);
                                 }}
-                                className="flex items-center gap-2 h-7 px-2 text-xs"
+                                className="flex items-center gap-2"
                               >
-                                <Star className="h-3 w-3" />
+                                <Star className="h-4 w-4" />
                                 Avaliar
                               </Button>
                             )}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-lg text-[#3e2626]">
-                            {formatPrice(item.totalPrice)}
+
+                        {/* Preço Total do Item */}
+                        <div className="flex-shrink-0 text-right">
+                          <p className="text-sm text-gray-500 mb-1">Subtotal</p>
+                          <p className="font-bold text-xl text-[#3e2626]">
+                            {formatPrice(item.totalPrice || (Number(item.unitPrice) * item.quantity))}
                           </p>
                         </div>
                       </div>
@@ -586,10 +607,11 @@ export default function OrderDetailsPage() {
                   })}
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Total:</span>
-                    <span className="text-[#3e2626] text-2xl">
+                {/* Total do Pedido */}
+                <div className="mt-8 pt-6 border-t-2 border-[#3e2626]/20">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-gray-700">Total:</span>
+                    <span className="text-2xl font-bold text-[#3e2626]">
                       {formatPrice(order.totalAmount)}
                     </span>
                   </div>

@@ -252,10 +252,39 @@ export class SalesService {
     const oldStatus = String(sale.status).toUpperCase();
     
     // Preparar dados para atualização
-    const updateData: any = { ...updateSaleDto };
+    const updateData: any = {};
+    
+    // Converter status de minúsculas (DTO) para maiúsculas (Prisma enum)
+    if (updateSaleDto.status) {
+      const statusMap: Record<string, SaleStatus> = {
+        pending: 'PENDING' as SaleStatus,
+        completed: 'COMPLETED' as SaleStatus,
+        cancelled: 'CANCELLED' as SaleStatus,
+        refunded: 'REFUNDED' as SaleStatus,
+        delivered: 'DELIVERED' as SaleStatus,
+        preparing: 'PREPARING' as SaleStatus,
+        shipped: 'SHIPPED' as SaleStatus,
+      };
+      
+      const statusLower = String(updateSaleDto.status).toLowerCase();
+      updateData.status = statusMap[statusLower];
+      
+      if (!updateData.status) {
+        throw new BadRequestException(`Status inválido: ${updateSaleDto.status}`);
+      }
+    }
+    
+    // Adicionar outros campos apenas se não forem undefined
+    if (updateSaleDto.paymentReference !== undefined) {
+      updateData.paymentReference = updateSaleDto.paymentReference;
+    }
+    
+    if (updateSaleDto.notes !== undefined) {
+      updateData.notes = updateSaleDto.notes;
+    }
     
     // Se está marcando como COMPLETED e é pedido online, definir deliveredAt
-    if (updateSaleDto.status && String(updateSaleDto.status).toUpperCase() === 'COMPLETED' && sale.isOnlineOrder) {
+    if (updateData.status === 'COMPLETED' && sale.isOnlineOrder) {
       updateData.deliveredAt = new Date();
     }
     

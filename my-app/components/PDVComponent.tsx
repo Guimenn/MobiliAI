@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
-import { productsAPI, salesAPI } from '@/lib/api';
+import { salesAPI } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
-  Search,
   ShoppingCart,
   Plus,
   Minus,
@@ -19,16 +18,16 @@ import {
   Banknote,
   QrCode,
   Loader2,
-  AlertCircle,
   CheckCircle,
   X,
-  Barcode,
-  UserCheck,
-  Package
+  Package,
+  Store,
 } from 'lucide-react';
 import { showAlert } from '@/lib/alerts';
 import Image from 'next/image';
 import PDVPaymentModal from '@/components/PDVPaymentModal';
+import PDVPickupPage from '@/components/PDVPickupPage';
+import PDVProductsPage from '@/components/PDVProductsPage';
 
 interface Product {
   id: string;
@@ -60,16 +59,13 @@ interface PDVComponentProps {
 
 export default function PDVComponent({ initialCustomer, pickupOrders = [], onReset }: PDVComponentProps = {}) {
   const { user } = useAppStore();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [products, setProducts] = useState<Product[]>([]);
+  const [activeTab, setActiveTab] = useState<'products' | 'pickup'>('products');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [customerId, setCustomerId] = useState<string>('');
   const [notes, setNotes] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [isProcessingSale, setIsProcessingSale] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [currentSale, setCurrentSale] = useState<any>(null);
@@ -79,14 +75,6 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
   const [customerCpf, setCustomerCpf] = useState('');
   const [foundCustomer, setFoundCustomer] = useState<any>(initialCustomer || null);
   const [pendingPickupOrders, setPendingPickupOrders] = useState<any[]>(pickupOrders || []);
-  const [markingAsPickedUp, setMarkingAsPickedUp] = useState<string | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (user?.storeId) {
-      loadProducts();
-    }
-  }, [user?.storeId]);
 
   useEffect(() => {
     // Se receber cliente inicial, preencher os campos
@@ -101,65 +89,16 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
   }, [initialCustomer]);
 
   useEffect(() => {
-    // Focar no campo de busca ao montar
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
+    // Se houver pedidos de retirada, mostrar a aba de retirada por padrão
+    if (pendingPickupOrders.length > 0 && activeTab === 'products') {
+      setActiveTab('pickup');
     }
-  }, []);
-
-  const loadProducts = async () => {
-    if (!user?.storeId) return;
-    
-    try {
-      setIsLoading(true);
-      const data = await productsAPI.getAll(user.storeId);
-      // Filtrar apenas produtos ativos e com estoque
-      const availableProducts = data.filter((p: Product) => p.stock > 0);
-      setProducts(availableProducts);
-    } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      showAlert('error', 'Erro ao carregar produtos');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSearch = async (value: string) => {
-    setSearchTerm(value);
-    
-    if (!value.trim()) {
-      setProducts([]);
-      return;
-    }
-
-    if (!user?.storeId) return;
-
-    try {
-      setIsSearching(true);
-      const allProducts = await productsAPI.getAll(user.storeId);
-      
-      // Buscar por nome, código de barras ou SKU
-      const searchLower = value.toLowerCase();
-      const filtered = allProducts.filter((p: Product) => {
-        const matchesName = p.name.toLowerCase().includes(searchLower);
-        const matchesBarcode = p.barcode?.toLowerCase().includes(searchLower);
-        const matchesSku = p.sku?.toLowerCase().includes(searchLower);
-        return (matchesName || matchesBarcode || matchesSku) && p.stock > 0;
-      });
-      
-      setProducts(filtered);
-    } catch (error) {
-      console.error('Erro ao buscar produtos:', error);
-    } finally {
-      setIsSearching(false);
-    }
-  };
+  }, [pendingPickupOrders.length]);
 
   const addToCart = (product: Product, quantity: number = 1) => {
     const existingItem = cart.find(item => item.productId === product.id);
     
     if (existingItem) {
-      // Se já existe no carrinho, aumentar quantidade
       const newQuantity = existingItem.quantity + quantity;
       if (newQuantity > product.stock) {
         showAlert('error', `Quantidade indisponível. Estoque disponível: ${product.stock}`);
@@ -168,7 +107,6 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
       updateQuantity(product.id, newQuantity);
       showAlert('success', `${quantity} unidade(s) de ${product.name} adicionada(s)`);
     } else {
-      // Adicionar novo item ao carrinho
       if (quantity > product.stock) {
         showAlert('error', `Quantidade indisponível. Estoque disponível: ${product.stock}`);
         return;
@@ -185,14 +123,6 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
       setCart([...cart, newItem]);
       showAlert('success', `${quantity} unidade(s) de ${product.name} adicionada(s) ao carrinho`);
     }
-    
-    // NÃO limpar busca - permite continuar adicionando produtos
-    // Focar no campo de busca novamente
-    setTimeout(() => {
-      if (searchInputRef.current) {
-        searchInputRef.current.focus();
-      }
-    }, 100);
   };
 
   const updateQuantity = (productId: string, newQuantity: number) => {
@@ -349,16 +279,6 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
       // Limpar carrinho e campos
       clearCart();
       
-      // Recarregar produtos para atualizar estoque
-      await loadProducts();
-      
-      // Focar no campo de busca
-      setTimeout(() => {
-        if (searchInputRef.current) {
-          searchInputRef.current.focus();
-        }
-      }, 100);
-      
     } catch (error: any) {
       console.error('Erro ao finalizar venda:', error);
       const errorMessage = error.response?.data?.message || 'Erro ao finalizar venda';
@@ -385,296 +305,73 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
     // Limpar carrinho e campos
     clearCart();
     setCurrentSale(null);
-    
-    // Recarregar produtos para atualizar estoque
-    await loadProducts();
-    
-    // Focar no campo de busca
-    setTimeout(() => {
-      if (searchInputRef.current) {
-        searchInputRef.current.focus();
-      }
-    }, 100);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && products.length > 0) {
-      addToCart(products[0]);
-    }
-  };
-
-  // Função para marcar pedido como retirado
-  const handleMarkAsPickedUp = async (orderId: string) => {
-    try {
-      setMarkingAsPickedUp(orderId);
-      await salesAPI.update(orderId, {
-        status: 'COMPLETED',
-      });
-      // Atualizar a lista removendo o pedido retirado
-      setPendingPickupOrders(prev => prev.filter(order => order.id !== orderId));
-      showAlert('success', 'Pedido marcado como retirado com sucesso!');
-    } catch (error: any) {
-      console.error('Erro ao marcar pedido como retirado:', error);
-      showAlert('error', 'Erro ao marcar pedido como retirado. Tente novamente.');
-    } finally {
-      setMarkingAsPickedUp(null);
-    }
+  const handleOrderPickedUp = (orderId: string) => {
+    setPendingPickupOrders(prev => prev.filter(order => order.id !== orderId));
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Seção de Pedidos para Retirada */}
-      {pendingPickupOrders.length > 0 && (
-        <Card className="mb-4 border-2 border-yellow-200 bg-yellow-50 shadow-lg flex-shrink-0">
-          <CardHeader className="bg-yellow-500 text-white rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Package className="h-5 w-5" />
-              Pedidos para Retirada ({pendingPickupOrders.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {pendingPickupOrders.map((order: any) => (
-                <div
-                  key={order.id}
-                  className="bg-white rounded-lg p-4 border-2 border-yellow-200 shadow-sm"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="font-semibold text-gray-900">
-                          Pedido #{order.saleNumber}
-                        </span>
-                        <Badge variant="outline" className="text-xs">
-                          {order.status === 'PENDING' ? 'Pendente' : 'Preparando'}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <p>
-                          <span className="font-medium">Valor:</span> R${' '}
-                          {Number(order.totalAmount).toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                          })}
-                        </p>
-                        {order.items && order.items.length > 0 && (
-                          <div className="mt-2">
-                            <p className="font-medium text-xs text-gray-500 mb-1">Itens do pedido:</p>
-                            <div className="space-y-1">
-                              {order.items.slice(0, 3).map((item: any, idx: number) => (
-                                <p key={idx} className="text-xs text-gray-600">
-                                  • {item.product?.name || 'Produto'} - Qtd: {item.quantity}
-                                </p>
-                              ))}
-                              {order.items.length > 3 && (
-                                <p className="text-xs text-gray-500">
-                                  + {order.items.length - 3} outro(s) item(ns)
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => handleMarkAsPickedUp(order.id)}
-                      disabled={markingAsPickedUp === order.id}
-                      className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
-                      size="sm"
-                    >
-                      {markingAsPickedUp === order.id ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Processando...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Marcar como Retirado
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
-        {/* Coluna Esquerda - Busca e Produtos */}
-        <div className="lg:col-span-2 space-y-4 overflow-y-auto">
-        {/* Busca de Produtos */}
-        <Card className="shadow-lg border-2 border-[#3e2626]/10">
-          <CardContent className="p-4">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-[#3e2626] z-10" />
-              <Input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Buscar por nome, SKU ou código de barras..."
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="pl-12 pr-12 h-14 text-lg border-2 border-[#3e2626]/20 focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 rounded-lg font-medium"
-              />
-              {isSearching && (
-                <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-[#3e2626] animate-spin" />
-              )}
-              {!isSearching && searchTerm && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-10 w-10 p-0 hover:bg-gray-100"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setProducts([]);
-                  }}
-                >
-                  <X className="h-5 w-5 text-gray-500" />
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Lista de Produtos */}
-        <Card className="flex-1 shadow-lg border-0">
-          <CardHeader className="bg-[#3e2626] text-white rounded-t-lg">
-            <CardTitle className="flex items-center justify-between text-white">
-              <span className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Produtos
-              </span>
-              {products.length > 0 && (
-                <Badge className="bg-white text-[#3e2626] font-semibold">{products.length} encontrado(s)</Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#3e2626]" />
-              </div>
-            ) : products.length === 0 && searchTerm ? (
-              <div className="text-center py-16">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-red-50 rounded-full mb-4">
-                  <AlertCircle className="h-10 w-10 text-red-400" />
-                </div>
-                <p className="text-gray-700 font-semibold text-lg mb-2">Nenhum produto encontrado</p>
-                <p className="text-gray-500 text-sm">Tente buscar com outro termo</p>
-              </div>
-            ) : products.length === 0 && !searchTerm ? (
-              <div className="text-center py-16">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-50 rounded-full mb-4">
-                  <Barcode className="h-10 w-10 text-blue-400" />
-                </div>
-                <p className="text-gray-700 font-semibold text-lg mb-2">Buscar Produtos</p>
-                <p className="text-gray-500 text-sm">Digite o nome, SKU ou código de barras para buscar</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
-                {products.map((product) => {
-                  const cartItem = cart.find(item => item.productId === product.id);
-                  const currentQuantity = cartItem?.quantity || 0;
-                  
-                  return (
-                    <div
-                      key={product.id}
-                      className="border-2 rounded-xl p-4 hover:border-[#3e2626] hover:shadow-lg transition-all bg-white group"
-                    >
-                      <div className="flex flex-col space-y-3">
-                        {product.imageUrl ? (
-                          <div className="relative w-full h-32 rounded-lg overflow-hidden bg-gray-100">
-                            <Image
-                              src={product.imageUrl}
-                              alt={product.name}
-                              fill
-                              className="object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
-                            <ShoppingCart className="h-12 w-12 text-gray-400" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-base text-gray-900 line-clamp-2 mb-2">{product.name}</h3>
-                          <p className="text-2xl font-bold text-[#3e2626] mb-3">
-                            {formatCurrency(product.price)}
-                          </p>
-                          <div className="flex items-center justify-between mb-3">
-                            <Badge variant={product.stock > 0 ? 'default' : 'destructive'} className="text-xs">
-                              Estoque: {product.stock}
-                            </Badge>
-                            {product.barcode && (
-                              <span className="text-xs text-gray-500">#{product.barcode}</span>
-                            )}
-                          </div>
-                          
-                          {cartItem && (
-                            <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
-                              <p className="text-xs text-green-700 font-medium">
-                                No carrinho: {currentQuantity} unidade(s)
-                              </p>
-                            </div>
-                          )}
-                          
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 h-9"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (cartItem) {
-                                  updateQuantity(product.id, cartItem.quantity - 1);
-                                }
-                              }}
-                              disabled={!cartItem || cartItem.quantity <= 0}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                addToCart(product, 1);
-                              }}
-                              className="flex-1 bg-[#3e2626] hover:bg-[#5a3a3a] text-white h-9"
-                              disabled={product.stock === 0 || (cartItem && cartItem.quantity >= product.stock)}
-                            >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Adicionar
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 h-9"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (cartItem) {
-                                  updateQuantity(product.id, cartItem.quantity + 1);
-                                } else {
-                                  addToCart(product, 1);
-                                }
-                              }}
-                              disabled={product.stock === 0 || (cartItem && cartItem.quantity >= product.stock)}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+    <div className="flex flex-col h-full overflow-hidden bg-gray-50">
+      {/* Abas de Navegação */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex gap-2 p-4">
+          <Button
+            variant={activeTab === 'products' ? 'default' : 'ghost'}
+            onClick={() => setActiveTab('products')}
+            className={`flex-1 h-12 text-base font-semibold transition-all ${
+              activeTab === 'products'
+                ? 'bg-[#3e2626] hover:bg-[#5a3a3a] text-white shadow-lg'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Store className="h-5 w-5 mr-2" />
+            Produtos
+          </Button>
+          <Button
+            variant={activeTab === 'pickup' ? 'default' : 'ghost'}
+            onClick={() => setActiveTab('pickup')}
+            className={`flex-1 h-12 text-base font-semibold transition-all relative ${
+              activeTab === 'pickup'
+                ? 'bg-[#3e2626] hover:bg-[#5a3a3a] text-white shadow-lg'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Package className="h-5 w-5 mr-2" />
+            Retiradas
+            {pendingPickupOrders.length > 0 && (
+              <Badge className="ml-2 bg-red-500 text-white">
+                {pendingPickupOrders.length}
+              </Badge>
             )}
-          </CardContent>
-        </Card>
+          </Button>
+        </div>
       </div>
 
-      {/* Coluna Direita - Carrinho e Finalização */}
+      <div className={`grid flex-1 overflow-hidden p-6 gap-6 ${
+        activeTab === 'products' 
+          ? 'grid-cols-1 lg:grid-cols-3' 
+          : 'grid-cols-1'
+      }`}>
+        {/* Coluna Esquerda - Conteúdo Principal */}
+        <div className={activeTab === 'products' ? 'lg:col-span-2 overflow-hidden' : 'overflow-hidden'}>
+          {activeTab === 'products' ? (
+            <PDVProductsPage
+              cart={cart}
+              onAddToCart={addToCart}
+              onUpdateQuantity={updateQuantity}
+              onRemoveFromCart={removeFromCart}
+            />
+          ) : (
+            <PDVPickupPage
+              pickupOrders={pendingPickupOrders}
+              onOrderPickedUp={handleOrderPickedUp}
+            />
+          )}
+        </div>
+
+      {/* Coluna Direita - Carrinho e Finalização (apenas na aba de produtos) */}
+      {activeTab === 'products' && (
       <div className="space-y-4">
         <Card className="sticky top-4 shadow-xl border-0">
           <CardHeader className="bg-[#3e2626] text-white rounded-t-lg">
@@ -936,7 +633,8 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
             )}
           </CardContent>
         </Card>
-        </div>
+      </div>
+      )}
       </div>
 
       {/* Modal de Pagamento */}

@@ -231,9 +231,19 @@ export const useAppStore = create<AppState>()(
         set({ user, isAuthenticated: !!user });
         
         // Se o usuário fez login, carregar o carrinho do backend (em background)
+        // APENAS para CUSTOMER ou ADMIN (outros roles não têm carrinho de customer)
         if (user && typeof window !== 'undefined') {
+          const userRole = user.role?.toUpperCase();
+          const isCustomer = userRole === 'CUSTOMER' || userRole === 'ADMIN';
+          
           // Limpar carrinho local PRIMEIRO para evitar conflitos
           set({ cart: [], cartTotal: 0 });
+          
+          // Se não for customer/admin, não tentar carregar carrinho
+          if (!isCustomer) {
+            console.log(`ℹ️ Usuário com role ${userRole} não precisa de carrinho de customer, pulando carregamento.`);
+            return;
+          }
           
           // Marcar que o setUser vai carregar o carrinho (para evitar que ClientProviders também carregue)
           const cartLoadedKey = `cart_loaded_${user.id}`;
@@ -364,8 +374,36 @@ export const useAppStore = create<AppState>()(
       addToCart: async (product, quantity = 1) => {
         const { cart, user, isAuthenticated } = get();
 
+        // Verificar se o usuário tem permissão para usar carrinho de customer
+        const userRole = user?.role?.toUpperCase();
+        const isCustomer = userRole === 'CUSTOMER' || userRole === 'ADMIN';
+
         // Se NÃO estiver autenticado, mantém comportamento apenas local
         if (!isAuthenticated || !user) {
+          const existingItem = cart.find(item => item.product.id === product.id);
+          
+          let updatedCart: CartItem[];
+          if (existingItem) {
+            updatedCart = cart.map(item =>
+              item.product.id === product.id
+                ? { ...item, quantity: item.quantity + quantity }
+                : item
+            );
+          } else {
+            updatedCart = [...cart, { product, quantity }];
+          }
+          
+          const cartTotal = updatedCart.reduce(
+            (total, item) => total + (Number(item.product.price) * item.quantity),
+            0
+          );
+          set({ cart: updatedCart, cartTotal });
+          return;
+        }
+
+        // Se não for customer/admin, apenas atualizar localmente
+        if (!isCustomer) {
+          console.log(`ℹ️ Usuário com role ${userRole} não pode usar carrinho de customer, atualizando apenas localmente.`);
           const existingItem = cart.find(item => item.product.id === product.id);
           
           let updatedCart: CartItem[];
@@ -472,8 +510,24 @@ export const useAppStore = create<AppState>()(
       removeFromCart: async (productId) => {
         const { cart, user, isAuthenticated } = get();
 
+        // Verificar se o usuário tem permissão para usar carrinho de customer
+        const userRole = user?.role?.toUpperCase();
+        const isCustomer = userRole === 'CUSTOMER' || userRole === 'ADMIN';
+
         // Se não estiver autenticado, apenas atualizar local
         if (!isAuthenticated || !user) {
+          const updatedCart = cart.filter(item => item.product.id !== productId);
+          const cartTotal = updatedCart.reduce(
+            (total, item) => total + (item.product.price * item.quantity),
+            0
+          );
+          set({ cart: updatedCart, cartTotal });
+          return;
+        }
+
+        // Se não for customer/admin, apenas atualizar localmente
+        if (!isCustomer) {
+          console.log(`ℹ️ Usuário com role ${userRole} não pode usar carrinho de customer, removendo apenas localmente.`);
           const updatedCart = cart.filter(item => item.product.id !== productId);
           const cartTotal = updatedCart.reduce(
             (total, item) => total + (item.product.price * item.quantity),
@@ -549,6 +603,10 @@ export const useAppStore = create<AppState>()(
           return;
         }
         
+        // Verificar se o usuário tem permissão para usar carrinho de customer
+        const userRole = user?.role?.toUpperCase();
+        const isCustomer = userRole === 'CUSTOMER' || userRole === 'ADMIN';
+        
         const itemToUpdate = cart.find(item => item.product.id === productId);
         const updatedCart = cart.map(item =>
           item.product.id === productId
@@ -558,8 +616,8 @@ export const useAppStore = create<AppState>()(
         const cartTotal = updatedCart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
         set({ cart: updatedCart, cartTotal });
         
-        // Sincronizar com o backend se o usuário estiver autenticado
-        if (isAuthenticated && user && itemToUpdate?.id) {
+        // Sincronizar com o backend se o usuário estiver autenticado E for customer/admin
+        if (isAuthenticated && user && isCustomer && itemToUpdate?.id) {
           try {
             const { customerAPI } = await import('./api');
             await customerAPI.updateCartItem(itemToUpdate.id, quantity);
@@ -573,6 +631,10 @@ export const useAppStore = create<AppState>()(
       clearCart: async () => {
         const { user, isAuthenticated } = get();
         
+        // Verificar se o usuário tem permissão para usar carrinho de customer
+        const userRole = user?.role?.toUpperCase();
+        const isCustomer = userRole === 'CUSTOMER' || userRole === 'ADMIN';
+        
         // Limpar localmente primeiro
         set({ cart: [], cartTotal: 0 });
         
@@ -582,8 +644,8 @@ export const useAppStore = create<AppState>()(
           sessionStorage.removeItem(cartLoadedKey);
         }
         
-        // Se estiver autenticado, limpar também no backend
-        if (isAuthenticated && user) {
+        // Se estiver autenticado E for customer/admin, limpar também no backend
+        if (isAuthenticated && user && isCustomer) {
           try {
             const { customerAPI } = await import('./api');
             await customerAPI.clearCart();

@@ -23,6 +23,7 @@ import {
   List,
   Receipt,
   Monitor,
+  ArrowRight,
 } from 'lucide-react';
 
 function ProductsHeaderComponent({ 
@@ -43,43 +44,48 @@ function ProductsHeaderComponent({
 
   if (!isProductsPage) {
     return (
-      <header className="bg-[#3e2626] border-b border-[#3e2626]/20 sticky top-0 z-30 shadow-lg">
+      <header className="border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <Button
               variant="ghost"
-              size="sm"
-              className="lg:hidden mr-3 text-white hover:bg-white/20"
+              size="icon"
+              className="lg:hidden"
               onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Abrir menu lateral"
             >
               <Menu className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-white">
-                {pathname.startsWith('/employee/pdv') ? 'Ponto de Venda' : pathname === '/employee/sales' ? 'Vendas' : pathname === '/employee/timeclock' ? 'Ponto' : 'Dashboard'}
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Painel funcionário
+              </p>
+              <h1 className="text-xl font-semibold text-foreground">
+                {pathname.startsWith('/employee/pdv') ? 'Ponto de Venda' : 
+                 pathname === '/employee/sales' ? 'Vendas' : 
+                 pathname === '/employee/timeclock' ? 'Ponto' : 
+                 'Dashboard'}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/employee/profile')}
-              className="hidden md:flex items-center space-x-3 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30 hover:bg-white/30 transition-all duration-300 cursor-pointer"
+              className="hidden items-center gap-3 rounded-2xl border border-border bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50 sm:flex"
             >
-              <Avatar className="h-10 w-10 ring-2 ring-white/30 flex-shrink-0">
-                <AvatarImage 
-                  src={user?.avatarUrl || ''} 
-                  alt={user?.name || 'Usuário'}
-                  className="object-cover"
-                />
-                <AvatarFallback className="bg-white/30 text-white font-bold">
-                  {user?.name?.charAt(0).toUpperCase() || 'F'}
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
+                  {user?.name?.charAt(0)?.toUpperCase() || 'F'}
                 </AvatarFallback>
               </Avatar>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-white">{user?.name}</p>
-                <p className="text-xs text-white/80">Funcionário</p>
+              <div className="min-w-0 text-left">
+                <p className="truncate text-sm font-medium text-foreground">
+                  {user?.name || 'Funcionário'}
+                </p>
+                <p className="text-xs text-muted-foreground">Funcionário</p>
               </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             </button>
           </div>
         </div>
@@ -260,13 +266,57 @@ export default function EmployeeLayout({
     }
   }, [user]);
 
-  const navigation = [
-    { name: 'Início', href: '/employee', icon: Home, current: pathname === '/employee' },
-    { name: 'PDV', href: '/employee/pdv', icon: ShoppingCart, current: pathname.startsWith('/employee/pdv') },
-    { name: 'Produtos', href: '/employee/products', icon: Package, current: pathname.startsWith('/employee/products') },
-    { name: 'Vendas', href: '/employee/sales', icon: Receipt, current: pathname.startsWith('/employee/sales') },
-    { name: 'Ponto', href: '/employee/timeclock', icon: Clock, current: pathname.startsWith('/employee/timeclock') },
+  const navigationSections = [
+    {
+      title: 'Visão geral',
+      items: [
+        {
+          name: 'Dashboard',
+          href: '/employee',
+          icon: Home,
+          current: pathname === '/employee',
+        },
+      ],
+    },
+    {
+      title: 'Operações',
+      items: [
+        {
+          name: 'PDV',
+          href: '/employee/pdv',
+          icon: ShoppingCart,
+          current: pathname.startsWith('/employee/pdv'),
+        },
+        {
+          name: 'Produtos',
+          href: '/employee/products',
+          icon: Package,
+          current: pathname.startsWith('/employee/products'),
+        },
+        {
+          name: 'Vendas',
+          href: '/employee/sales',
+          icon: Receipt,
+          current: pathname.startsWith('/employee/sales'),
+        },
+      ],
+    },
+    {
+      title: 'Recursos',
+      items: [
+        {
+          name: 'Ponto',
+          href: '/employee/timeclock',
+          icon: Clock,
+          current: pathname.startsWith('/employee/timeclock'),
+        },
+      ],
+    },
   ];
+
+  const currentNavigationItem = navigationSections
+    .flatMap((section) => section.items)
+    .find((item) => item.current);
 
   const handleLogout = () => {
     const { logout } = useAppStore.getState();
@@ -289,68 +339,93 @@ export default function EmployeeLayout({
 
   return (
     <ProductsHeaderProvider>
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-muted/40 text-foreground">
         {/* Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-xl border-r border-gray-200 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0`}>
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="px-6 py-8 border-b border-[#8B4513]/30 bg-[#3e2626]">
-            <div className="flex items-center space-x-3">
-              <div className="w-16 h-16 relative flex items-center justify-center bg-white rounded-xl p-2 border border-white/30 shadow-lg">
+        <div
+          className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="flex h-full flex-col">
+            <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-4">
+              <div className="relative h-[54px] w-full flex items-center justify-center">
                 <Image
-                  src="/logo.png"
+                  src="/logotipos/8.svg"
                   alt="MobiliAI Logo"
-                  width={56}
-                  height={56}
+                  width={300}
+                  height={100}
                   className="object-contain"
                 />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">MobiliAI</h1>
-                <p className="text-xs text-white/80 font-medium">Painel Funcionário</p>
-              </div>
             </div>
-          </div>
-          
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            <div className="space-y-1">
-              {navigation.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.name}
-                    onClick={() => {
-                      router.push(item.href);
-                      setSidebarOpen(false);
-                    }}
-                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
-                      item.current 
-                        ? 'bg-[#3e2626] text-white shadow-md' 
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Icon className="h-5 w-5 mr-3" />
-                    {item.name}
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
 
-          {/* Logout Button */}
-          <div className="px-4 py-4 border-t border-gray-200">
-            <Button
-              onClick={handleLogout}
-              variant="ghost"
-              className="w-full justify-start text-gray-700 hover:bg-red-50 hover:text-red-600"
-            >
-              <LogOut className="h-4 w-4 mr-3" />
-              Sair
-            </Button>
+            <div className="border-b border-sidebar-border px-6 py-5">
+              <button
+                onClick={() => router.push('/employee')}
+                className="flex w-full items-center gap-3 rounded-2xl bg-muted/40 p-3 transition-colors hover:bg-muted/60"
+              >
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
+                    {user?.name?.charAt(0)?.toUpperCase() || 'F'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="truncate text-sm font-semibold text-sidebar-foreground">
+                    {user?.name || 'Funcionário'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Funcionário</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </button>
+            </div>
+
+            <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-6">
+              {navigationSections.map((section) => (
+                <div key={section.title} className="space-y-2">
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {section.title}
+                  </p>
+                  <div className="space-y-1">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = item.current;
+
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => {
+                            router.push(item.href);
+                            setSidebarOpen(false);
+                          }}
+                          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                            isActive
+                              ? 'bg-[#3e2626] text-primary-foreground shadow-sm'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent/80 hover:text-foreground'
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span className="truncate">{item.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
+
+            <div className="border-t border-sidebar-border px-4 py-5">
+              <Button
+                variant="ghost"
+                className="flex w-full items-center justify-start gap-2 rounded-xl px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent/70"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4" />
+                Sair
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Main Content */}
       <div className="lg:ml-64">
@@ -417,15 +492,14 @@ export default function EmployeeLayout({
         )}
 
         {/* Page Content */}
-        <main className={`${pathname === '/employee' ? 'p-8 bg-white' : pathname.startsWith('/employee/pdv') ? 'p-0 bg-white overflow-hidden' : 'p-8 bg-gray-50'} ${pathname.startsWith('/employee/pdv') ? 'h-screen' : 'min-h-screen'}`}>
+        <main className={`${pathname.startsWith('/employee/pdv') ? 'p-0 bg-white overflow-hidden h-screen' : 'p-6'}`}>
           {children}
         </main>
       </div>
 
-      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+        <div
+          className="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
