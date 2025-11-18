@@ -59,6 +59,8 @@ interface Coupon {
   categoryId?: string;
   productId?: string;
   storeId?: string;
+  assignmentType?: 'EXCLUSIVE' | 'ALL_ACCOUNTS' | 'NEW_ACCOUNTS_ONLY';
+  couponType?: 'PRODUCT' | 'SHIPPING';
   createdAt: string;
   creator?: {
     id: string;
@@ -104,6 +106,8 @@ export default function CouponsPage() {
     productId: '',
     storeId: '',
     isActive: true,
+    assignmentType: 'EXCLUSIVE' as 'EXCLUSIVE' | 'ALL_ACCOUNTS' | 'NEW_ACCOUNTS_ONLY',
+    couponType: 'PRODUCT' as 'PRODUCT' | 'SHIPPING',
   });
 
   useEffect(() => {
@@ -222,6 +226,8 @@ export default function CouponsPage() {
       productId: '',
       storeId: '',
       isActive: true,
+      assignmentType: 'EXCLUSIVE',
+      couponType: 'PRODUCT',
     });
     setSelectedCoupon(null);
     setIsCreateModalOpen(true);
@@ -254,6 +260,8 @@ export default function CouponsPage() {
       productId: coupon.productId || '',
       storeId: coupon.storeId || '',
       isActive: coupon.isActive,
+      assignmentType: (coupon as any).assignmentType || 'EXCLUSIVE',
+      couponType: (coupon as any).couponType || 'PRODUCT',
     });
     setIsEditModalOpen(true);
   };
@@ -497,6 +505,34 @@ export default function CouponsPage() {
                       </div>
                     )}
                     
+                    {/* Mostrar tipo de cupom e atribuição */}
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          (coupon as any).couponType === 'SHIPPING' ? 'border-orange-500 text-orange-700 bg-orange-50' :
+                          'border-blue-500 text-blue-700 bg-blue-50'
+                        }
+                      >
+                        {(coupon as any).couponType === 'SHIPPING' ? '🚚 Frete' : '📦 Produtos'}
+                        {!(coupon as any).couponType && '📦 Produtos'}
+                      </Badge>
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          coupon.assignmentType === 'EXCLUSIVE' ? 'border-blue-500 text-blue-700' :
+                          coupon.assignmentType === 'ALL_ACCOUNTS' ? 'border-green-500 text-green-700' :
+                          coupon.assignmentType === 'NEW_ACCOUNTS_ONLY' ? 'border-purple-500 text-purple-700' :
+                          'border-gray-500 text-gray-700'
+                        }
+                      >
+                        {coupon.assignmentType === 'EXCLUSIVE' && '🔒 Exclusivo'}
+                        {coupon.assignmentType === 'ALL_ACCOUNTS' && '👥 Todas as Contas'}
+                        {coupon.assignmentType === 'NEW_ACCOUNTS_ONLY' && '🆕 Contas Novas'}
+                        {!coupon.assignmentType && '🔒 Exclusivo'}
+                      </Badge>
+                    </div>
+                    
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <span className="text-gray-500">Desconto:</span>
@@ -725,6 +761,53 @@ export default function CouponsPage() {
                   <SelectItem value="STORE">Loja Específica</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="couponType">Tipo de Cupom *</Label>
+                <Select
+                  value={formData.couponType}
+                  onValueChange={(value: 'PRODUCT' | 'SHIPPING') =>
+                    setFormData({ ...formData, couponType: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PRODUCT">Para Produtos</SelectItem>
+                    <SelectItem value="SHIPPING">Para Frete</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formData.couponType === 'PRODUCT' && 'Desconto aplicado nos produtos'}
+                  {formData.couponType === 'SHIPPING' && 'Desconto aplicado no frete'}
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="assignmentType">Tipo de Atribuição *</Label>
+                <Select
+                  value={formData.assignmentType}
+                  onValueChange={(value: 'EXCLUSIVE' | 'ALL_ACCOUNTS' | 'NEW_ACCOUNTS_ONLY') =>
+                    setFormData({ ...formData, assignmentType: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EXCLUSIVE">Exclusivo (precisa digitar o código)</SelectItem>
+                    <SelectItem value="ALL_ACCOUNTS">Atribuído a qualquer conta</SelectItem>
+                    <SelectItem value="NEW_ACCOUNTS_ONLY">Somente para contas novas</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formData.assignmentType === 'EXCLUSIVE' && 'O cliente precisa digitar o código do cupom manualmente'}
+                  {formData.assignmentType === 'ALL_ACCOUNTS' && 'O cupom aparecerá automaticamente para todos os clientes'}
+                  {formData.assignmentType === 'NEW_ACCOUNTS_ONLY' && 'O cupom aparecerá automaticamente apenas para contas recém-criadas'}
+                </p>
+              </div>
             </div>
 
             {/* Campo condicional para Categoria */}

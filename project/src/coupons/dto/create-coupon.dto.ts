@@ -12,6 +12,17 @@ export enum CouponApplicableTo {
   STORE = 'STORE',
 }
 
+export enum CouponAssignmentType {
+  EXCLUSIVE = 'EXCLUSIVE',
+  ALL_ACCOUNTS = 'ALL_ACCOUNTS',
+  NEW_ACCOUNTS_ONLY = 'NEW_ACCOUNTS_ONLY',
+}
+
+export enum CouponType {
+  PRODUCT = 'PRODUCT',
+  SHIPPING = 'SHIPPING',
+}
+
 export class CreateCouponDto {
   @IsString()
   code: string;
@@ -70,5 +81,13 @@ export class CreateCouponDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsEnum(CouponAssignmentType)
+  assignmentType?: CouponAssignmentType;
+
+  @IsOptional()
+  @IsEnum(CouponType)
+  couponType?: CouponType;
 }
 

@@ -633,6 +633,8 @@ model Coupon {
   categoryId        String?
   productId         String?
   storeId           String?
+  assignmentType    CouponAssignmentType?
+  couponType        CouponType?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   createdBy         String
@@ -666,6 +668,17 @@ enum CouponApplicableTo {
   CATEGORY
   PRODUCT
   STORE
+}
+
+enum CouponAssignmentType {
+  EXCLUSIVE
+  ALL_ACCOUNTS
+  NEW_ACCOUNTS_ONLY
+}
+
+enum CouponType {
+  PRODUCT
+  SHIPPING
 }
 
 enum UserRole {
