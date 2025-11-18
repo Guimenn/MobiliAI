@@ -36,7 +36,10 @@ export class PublicSupportService {
         zipCode: true,
         phone: true,
         email: true,
-        openingHours: true,
+        workingHours: true,
+        openingTime: true,
+        closingTime: true,
+        workingDays: true,
       },
     });
 
@@ -117,7 +120,10 @@ export class PublicSupportService {
         zipCode: true,
         phone: true,
         email: true,
-        openingHours: true,
+        workingHours: true,
+        openingTime: true,
+        closingTime: true,
+        workingDays: true,
       },
     });
 
