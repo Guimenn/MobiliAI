@@ -277,6 +277,9 @@ export default function CheckoutPage() {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
   const [couponError, setCouponError] = useState('');
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [customerCoupons, setCustomerCoupons] = useState<any[]>([]);
+  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
 
   // Opções de entrega
   const [selectedShipping, setSelectedShipping] = useState<'standard' | 'express' | 'pickup'>('standard');
@@ -1081,6 +1084,189 @@ export default function CheckoutPage() {
     setAppliedCoupon(null);
     setCouponCode('');
     setCouponError('');
+  };
+
+  // Buscar cupons atribuídos ao cliente
+  const fetchCustomerCoupons = async () => {
+    setIsLoadingCoupons(true);
+    try {
+      const token = useAppStore.getState().token;
+      const user = useAppStore.getState().user;
+      
+      // Construir URL corretamente (API_URL já contém /api)
+      const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+      const couponsUrl = `${apiBaseUrl}/customer/coupons`;
+
+      console.log('🔍 Buscando cupons do cliente...', {
+        hasToken: !!token,
+        userId: user?.id,
+        userEmail: user?.email,
+        userRole: user?.role,
+        apiUrl: couponsUrl
+      });
+
+      if (!token) {
+        console.warn('⚠️ Token não encontrado, não é possível buscar cupons');
+        setCustomerCoupons([]);
+        setIsLoadingCoupons(false);
+        return;
+      }
+
+      // Tentar buscar cupons atribuídos ao cliente via API
+      try {
+        const response = await fetch(couponsUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        console.log('📡 Resposta da API:', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📦 Dados brutos recebidos:', data);
+          
+          // Tentar extrair cupons de diferentes formatos possíveis
+          let coupons = [];
+          if (Array.isArray(data)) {
+            coupons = data;
+          } else if (data.coupons && Array.isArray(data.coupons)) {
+            coupons = data.coupons;
+          } else if (data.data && Array.isArray(data.data)) {
+            coupons = data.data;
+          } else {
+            coupons = [];
+          }
+          
+          console.log('📋 Cupons processados:', coupons.length, coupons);
+          setCustomerCoupons(coupons);
+        } else {
+          const errorText = await response.text();
+          console.warn('⚠️ Erro ao buscar cupons:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          setCustomerCoupons([]);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao buscar cupons:', error);
+        setCustomerCoupons([]);
+      }
+    } catch (error) {
+      console.error('❌ Erro geral ao buscar cupons:', error);
+      setCustomerCoupons([]);
+    } finally {
+      setIsLoadingCoupons(false);
+    }
+  };
+
+  // Abrir modal de cupons
+  const handleOpenCouponModal = () => {
+    setShowCouponModal(true);
+    fetchCustomerCoupons();
+  };
+
+  // Aplicar cupom do modal
+  const handleApplyCouponFromModal = async (code: string) => {
+    setCouponCode(code);
+    setShowCouponModal(false);
+    // Aplicar o cupom automaticamente
+    const upperCode = code.toUpperCase().trim();
+    const firstProduct = checkoutItems[0]?.product;
+    const categoryId = firstProduct?.category;
+    const productId = checkoutItems.length === 1 ? checkoutItems[0].product.id : undefined;
+    
+    try {
+      const validation = await customerAPI.validateCoupon(
+        upperCode,
+        subtotal,
+        productId,
+        categoryId,
+        selectedStore || undefined
+      );
+
+      if (validation.valid) {
+        setAppliedCoupon({
+          code: validation.coupon.code,
+          discount: validation.discount,
+        });
+        setCouponError('');
+        showAlert('success', `Cupom ${validation.coupon.code} aplicado com sucesso!`);
+      } else {
+        setCouponError('Cupom inválido ou expirado');
+        showAlert('error', 'Cupom inválido ou expirado');
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Erro ao validar cupom';
+      setCouponError(errorMessage);
+      showAlert('error', errorMessage);
+    }
+  };
+
+  // Categorizar cupons
+  const categorizeCoupons = (coupons: any[]) => {
+    const shippingCoupons: any[] = [];
+    const unavailableCoupons: any[] = [];
+    const availableCoupons: any[] = [];
+
+    console.log('🔍 Categorizando cupons:', coupons.length, coupons);
+
+    coupons.forEach(coupon => {
+      // Verificar se é cupom de frete (usar couponType do backend)
+      const isShipping = coupon.couponType === 'SHIPPING' || 
+                        coupon.type === 'shipping' || 
+                        coupon.category === 'Frete' ||
+                        (coupon.description && coupon.description.toLowerCase().includes('frete'));
+      
+      console.log(`  - Cupom ${coupon.code}:`, {
+        couponType: coupon.couponType,
+        isShipping,
+        minimumPurchase: coupon.minimumPurchase,
+        subtotal,
+        validUntil: coupon.validUntil || coupon.expiresAt
+      });
+      
+      if (isShipping) {
+        shippingCoupons.push(coupon);
+      } else {
+        // Verificar se está disponível
+        const minPurchase = coupon.minimumPurchase || 0;
+        const expiresAt = coupon.validUntil || coupon.expiresAt;
+        const isExpired = expiresAt ? new Date(expiresAt) <= new Date() : false;
+        const hasMinPurchase = subtotal >= minPurchase;
+        const hasUsageLimit = coupon.usageLimit ? (coupon.usedCount || 0) < coupon.usageLimit : true;
+        
+        const isAvailable = hasMinPurchase && !isExpired && hasUsageLimit;
+        
+        console.log(`    Disponibilidade:`, {
+          hasMinPurchase,
+          isExpired,
+          hasUsageLimit,
+          isAvailable
+        });
+        
+        if (isAvailable) {
+          availableCoupons.push(coupon);
+        } else {
+          unavailableCoupons.push(coupon);
+        }
+      }
+    });
+
+    console.log('📊 Cupons categorizados:', {
+      shipping: shippingCoupons.length,
+      available: availableCoupons.length,
+      unavailable: unavailableCoupons.length
+    });
+
+    return { shippingCoupons, unavailableCoupons, availableCoupons };
   };
 
   // Validar formulário
@@ -2131,21 +2317,14 @@ export default function CheckoutPage() {
                 {/* Cupom */}
                 {!appliedCoupon && (
                   <div className="pt-4 border-t border-gray-200">
-                    <div className="flex space-x-2">
-                      <Input
-                        placeholder="Código do cupom"
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button
-                        onClick={handleApplyCoupon}
-                        variant="outline"
-                        className="border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
-                      >
-                        Aplicar
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={handleOpenCouponModal}
+                      variant="outline"
+                      className="w-full border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white flex items-center justify-center space-x-2"
+                    >
+                      <Tag className="h-4 w-4" />
+                      <span>Cupons</span>
+                    </Button>
                     {couponError && (
                       <p className="text-sm text-red-600 mt-2 flex items-center space-x-1">
                         <AlertCircle className="h-4 w-4" />
@@ -2722,6 +2901,254 @@ export default function CheckoutPage() {
           ) : (
             <div className="text-center text-gray-500 py-12">Produto não encontrado.</div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Cupons */}
+      <Dialog open={showCouponModal} onOpenChange={setShowCouponModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-[#3e2626] flex items-center space-x-2">
+              <Tag className="h-6 w-6" />
+              <span>Cupons Disponíveis</span>
+            </DialogTitle>
+            <DialogDescription>
+              Escolha um cupom atribuído ou digite um código exclusivo
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 mt-4">
+            {/* Input para cupons exclusivos */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-[#3e2626]">Cupom Exclusivo</Label>
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Digite o código do cupom exclusivo"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  className="flex-1"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleApplyCoupon();
+                    }
+                  }}
+                />
+                <Button
+                  onClick={handleApplyCoupon}
+                  className="bg-[#3e2626] text-white hover:bg-[#2a1f1f]"
+                >
+                  Aplicar
+                </Button>
+              </div>
+              {couponError && (
+                <p className="text-sm text-red-600 flex items-center space-x-1">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{couponError}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Cupons atribuídos ao cliente */}
+            {isLoadingCoupons ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+                <span className="ml-2 text-gray-600">Carregando cupons...</span>
+              </div>
+            ) : (
+              <>
+                {(() => {
+                  const { shippingCoupons, unavailableCoupons, availableCoupons } = categorizeCoupons(customerCoupons);
+                  
+                  return (
+                    <div className="space-y-6">
+                      {/* Cupons de Frete */}
+                      {shippingCoupons.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-lg font-semibold text-[#3e2626] flex items-center space-x-2">
+                            <Truck className="h-5 w-5" />
+                            <span>Cupons de Frete</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {shippingCoupons.map((coupon) => (
+                              <Card key={coupon.id || coupon.code} className="p-4 hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <Badge className="bg-blue-500 text-white">{coupon.code}</Badge>
+                                      {coupon.discountType === 'percentage' ? (
+                                        <span className="text-lg font-bold text-green-600">
+                                          {coupon.discountValue}% OFF
+                                        </span>
+                                      ) : (
+                                        <span className="text-lg font-bold text-green-600">
+                                          R$ {coupon.discountValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-gray-600">{coupon.description || 'Cupom de frete'}</p>
+                                    {(coupon.validUntil || coupon.expiresAt) && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        Válido até {new Date(coupon.validUntil || coupon.expiresAt).toLocaleDateString('pt-BR')}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    onClick={() => handleApplyCouponFromModal(coupon.code)}
+                                    className="ml-4 bg-[#3e2626] text-white hover:bg-[#2a1f1f]"
+                                  >
+                                    Usar
+                                  </Button>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Cupons Disponíveis */}
+                      {availableCoupons.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-lg font-semibold text-[#3e2626] flex items-center space-x-2">
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <span>Cupons Disponíveis</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {availableCoupons.map((coupon) => (
+                              <Card key={coupon.id || coupon.code} className="p-4 hover:shadow-md transition-shadow border-green-200">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <Badge className="bg-green-500 text-white">{coupon.code}</Badge>
+                                      {coupon.discountType === 'percentage' ? (
+                                        <span className="text-lg font-bold text-green-600">
+                                          {coupon.discountValue}% OFF
+                                        </span>
+                                      ) : (
+                                        <span className="text-lg font-bold text-green-600">
+                                          R$ {coupon.discountValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-gray-600">{coupon.description || 'Cupom disponível'}</p>
+                                    {coupon.minimumPurchase && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        Compra mínima: R$ {coupon.minimumPurchase.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                    )}
+                                    {(coupon.validUntil || coupon.expiresAt) && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        Válido até {new Date(coupon.validUntil || coupon.expiresAt).toLocaleDateString('pt-BR')}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    onClick={() => handleApplyCouponFromModal(coupon.code)}
+                                    className="ml-4 bg-green-600 text-white hover:bg-green-700"
+                                  >
+                                    Usar
+                                  </Button>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Cupons Indisponíveis */}
+                      {unavailableCoupons.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-lg font-semibold text-[#3e2626] flex items-center space-x-2">
+                            <AlertCircle className="h-5 w-5 text-orange-500" />
+                            <span>Cupons Indisponíveis</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {unavailableCoupons.map((coupon) => {
+                              const minPurchase = coupon.minimumPurchase || 0;
+                              const missing = minPurchase - subtotal;
+                              const expiresAt = coupon.validUntil || coupon.expiresAt;
+                              const isExpired = expiresAt && new Date(expiresAt) <= new Date();
+                              const isUsed = coupon.usageLimit ? (coupon.usedCount || 0) >= coupon.usageLimit : false;
+                              
+                              return (
+                                <Card key={coupon.id || coupon.code} className="p-4 bg-gray-50 border-gray-200 opacity-75">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center space-x-2 mb-1">
+                                        <Badge className="bg-gray-500 text-white">{coupon.code}</Badge>
+                                        {coupon.discountType === 'percentage' ? (
+                                          <span className="text-lg font-bold text-gray-600">
+                                            {coupon.discountValue}% OFF
+                                          </span>
+                                        ) : (
+                                          <span className="text-lg font-bold text-gray-600">
+                                            R$ {coupon.discountValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-sm text-gray-600">{coupon.description || 'Cupom indisponível'}</p>
+                                      
+                                      {/* Mostrar o que falta */}
+                                      {!isExpired && !isUsed && minPurchase > subtotal && (
+                                        <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                                          <p className="text-xs text-orange-700 font-semibold">
+                                            Faltam R$ {missing.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para usar este cupom
+                                          </p>
+                                          <p className="text-xs text-orange-600 mt-1">
+                                            Compra mínima: R$ {minPurchase.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                          </p>
+                                        </div>
+                                      )}
+                                      
+                                      {isExpired && (
+                                        <p className="text-xs text-red-600 mt-1 font-semibold">
+                                          Cupom expirado em {new Date(expiresAt).toLocaleDateString('pt-BR')}
+                                        </p>
+                                      )}
+                                      
+                                      {isUsed && (
+                                        <p className="text-xs text-red-600 mt-1 font-semibold">
+                                          Cupom já utilizado (limite atingido)
+                                        </p>
+                                      )}
+                                    </div>
+                                    <Button
+                                      disabled
+                                      className="ml-4 bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    >
+                                      Indisponível
+                                    </Button>
+                                  </div>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Mensagem quando não há cupons */}
+                      {customerCoupons.length === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          <Tag className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                          <p>Você não possui cupons atribuídos no momento.</p>
+                          <p className="text-sm mt-2">Use o campo acima para digitar um cupom exclusivo.</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCouponModal(false)}
+              className="border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

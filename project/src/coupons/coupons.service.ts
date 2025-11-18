@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { User } from '../entities/user.entity';
-import { UserRole } from '@prisma/client';
+import { UserRole, CouponAssignmentType } from '@prisma/client';
 
 @Injectable()
 export class CouponsService {
@@ -84,6 +84,8 @@ export class CouponsService {
         productId: createCouponDto.productId,
         storeId,
         isActive: createCouponDto.isActive !== undefined ? createCouponDto.isActive : true,
+        assignmentType: createCouponDto.assignmentType,
+        couponType: createCouponDto.couponType,
         createdBy: user.id,
       },
       include: {
@@ -348,6 +350,8 @@ export class CouponsService {
     if (updateData.categoryId !== undefined) updatePayload.categoryId = updateData.categoryId;
     if (updateData.productId !== undefined) updatePayload.productId = updateData.productId;
     if (updateData.isActive !== undefined) updatePayload.isActive = updateData.isActive;
+    if (updateData.assignmentType !== undefined) updatePayload.assignmentType = updateData.assignmentType;
+    if (updateData.couponType !== undefined) updatePayload.couponType = updateData.couponType;
 
     return await this.prisma.coupon.update({
       where: { id },
@@ -368,6 +372,126 @@ export class CouponsService {
         },
       },
     });
+  }
+
+  async getCustomerCoupons(customerId: string) {
+    // Buscar cupons atribuídos ao cliente
+    // Inclui cupons com assignmentType = ALL_ACCOUNTS ou NEW_ACCOUNTS_ONLY
+    // Não inclui cupons EXCLUSIVE (esses precisam ser digitados)
+    
+    const now = new Date();
+    
+    // Buscar informações do cliente para verificar se é conta nova
+    const customer = await this.prisma.user.findUnique({
+      where: { id: customerId },
+      select: { createdAt: true }
+    });
+
+    if (!customer) {
+      console.log('❌ Cliente não encontrado:', customerId);
+      return [];
+    }
+
+    // Verificar se é conta nova (criada nos últimos 30 dias)
+    const accountAge = now.getTime() - new Date(customer.createdAt).getTime();
+    const isNewAccount = accountAge < (30 * 24 * 60 * 60 * 1000); // 30 dias em milissegundos
+
+    // Construir filtro de assignmentType
+    const assignmentTypeFilter: CouponAssignmentType[] = [CouponAssignmentType.ALL_ACCOUNTS];
+    if (isNewAccount) {
+      assignmentTypeFilter.push(CouponAssignmentType.NEW_ACCOUNTS_ONLY);
+    }
+
+    console.log('🔍 Buscando cupons para cliente:', {
+      customerId,
+      isNewAccount,
+      assignmentTypeFilter,
+      now: now.toISOString()
+    });
+
+    // Buscar cupons com ALL_ACCOUNTS ou NEW_ACCOUNTS_ONLY (se for conta nova)
+    // Também incluir cupons com assignmentType NULL (para compatibilidade com cupons antigos)
+    const whereClause: any = {
+      isActive: true,
+      validFrom: { lte: now },
+      validUntil: { gte: now },
+      OR: [
+        {
+          assignmentType: {
+            in: assignmentTypeFilter
+          }
+        },
+        // Incluir cupons sem assignmentType definido (NULL) se forem ALL_ACCOUNTS por padrão
+        // Mas apenas se não tiverem sido explicitamente marcados como EXCLUSIVE
+        {
+          assignmentType: null
+        }
+      ]
+    };
+
+    console.log('🔍 Query where clause:', JSON.stringify(whereClause, null, 2));
+
+    const coupons = await this.prisma.coupon.findMany({
+      where: whereClause,
+      include: {
+        _count: {
+          select: {
+            couponUsages: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    console.log('📋 Cupons encontrados antes do filtro:', coupons.length, coupons.map(c => ({
+      code: c.code,
+      assignmentType: c.assignmentType,
+      isActive: c.isActive,
+      validFrom: c.validFrom.toISOString(),
+      validUntil: c.validUntil.toISOString(),
+      usageLimit: c.usageLimit,
+      usedCount: c._count.couponUsages
+    })));
+
+    // Filtrar cupons que não atingiram o limite de uso
+    const filteredCoupons = coupons
+      .filter(coupon => {
+        if (!coupon.usageLimit) return true;
+        const canUse = coupon._count.couponUsages < coupon.usageLimit;
+        if (!canUse) {
+          console.log('⚠️ Cupom excluído por limite de uso:', coupon.code, {
+            used: coupon._count.couponUsages,
+            limit: coupon.usageLimit
+          });
+        }
+        return canUse;
+      })
+      .map(coupon => ({
+        id: coupon.id,
+        code: coupon.code,
+        description: coupon.description,
+        discountType: coupon.discountType,
+        discountValue: Number(coupon.discountValue),
+        minimumPurchase: coupon.minimumPurchase ? Number(coupon.minimumPurchase) : undefined,
+        maximumDiscount: coupon.maximumDiscount ? Number(coupon.maximumDiscount) : undefined,
+        usageLimit: coupon.usageLimit,
+        usedCount: coupon._count.couponUsages,
+        isActive: coupon.isActive,
+        validFrom: coupon.validFrom.toISOString(),
+        validUntil: coupon.validUntil.toISOString(),
+        applicableTo: coupon.applicableTo,
+        categoryId: coupon.categoryId,
+        productId: coupon.productId,
+        storeId: coupon.storeId,
+        assignmentType: coupon.assignmentType,
+        couponType: coupon.couponType,
+        createdAt: coupon.createdAt.toISOString(),
+      }));
+
+    console.log('✅ Cupons retornados para o cliente:', filteredCoupons.length, filteredCoupons.map(c => c.code));
+    return filteredCoupons;
   }
 
   async remove(id: string, user: User) {
