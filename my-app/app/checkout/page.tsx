@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -275,7 +275,15 @@ export default function CheckoutPage() {
 
   // Cupom e descontos
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; couponType?: string } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ 
+    code: string; 
+    discount: number; 
+    couponType?: string;
+    applicableTo?: string;
+    storeId?: string;
+    categoryId?: string;
+    productId?: string;
+  } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [customerCoupons, setCustomerCoupons] = useState<any[]>([]);
@@ -349,6 +357,66 @@ export default function CheckoutPage() {
       return total + (currentPrice * item.quantity);
     }, 0);
   }, [checkoutItems]);
+
+  // Função para identificar produtos elegíveis para um cupom
+  const getEligibleItems = useCallback((coupon: { applicableTo?: string; storeId?: string; categoryId?: string; productId?: string }) => {
+    if (!coupon.applicableTo || coupon.applicableTo === 'ALL') {
+      // Cupom para todos os produtos
+      return checkoutItems;
+    }
+
+    const eligibleItems: typeof checkoutItems = [];
+
+    checkoutItems.forEach(item => {
+      const product = item.product;
+      let isEligible = false;
+
+      switch (coupon.applicableTo) {
+        case 'STORE':
+          if (coupon.storeId) {
+            const couponStoreId = String(coupon.storeId).trim();
+            const productStoreId = product?.storeId ? String(product.storeId).trim() : undefined;
+            const currentStoreId = selectedStore ? String(selectedStore).trim() : productStoreId;
+            isEligible = currentStoreId === couponStoreId;
+          }
+          break;
+
+        case 'CATEGORY':
+          if (coupon.categoryId) {
+            const couponCategoryId = String(coupon.categoryId).trim().toUpperCase();
+            const productCategory = product?.category ? String(product.category).trim().toUpperCase() : undefined;
+            isEligible = productCategory === couponCategoryId;
+          }
+          break;
+
+        case 'PRODUCT':
+          if (coupon.productId) {
+            const couponProductId = String(coupon.productId).trim();
+            const productId = product?.id ? String(product.id).trim() : undefined;
+            isEligible = productId === couponProductId;
+          }
+          break;
+
+        default:
+          isEligible = true;
+      }
+
+      if (isEligible) {
+        eligibleItems.push(item);
+      }
+    });
+
+    return eligibleItems;
+  }, [checkoutItems, selectedStore]);
+
+  // Função para calcular subtotal apenas dos produtos elegíveis
+  const calculateEligibleSubtotal = useCallback((coupon: { applicableTo?: string; storeId?: string; categoryId?: string; productId?: string }) => {
+    const eligibleItems = getEligibleItems(coupon);
+    return eligibleItems.reduce((total, item) => {
+      const currentPrice = getCurrentPrice(item.product);
+      return total + (currentPrice * item.quantity);
+    }, 0);
+  }, [getEligibleItems]);
 
   const shippingCost = useMemo(() => {
     // Retirada na loja é sempre grátis
@@ -1053,35 +1121,229 @@ export default function CheckoutPage() {
     try {
       const upperCode = couponCode.toUpperCase().trim();
       
-      // Buscar informações dos produtos para validação
-      const firstProduct = checkoutItems[0]?.product;
-      const categoryId = firstProduct?.category;
-      const productId = checkoutItems.length === 1 ? checkoutItems[0].product.id : undefined;
+      // Para cupons de produto específico, precisamos tentar validar com cada produto do carrinho
+      // Primeiro, tentar validar com todos os produtos para encontrar o que corresponde
+      let validation;
+      let couponInfo: any = null;
+      let foundEligible = false;
       
-      // Validar cupom via API
-      const validation = await customerAPI.validateCoupon(
-        upperCode,
-        subtotal,
-        productId,
-        categoryId,
-        selectedStore || undefined,
-        shippingCost // Passar valor do frete para cálculo correto de cupons de frete
-      );
+      // Tentar validar com cada produto do carrinho
+      for (const item of checkoutItems) {
+        const testProduct = item.product;
+        const testCategoryId = testProduct?.category ? String(testProduct.category).trim().toUpperCase() : undefined;
+        const testProductId = testProduct?.id;
+        
+        // Garantir que o storeId seja uma string normalizada
+        let normalizedStoreId = selectedStore ? String(selectedStore).trim() : undefined;
+        if (!normalizedStoreId || normalizedStoreId === '') {
+          if (testProduct?.storeId) {
+            normalizedStoreId = String(testProduct.storeId).trim();
+          } else if (stores.length > 0 && stores[0]?.id) {
+            normalizedStoreId = String(stores[0].id).trim();
+          }
+        }
+        
+        try {
+          const testValidation = await customerAPI.validateCoupon(
+            upperCode,
+            subtotal,
+            testProductId,
+            testCategoryId,
+            normalizedStoreId,
+            shippingCost
+          );
+          
+          if (testValidation.valid && testValidation.coupon) {
+            validation = testValidation;
+            couponInfo = {
+              applicableTo: testValidation.coupon.applicableTo || 'ALL',
+              storeId: testValidation.coupon.storeId,
+              categoryId: testValidation.coupon.categoryId,
+              productId: testValidation.coupon.productId,
+              discountType: testValidation.coupon.discountType,
+              discountValue: testValidation.coupon.discountValue,
+              couponType: testValidation.coupon.couponType,
+              minimumPurchase: testValidation.coupon.minimumPurchase,
+              maximumDiscount: testValidation.coupon.maximumDiscount,
+            };
+            foundEligible = true;
+            break;
+          }
+        } catch (e: any) {
+          // Se o erro não for sobre produto/loja/categoria, pode ser outro problema
+          const errorMsg = e.response?.data?.message || e.message || '';
+          // Se for erro de produto/loja/categoria, continuar tentando
+          // Se for outro erro (expirado, inativo, etc), parar e mostrar erro
+          if (!errorMsg.includes('produto') && !errorMsg.includes('loja') && !errorMsg.includes('categoria') && !errorMsg.includes('Categoria')) {
+            // Erro não relacionado a produto/loja/categoria, pode ser cupom inválido
+            throw e;
+          }
+          // Continuar tentando com próximo produto
+          continue;
+        }
+      }
+      
+      if (!foundEligible) {
+        // Tentar uma última vez sem productId para ver se é cupom geral
+        try {
+          const firstProduct = checkoutItems[0]?.product;
+          const categoryId = firstProduct?.category ? String(firstProduct.category).trim().toUpperCase() : undefined;
+          let normalizedStoreId = selectedStore ? String(selectedStore).trim() : undefined;
+          
+          if (!normalizedStoreId || normalizedStoreId === '') {
+            if (firstProduct?.storeId) {
+              normalizedStoreId = String(firstProduct.storeId).trim();
+            } else if (stores.length > 0 && stores[0]?.id) {
+              normalizedStoreId = String(stores[0].id).trim();
+            }
+          }
+          
+          validation = await customerAPI.validateCoupon(
+            upperCode,
+            subtotal,
+            undefined, // Sem productId para cupons gerais
+            categoryId,
+            normalizedStoreId,
+            shippingCost
+          );
+          
+          if (validation.valid && validation.coupon) {
+            couponInfo = {
+              applicableTo: validation.coupon.applicableTo || 'ALL',
+              storeId: validation.coupon.storeId,
+              categoryId: validation.coupon.categoryId,
+              productId: validation.coupon.productId,
+              discountType: validation.coupon.discountType,
+              discountValue: validation.coupon.discountValue,
+              couponType: validation.coupon.couponType,
+              minimumPurchase: validation.coupon.minimumPurchase,
+              maximumDiscount: validation.coupon.maximumDiscount,
+            };
+            foundEligible = true;
+          }
+        } catch (e) {
+          // Se ainda falhar, mostrar mensagem
+          setCouponError('');
+          showAlert('info', 'Este cupom não é válido para os produtos no seu carrinho. Verifique se você possui produtos que atendem aos critérios do cupom.');
+          return;
+        }
+      }
+      
+      if (!foundEligible) {
+        setCouponError('');
+        showAlert('info', 'Este cupom não é válido para os produtos no seu carrinho. Verifique se você possui produtos que atendem aos critérios do cupom.');
+        return;
+      }
 
-      if (validation.valid) {
+      if (validation && validation.valid && couponInfo) {
+        // Verificar se há produtos elegíveis
+        const eligibleItems = getEligibleItems(couponInfo);
+        
+        if (eligibleItems.length === 0) {
+          // Não há produtos elegíveis
+          setCouponError('');
+          showAlert('info', 'Este cupom não é válido para os produtos no seu carrinho. Adicione produtos que atendem aos critérios do cupom.');
+          return;
+        }
+
+        // Calcular subtotal apenas dos produtos elegíveis
+        const eligibleSubtotal = calculateEligibleSubtotal(couponInfo);
+        
+        // Verificar valor mínimo com produtos elegíveis
+        if (couponInfo.minimumPurchase && eligibleSubtotal < Number(couponInfo.minimumPurchase)) {
+          // Valor mínimo não atingido com produtos elegíveis
+          setCouponError('');
+          showAlert('info', `Este cupom requer um valor mínimo de R$ ${Number(couponInfo.minimumPurchase).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} nos produtos elegíveis.`);
+          return;
+        }
+        
+        // Recalcular desconto baseado no subtotal elegível
+        let recalculatedDiscount = 0;
+        
+        if (couponInfo.couponType === 'SHIPPING') {
+          // Para cupons de frete, usar o desconto original
+          recalculatedDiscount = validation.discount;
+        } else {
+          // Para cupons de produto, recalcular baseado no subtotal elegível
+          if (couponInfo.discountType === 'PERCENTAGE') {
+            recalculatedDiscount = (eligibleSubtotal * Number(couponInfo.discountValue)) / 100;
+            // Aplicar desconto máximo se houver
+            if (couponInfo.maximumDiscount && recalculatedDiscount > Number(couponInfo.maximumDiscount)) {
+              recalculatedDiscount = Number(couponInfo.maximumDiscount);
+            }
+          } else {
+            recalculatedDiscount = Number(couponInfo.discountValue);
+          }
+          // Garantir que o desconto não seja maior que o subtotal elegível
+          if (recalculatedDiscount > eligibleSubtotal) {
+            recalculatedDiscount = eligibleSubtotal;
+          }
+        }
+
+        // Arredondar para 2 casas decimais
+        recalculatedDiscount = Math.round(recalculatedDiscount * 100) / 100;
+
         setAppliedCoupon({
           code: validation.coupon.code,
-          discount: validation.discount,
+          discount: recalculatedDiscount,
+          couponType: couponInfo.couponType,
+          applicableTo: couponInfo.applicableTo,
+          storeId: couponInfo.storeId,
+          categoryId: couponInfo.categoryId,
+          productId: couponInfo.productId,
         });
         setCouponError('');
-        showAlert('success', `Cupom ${validation.coupon.code} aplicado com sucesso!`);
+        
+        if (eligibleItems.length < checkoutItems.length) {
+          showAlert('success', `Cupom ${validation.coupon.code} aplicado com sucesso! O desconto será aplicado apenas nos produtos elegíveis (${eligibleItems.length} de ${checkoutItems.length} produtos).`);
+        } else {
+          showAlert('success', `Cupom ${validation.coupon.code} aplicado com sucesso!`);
+        }
       } else {
-        setCouponError('Cupom inválido ou expirado');
+        // Cupom inválido - não mostrar erro, apenas não aplicar
+        setCouponError('');
+        showAlert('info', 'Este cupom não está disponível para este pedido. Verifique os cupons disponíveis na lista.');
       }
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Erro ao validar cupom';
-      setCouponError(errorMessage);
-      showAlert('error', errorMessage);
+      let errorMessage = error.response?.data?.message || error.message || 'Erro ao validar cupom';
+      let friendlyMessage = '';
+      const messageType: 'info' = 'info';
+      
+      // Tratar erros de forma mais amigável - criar mensagens informativas ao invés de erros
+      if (errorMessage.includes('não é válido para esta loja') || errorMessage.includes('Loja não foi selecionada')) {
+        // Extrair nome da loja se disponível
+        const storeMatch = errorMessage.match(/loja com ID "([^"]+)"/);
+        if (storeMatch) {
+          const couponStoreId = storeMatch[1];
+          const couponStore = stores.find(s => String(s.id).trim() === couponStoreId);
+          const couponStoreName = couponStore?.name || 'outra loja';
+          friendlyMessage = `Este cupom é válido apenas para a loja "${couponStoreName}". Verifique os cupons disponíveis para a loja selecionada.`;
+        } else {
+          friendlyMessage = 'Este cupom não é válido para a loja selecionada. Verifique os cupons disponíveis na lista.';
+        }
+      } else if (errorMessage.includes('categoria') || errorMessage.includes('Categoria')) {
+        friendlyMessage = 'Este cupom não é válido para os produtos no seu carrinho. Adicione produtos da categoria correta ou escolha outro cupom.';
+      } else if (errorMessage.includes('produto') || errorMessage.includes('Produto')) {
+        friendlyMessage = 'Este cupom não é válido para os produtos no seu carrinho. Adicione o produto correto ou escolha outro cupom.';
+      } else if (errorMessage.includes('compra mínima') || errorMessage.includes('valor mínimo')) {
+        // Extrair valor mínimo se disponível
+        const minMatch = errorMessage.match(/R\$\s*([\d.,]+)/i) || errorMessage.match(/(\d+)/);
+        if (minMatch) {
+          friendlyMessage = `Este cupom requer um valor mínimo de compra. Verifique os cupons disponíveis na lista.`;
+        } else {
+          friendlyMessage = 'Este cupom não atende aos requisitos mínimos. Verifique os cupons disponíveis na lista.';
+        }
+      } else if (errorMessage.includes('expirado') || errorMessage.includes('expirada')) {
+        friendlyMessage = 'Este cupom está expirado. Verifique os cupons disponíveis na lista.';
+      } else if (errorMessage.includes('não encontrado') || errorMessage.includes('não existe')) {
+        friendlyMessage = 'Cupom não encontrado. Verifique o código digitado ou consulte os cupons disponíveis na lista.';
+      } else {
+        friendlyMessage = 'Este cupom não está disponível para este pedido. Verifique os cupons disponíveis na lista.';
+      }
+      
+      // Não mostrar erro vermelho, apenas mensagem informativa
+      setCouponError('');
+      showAlert(messageType, friendlyMessage);
     }
   };
 
@@ -1185,36 +1447,244 @@ export default function CheckoutPage() {
     setShowCouponModal(false);
     // Aplicar o cupom automaticamente
     const upperCode = code.toUpperCase().trim();
-    const firstProduct = checkoutItems[0]?.product;
-    const categoryId = firstProduct?.category;
-    const productId = checkoutItems.length === 1 ? checkoutItems[0].product.id : undefined;
+    
+    // Para cupons de produto específico, precisamos tentar validar com cada produto do carrinho
+    let validation;
+    let couponInfo: any = null;
+    let foundEligible = false;
+    
+    // Tentar validar com cada produto do carrinho
+    for (const item of checkoutItems) {
+      const testProduct = item.product;
+      const testCategoryId = testProduct?.category ? String(testProduct.category).trim().toUpperCase() : undefined;
+      const testProductId = testProduct?.id;
+      
+      // Garantir que o storeId seja uma string normalizada
+      let normalizedStoreId = selectedStore ? String(selectedStore).trim() : undefined;
+      if (!normalizedStoreId || normalizedStoreId === '') {
+        if (testProduct?.storeId) {
+          normalizedStoreId = String(testProduct.storeId).trim();
+        } else if (stores.length > 0 && stores[0]?.id) {
+          normalizedStoreId = String(stores[0].id).trim();
+        }
+      }
+      
+      try {
+        const testValidation = await customerAPI.validateCoupon(
+          upperCode,
+          subtotal,
+          testProductId,
+          testCategoryId,
+          normalizedStoreId,
+          shippingCost
+        );
+        
+        if (testValidation.valid && testValidation.coupon) {
+          validation = testValidation;
+          couponInfo = {
+            applicableTo: testValidation.coupon.applicableTo || 'ALL',
+            storeId: testValidation.coupon.storeId,
+            categoryId: testValidation.coupon.categoryId,
+            productId: testValidation.coupon.productId,
+            discountType: testValidation.coupon.discountType,
+            discountValue: testValidation.coupon.discountValue,
+            couponType: testValidation.coupon.couponType,
+            minimumPurchase: testValidation.coupon.minimumPurchase,
+            maximumDiscount: testValidation.coupon.maximumDiscount,
+          };
+          foundEligible = true;
+          break;
+        }
+      } catch (e: any) {
+        // Se o erro não for sobre produto/loja/categoria, pode ser outro problema
+        const errorMsg = e.response?.data?.message || e.message || '';
+        // Se for erro de produto/loja/categoria, continuar tentando
+        // Se for outro erro (expirado, inativo, etc), parar e mostrar erro
+        if (!errorMsg.includes('produto') && !errorMsg.includes('loja') && !errorMsg.includes('categoria') && !errorMsg.includes('Categoria')) {
+          // Erro não relacionado a produto/loja/categoria, pode ser cupom inválido
+          throw e;
+        }
+        // Continuar tentando com próximo produto
+        continue;
+      }
+    }
+    
+    if (!foundEligible) {
+      // Tentar uma última vez sem productId para ver se é cupom geral
+      try {
+        const firstProduct = checkoutItems[0]?.product;
+        const categoryId = firstProduct?.category ? String(firstProduct.category).trim().toUpperCase() : undefined;
+        let normalizedStoreId = selectedStore ? String(selectedStore).trim() : undefined;
+        
+        if (!normalizedStoreId || normalizedStoreId === '') {
+          if (firstProduct?.storeId) {
+            normalizedStoreId = String(firstProduct.storeId).trim();
+          } else if (stores.length > 0 && stores[0]?.id) {
+            normalizedStoreId = String(stores[0].id).trim();
+          }
+        }
+        
+        validation = await customerAPI.validateCoupon(
+          upperCode,
+          subtotal,
+          undefined, // Sem productId para cupons gerais
+          categoryId,
+          normalizedStoreId,
+          shippingCost
+        );
+        
+        if (validation.valid && validation.coupon) {
+          couponInfo = {
+            applicableTo: validation.coupon.applicableTo || 'ALL',
+            storeId: validation.coupon.storeId,
+            categoryId: validation.coupon.categoryId,
+            productId: validation.coupon.productId,
+            discountType: validation.coupon.discountType,
+            discountValue: validation.coupon.discountValue,
+            couponType: validation.coupon.couponType,
+            minimumPurchase: validation.coupon.minimumPurchase,
+            maximumDiscount: validation.coupon.maximumDiscount,
+          };
+          foundEligible = true;
+        }
+      } catch (e) {
+        // Se ainda falhar, mostrar mensagem
+        setCouponError('');
+        showAlert('info', 'Este cupom não é válido para os produtos no seu carrinho. Verifique se você possui produtos que atendem aos critérios do cupom.');
+        return;
+      }
+    }
+    
+    if (!foundEligible) {
+      setCouponError('');
+      showAlert('info', 'Este cupom não é válido para os produtos no seu carrinho. Verifique se você possui produtos que atendem aos critérios do cupom.');
+      return;
+    }
     
     try {
-      const validation = await customerAPI.validateCoupon(
-        upperCode,
-        subtotal,
-        productId,
-        categoryId,
-        selectedStore || undefined,
-        shippingCost // Passar valor do frete para cálculo correto de cupons de frete
-      );
 
-      if (validation.valid) {
+      if (validation && validation.valid && validation.coupon) {
+        // Obter informações do cupom para identificar produtos elegíveis
+        const couponInfo = {
+          applicableTo: validation.coupon.applicableTo || 'ALL',
+          storeId: validation.coupon.storeId,
+          categoryId: validation.coupon.categoryId,
+          productId: validation.coupon.productId,
+          discountType: validation.coupon.discountType,
+          discountValue: validation.coupon.discountValue,
+          couponType: validation.coupon.couponType,
+          minimumPurchase: validation.coupon.minimumPurchase,
+          maximumDiscount: validation.coupon.maximumDiscount,
+        };
+
+        // Verificar se há produtos elegíveis
+        const eligibleItems = getEligibleItems(couponInfo);
+        
+        if (eligibleItems.length === 0) {
+          // Não há produtos elegíveis
+          setCouponError('');
+          showAlert('info', 'Este cupom não é válido para os produtos no seu carrinho. Adicione produtos que atendem aos critérios do cupom.');
+          return;
+        }
+
+        // Calcular subtotal apenas dos produtos elegíveis
+        const eligibleSubtotal = calculateEligibleSubtotal(couponInfo);
+        
+        // Verificar valor mínimo com produtos elegíveis
+        if (couponInfo.minimumPurchase && eligibleSubtotal < Number(couponInfo.minimumPurchase)) {
+          // Valor mínimo não atingido com produtos elegíveis
+          setCouponError('');
+          showAlert('info', `Este cupom requer um valor mínimo de R$ ${Number(couponInfo.minimumPurchase).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} nos produtos elegíveis.`);
+          return;
+        }
+        
+        // Recalcular desconto baseado no subtotal elegível
+        let recalculatedDiscount = 0;
+        
+        if (couponInfo.couponType === 'SHIPPING') {
+          // Para cupons de frete, usar o desconto original
+          recalculatedDiscount = validation.discount;
+        } else {
+          // Para cupons de produto, recalcular baseado no subtotal elegível
+          if (couponInfo.discountType === 'PERCENTAGE') {
+            recalculatedDiscount = (eligibleSubtotal * Number(couponInfo.discountValue)) / 100;
+            // Aplicar desconto máximo se houver
+            if (couponInfo.maximumDiscount && recalculatedDiscount > Number(couponInfo.maximumDiscount)) {
+              recalculatedDiscount = Number(couponInfo.maximumDiscount);
+            }
+          } else {
+            recalculatedDiscount = Number(couponInfo.discountValue);
+          }
+          // Garantir que o desconto não seja maior que o subtotal elegível
+          if (recalculatedDiscount > eligibleSubtotal) {
+            recalculatedDiscount = eligibleSubtotal;
+          }
+        }
+
+        // Arredondar para 2 casas decimais
+        recalculatedDiscount = Math.round(recalculatedDiscount * 100) / 100;
+
         setAppliedCoupon({
           code: validation.coupon.code,
-          discount: validation.discount,
-          couponType: validation.coupon.couponType, // Incluir tipo do cupom
+          discount: recalculatedDiscount,
+          couponType: couponInfo.couponType,
+          applicableTo: couponInfo.applicableTo,
+          storeId: couponInfo.storeId,
+          categoryId: couponInfo.categoryId,
+          productId: couponInfo.productId,
         });
         setCouponError('');
-        showAlert('success', `Cupom ${validation.coupon.code} aplicado com sucesso!`);
+        
+        if (eligibleItems.length < checkoutItems.length) {
+          showAlert('success', `Cupom ${validation.coupon.code} aplicado com sucesso! O desconto será aplicado apenas nos produtos elegíveis (${eligibleItems.length} de ${checkoutItems.length} produtos).`);
+        } else {
+          showAlert('success', `Cupom ${validation.coupon.code} aplicado com sucesso!`);
+        }
       } else {
-        setCouponError('Cupom inválido ou expirado');
-        showAlert('error', 'Cupom inválido ou expirado');
+        // Cupom inválido - não mostrar erro, apenas não aplicar
+        setCouponError('');
+        showAlert('info', 'Este cupom não está disponível para este pedido. Verifique os cupons disponíveis na lista.');
       }
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Erro ao validar cupom';
-      setCouponError(errorMessage);
-      showAlert('error', errorMessage);
+      let errorMessage = error.response?.data?.message || error.message || 'Erro ao validar cupom';
+      let friendlyMessage = '';
+      const messageType: 'info' = 'info';
+      
+      // Tratar erros de forma mais amigável - criar mensagens informativas ao invés de erros
+      if (errorMessage.includes('não é válido para esta loja') || errorMessage.includes('Loja não foi selecionada')) {
+        // Extrair nome da loja se disponível
+        const storeMatch = errorMessage.match(/loja com ID "([^"]+)"/);
+        if (storeMatch) {
+          const couponStoreId = storeMatch[1];
+          const couponStore = stores.find(s => String(s.id).trim() === couponStoreId);
+          const couponStoreName = couponStore?.name || 'outra loja';
+          friendlyMessage = `Este cupom é válido apenas para a loja "${couponStoreName}". Verifique os cupons disponíveis para a loja selecionada.`;
+        } else {
+          friendlyMessage = 'Este cupom não é válido para a loja selecionada. Verifique os cupons disponíveis na lista.';
+        }
+      } else if (errorMessage.includes('categoria') || errorMessage.includes('Categoria')) {
+        friendlyMessage = 'Este cupom não é válido para os produtos no seu carrinho. Adicione produtos da categoria correta ou escolha outro cupom.';
+      } else if (errorMessage.includes('produto') || errorMessage.includes('Produto')) {
+        friendlyMessage = 'Este cupom não é válido para os produtos no seu carrinho. Adicione o produto correto ou escolha outro cupom.';
+      } else if (errorMessage.includes('compra mínima') || errorMessage.includes('valor mínimo')) {
+        // Extrair valor mínimo se disponível
+        const minMatch = errorMessage.match(/R\$\s*([\d.,]+)/i) || errorMessage.match(/(\d+)/);
+        if (minMatch) {
+          friendlyMessage = `Este cupom requer um valor mínimo de compra. Verifique os cupons disponíveis na lista.`;
+        } else {
+          friendlyMessage = 'Este cupom não atende aos requisitos mínimos. Verifique os cupons disponíveis na lista.';
+        }
+      } else if (errorMessage.includes('expirado') || errorMessage.includes('expirada')) {
+        friendlyMessage = 'Este cupom está expirado. Verifique os cupons disponíveis na lista.';
+      } else if (errorMessage.includes('não encontrado') || errorMessage.includes('não existe')) {
+        friendlyMessage = 'Cupom não encontrado. Verifique o código digitado ou consulte os cupons disponíveis na lista.';
+      } else {
+        friendlyMessage = 'Este cupom não está disponível para este pedido. Verifique os cupons disponíveis na lista.';
+      }
+      
+      // Não mostrar erro vermelho, apenas mensagem informativa
+      setCouponError('');
+      showAlert(messageType, friendlyMessage);
     }
   };
 
@@ -1226,6 +1696,12 @@ export default function CheckoutPage() {
 
     console.log('🔍 Categorizando cupons:', coupons.length, coupons);
 
+    // Obter loja selecionada ou loja do primeiro produto
+    const firstProduct = checkoutItems[0]?.product;
+    const currentStoreId = selectedStore 
+      ? String(selectedStore).trim() 
+      : (firstProduct?.storeId ? String(firstProduct.storeId).trim() : undefined);
+
     coupons.forEach(coupon => {
       // Verificar se é cupom de frete (usar couponType do backend)
       const isShipping = coupon.couponType === 'SHIPPING' || 
@@ -1236,6 +1712,9 @@ export default function CheckoutPage() {
       console.log(`  - Cupom ${coupon.code}:`, {
         couponType: coupon.couponType,
         isShipping,
+        applicableTo: coupon.applicableTo,
+        couponStoreId: coupon.storeId,
+        currentStoreId,
         minimumPurchase: coupon.minimumPurchase,
         subtotal,
         validUntil: coupon.validUntil || coupon.expiresAt
@@ -1251,19 +1730,133 @@ export default function CheckoutPage() {
         const hasMinPurchase = subtotal >= minPurchase;
         const hasUsageLimit = coupon.usageLimit ? (coupon.usedCount || 0) < coupon.usageLimit : true;
         
-        const isAvailable = hasMinPurchase && !isExpired && hasUsageLimit;
+        // Obter informações dos produtos no carrinho
+        const cartProductIds = checkoutItems.map(item => item.product?.id).filter(Boolean);
+        const cartCategories = checkoutItems
+          .map(item => item.product?.category)
+          .filter(Boolean)
+          .map(cat => String(cat).trim().toUpperCase());
+        
+        // Verificar se é cupom de loja específica
+        const isStoreCoupon = coupon.applicableTo === 'STORE';
+        let isStoreValid = true;
+        let storeReason = '';
+        
+        if (isStoreCoupon && coupon.storeId) {
+          const couponStoreId = String(coupon.storeId).trim();
+          if (!currentStoreId) {
+            isStoreValid = false;
+            storeReason = 'Selecione uma loja para usar este cupom';
+          } else if (couponStoreId !== currentStoreId) {
+            isStoreValid = false;
+            // Buscar nome da loja do cupom
+            const couponStore = stores.find(s => String(s.id).trim() === couponStoreId);
+            const couponStoreName = couponStore?.name || 'outra loja';
+            storeReason = `Este cupom é válido apenas para a loja "${couponStoreName}"`;
+          }
+        }
+        
+        // Verificar se é cupom de categoria específica
+        const isCategoryCoupon = coupon.applicableTo === 'CATEGORY';
+        let isCategoryValid = true;
+        let categoryReason = '';
+        
+        if (isCategoryCoupon && coupon.categoryId) {
+          const couponCategoryId = String(coupon.categoryId).trim().toUpperCase();
+          const hasMatchingCategory = cartCategories.some(cat => cat === couponCategoryId);
+          
+          if (!hasMatchingCategory) {
+            isCategoryValid = false;
+            // Mapear categoria para nome amigável
+            const categoryNames: { [key: string]: string } = {
+              'TINTA': 'Tintas',
+              'PINCEL': 'Pincéis',
+              'ROLO': 'Rolos',
+              'FITA': 'Fitas',
+              'KIT': 'Kits',
+              'SOFA': 'Sofás',
+              'MESA': 'Mesas',
+              'CADEIRA': 'Cadeiras',
+              'ARMARIO': 'Armários',
+              'CAMA': 'Camas',
+              'DECORACAO': 'Decoração',
+              'ILUMINACAO': 'Iluminação',
+              'MESA_CENTRO': 'Mesas de Centro',
+              'OUTROS': 'Outros'
+            };
+            const categoryName = categoryNames[couponCategoryId] || couponCategoryId;
+            categoryReason = `Este cupom é válido apenas para produtos da categoria "${categoryName}"`;
+          }
+        }
+        
+        // Verificar se é cupom de produto específico
+        const isProductCoupon = coupon.applicableTo === 'PRODUCT';
+        let isProductValid = true;
+        let productReason = '';
+        
+        if (isProductCoupon && coupon.productId) {
+          const couponProductId = String(coupon.productId).trim();
+          const hasMatchingProduct = cartProductIds.some(id => String(id).trim() === couponProductId);
+          
+          if (!hasMatchingProduct) {
+            isProductValid = false;
+            // Tentar buscar nome do produto (se disponível nos cupons retornados)
+            const couponProduct = coupon.product || null;
+            const productName = couponProduct?.name || 'produto específico';
+            productReason = `Este cupom é válido apenas para o produto "${productName}"`;
+          }
+        }
+        
+        const isAvailable = hasMinPurchase && !isExpired && hasUsageLimit && isStoreValid && isCategoryValid && isProductValid;
         
         console.log(`    Disponibilidade:`, {
           hasMinPurchase,
           isExpired,
           hasUsageLimit,
+          isStoreValid,
+          storeReason,
+          isCategoryValid,
+          categoryReason,
+          isProductValid,
+          productReason,
           isAvailable
         });
         
         if (isAvailable) {
           availableCoupons.push(coupon);
         } else {
-          unavailableCoupons.push(coupon);
+          // Adicionar motivo da indisponibilidade
+          const unavailableReason: string[] = [];
+          
+          if (!hasMinPurchase) {
+            const missing = minPurchase - subtotal;
+            unavailableReason.push(`Faltam R$ ${missing.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para usar este cupom (compra mínima: R$ ${minPurchase.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`);
+          }
+          
+          if (isExpired) {
+            unavailableReason.push(`Cupom expirado em ${new Date(expiresAt).toLocaleDateString('pt-BR')}`);
+          }
+          
+          if (!hasUsageLimit) {
+            unavailableReason.push('Cupom já utilizado (limite atingido)');
+          }
+          
+          if (!isStoreValid && storeReason) {
+            unavailableReason.push(storeReason);
+          }
+          
+          if (!isCategoryValid && categoryReason) {
+            unavailableReason.push(categoryReason);
+          }
+          
+          if (!isProductValid && productReason) {
+            unavailableReason.push(productReason);
+          }
+          
+          unavailableCoupons.push({
+            ...coupon,
+            unavailableReason: unavailableReason.join(' • ')
+          });
         }
       }
     });
@@ -1393,7 +1986,8 @@ export default function CheckoutPage() {
         shippingCost,
         insuranceCost,
         tax,
-        discount,
+        productDiscount,
+        shippingDiscount,
       });
       
       // Preparar notas do pedido
@@ -1428,7 +2022,7 @@ export default function CheckoutPage() {
         shippingCost: shippingCost,
         insuranceCost: insuranceCost,
         tax: tax,
-        discount: discount,
+        discount: productDiscount,
         couponCode: appliedCoupon?.code,
         notes: notes,
       });
@@ -2148,7 +2742,7 @@ export default function CheckoutPage() {
                           <div className="flex-1">
                             <h4 className="font-semibold text-[#3e2626]">{item.product.name}</h4>
                             <p className="text-sm text-gray-600">Quantidade: {item.quantity}</p>
-                            <p className="text-lg font-bold text-[#3e2626] mt-1">
+                            <div className="text-lg font-bold text-[#3e2626] mt-1">
                               {(() => {
                                 const originalPrice = Number(item.product.price);
                                 const currentPrice = getCurrentPrice(item.product);
@@ -2167,7 +2761,7 @@ export default function CheckoutPage() {
                                   </div>
                                 );
                               })()}
-                            </p>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -2356,12 +2950,6 @@ export default function CheckoutPage() {
                       <Tag className="h-4 w-4" />
                       <span>Cupons</span>
                     </Button>
-                    {couponError && (
-                      <p className="text-sm text-red-600 mt-2 flex items-center space-x-1">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>{couponError}</span>
-                      </p>
-                    )}
                   </div>
                 )}
 
@@ -2971,12 +3559,6 @@ export default function CheckoutPage() {
                   Aplicar
                 </Button>
               </div>
-              {couponError && (
-                <p className="text-sm text-red-600 flex items-center space-x-1">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{couponError}</span>
-                </p>
-              )}
             </div>
 
             {/* Cupons atribuídos ao cliente */}
@@ -3094,52 +3676,34 @@ export default function CheckoutPage() {
                           </h3>
                           <div className="space-y-2">
                             {unavailableCoupons.map((coupon) => {
-                              const minPurchase = coupon.minimumPurchase || 0;
-                              const missing = minPurchase - subtotal;
-                              const expiresAt = coupon.validUntil || coupon.expiresAt;
-                              const isExpired = expiresAt && new Date(expiresAt) <= new Date();
-                              const isUsed = coupon.usageLimit ? (coupon.usedCount || 0) >= coupon.usageLimit : false;
-                              
                               return (
                                 <Card key={coupon.id || coupon.code} className="p-4 bg-gray-50 border-gray-200 opacity-75">
                                   <div className="flex items-center justify-between">
                                     <div className="flex-1">
                                       <div className="flex items-center space-x-2 mb-1">
                                         <Badge className="bg-gray-500 text-white">{coupon.code}</Badge>
-                                        {coupon.discountType === 'percentage' ? (
+                                        {coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' ? (
                                           <span className="text-lg font-bold text-gray-600">
                                             {coupon.discountValue}% OFF
                                           </span>
                                         ) : (
                                           <span className="text-lg font-bold text-gray-600">
-                                            R$ {coupon.discountValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            R$ {Number(coupon.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                           </span>
                                         )}
                                       </div>
-                                      <p className="text-sm text-gray-600">{coupon.description || 'Cupom indisponível'}</p>
+                                      <p className="text-sm text-gray-600 mb-2">{coupon.description || 'Cupom indisponível'}</p>
                                       
-                                      {/* Mostrar o que falta */}
-                                      {!isExpired && !isUsed && minPurchase > subtotal && (
+                                      {/* Mostrar motivo da indisponibilidade */}
+                                      {coupon.unavailableReason && (
                                         <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
-                                          <p className="text-xs text-orange-700 font-semibold">
-                                            Faltam R$ {missing.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para usar este cupom
-                                          </p>
-                                          <p className="text-xs text-orange-600 mt-1">
-                                            Compra mínima: R$ {minPurchase.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                          </p>
+                                          <div className="flex items-start space-x-2">
+                                            <Info className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                                            <p className="text-xs text-orange-700 font-medium">
+                                              {coupon.unavailableReason}
+                                            </p>
+                                          </div>
                                         </div>
-                                      )}
-                                      
-                                      {isExpired && (
-                                        <p className="text-xs text-red-600 mt-1 font-semibold">
-                                          Cupom expirado em {new Date(expiresAt).toLocaleDateString('pt-BR')}
-                                        </p>
-                                      )}
-                                      
-                                      {isUsed && (
-                                        <p className="text-xs text-red-600 mt-1 font-semibold">
-                                          Cupom já utilizado (limite atingido)
-                                        </p>
                                       )}
                                     </div>
                                     <Button

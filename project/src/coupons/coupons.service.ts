@@ -67,7 +67,59 @@ export class CouponsService {
       storeId = user.storeId;
     }
 
+    // Validar se a loja existe (se applicableTo for STORE)
+    if (applicableTo === 'STORE' && storeId) {
+      const store = await this.prisma.store.findUnique({
+        where: { id: storeId },
+        select: { id: true, name: true, isActive: true }
+      });
+
+      if (!store) {
+        throw new BadRequestException(`Loja com ID "${storeId}" não foi encontrada. Por favor, selecione uma loja válida.`);
+      }
+
+      if (!store.isActive) {
+        throw new BadRequestException(`A loja "${store.name}" está inativa. Por favor, selecione uma loja ativa.`);
+      }
+
+      console.log('✅ Loja validada para cupom:', {
+        storeId: store.id,
+        storeName: store.name,
+        isActive: store.isActive
+      });
+    }
+
     // Criar cupom
+    console.log('💾 Salvando cupom no banco:', {
+      code: createCouponDto.code.toUpperCase(),
+      applicableTo: createCouponDto.applicableTo || 'ALL',
+      storeId: storeId,
+      storeIdType: typeof storeId,
+      categoryId: createCouponDto.categoryId,
+      productId: createCouponDto.productId
+    });
+
+    // Garantir que storeId seja uma string válida ou null
+    let finalStoreId: string | null = null;
+    if (applicableTo === 'STORE' && storeId) {
+      finalStoreId = String(storeId).trim();
+      if (finalStoreId === '' || finalStoreId === 'null' || finalStoreId === 'undefined') {
+        finalStoreId = null;
+      }
+    } else if (applicableTo !== 'STORE') {
+      finalStoreId = null;
+    }
+
+    console.log('💾 Salvando cupom no banco:', {
+      code: createCouponDto.code.toUpperCase(),
+      applicableTo: createCouponDto.applicableTo || 'ALL',
+      storeId: finalStoreId,
+      storeIdType: typeof finalStoreId,
+      storeIdOriginal: storeId,
+      categoryId: createCouponDto.categoryId,
+      productId: createCouponDto.productId
+    });
+
     const coupon = await this.prisma.coupon.create({
       data: {
         code: createCouponDto.code.toUpperCase(),
@@ -82,7 +134,7 @@ export class CouponsService {
         applicableTo: createCouponDto.applicableTo || 'ALL',
         categoryId: createCouponDto.categoryId,
         productId: createCouponDto.productId,
-        storeId,
+        storeId: finalStoreId,
         isActive: createCouponDto.isActive !== undefined ? createCouponDto.isActive : true,
         assignmentType: createCouponDto.assignmentType,
         couponType: createCouponDto.couponType,
@@ -103,6 +155,15 @@ export class CouponsService {
           },
         },
       },
+    });
+
+    console.log('✅ Cupom criado com sucesso:', {
+      id: coupon.id,
+      code: coupon.code,
+      applicableTo: coupon.applicableTo,
+      storeId: coupon.storeId,
+      storeName: coupon.store?.name || 'Loja não encontrada',
+      storeExists: !!coupon.store
     });
 
     return coupon;
@@ -148,10 +209,24 @@ export class CouponsService {
       },
     });
 
-    return coupons.map(coupon => ({
+    const mappedCoupons = coupons.map(coupon => ({
       ...coupon,
       usedCount: coupon._count.couponUsages,
     }));
+
+    // Log para debug de cupons de loja
+    const storeCoupons = mappedCoupons.filter(c => c.applicableTo === 'STORE');
+    if (storeCoupons.length > 0) {
+      console.log('🏪 Cupons de loja encontrados:', storeCoupons.map(c => ({
+        code: c.code,
+        storeId: c.storeId,
+        storeName: c.store?.name || 'NÃO ENCONTRADA',
+        storeExists: !!c.store,
+        storeIdType: typeof c.storeId
+      })));
+    }
+
+    return mappedCoupons;
   }
 
   async findOne(id: string, user: User) {
@@ -203,6 +278,16 @@ export class CouponsService {
     if (!coupon) {
       throw new NotFoundException('Cupom não encontrado');
     }
+
+    console.log('🔍 Iniciando validação de cupom:');
+    console.log('  - Código:', coupon.code);
+    console.log('  - applicableTo:', coupon.applicableTo);
+    console.log('  - couponStoreId (raw):', coupon.storeId);
+    console.log('  - couponCategoryId:', coupon.categoryId);
+    console.log('  - couponProductId:', coupon.productId);
+    console.log('  - requestStoreId (raw):', validateCouponDto.storeId);
+    console.log('  - requestCategoryId:', validateCouponDto.categoryId);
+    console.log('  - requestProductId:', validateCouponDto.productId);
 
     // Verificar se o usuário já usou este cupom (se fornecido)
     if (userId) {
@@ -264,16 +349,108 @@ export class CouponsService {
     }
 
     // Verificar aplicabilidade
-    if (coupon.applicableTo === 'PRODUCT' && validateCouponDto.productId !== coupon.productId) {
-      throw new BadRequestException('Cupom não é válido para este produto');
+    // IMPORTANTE: Verificar o tipo de aplicabilidade do cupom primeiro
+    console.log('🔍 Verificando aplicabilidade do cupom:', {
+      applicableTo: coupon.applicableTo,
+      couponProductId: coupon.productId,
+      couponCategoryId: coupon.categoryId,
+      couponStoreId: coupon.storeId,
+      requestProductId: validateCouponDto.productId,
+      requestCategoryId: validateCouponDto.categoryId,
+      requestStoreId: validateCouponDto.storeId
+    });
+
+    if (coupon.applicableTo === 'PRODUCT') {
+      if (!validateCouponDto.productId) {
+        throw new BadRequestException('Este cupom é válido apenas para um produto específico. Por favor, adicione o produto correto ao carrinho.');
+      }
+      if (validateCouponDto.productId !== coupon.productId) {
+        throw new BadRequestException(`Cupom não é válido para este produto. Este cupom é válido apenas para o produto com ID "${coupon.productId}".`);
+      }
     }
 
-    if (coupon.applicableTo === 'CATEGORY' && validateCouponDto.categoryId !== coupon.categoryId) {
-      throw new BadRequestException('Cupom não é válido para esta categoria');
+    if (coupon.applicableTo === 'CATEGORY') {
+      // Normalizar valores para comparação (trim, uppercase, tratar null/undefined)
+      const couponCategoryId = coupon.categoryId?.toString().trim().toUpperCase() || '';
+      const requestCategoryId = validateCouponDto.categoryId?.toString().trim().toUpperCase() || '';
+      
+      console.log('🔍 Validação de cupom de categoria:', {
+        couponCode: coupon.code,
+        couponCategoryId,
+        requestCategoryId,
+        match: couponCategoryId === requestCategoryId,
+        couponApplicableTo: coupon.applicableTo
+      });
+      
+      if (!validateCouponDto.categoryId) {
+        throw new BadRequestException('Categoria do produto não foi informada. Este cupom é válido apenas para produtos da categoria específica.');
+      }
+      
+      if (couponCategoryId !== requestCategoryId) {
+        throw new BadRequestException(
+          `Cupom não é válido para esta categoria. Este cupom é válido apenas para produtos da categoria ${couponCategoryId}, mas o produto selecionado pertence à categoria ${requestCategoryId}.`
+        );
+      }
     }
 
-    if (coupon.applicableTo === 'STORE' && validateCouponDto.storeId !== coupon.storeId) {
-      throw new BadRequestException('Cupom não é válido para esta loja');
+    if (coupon.applicableTo === 'STORE') {
+      // Normalizar valores para comparação (trim, tratar null/undefined)
+      const couponStoreId = coupon.storeId ? String(coupon.storeId).trim() : null;
+      const requestStoreId = validateCouponDto.storeId ? String(validateCouponDto.storeId).trim() : null;
+      
+      console.log('🔍 Validação de cupom de loja:');
+      console.log('  - Código do cupom:', coupon.code);
+      console.log('  - applicableTo:', coupon.applicableTo);
+      console.log('  - couponStoreId (normalizado):', couponStoreId);
+      console.log('  - couponStoreId (tipo):', typeof couponStoreId);
+      console.log('  - couponStoreId (raw do DB):', coupon.storeId);
+      console.log('  - requestStoreId (normalizado):', requestStoreId);
+      console.log('  - requestStoreId (tipo):', typeof requestStoreId);
+      console.log('  - requestStoreId (raw da requisição):', validateCouponDto.storeId);
+      console.log('  - Comparação direta:', coupon.storeId, '===', validateCouponDto.storeId, '?', coupon.storeId === validateCouponDto.storeId);
+      console.log('  - Comparação normalizada:', couponStoreId, '===', requestStoreId, '?', couponStoreId === requestStoreId);
+      
+      if (!couponStoreId || couponStoreId === 'null' || couponStoreId === 'undefined') {
+        console.error('❌ ERRO: Cupom de loja sem storeId definido!', {
+          couponId: coupon.id,
+          couponCode: coupon.code,
+          storeId: coupon.storeId,
+          storeIdType: typeof coupon.storeId
+        });
+        throw new BadRequestException('Cupom configurado incorretamente: loja não definida no cupom. Entre em contato com o suporte.');
+      }
+      
+      if (!requestStoreId || requestStoreId === '' || requestStoreId === 'null' || requestStoreId === 'undefined') {
+        console.error('❌ ERRO: Loja não foi fornecida na requisição!', {
+          couponCode: coupon.code,
+          requestStoreId: validateCouponDto.storeId,
+          requestStoreIdType: typeof validateCouponDto.storeId
+        });
+        throw new BadRequestException('Loja não foi selecionada. Este cupom é válido apenas para uma loja específica. Por favor, selecione a loja correta antes de aplicar o cupom.');
+      }
+      
+      // Comparação mais robusta
+      const storeIdsMatch = couponStoreId === requestStoreId || 
+                           String(coupon.storeId) === String(validateCouponDto.storeId);
+      
+      if (!storeIdsMatch) {
+        console.error('❌ ERRO: IDs de loja não correspondem!', {
+          couponCode: coupon.code,
+          couponStoreId,
+          requestStoreId,
+          couponStoreIdRaw: coupon.storeId,
+          requestStoreIdRaw: validateCouponDto.storeId
+        });
+        throw new BadRequestException(
+          `Cupom não é válido para esta loja. Este cupom é válido apenas para a loja com ID "${couponStoreId}", mas a loja selecionada tem ID "${requestStoreId}".`
+        );
+      }
+      
+      console.log('✅ Validação de loja passou:', {
+        couponStoreId,
+        requestStoreId,
+        match: storeIdsMatch
+      });
     }
 
     // Verificar se é cupom de primeira compra e se o usuário já fez compras
@@ -330,6 +507,11 @@ export class CouponsService {
         discountType: coupon.discountType,
         discountValue: Number(coupon.discountValue),
         couponType: coupon.couponType, // Incluir tipo do cupom
+        applicableTo: coupon.applicableTo, // Incluir tipo de aplicabilidade
+        storeId: coupon.storeId, // Incluir ID da loja se aplicável
+        categoryId: coupon.categoryId, // Incluir ID da categoria se aplicável
+        productId: coupon.productId, // Incluir ID do produto se aplicável
+        maximumDiscount: coupon.maximumDiscount ? Number(coupon.maximumDiscount) : null, // Incluir desconto máximo
       },
       discount: Math.round(discount * 100) / 100, // Arredondar para 2 casas decimais
       finalAmount: Math.max(0, validateCouponDto.totalAmount - discount),
@@ -337,6 +519,14 @@ export class CouponsService {
   }
 
   async update(id: string, updateData: Partial<CreateCouponDto>, user: User) {
+    console.log('📝 Iniciando atualização de cupom:', {
+      id,
+      applicableTo: updateData.applicableTo,
+      storeId: updateData.storeId,
+      storeIdType: typeof updateData.storeId,
+      updateDataKeys: Object.keys(updateData)
+    });
+
     const coupon = await this.prisma.coupon.findUnique({
       where: { id },
     });
@@ -344,6 +534,26 @@ export class CouponsService {
     if (!coupon) {
       throw new NotFoundException('Cupom não encontrado');
     }
+
+    console.log('📝 Iniciando atualização de cupom:', {
+      id,
+      updateDataReceived: {
+        ...updateData,
+        storeId: updateData.storeId,
+        storeIdType: typeof updateData.storeId,
+        storeIdIsUndefined: updateData.storeId === undefined,
+        storeIdIsNull: updateData.storeId === null,
+        storeIdValue: updateData.storeId
+      }
+    });
+
+    console.log('📋 Cupom atual no banco:', {
+      id: coupon.id,
+      code: coupon.code,
+      applicableTo: coupon.applicableTo,
+      storeId: coupon.storeId,
+      storeIdType: typeof coupon.storeId
+    });
 
     // Verificar permissão
     const userRole = user.role?.toUpperCase();
@@ -379,11 +589,177 @@ export class CouponsService {
     if (updateData.applicableTo) updatePayload.applicableTo = updateData.applicableTo;
     if (updateData.categoryId !== undefined) updatePayload.categoryId = updateData.categoryId;
     if (updateData.productId !== undefined) updatePayload.productId = updateData.productId;
+    
+    // Tratar storeId corretamente
+    const applicableTo = updateData.applicableTo || coupon.applicableTo;
+    
+    console.log('🔍 Processando storeId:', {
+      updateDataStoreId: updateData.storeId,
+      updateDataStoreIdType: typeof updateData.storeId,
+      updateDataStoreIdIsUndefined: updateData.storeId === undefined,
+      updateDataStoreIdIsNull: updateData.storeId === null,
+      updateDataStoreIdIsEmpty: updateData.storeId === '',
+      applicableTo,
+      currentCouponStoreId: coupon.storeId,
+      updateDataKeys: Object.keys(updateData)
+    });
+
+    // Tratar storeId baseado no applicableTo
+    // IMPORTANTE: Sempre processar storeId quando applicableTo for STORE
+    if (applicableTo === 'STORE') {
+      // Se storeId foi fornecido explicitamente
+      if (updateData.storeId !== undefined && updateData.storeId !== null) {
+        const storeIdStr = String(updateData.storeId).trim();
+        
+        console.log('🔍 Processando storeId fornecido:', {
+          storeIdStr,
+          isEmpty: storeIdStr === '',
+          isNull: storeIdStr === 'null',
+          isUndefined: storeIdStr === 'undefined'
+        });
+        
+        if (storeIdStr === '' || storeIdStr === 'null' || storeIdStr === 'undefined') {
+          // Se storeId está vazio, usar o storeId atual se existir
+          if (coupon.storeId) {
+            console.log('⚠️ storeId vazio fornecido, mantendo storeId atual:', coupon.storeId);
+            // Não atualizar storeId no payload, manter o existente
+          } else {
+            throw new BadRequestException('Loja é obrigatória quando o cupom é aplicável a uma loja específica');
+          }
+        } else {
+          // Validar se a loja existe
+          const store = await this.prisma.store.findUnique({
+            where: { id: storeIdStr },
+            select: { id: true, name: true, isActive: true }
+          });
+
+          if (!store) {
+            throw new BadRequestException(`Loja com ID "${storeIdStr}" não foi encontrada. Por favor, selecione uma loja válida.`);
+          }
+
+          if (!store.isActive) {
+            throw new BadRequestException(`A loja "${store.name}" está inativa. Por favor, selecione uma loja ativa.`);
+          }
+
+          console.log('✅ Loja validada para atualização do cupom:', {
+            storeId: store.id,
+            storeName: store.name,
+            isActive: store.isActive
+          });
+          
+          // CRÍTICO: Sempre adicionar storeId ao payload quando fornecido e válido
+          updatePayload.storeId = storeIdStr;
+          console.log('💾 storeId ADICIONADO ao payload para salvar:', {
+            storeId: updatePayload.storeId,
+            storeIdType: typeof updatePayload.storeId,
+            payloadKeys: Object.keys(updatePayload)
+          });
+        }
+      } else {
+        // Se storeId não foi fornecido, verificar se já existe
+        if (!coupon.storeId) {
+          throw new BadRequestException('Loja é obrigatória quando o cupom é aplicável a uma loja específica');
+        }
+        // Se já tem storeId, não fazer nada (manter o existente)
+        console.log('ℹ️ storeId não fornecido, mantendo storeId atual:', coupon.storeId);
+      }
+    } else {
+      // Se não for STORE, remover storeId
+      if (updateData.applicableTo && updateData.applicableTo !== 'STORE') {
+        updatePayload.storeId = null;
+        console.log('🗑️ Removendo storeId pois applicableTo não é mais STORE');
+      }
+    }
+    
     if (updateData.isActive !== undefined) updatePayload.isActive = updateData.isActive;
     if (updateData.assignmentType !== undefined) updatePayload.assignmentType = updateData.assignmentType;
     if (updateData.couponType !== undefined) updatePayload.couponType = updateData.couponType;
 
-    return await this.prisma.coupon.update({
+    // Verificação final: garantir que storeId está no payload se applicableTo for STORE
+    const finalApplicableTo = updatePayload.applicableTo || coupon.applicableTo;
+    
+    console.log('🔍 Verificação final do payload:', {
+      finalApplicableTo,
+      updatePayloadStoreId: updatePayload.storeId,
+      updatePayloadStoreIdType: typeof updatePayload.storeId,
+      updatePayloadStoreIdIsUndefined: updatePayload.storeId === undefined,
+      updateDataStoreId: updateData.storeId,
+      couponStoreId: coupon.storeId,
+      updatePayloadKeys: Object.keys(updatePayload)
+    });
+    
+    if (finalApplicableTo === 'STORE') {
+      // Se storeId não está no payload mas foi fornecido, adicionar
+      if (updatePayload.storeId === undefined && updateData.storeId !== undefined && updateData.storeId !== null) {
+        const storeIdStr = String(updateData.storeId).trim();
+        if (storeIdStr && storeIdStr !== 'null' && storeIdStr !== 'undefined' && storeIdStr !== '') {
+          updatePayload.storeId = storeIdStr;
+          console.log('🔧 Adicionando storeId ao payload (verificação final):', storeIdStr);
+        }
+      }
+      
+      // Se storeId não está no payload e não foi fornecido, mas já existe no cupom, manter
+      if (updatePayload.storeId === undefined && coupon.storeId) {
+        console.log('ℹ️ Mantendo storeId existente (não será alterado):', coupon.storeId);
+        // Não adicionar ao payload, o Prisma manterá o valor atual
+      }
+      
+      // Se storeId não está no payload, não foi fornecido e não existe, erro
+      if (updatePayload.storeId === undefined && !coupon.storeId) {
+        throw new BadRequestException('Loja é obrigatória quando o cupom é aplicável a uma loja específica');
+      }
+    }
+
+    // VERIFICAÇÃO CRÍTICA: Garantir que storeId está no payload se applicableTo for STORE
+    if (finalApplicableTo === 'STORE') {
+      // Processar storeId: garantir que seja uma string válida ou null
+      let finalStoreId: string | null = null;
+      
+      // Prioridade 1: storeId fornecido em updateData
+      if (updateData.storeId !== undefined && updateData.storeId !== null) {
+        const storeIdStr = String(updateData.storeId).trim();
+        if (storeIdStr && storeIdStr !== 'null' && storeIdStr !== 'undefined' && storeIdStr !== '') {
+          finalStoreId = storeIdStr;
+        }
+      }
+      
+      // Prioridade 2: storeId já existente no cupom (se não foi fornecido novo)
+      if (!finalStoreId && coupon.storeId) {
+        finalStoreId = String(coupon.storeId).trim();
+      }
+      
+      // Se ainda não tem storeId, erro
+      if (!finalStoreId) {
+        throw new BadRequestException('Loja é obrigatória quando o cupom é aplicável a uma loja específica');
+      }
+      
+      // FORÇAR storeId no payload (sempre, mesmo que já esteja)
+      updatePayload.storeId = finalStoreId;
+      console.log('🔧 FORÇANDO storeId no payload (última verificação):', {
+        finalStoreId,
+        storeIdType: typeof finalStoreId,
+        wasInPayload: 'storeId' in updatePayload,
+        previousValue: updatePayload.storeId
+      });
+    }
+
+    // Log final antes de salvar
+    console.log('💾 Atualizando cupom no banco (FINAL):', {
+      id,
+      applicableTo: finalApplicableTo,
+      storeIdNoPayload: updatePayload.storeId,
+      storeIdNoPayloadType: typeof updatePayload.storeId,
+      storeIdNoPayloadIsUndefined: updatePayload.storeId === undefined,
+      storeIdFinal: updatePayload.storeId !== undefined ? updatePayload.storeId : coupon.storeId,
+      updatePayloadKeys: Object.keys(updatePayload),
+      updatePayloadStoreId: updatePayload.storeId,
+      updatePayloadHasStoreId: 'storeId' in updatePayload,
+      updatePayloadJSON: JSON.stringify(updatePayload, null, 2),
+      updateDataStoreId: updateData.storeId,
+      payloadWillSaveStoreId: updatePayload.storeId !== undefined && updatePayload.storeId !== null
+    });
+
+    const updatedCoupon = await this.prisma.coupon.update({
       where: { id },
       data: updatePayload,
       include: {
@@ -402,6 +778,31 @@ export class CouponsService {
         },
       },
     });
+
+    console.log('✅ Cupom atualizado com sucesso:', {
+      id: updatedCoupon.id,
+      code: updatedCoupon.code,
+      applicableTo: updatedCoupon.applicableTo,
+      storeId: updatedCoupon.storeId,
+      storeIdType: typeof updatedCoupon.storeId,
+      storeName: updatedCoupon.store?.name || 'Loja não encontrada',
+      storeExists: !!updatedCoupon.store,
+      storeIdFromDB: updatedCoupon.storeId,
+      storeIdFromPayload: updatePayload.storeId,
+      storeIdMatch: updatedCoupon.storeId === updatePayload.storeId
+    });
+
+    // Verificação crítica: se applicableTo é STORE, storeId deve estar salvo
+    if (updatedCoupon.applicableTo === 'STORE' && !updatedCoupon.storeId) {
+      console.error('🚨 ERRO CRÍTICO: Cupom de loja sem storeId salvo!', {
+        couponId: updatedCoupon.id,
+        applicableTo: updatedCoupon.applicableTo,
+        storeId: updatedCoupon.storeId,
+        payloadStoreId: updatePayload.storeId
+      });
+    }
+
+    return updatedCoupon;
   }
 
   async getCustomerCoupons(customerId: string) {

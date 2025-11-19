@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
@@ -114,10 +115,13 @@ export default function Header() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loadingNotifications, setLoadingNotifications] = useState(false);
+    const [notificationPosition, setNotificationPosition] = useState<{ top: number; right: number } | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
     
     // Refs para os dropdowns
     const userDropdownRef = useRef<HTMLDivElement>(null);
     const notificationsDropdownRef = useRef<HTMLDivElement>(null);
+    const notificationsButtonRef = useRef<HTMLButtonElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     // Handlers
@@ -272,8 +276,20 @@ export default function Header() {
     };
 
     const handleNotificationsClick = () => {
-        setNotificationsOpen(!notificationsOpen);
+        const newState = !notificationsOpen;
+        setNotificationsOpen(newState);
         setUserDropdownOpen(false); // Fechar dropdown do usuário se estiver aberto
+        
+        // Calcular posição do dropdown quando abrir
+        if (newState && notificationsButtonRef.current) {
+            const rect = notificationsButtonRef.current.getBoundingClientRect();
+            setNotificationPosition({
+                top: rect.bottom + 12, // 12px de margem (mt-3)
+                right: window.innerWidth - rect.right
+            });
+        } else {
+            setNotificationPosition(null);
+        }
     };
 
     const markNotificationAsRead = async (id: string) => {
@@ -434,6 +450,37 @@ export default function Header() {
         }
     };
 
+    // Verificar se está montado (para Portal)
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    // Atualizar posição do dropdown quando necessário
+    useEffect(() => {
+        if (notificationsOpen && notificationsButtonRef.current) {
+            const updatePosition = () => {
+                const rect = notificationsButtonRef.current?.getBoundingClientRect();
+                if (rect) {
+                    setNotificationPosition({
+                        top: rect.bottom + 12,
+                        right: window.innerWidth - rect.right
+                    });
+                }
+            };
+            
+            updatePosition();
+            window.addEventListener('scroll', updatePosition, true);
+            window.addEventListener('resize', updatePosition);
+            
+            return () => {
+                window.removeEventListener('scroll', updatePosition, true);
+                window.removeEventListener('resize', updatePosition);
+            };
+        } else {
+            setNotificationPosition(null);
+        }
+    }, [notificationsOpen]);
+
     // Buscar notificações quando usuário estiver autenticado
     useEffect(() => {
         fetchNotifications();
@@ -531,7 +578,7 @@ export default function Header() {
 
     return (
      
-        <header className={`w-full fixed top-0 left-0 right-0 transition-all duration-500 ease-in-out z-40 transform mb-10  ${
+        <header className={`w-full fixed top-0 left-0 right-0 transition-all duration-500 ease-in-out z-[900] transform mb-10  ${
             isHeaderVisible 
                 ? 'translate-y-0 opacity-100 visible' 
                 : '-translate-y-full opacity-0 invisible pointer-events-none'
@@ -794,13 +841,14 @@ export default function Header() {
                {/* Notifications Icon */}
                <div className="relative" ref={notificationsDropdownRef}>
                  <button 
-                   onClick={handleNotificationsClick}
-                   className={`p-2 transition-colors relative ${
-                     isHomePage 
-                       ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
-                       : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
-                   }`}
-                 >
+                  ref={notificationsButtonRef}
+                  onClick={handleNotificationsClick}
+                  className={`p-2 transition-colors relative ${
+                    isHomePage 
+                      ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
+                      : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
+                  }`}
+                >
                    <Bell className="h-6 w-6" />
                    {unreadCount > 0 && (
                      <span 
@@ -817,11 +865,20 @@ export default function Header() {
                    )}
                  </button>
                  
-                 {/* Notifications Dropdown */}
-                 {notificationsOpen && (
-                   <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 z-[999] animate-in slide-in-from-top-2 duration-200 max-h-[500px] flex flex-col">
-                                           {/* Header */}
-                      <div className="px-4 py-3 bg-[#3e2626] rounded-t-2xl flex items-center justify-between">
+                 {/* Notifications Dropdown - Renderizado via Portal para garantir z-index */}
+                 {notificationsOpen && isMounted && notificationPosition && createPortal(
+                   <div 
+                     className="fixed w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 animate-in slide-in-from-top-2 duration-200 max-h-[500px] flex flex-col"
+                     style={{
+                       top: `${notificationPosition.top}px`,
+                       right: `${notificationPosition.right}px`,
+                       zIndex: 2147483647,
+                       position: 'fixed',
+                       isolation: 'isolate'
+                     }}
+                   >
+                     {/* Header */}
+                     <div className="px-4 py-3 bg-[#3e2626] rounded-t-2xl flex items-center justify-between">
                        <div>
                          <h3 className="text-sm font-bold text-white">Notificações</h3>
                          {unreadCount > 0 && (
@@ -886,7 +943,8 @@ export default function Header() {
                          </div>
                        )}
                      </div>
-                   </div>
+                   </div>,
+                   document.body
                  )}
                </div>
               

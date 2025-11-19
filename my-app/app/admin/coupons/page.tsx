@@ -89,6 +89,7 @@ export default function CouponsPage() {
   const [products, setProducts] = useState<Array<{ id: string; name: string }>>([]);
   const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
 
   // Form states
   const [formData, setFormData] = useState({
@@ -185,6 +186,15 @@ export default function CouponsPage() {
     try {
       setIsLoading(true);
       const data = await adminAPI.getCoupons();
+      console.log('📋 Cupons carregados:', {
+        total: data.length,
+        cuponsComLoja: data.filter((c: Coupon) => c.applicableTo === 'STORE').map((c: Coupon) => ({
+          code: c.code,
+          storeId: c.storeId,
+          storeName: c.store?.name || 'Não encontrada',
+          storeExists: !!c.store
+        }))
+      });
       setCoupons(data);
     } catch (error: any) {
       toast.error('Erro ao carregar cupons', {
@@ -234,6 +244,15 @@ export default function CouponsPage() {
   };
 
   const handleEdit = (coupon: Coupon) => {
+    console.log('✏️ Editando cupom:', {
+      code: coupon.code,
+      applicableTo: coupon.applicableTo,
+      storeId: coupon.storeId,
+      storeIdType: typeof coupon.storeId,
+      store: coupon.store,
+      storeName: coupon.store?.name
+    });
+    
     setSelectedCoupon(coupon);
     setFormData({
       code: coupon.code,
@@ -282,6 +301,15 @@ export default function CouponsPage() {
         return;
       }
 
+      // Log para debug
+      console.log('📝 Dados do formulário antes de enviar:', {
+        applicableTo: formData.applicableTo,
+        storeId: formData.storeId,
+        storeIdType: typeof formData.storeId,
+        storesAvailable: stores.length,
+        selectedStore: stores.find(s => s.id === formData.storeId)
+      });
+
       // Converter datetime-local para ISO string corretamente
       // datetime-local retorna "YYYY-MM-DDTHH:mm" sem timezone
       // Quando você cria new Date("2025-11-17T16:00"), o JavaScript interpreta como horário local
@@ -316,16 +344,74 @@ export default function CouponsPage() {
       if (!payload.minimumPurchase) delete payload.minimumPurchase;
       if (!payload.maximumDiscount) delete payload.maximumDiscount;
       if (!payload.usageLimit) delete payload.usageLimit;
-      if (!payload.categoryId) delete payload.categoryId;
-      if (!payload.productId) delete payload.productId;
-      if (!payload.storeId) delete payload.storeId;
       if (!payload.description) delete payload.description;
+      
+      // Remover campos de aplicabilidade apenas se não forem necessários
+      // IMPORTANTE: Não remover storeId se applicableTo for 'STORE'
+      if (payload.applicableTo !== 'CATEGORY') {
+        if (!payload.categoryId) delete payload.categoryId;
+      }
+      if (payload.applicableTo !== 'PRODUCT') {
+        if (!payload.productId) delete payload.productId;
+      }
+      if (payload.applicableTo !== 'STORE') {
+        if (!payload.storeId) delete payload.storeId;
+      } else {
+        // Se for cupom de loja, garantir que storeId está presente e não vazio
+        if (!payload.storeId || payload.storeId.trim() === '') {
+          console.error('❌ ERRO: storeId vazio para cupom de loja!', {
+            applicableTo: payload.applicableTo,
+            storeId: payload.storeId,
+            formDataStoreId: formData.storeId
+          });
+          toast.error('Por favor, selecione uma loja válida');
+          return;
+        }
+        // Garantir que storeId seja uma string válida
+        payload.storeId = payload.storeId.trim();
+        console.log('✅ storeId preservado para cupom de loja:', {
+          storeId: payload.storeId,
+          storeName: stores.find(s => s.id === payload.storeId)?.name
+        });
+      }
 
+      // Log final do payload
+      console.log('📤 Payload final enviado ao backend:', {
+        code: payload.code,
+        applicableTo: payload.applicableTo,
+        storeId: payload.storeId || 'NÃO ENVIADO',
+        storeIdType: typeof payload.storeId,
+        storeIdRaw: payload.storeId,
+        storeIdIsUndefined: payload.storeId === undefined,
+        storeIdIsNull: payload.storeId === null,
+        storeIdIsEmpty: payload.storeId === '',
+        categoryId: payload.categoryId || 'NÃO ENVIADO',
+        productId: payload.productId || 'NÃO ENVIADO',
+        discountType: payload.discountType,
+        discountValue: payload.discountValue,
+        validFrom: payload.validFrom,
+        validUntil: payload.validUntil,
+        isActive: payload.isActive,
+        assignmentType: payload.assignmentType,
+        couponType: payload.couponType,
+        payloadKeys: Object.keys(payload),
+        payloadJSON: JSON.stringify(payload)
+      });
+
+      let createdCoupon;
       if (selectedCoupon) {
-        await adminAPI.updateCoupon(selectedCoupon.id, payload);
+        createdCoupon = await adminAPI.updateCoupon(selectedCoupon.id, payload);
         toast.success('Cupom atualizado com sucesso!');
       } else {
-        await adminAPI.createCoupon(payload);
+        createdCoupon = await adminAPI.createCoupon(payload);
+        console.log('✅ Resposta do backend após criar cupom:', {
+          id: createdCoupon?.id,
+          code: createdCoupon?.code,
+          applicableTo: createdCoupon?.applicableTo,
+          storeId: createdCoupon?.storeId,
+          store: createdCoupon?.store,
+          storeName: createdCoupon?.store?.name || 'Loja não encontrada na resposta'
+        });
         toast.success('Cupom criado com sucesso!');
       }
 
@@ -334,6 +420,12 @@ export default function CouponsPage() {
       setSelectedCoupon(null);
       loadCoupons();
     } catch (error: any) {
+      console.error('❌ Erro ao salvar cupom:', {
+        error,
+        response: error.response?.data,
+        message: error.response?.data?.message || error.message,
+        status: error.response?.status
+      });
       toast.error('Erro ao salvar cupom', {
         description: error.response?.data?.message || error.message,
       });
@@ -422,7 +514,7 @@ export default function CouponsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8" style={{ position: 'relative', zIndex: 1 }}>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-[#3e2626] flex items-center gap-2">
@@ -437,7 +529,7 @@ export default function CouponsPage() {
         </Button>
       </div>
 
-      <Card className="mb-6">
+      <Card className="mb-6" style={{ zIndex: 1 }}>
         <CardContent className="pt-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -499,7 +591,9 @@ export default function CouponsPage() {
                             products.find(p => p.id === coupon.productId)?.name || coupon.productId || 'Produto não encontrado'
                           )}
                           {coupon.applicableTo === 'STORE' && (
-                            stores.find(s => s.id === coupon.storeId)?.name || coupon.store?.name || coupon.storeId || 'Loja não encontrada'
+                            coupon.store?.name || 
+                            stores.find(s => s.id === coupon.storeId)?.name || 
+                            (coupon.storeId ? `Loja ID: ${coupon.storeId}` : 'Loja não encontrada')
                           )}
                         </Badge>
                       </div>
@@ -593,6 +687,7 @@ export default function CouponsPage() {
           setIsCreateModalOpen(false);
           setIsEditModalOpen(false);
           setSelectedCoupon(null);
+          setProductSearchTerm(''); // Limpar busca ao fechar modal
         }
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -740,7 +835,7 @@ export default function CouponsPage() {
               <Label htmlFor="applicableTo">Aplicável a</Label>
               <Select
                 value={formData.applicableTo}
-                onValueChange={(value: 'ALL' | 'CATEGORY' | 'PRODUCT' | 'STORE') =>
+                onValueChange={(value: 'ALL' | 'CATEGORY' | 'PRODUCT' | 'STORE') => {
                   setFormData({ 
                     ...formData, 
                     applicableTo: value,
@@ -748,8 +843,12 @@ export default function CouponsPage() {
                     categoryId: value !== 'CATEGORY' ? '' : formData.categoryId,
                     productId: value !== 'PRODUCT' ? '' : formData.productId,
                     storeId: value !== 'STORE' ? '' : formData.storeId,
-                  })
-                }
+                  });
+                  // Limpar busca quando mudar de produto para outro tipo
+                  if (value !== 'PRODUCT') {
+                    setProductSearchTerm('');
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -843,25 +942,73 @@ export default function CouponsPage() {
                 ) : (
                   <Select
                     value={formData.productId}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, productId: value })
-                    }
+                    onValueChange={(value) => {
+                      setFormData({ ...formData, productId: value });
+                      setProductSearchTerm(''); // Limpar busca após seleção
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um produto" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {products.length === 0 ? (
-                        <SelectItem value="" disabled>
-                          Nenhum produto encontrado
-                        </SelectItem>
-                      ) : (
-                        products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name}
-                          </SelectItem>
-                        ))
-                      )}
+                    <SelectContent className="max-h-[400px] p-0">
+                      {/* Barra de pesquisa dentro do Select */}
+                      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
+                          <Input
+                            placeholder="Buscar produto por nome..."
+                            value={productSearchTerm}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setProductSearchTerm(e.target.value);
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                            }}
+                            onKeyDown={(e) => {
+                              e.stopPropagation();
+                              // Permitir navegação com setas e Enter
+                              if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
+                                e.stopPropagation();
+                              }
+                            }}
+                            onFocus={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className="pl-10 h-9 w-full"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Lista de produtos filtrados */}
+                      <div className="max-h-[300px] overflow-y-auto">
+                        {products.length === 0 ? (
+                          <div className="px-2 py-6 text-center text-sm text-gray-500">
+                            Nenhum produto encontrado
+                          </div>
+                        ) : (() => {
+                          // Filtrar produtos baseado no termo de busca
+                          const filteredProducts = products.filter((product) =>
+                            product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
+                          );
+                          
+                          if (filteredProducts.length === 0) {
+                            return (
+                              <div className="px-2 py-6 text-center text-sm text-gray-500">
+                                Nenhum produto encontrado com "{productSearchTerm}"
+                              </div>
+                            );
+                          }
+                          
+                          return filteredProducts.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name}
+                            </SelectItem>
+                          ));
+                        })()}
+                      </div>
                     </SelectContent>
                   </Select>
                 )}

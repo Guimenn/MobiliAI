@@ -1077,6 +1077,14 @@ export const customerAPI = {
 
   // Checkout
   validateCoupon: async (code: string, totalAmount: number, productId?: string, categoryId?: string, storeId?: string, shippingCost?: number) => {
+    console.log('📤 Enviando validação de cupom para API:', {
+      code,
+      totalAmount,
+      productId,
+      categoryId,
+      storeId,
+      shippingCost,
+    });
     const response = await api.post('/coupons/validate', {
       code,
       totalAmount,
@@ -1085,6 +1093,7 @@ export const customerAPI = {
       storeId,
       shippingCost,
     });
+    console.log('📥 Resposta da validação:', response.data);
     return response.data;
   },
 
