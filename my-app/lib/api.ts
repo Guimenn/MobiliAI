@@ -1076,13 +1076,14 @@ export const customerAPI = {
   },
 
   // Checkout
-  validateCoupon: async (code: string, totalAmount: number, productId?: string, categoryId?: string, storeId?: string) => {
+  validateCoupon: async (code: string, totalAmount: number, productId?: string, categoryId?: string, storeId?: string, shippingCost?: number) => {
     const response = await api.post('/coupons/validate', {
       code,
       totalAmount,
       productId,
       categoryId,
       storeId,
+      shippingCost,
     });
     return response.data;
   },
