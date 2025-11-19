@@ -647,19 +647,53 @@ export class PaymentService {
       // Garantir conexão com o banco
       await this.prisma.ensureConnection();
 
+      // Buscar a venda atual para verificar seu status
+      const currentSale = await this.prisma.sale.findUnique({
+        where: { id: saleId },
+        select: { status: true, paymentReference: true },
+      });
+
+      if (!currentSale) {
+        throw new BadRequestException(`Venda com ID ${saleId} não encontrada`);
+      }
+
+      // Se a venda já está COMPLETED, retornar sucesso sem atualizar novamente
+      if (currentSale.status === 'COMPLETED') {
+        return {
+          success: true,
+          status: 'succeeded',
+          saleId,
+          amount: paymentIntent.amount / 100,
+          message: 'Pagamento já foi confirmado anteriormente',
+        };
+      }
+
       // Verificar status do pagamento
       if (paymentIntent.status === 'succeeded') {
-        // Atualizar venda como paga (com retry)
-        await this.prisma.executeWithRetry(async () => {
-          return await this.prisma.sale.update({
-            where: { id: saleId },
-            data: {
-              status: 'COMPLETED',
-              paymentMethod: 'CREDIT_CARD',
-              paymentReference: paymentIntentId,
-            },
+        // Verificar se o pagamento realmente foi processado
+        // Só atualizar se a venda ainda estiver em PENDING
+        if (currentSale.status === 'PENDING') {
+          // Atualizar venda como paga (com retry)
+          await this.prisma.executeWithRetry(async () => {
+            return await this.prisma.sale.update({
+              where: { id: saleId },
+              data: {
+                status: 'COMPLETED',
+                paymentMethod: 'CREDIT_CARD',
+                paymentReference: paymentIntentId,
+              },
+            });
           });
-        });
+        } else {
+          // Se a venda não está em PENDING, não atualizar o status
+          console.warn(`Tentativa de confirmar pagamento para venda ${saleId} com status ${currentSale.status}`);
+          return {
+            success: false,
+            status: paymentIntent.status,
+            saleId,
+            message: `Venda já possui status ${currentSale.status}, não foi possível atualizar para COMPLETED`,
+          };
+        }
 
         return {
           success: true,

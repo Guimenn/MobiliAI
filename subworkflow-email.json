@@ -2,91 +2,129 @@
   "nodes": [
     {
       "parameters": {
-        "name": "Enviar_Mensagem_Humano",
-        "description": "Use esta ferramenta quando o cliente precisar falar com um atendente humano, tiver uma dúvida muito complexa que você não consegue resolver, ou quando o cliente explicitamente solicitar falar com uma pessoa. Sempre colete nome, email e uma descrição detalhada da dúvida ou problema antes de usar esta ferramenta.",
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "GH8YryH27j3FhCpR"
-        },
-        "fields": {
-          "values": [
+        "inputSource": "passthrough"
+      },
+      "id": "3b163a85-37a5-4c18-bfce-f3d02af33326",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        576,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "men.guilherme5@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ `<!DOCTYPE html><html><head><meta charset='UTF-8'><style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:linear-gradient(135deg,#2b2b2b,#444);color:white;padding:20px;text-align:center;border-radius:8px 8px 0 0}.content{background:#f9f9f9;padding:30px;border-radius:0 0 8px 8px}.info-box{background:white;padding:15px;margin:15px 0;border-left:4px solid #2b2b2b;border-radius:4px}.label{font-weight:bold;color:#555}.value{margin-top:5px;color:#333}</style></head><body><div class='container'><div class='header'><h1>Nova Solicitação de Atendimento Humano</h1><p>MobiliAI - Sistema de Suporte</p></div><div class='content'><p>Você recebeu uma nova solicitação.</p><div class='info-box'><div class='label'>Nome do Cliente:</div><div class='value'>${$json.name}</div></div><div class='info-box'><div class='label'>Email do Cliente:</div><div class='value'>${$json.email}</div></div><div class='info-box'><div class='label'>Assunto:</div><div class='value'>${$json.subject}</div></div><div class='info-box'><div class='label'>Mensagem:</div><div class='value'>${$json.message}</div></div></div></div></body></html>` }}",
+        "options": {
+          "replyTo": "={{ $json.email }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1024,
+        192
+      ],
+      "id": "ac71f834-8af9-4507-aa3a-72d4cfd75fe2",
+      "name": "Send Gmail",
+      "webhookId": "58a1222c-22f4-40fa-8d59-2d8e4f0b5b7d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "2zHqCIiHozIv7QgD",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
             {
-              "name": "route",
-              "stringValue": "message"
+              "id": "67844984-4491-4176-b6b4-5100a99288e8",
+              "name": "name",
+              "value": "={{ $json.query?.name || $json.name || 'Não informado' }}",
+              "type": "string"
+            },
+            {
+              "id": "253a1f1e-0932-4f47-9f3d-a11746340d5c",
+              "name": "email",
+              "value": "={{ $json.query?.email || $json.email || 'noreply@mobiliai.com' }}",
+              "type": "string"
+            },
+            {
+              "id": "c93822e9-e362-40e3-9107-a86d7b49655c",
+              "name": "subject",
+              "value": "={{ $json.query?.subject || $json.subject || 'Atendimento' }}",
+              "type": "string"
+            },
+            {
+              "id": "1c687e47-0963-4e12-8328-19445d7284b3",
+              "name": "message",
+              "value": "={{ $json.query?.message || $json.message || 'Sem mensagem' }}",
+              "type": "string"
             }
           ]
         },
-        "specifyInputSchema": true,
-        "jsonSchemaExample": "{\n  \"email\": \"email do cliente\",\n  \"name\": \"nome completo do cliente\",\n  \"message\": \"descrição detalhada da dúvida ou problema do cliente\",\n  \"subject\": \"assunto da mensagem\"\n}"
+        "options": {}
       },
-      "id": "5907b213-3620-47c8-8475-1dcef90d8a32",
-      "name": "Send Message",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "id": "681dd609-4b9d-4870-be29-901900bbe193",
+      "name": "Formatar Dados1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        464,
-        -224
-      ],
-      "typeVersion": 1.2
-    },
-    {
-      "parameters": {
-        "inputSource": "passthrough"
-      },
-      "id": "9461348b-0396-462b-87a8-9f21a0d1ebc6",
-      "typeVersion": 1.1,
-      "name": "Start",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "position": [
-        80,
-        -32
+        800,
+        192
       ]
     },
     {
       "parameters": {
-        "fromEmail": "={{ $json.email || 'noreply@mobiliai.com' }}",
-        "toEmail": "men.guilherme5@gmail.com",
-        "subject": "={{ $json.subject || 'Solicitação de Atendimento Humano - MobiliAI' }}",
-        "html": "<!DOCTYPE html><html><head><meta charset='UTF-8'><style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:linear-gradient(135deg,#2b2b2b,#444);color:white;padding:20px;text-align:center;border-radius:8px 8px 0 0}.content{background:#f9f9f9;padding:30px;border-radius:0 0 8px 8px}.info-box{background:white;padding:15px;margin:15px 0;border-left:4px solid #2b2b2b;border-radius:4px}.label{font-weight:bold;color:#555}.value{margin-top:5px;color:#333}</style></head><body><div class='container'><div class='header'><h1>Nova Solicitação de Atendimento Humano</h1><p>MobiliAI - Sistema de Suporte</p></div><div class='content'><p>Você recebeu uma nova solicitação de atendimento humano através do chatbot.</p><div class='info-box'><div class='label'>Nome do Cliente:</div><div class='value'>\\\\\\\" + ($json.name || 'Não informado') + \\\\\\\"</div></div><div class='info-box'><div class='label'>Email do Cliente:</div><div class='value'>\\\\\\\" + ($json.email || 'Não informado') + \\\\\\\"</div></div><div class='info-box'><div class='label'>Assunto:</div><div class='value'>\\\\\\\" + ($json.subject || 'Não especificado') + \\\\\\\"</div></div><div class='info-box'><div class='label'>Mensagem:</div><div class='value'>\\\\\\\" + ($json.message || 'Nenhuma mensagem fornecida') + \\\\\\\"</div></div><p style='margin-top:30px;padding-top:20px;border-top:1px solid #ddd;color:#666;font-size:12px'>Esta mensagem foi gerada automaticamente pelo sistema de chatbot da MobiliAI.</p></div></div></body></html>",
-        "options": {}
+        "jsCode": "// Retorna resposta de sucesso\nconst items = $input.all();\nconst emailData = items[0].json;\n\nreturn items.map(item => {\n  return {\n    json: {\n      output: `Solicitação enviada com sucesso! 📧\\n\\nDetalhes:\\n• Nome: ${emailData.name}\\n• Email: ${emailData.email}`,\n      success: true,\n      email: emailData.email,\n      name: emailData.name\n    }\n  };\n});"
       },
-      "id": "6f1a3ea0-e86c-4011-8101-40259bf7640e",
-      "name": "Send Email",
-      "type": "n8n-nodes-base.emailSend",
+      "id": "8746e8d5-d490-42fe-8fd3-aa34b3d470aa",
+      "name": "Return Success1",
+      "type": "n8n-nodes-base.code",
       "position": [
-        304,
-        -32
+        1248,
+        192
       ],
-      "typeVersion": 2.1,
-      "webhookId": "26204ae1-520a-475a-a2b0-3eebacaaa71a",
-      "credentials": {
-        "smtp": {
-          "id": "n32UwuxakmnITBF4",
-          "name": "SMTP account"
-        }
-      }
+      "typeVersion": 2
     }
   ],
   "connections": {
-    "Send Message": {
-      "ai_tool": [
-        []
-      ]
-    },
-    "Start": {
+    "When Executed by Another Workflow": {
       "main": [
         [
           {
-            "node": "Send Email",
+            "node": "Formatar Dados1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send Email": {
+    "Send Gmail": {
       "main": [
-        []
+        [
+          {
+            "node": "Return Success1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Dados1": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

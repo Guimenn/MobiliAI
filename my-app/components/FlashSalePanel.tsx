@@ -399,7 +399,7 @@ export default function FlashSalePanel({
             <CardDescription>
               {activeFlashSaleProduct 
                 ? `Apenas um produto pode estar em oferta relâmpago por vez. Produto atual: ${activeFlashSaleProduct.name}`
-                : 'Busque e selecione o produto que deseja colocar em oferta relâmpago'
+                : 'Busque e selecione o produto da sua loja que deseja colocar em oferta relâmpago'
               }
             </CardDescription>
           </CardHeader>
