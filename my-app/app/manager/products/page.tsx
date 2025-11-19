@@ -29,8 +29,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Search
+  Search,
+  Zap,
+  Percent
 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import FlashSalePanel from '@/components/FlashSalePanel';
 
 interface Product {
   id: string;
@@ -42,6 +46,16 @@ interface Product {
   imageUrls?: string[];
   category?: string;
   brand?: string;
+  isFlashSale?: boolean;
+  flashSaleStartDate?: string;
+  flashSaleEndDate?: string;
+  flashSalePrice?: number;
+  flashSaleDiscountPercent?: number;
+  isOnSale?: boolean;
+  saleStartDate?: string;
+  saleEndDate?: string;
+  salePrice?: number;
+  saleDiscountPercent?: number;
 }
 
 export default function ManagerProductsPage() {
@@ -64,6 +78,12 @@ export default function ManagerProductsPage() {
   
   // Carrossel
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  // Estado para o painel de oferta relâmpago
+  const [showFlashSalePanel, setShowFlashSalePanel] = useState(false);
+  
+  // Estado para controlar a aba ativa
+  const [activeTab, setActiveTab] = useState<'all' | 'on-sale'>('all');
 
   const handleCreateProduct = () => {
     setEditedProduct({
@@ -80,7 +100,13 @@ export default function ManagerProductsPage() {
       height: '',
       depth: '',
       weight: '',
-      isActive: true
+      isActive: true,
+      // Campos de oferta
+      isOnSale: false,
+      salePrice: undefined,
+      saleDiscountPercent: undefined,
+      saleStartDate: '',
+      saleEndDate: ''
     });
     setExistingImages([]);
     setUploadedImages([]);
@@ -93,17 +119,8 @@ export default function ManagerProductsPage() {
   }, []);
 
   useEffect(() => {
-    if (searchTerm) {
-      const filtered = products.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.category?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredProducts(filtered);
-    } else {
-      setFilteredProducts(products);
-    }
-  }, [searchTerm, products]);
+    setFilteredProducts(getFilteredProducts());
+  }, [searchTerm, products, activeTab]);
 
   const loadProducts = async () => {
     if (!user?.storeId) {
@@ -141,7 +158,21 @@ export default function ManagerProductsPage() {
 
   const handleEditProduct = (product: Product) => {
     setSelectedProduct(product);
-    setEditedProduct({ ...product });
+    const processedProduct = { ...product };
+    
+    // Converter datas de oferta normal se existirem
+    if (processedProduct.saleStartDate) {
+      processedProduct.saleStartDate = typeof processedProduct.saleStartDate === 'string' 
+        ? processedProduct.saleStartDate 
+        : new Date(processedProduct.saleStartDate).toISOString();
+    }
+    if (processedProduct.saleEndDate) {
+      processedProduct.saleEndDate = typeof processedProduct.saleEndDate === 'string' 
+        ? processedProduct.saleEndDate 
+        : new Date(processedProduct.saleEndDate).toISOString();
+    }
+    
+    setEditedProduct(processedProduct);
     const images = product?.imageUrls && product.imageUrls.length > 0 
       ? product.imageUrls 
       : product?.imageUrl 
@@ -222,6 +253,35 @@ export default function ManagerProductsPage() {
           productData.weight = Number(editedProduct.weight);
         }
 
+        // Adicionar campos de oferta normal
+        if (editedProduct.isOnSale) {
+          productData.isOnSale = true;
+          if (editedProduct.saleDiscountPercent) {
+            productData.saleDiscountPercent = Number(editedProduct.saleDiscountPercent);
+            // Calcular preço baseado no percentual
+            if (editedProduct.price) {
+              const discount = (editedProduct.price * editedProduct.saleDiscountPercent) / 100;
+              productData.salePrice = editedProduct.price - discount;
+            }
+          } else if (editedProduct.salePrice) {
+            productData.salePrice = Number(editedProduct.salePrice);
+          }
+          if (editedProduct.saleStartDate) {
+            const startDate = new Date(editedProduct.saleStartDate);
+            if (!isNaN(startDate.getTime())) {
+              productData.saleStartDate = startDate.toISOString();
+            }
+          }
+          if (editedProduct.saleEndDate) {
+            const endDate = new Date(editedProduct.saleEndDate);
+            if (!isNaN(endDate.getTime())) {
+              productData.saleEndDate = endDate.toISOString();
+            }
+          }
+        } else {
+          productData.isOnSale = false;
+        }
+
         await productsAPI.create(productData);
         toast.success('Produto criado com sucesso!');
       } else if (productModalMode === 'edit') {
@@ -254,6 +314,31 @@ export default function ManagerProductsPage() {
         }
         if (editedProduct.weight && !isNaN(Number(editedProduct.weight))) {
           updateData.weight = Number(editedProduct.weight);
+        }
+
+        // Adicionar campos de oferta normal
+        updateData.isOnSale = editedProduct.isOnSale || false;
+        if (editedProduct.saleDiscountPercent) {
+          updateData.saleDiscountPercent = Number(editedProduct.saleDiscountPercent);
+          // Calcular preço baseado no percentual
+          if (editedProduct.price) {
+            const discount = (editedProduct.price * editedProduct.saleDiscountPercent) / 100;
+            updateData.salePrice = editedProduct.price - discount;
+          }
+        } else if (editedProduct.salePrice) {
+          updateData.salePrice = Number(editedProduct.salePrice);
+        }
+        if (editedProduct.saleStartDate) {
+          const startDate = new Date(editedProduct.saleStartDate);
+          if (!isNaN(startDate.getTime())) {
+            updateData.saleStartDate = startDate.toISOString();
+          }
+        }
+        if (editedProduct.saleEndDate) {
+          const endDate = new Date(editedProduct.saleEndDate);
+          if (!isNaN(endDate.getTime())) {
+            updateData.saleEndDate = endDate.toISOString();
+          }
         }
 
         await productsAPI.update(editedProduct.id, updateData);
@@ -306,10 +391,246 @@ export default function ManagerProductsPage() {
     }).format(value);
   };
 
+  // Função para verificar se um produto está em oferta relâmpago ativa
+  const isFlashSaleActive = (product: Product): boolean => {
+    if (!product.isFlashSale || !product.flashSaleStartDate || !product.flashSaleEndDate) {
+      return false;
+    }
+    const now = new Date();
+    const start = new Date(product.flashSaleStartDate);
+    const end = new Date(product.flashSaleEndDate);
+    return now >= start && now <= end;
+  };
+
+  // Função para verificar se um produto está em oferta normal ativa
+  const isNormalSaleActive = (product: Product): boolean => {
+    if (!product.isOnSale || !product.saleStartDate || !product.saleEndDate) {
+      return false;
+    }
+    const now = new Date();
+    const start = new Date(product.saleStartDate);
+    const end = new Date(product.saleEndDate);
+    return now >= start && now <= end;
+  };
+
+  // Função para filtrar produtos
+  const getFilteredProducts = () => {
+    let filtered = products;
+    
+    // Filtro por busca
+    if (searchTerm) {
+      filtered = filtered.filter(product =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.category?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Filtro por oferta (se estiver na aba "em oferta")
+    if (activeTab === 'on-sale') {
+      filtered = filtered.filter(product => 
+        isFlashSaleActive(product) || isNormalSaleActive(product)
+      );
+    }
+    
+    return filtered;
+  };
+
   const totalProducts = products.length;
   const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= 10).length;
   const outOfStockProducts = products.filter(p => p.stock === 0).length;
   const inStockProducts = products.filter(p => p.stock > 10).length;
+
+  // Função para recarregar produtos após atualização
+  const onProductsChange = () => {
+    loadProducts();
+  };
+
+  // Função para renderizar seção de produtos
+  const renderProductsSection = (showOnlyOnSale: boolean) => {
+    const productsToShow = showOnlyOnSale 
+      ? filteredProducts.filter(p => isFlashSaleActive(p) || isNormalSaleActive(p))
+      : filteredProducts;
+
+    return (
+      <>
+        {/* Products Grid */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#3e2626] mx-auto mb-4"></div>
+              <p className="text-gray-600">Carregando produtos...</p>
+            </div>
+          </div>
+        ) : productsToShow.length === 0 ? (
+          <Card className="bg-white">
+            <CardContent className="text-center py-16">
+              <Package className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum produto encontrado</h3>
+              <p className="text-gray-600 mb-6">
+                {searchTerm ? 'Tente buscar com outro termo' : showOnlyOnSale ? 'Nenhum produto em oferta no momento' : 'Comece adicionando seu primeiro produto'}
+              </p>
+              {!searchTerm && !showOnlyOnSale && (
+                <Button 
+                  onClick={handleCreateProduct}
+                  className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Produto
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {productsToShow.map((product) => {
+              const isFlashSale = isFlashSaleActive(product);
+              const isNormalSale = isNormalSaleActive(product);
+              const salePrice = isFlashSale ? (product.flashSalePrice || product.price) : (isNormalSale ? (product.salePrice || product.price) : product.price);
+              const originalPrice = product.price;
+              
+              return (
+                <Card key={product.id} className={`overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 rounded-2xl group ${isFlashSale ? 'ring-2 ring-yellow-400 ring-opacity-50' : isNormalSale ? 'ring-2 ring-blue-400 ring-opacity-50' : ''}`}>
+                  {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) ? (
+                    <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
+                      <img
+                        src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      {isFlashSale && (
+                        <div className="absolute top-2 left-2 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
+                          <Zap className="h-3 w-3" />
+                          OFERTA RELÂMPAGO
+                        </div>
+                      )}
+                      {isNormalSale && !isFlashSale && (
+                        <div className="absolute top-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                          EM OFERTA
+                        </div>
+                      )}
+                      {product.imageUrls && product.imageUrls.length > 1 && (
+                        <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full font-medium shadow-lg">
+                          +{product.imageUrls.length - 1} mais
+                        </div>
+                      )}
+                      <div className="absolute top-3 right-3">
+                        <Badge className={
+                          product.stock > 10 
+                            ? 'bg-green-500 text-white border-0 shadow-md' 
+                            : product.stock > 0 
+                            ? 'bg-orange-500 text-white border-0 shadow-md' 
+                            : 'bg-red-500 text-white border-0 shadow-md'
+                        }>
+                          {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-video w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
+                      <Package className="h-16 w-16 text-gray-300" />
+                      {isFlashSale && (
+                        <div className="absolute top-2 left-2 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
+                          <Zap className="h-3 w-3" />
+                          OFERTA RELÂMPAGO
+                        </div>
+                      )}
+                      {isNormalSale && !isFlashSale && (
+                        <div className="absolute top-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                          EM OFERTA
+                        </div>
+                      )}
+                      <div className="absolute top-3 right-3">
+                        <Badge className={
+                          product.stock > 10 
+                            ? 'bg-green-500 text-white border-0 shadow-md' 
+                            : product.stock > 0 
+                            ? 'bg-orange-500 text-white border-0 shadow-md' 
+                            : 'bg-red-500 text-white border-0 shadow-md'
+                        }>
+                          {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg font-bold text-gray-900 line-clamp-2 mb-2 min-h-[3.5rem]">
+                      {product.name}
+                    </CardTitle>
+                    {product.description && (
+                      <CardDescription className="line-clamp-2 text-sm text-gray-600 min-h-[2.5rem]">
+                        {product.description}
+                      </CardDescription>
+                    )}
+                    {(isFlashSale || isNormalSale) && (
+                      <div className="flex items-center gap-2 mt-2">
+                        {isFlashSale && product.flashSaleDiscountPercent && (
+                          <Badge className="bg-red-500 text-white border-0 shadow-md">
+                            -{product.flashSaleDiscountPercent}%
+                          </Badge>
+                        )}
+                        {isNormalSale && product.saleDiscountPercent && (
+                          <Badge className="bg-blue-500 text-white border-0 shadow-md">
+                            -{product.saleDiscountPercent}%
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-4 pt-0">
+                    <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
+                      <span className="text-sm font-medium text-gray-600">Preço</span>
+                      {isFlashSale || isNormalSale ? (
+                        <div className="flex flex-col items-end">
+                          <span className="font-bold text-xl text-green-600">{formatCurrency(salePrice)}</span>
+                          <span className="text-sm text-gray-400 line-through">{formatCurrency(originalPrice)}</span>
+                        </div>
+                      ) : (
+                        <span className="font-bold text-xl text-[#3e2626]">{formatCurrency(originalPrice)}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-4 bg-gray-50 rounded-lg">
+                      <span className="text-sm font-medium text-gray-600">Estoque</span>
+                      <span className="font-semibold text-gray-900">{product.stock} unidades</span>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleViewProduct(product)}
+                        className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 flex-1 transition-all"
+                        title="Visualizar"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleEditProduct(product)}
+                        className="flex-1 border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white transition-all font-medium"
+                      >
+                        <Edit className="h-4 w-4 mr-1.5" />
+                        Editar
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleDeleteProduct(product)}
+                        className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -319,7 +640,7 @@ export default function ManagerProductsPage() {
           <h2 className="text-2xl font-bold text-[#3e2626]">Gestão de Estoque</h2>
           <p className="text-gray-600 mt-1">Gerencie os produtos e estoque da sua loja</p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full sm:w-auto flex-wrap">
           <div className="relative flex-1 sm:flex-initial">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -329,197 +650,73 @@ export default function ManagerProductsPage() {
               className="pl-10 w-full sm:w-64"
             />
           </div>
-          <Button 
-            onClick={handleCreateProduct}
-            className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white shadow-lg font-semibold"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Produto
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-[#3e2626] shadow-lg hover:shadow-xl transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#3e2626]">Total</CardTitle>
-            <div className="w-8 h-8 bg-[#3e2626]/10 rounded-lg flex items-center justify-center">
-              <ShoppingBag className="h-4 w-4 text-[#3e2626]" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#3e2626]">{totalProducts}</div>
-            <p className="text-xs text-[#3e2626]/70">produtos cadastrados</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-[#3e2626] shadow-lg hover:shadow-xl transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#3e2626]">Em Estoque</CardTitle>
-            <div className="w-8 h-8 bg-[#3e2626]/10 rounded-lg flex items-center justify-center">
-              <Package className="h-4 w-4 text-[#3e2626]" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#3e2626]">{inStockProducts}</div>
-            <p className="text-xs text-[#3e2626]/70">estoque adequado</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-[#3e2626] shadow-lg hover:shadow-xl transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#3e2626]">Estoque Baixo</CardTitle>
-            <div className="w-8 h-8 bg-[#3e2626]/10 rounded-lg flex items-center justify-center">
-              <AlertCircle className="h-4 w-4 text-[#3e2626]" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#3e2626]">{lowStockProducts}</div>
-            <p className="text-xs text-[#3e2626]/70">precisa reposição</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-[#3e2626] shadow-lg hover:shadow-xl transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#3e2626]">Sem Estoque</CardTitle>
-            <div className="w-8 h-8 bg-[#3e2626]/10 rounded-lg flex items-center justify-center">
-              <X className="h-4 w-4 text-[#3e2626]" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#3e2626]">{outOfStockProducts}</div>
-            <p className="text-xs text-[#3e2626]/70">fora de estoque</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Products Grid */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#3e2626] mx-auto mb-4"></div>
-            <p className="text-gray-600">Carregando produtos...</p>
-          </div>
-        </div>
-      ) : filteredProducts.length === 0 ? (
-        <Card className="bg-white">
-          <CardContent className="text-center py-16">
-            <Package className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum produto encontrado</h3>
-            <p className="text-gray-600 mb-6">
-              {searchTerm ? 'Tente buscar com outro termo' : 'Comece adicionando seu primeiro produto'}
-            </p>
-            {!searchTerm && (
+          {!showFlashSalePanel && (
+            <>
+              <Button 
+                variant="outline"
+                onClick={() => setShowFlashSalePanel(!showFlashSalePanel)}
+                className={`border-2 border-yellow-500 font-semibold shadow-lg ${
+                  showFlashSalePanel 
+                    ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                    : 'text-yellow-600 hover:bg-yellow-500 hover:text-white'
+                }`}
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Oferta Relâmpago
+              </Button>
               <Button 
                 onClick={handleCreateProduct}
-                className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white"
+                className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white shadow-lg font-semibold"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Adicionar Produto
+                Novo Produto
               </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 rounded-2xl group">
-              {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) ? (
-                <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
-                  <img
-                    src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  {product.imageUrls && product.imageUrls.length > 1 && (
-                    <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full font-medium shadow-lg">
-                      +{product.imageUrls.length - 1} mais
-                    </div>
-                  )}
-                  <div className="absolute top-3 right-3">
-                    <Badge className={
-                      product.stock > 10 
-                        ? 'bg-green-500 text-white border-0 shadow-md' 
-                        : product.stock > 0 
-                        ? 'bg-orange-500 text-white border-0 shadow-md' 
-                        : 'bg-red-500 text-white border-0 shadow-md'
-                    }>
-                      {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
-                    </Badge>
-                  </div>
-                </div>
-              ) : (
-                <div className="aspect-video w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
-                  <Package className="h-16 w-16 text-gray-300" />
-                  <div className="absolute top-3 right-3">
-                    <Badge className={
-                      product.stock > 10 
-                        ? 'bg-green-500 text-white border-0 shadow-md' 
-                        : product.stock > 0 
-                        ? 'bg-orange-500 text-white border-0 shadow-md' 
-                        : 'bg-red-500 text-white border-0 shadow-md'
-                    }>
-                      {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
-                    </Badge>
-                  </div>
-                </div>
-              )}
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-bold text-gray-900 line-clamp-2 mb-2 min-h-[3.5rem]">
-                  {product.name}
-                </CardTitle>
-                {product.description && (
-                  <CardDescription className="line-clamp-2 text-sm text-gray-600 min-h-[2.5rem]">
-                    {product.description}
-                  </CardDescription>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-4 pt-0">
-                <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
-                  <span className="text-sm font-medium text-gray-600">Preço</span>
-                  <span className="font-bold text-xl text-[#3e2626]">{formatCurrency(product.price)}</span>
-                </div>
-                <div className="flex items-center justify-between py-2 px-4 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-600">Estoque</span>
-                  <span className="font-semibold text-gray-900">{product.stock} unidades</span>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleViewProduct(product)}
-                    className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 flex-1 transition-all"
-                    title="Visualizar"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleEditProduct(product)}
-                    className="flex-1 border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white transition-all font-medium"
-                  >
-                    <Edit className="h-4 w-4 mr-1.5" />
-                    Editar
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleDeleteProduct(product)}
-                    className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all"
-                    title="Excluir"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+            </>
+          )}
         </div>
+      </div>
+
+      {/* Renderização condicional: Painel de Oferta Relâmpago ou conteúdo normal */}
+      {showFlashSalePanel ? (
+        <div className="px-6 pb-6">
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>ℹ️ Ofertas da sua loja:</strong> Você só pode configurar ofertas relâmpago para produtos da sua loja ({user?.store?.name || 'sua loja'}).
+            </p>
+          </div>
+          <FlashSalePanel
+            products={products}
+            onProductUpdated={onProductsChange}
+            onClose={() => setShowFlashSalePanel(false)}
+            token={token || ''}
+          />
+        </div>
+      ) : (
+        <>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'all' | 'on-sale')} className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Todos os Produtos
+              </TabsTrigger>
+              <TabsTrigger value="on-sale" className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Produtos em Oferta
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="all" className="mt-0">
+              {renderProductsSection(false)}
+            </TabsContent>
+
+            <TabsContent value="on-sale" className="mt-0">
+              {renderProductsSection(true)}
+            </TabsContent>
+          </Tabs>
+        </>
       )}
 
-      {/* Modal de Produto - Mesmo código do employee/products */}
+      {/* Modal de Produto */}
       {isProductModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden animate-in zoom-in-95 duration-300">
@@ -819,6 +1016,159 @@ export default function ManagerProductsPage() {
                             disabled={productModalMode === 'view'}
                           />
                         </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Ofertas e Promoções */}
+                  <Card className="border-2 border-blue-100 shadow-md rounded-xl overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 pb-4">
+                      <CardTitle className="text-base font-bold flex items-center text-gray-900">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mr-3">
+                          <Percent className="h-4 w-4 text-white" />
+                        </div>
+                        Ofertas e Promoções
+                      </CardTitle>
+                      <CardDescription className="text-blue-700 mt-2">
+                        Configure ofertas normais para este produto aparecer na loja
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5 p-6 bg-white">
+                      {/* Oferta Normal */}
+                      <div className="border-2 border-green-200 rounded-xl p-5 space-y-4 bg-gradient-to-br from-green-50 to-emerald-50 hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Tag className="h-5 w-5 text-green-600" />
+                            <Label className="text-base font-bold text-gray-900">
+                              Oferta Normal
+                            </Label>
+                          </div>
+                          {productModalMode !== 'view' ? (
+                            <label className="flex items-center cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={editedProduct?.isOnSale || false}
+                                onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, isOnSale: e.target.checked } : null)}
+                                className="mr-2 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                              />
+                              <span className="text-sm font-medium text-gray-700 group-hover:text-green-700">
+                                {editedProduct?.isOnSale ? 'Ativa' : 'Ativar Oferta'}
+                              </span>
+                            </label>
+                          ) : (
+                            <span className={`px-4 py-2 rounded-full text-sm font-semibold shadow-sm ${
+                              selectedProduct?.isOnSale ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                            }`}>
+                              {selectedProduct?.isOnSale ? '✓ Ativa' : 'Inativa'}
+                            </span>
+                          )}
+                        </div>
+
+                        {((productModalMode !== 'view' && editedProduct?.isOnSale) || (productModalMode === 'view' && selectedProduct?.isOnSale)) && (
+                          <div className="space-y-5">
+                            <div>
+                              <Label htmlFor="modal-saleDiscountPercent" className="text-sm font-semibold text-gray-700 mb-2 block">
+                                Desconto (%)
+                              </Label>
+                              {productModalMode !== 'view' ? (
+                                <div className="relative mt-1.5">
+                                  <Input
+                                    id="modal-saleDiscountPercent"
+                                    type="number"
+                                    step="1"
+                                    min="1"
+                                    max="99"
+                                    value={editedProduct?.saleDiscountPercent ?? ''}
+                                    onChange={(e) => {
+                                      const percent = parseInt(e.target.value) || undefined;
+                                      setEditedProduct((prev: any) => {
+                                        if (!prev) return null;
+                                        const newProduct = { ...prev, saleDiscountPercent: percent };
+                                        // Calcular preço de oferta baseado no percentual
+                                        if (percent && prev.price) {
+                                          const discount = (prev.price * percent) / 100;
+                                          newProduct.salePrice = prev.price - discount;
+                                        }
+                                        return newProduct;
+                                      });
+                                    }}
+                                    placeholder="Ex: 30"
+                                    className="pr-12 h-12 text-base font-semibold px-4 bg-gray-50 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] w-full"
+                                  />
+                                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-gray-600 font-semibold pointer-events-none">%</span>
+                                </div>
+                              ) : (
+                                <p className="mt-1.5 text-lg font-semibold text-green-600">
+                                  {selectedProduct?.saleDiscountPercent ? `${selectedProduct.saleDiscountPercent}% OFF` : selectedProduct?.salePrice ? `R$ ${selectedProduct.salePrice.toFixed(2)}` : '-'}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <Label htmlFor="modal-saleStartDate" className="text-sm font-semibold text-gray-700 mb-2 block">
+                                Data Início
+                              </Label>
+                              {productModalMode !== 'view' ? (
+                                <Input
+                                  id="modal-saleStartDate"
+                                  type="date"
+                                  value={editedProduct?.saleStartDate 
+                                    ? (typeof editedProduct.saleStartDate === 'string' 
+                                        ? editedProduct.saleStartDate.slice(0, 10)
+                                        : new Date(editedProduct.saleStartDate).toISOString().slice(0, 10))
+                                    : ''}
+                                  onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, saleStartDate: e.target.value ? `${e.target.value}T00:00:00` : '' } : null)}
+                                  className="mt-1.5 h-12 text-base bg-gray-50 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] w-full"
+                                />
+                              ) : (
+                                <div className="mt-1.5">
+                                  {selectedProduct?.saleStartDate ? (
+                                    <p className="text-gray-900 font-medium">
+                                      {new Date(selectedProduct.saleStartDate).toLocaleDateString('pt-BR', { 
+                                        day: '2-digit', 
+                                        month: '2-digit', 
+                                        year: 'numeric' 
+                                      })}
+                                    </p>
+                                  ) : (
+                                    <p className="text-gray-400 italic">Não definida</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <Label htmlFor="modal-saleEndDate" className="text-sm font-semibold text-gray-700 mb-2 block">
+                                Data Fim
+                              </Label>
+                              {productModalMode !== 'view' ? (
+                                <Input
+                                  id="modal-saleEndDate"
+                                  type="date"
+                                  value={editedProduct?.saleEndDate 
+                                    ? (typeof editedProduct.saleEndDate === 'string' 
+                                        ? editedProduct.saleEndDate.slice(0, 10)
+                                        : new Date(editedProduct.saleEndDate).toISOString().slice(0, 10))
+                                    : ''}
+                                  onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, saleEndDate: e.target.value ? `${e.target.value}T23:59:59` : '' } : null)}
+                                  className="mt-1.5 h-12 text-base bg-gray-50 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] w-full"
+                                />
+                              ) : (
+                                <div className="mt-1.5">
+                                  {selectedProduct?.saleEndDate ? (
+                                    <p className="text-gray-900 font-medium">
+                                      {new Date(selectedProduct.saleEndDate).toLocaleDateString('pt-BR', { 
+                                        day: '2-digit', 
+                                        month: '2-digit', 
+                                        year: 'numeric' 
+                                      })}
+                                    </p>
+                                  ) : (
+                                    <p className="text-gray-400 italic">Não definida</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

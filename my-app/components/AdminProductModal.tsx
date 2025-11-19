@@ -824,125 +824,154 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden animate-in zoom-in-95 duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div className="flex items-center space-x-3">
-            {isEditing ? (
-              <Edit className="h-6 w-6 text-blue-600" />
-            ) : (
-              <Eye className="h-6 w-6 text-green-600" />
-            )}
-            <h2 className="text-2xl font-bold text-gray-900">
-              {mode === 'create' ? 'Novo Produto' : isEditing ? 'Editar Produto' : 'Visualizar Produto'}
-            </h2>
-          </div>
+        <div className="bg-[#3e2626] text-white p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
+                <Package className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {mode === 'create' ? 'Novo Produto' : isEditing ? 'Editar Produto' : 'Visualizar Produto'}
+                </h2>
+                <p className="text-sm text-white/90 mt-0.5">
+                  {mode === 'view' && !isEditing ? 'Visualização dos detalhes do produto' : 'Preencha as informações do produto'}
+                </p>
+              </div>
+            </div>
             <div className="flex items-center space-x-2">
-            {isEditing && (
-              <>
-
-                <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSave} disabled={isLoading} className="bg-[#3e2626] hover:bg-[#8B4513]">
-                  <Save className="h-4 w-4 mr-2" />
-                  {isLoading ? 'Salvando...' : 'Salvar'}
-                </Button>
-              </>
-            )}
-            {!isEditing && (
-              <>
-                <Button onClick={() => setIsEditing(true)} className="bg-[#3e2626] hover:bg-[#8B4513]">
+              {!isEditing && mode !== 'create' && (
+                <Button 
+                  variant="outline"
+                  onClick={() => setIsEditing(true)}
+                  className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
+                >
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
                 </Button>
+              )}
+              {isEditing && (
+                <>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleCancel} 
+                    disabled={isLoading}
+                    className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={isLoading}
+                    className="bg-white text-[#3e2626] hover:bg-white/90 border border-white/30 shadow-lg font-semibold"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {isLoading ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </>
+              )}
+              {!isEditing && mode !== 'create' && (
                 <Button 
                   variant="outline" 
                   onClick={handleDelete} 
                   disabled={isLoading}
-                  className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
+                  className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   {isLoading ? 'Excluindo...' : 'Excluir'}
                 </Button>
-              </>
-            )}
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+              )}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onClose}
+                className="text-white hover:bg-white/20 rounded-lg"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-8 overflow-y-auto max-h-[calc(95vh-140px)] bg-gradient-to-br from-gray-50 to-white">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Image Section */}
             <div className="space-y-4">
-              <div 
-                className="relative aspect-square bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => {
-                  const allImages = [
-                    ...existingImages, 
-                    ...uploadedImages.map(file => URL.createObjectURL(file)),
-                    ...(editedProduct?.imageUrls || [])
-                  ];
-                  if (allImages.length > 0) {
-                    setIsCarouselOpen(true);
-                  }
-                }}
-              >
-                {(existingImages.length > 0 || uploadedImages.length > 0 || (editedProduct?.imageUrls && editedProduct.imageUrls.length > 0)) ? (
-                  <img
-                    src={
-                      existingImages.length > 0 
-                        ? existingImages[0] 
-                        : uploadedImages.length > 0 
-                        ? URL.createObjectURL(uploadedImages[0])
-                        : editedProduct?.imageUrls?.[0]
-                    }
-                    alt={editedProduct?.name || 'Produto'}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center">
-                    <Package className="h-12 w-12 text-gray-400" />
-                  </div>
-                )}
-                {/* Indicador de múltiplas imagens */}
-                {((existingImages.length + uploadedImages.length + (editedProduct?.imageUrls?.length || 0)) > 1) && (
-                  <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded-full text-xs font-medium">
-                    {existingImages.length + uploadedImages.length + (editedProduct?.imageUrls?.length || 0)} imagens
-                  </div>
-                )}
-              </div>
-              
-              {isEditing && (
-                <div className="mt-4">
-                  <ImageUpload
-                    images={uploadedImages}
-                    onImagesChange={handleImagesChange}
-                    maxImages={5}
-                    existingImages={existingImages}
-                    onRemoveExisting={handleRemoveExistingImage}
-                  />
+              {!isEditing && (existingImages.length > 0 || uploadedImages.length > 0 || (editedProduct?.imageUrls && editedProduct.imageUrls.length > 0)) ? (
+                <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl relative overflow-hidden group shadow-xl border border-gray-200">
+                  {(existingImages.length > 0 || uploadedImages.length > 0 || (editedProduct?.imageUrls && editedProduct.imageUrls.length > 0)) ? (
+                    <img
+                      src={
+                        existingImages.length > 0 
+                          ? existingImages[0] 
+                          : uploadedImages.length > 0 
+                          ? URL.createObjectURL(uploadedImages[0])
+                          : editedProduct?.imageUrls?.[0]
+                      }
+                      alt={editedProduct?.name || 'Produto'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="h-20 w-20 text-gray-300" />
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <>
+                  <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 shadow-lg">
+                    {existingImages.length > 0 || uploadedImages.length > 0 || (editedProduct?.imageUrls && editedProduct.imageUrls.length > 0) ? (
+                      <img
+                        src={
+                          existingImages.length > 0 
+                            ? existingImages[0] 
+                            : uploadedImages.length > 0 
+                            ? URL.createObjectURL(uploadedImages[0])
+                            : editedProduct?.imageUrls?.[0]
+                        }
+                        alt={editedProduct?.name || 'Produto'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-center">
+                        <Package className="h-16 w-16 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">Nenhuma imagem</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {isEditing && (
+                    <ImageUpload
+                      images={uploadedImages}
+                      onImagesChange={handleImagesChange}
+                      maxImages={5}
+                      existingImages={existingImages}
+                      onRemoveExisting={handleRemoveExistingImage}
+                    />
+                  )}
+                </>
               )}
             </div>
 
             {/* Product Details */}
             <div className="space-y-6">
               {/* Basic Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg">
-                    <Tag className="h-5 w-5 mr-2" />
+              <Card className="border border-gray-200 shadow-md rounded-xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 pb-4">
+                  <CardTitle className="text-base font-bold flex items-center text-gray-900">
+                    <div className="w-8 h-8 bg-[#3e2626] rounded-lg flex items-center justify-center mr-3">
+                      <Tag className="h-4 w-4 text-white" />
+                    </div>
                     Informações Básicas
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-5 p-6 bg-white">
                   <div>
-                    <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="name" className="text-sm font-semibold text-gray-700 mb-2 block">
                       Nome do Produto *
                     </Label>
                     {isEditing ? (
@@ -951,15 +980,15 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                         value={editedProduct?.name || ''}
                         onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, name: e.target.value } : null)}
                         placeholder="Nome do produto"
-                        className="mt-1"
+                        className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
                       />
                     ) : (
-                      <p className="mt-1 text-lg font-semibold text-gray-900">{product?.name || 'Novo Produto'}</p>
+                      <p className="mt-1.5 text-lg font-semibold text-gray-900">{product?.name || 'Novo Produto'}</p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="description" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="description" className="text-sm font-semibold text-gray-700 mb-2 block">
                       Descrição
                     </Label>
                     {isEditing ? (
@@ -968,38 +997,58 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                         value={editedProduct?.description || ''}
                         onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, description: e.target.value } : null)}
                         placeholder="Descrição do produto"
-                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent resize-none"
-                        rows={3}
+                        className="mt-1.5 w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B4513] focus:border-[#8B4513] resize-none transition-all"
+                        rows={4}
                       />
                     ) : (
-                      <p className="mt-1 text-gray-600">{product?.description || 'Sem descrição'}</p>
+                      <p className="mt-1.5 text-gray-600">{product?.description || 'Sem descrição'}</p>
                     )}
                   </div>
 
-                  <div>
-                    <Label htmlFor="category" className="text-sm font-medium text-gray-700">
-                      Categoria *
-                    </Label>
-                    {isEditing ? (
-                      <select
-                        id="category"
-                        value={editedProduct?.category || ''}
-                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, category: e.target.value } : null)}
-                        className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e2626] focus:border-transparent"
-                      >
-                        {categories.map(category => (
-                          <option key={category.value} value={category.value}>
-                            {category.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <p className="mt-1 text-gray-900">{product?.category}</p>
-                    )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="category" className="text-sm font-semibold text-gray-700 mb-2 block">
+                        Categoria *
+                      </Label>
+                      {isEditing ? (
+                        <select
+                          id="category"
+                          value={editedProduct?.category || ''}
+                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, category: e.target.value } : null)}
+                          className="w-full mt-1.5 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8B4513] focus:border-[#8B4513] bg-white transition-all"
+                        >
+                          {categories.map(category => (
+                            <option key={category.value} value={category.value}>
+                              {category.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="mt-1.5 text-gray-900">{product?.category}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="brand" className="text-sm font-semibold text-gray-700 mb-2 block">
+                        Marca
+                      </Label>
+                      {isEditing ? (
+                        <Input
+                          id="brand"
+                          value={editedProduct?.brand || ''}
+                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, brand: e.target.value } : null)}
+                          placeholder="Marca"
+                          className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                        />
+                      ) : (
+                        <p className="mt-1.5 text-gray-600">{product?.brand || 'Sem marca'}</p>
+                      )}
+                    </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="sku" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="sku" className="text-sm font-semibold text-gray-700 mb-2 block flex items-center">
+                      <Hash className="h-4 w-4 mr-1.5" />
                       SKU
                     </Label>
                     {isEditing ? (
@@ -1008,101 +1057,88 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                         value={editedProduct?.sku || ''}
                         onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, sku: e.target.value } : null)}
                         placeholder="Código SKU"
-                        className="mt-1"
+                        className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
                       />
                     ) : (
-                      <p className="mt-1 text-gray-600">{product?.sku || 'Sem SKU'}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="brand" className="text-sm font-medium text-gray-700">
-                      Marca
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="brand"
-                        value={editedProduct?.brand || ''}
-                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, brand: e.target.value } : null)}
-                        placeholder="Marca do produto"
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="mt-1 text-gray-600">{product?.brand || 'Sem marca'}</p>
+                      <p className="mt-1.5 text-gray-600">{product?.sku || 'Sem SKU'}</p>
                     )}
                   </div>
                 </CardContent>
               </Card>
 
               {/* Pricing and Stock */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg">
-                    <DollarSign className="h-5 w-5 mr-2" />
+              <Card className="border border-gray-200 shadow-md rounded-xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 pb-4">
+                  <CardTitle className="text-base font-bold flex items-center text-gray-900">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center mr-3">
+                      <DollarSign className="h-4 w-4 text-white" />
+                    </div>
                     Preço e Estoque
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="price" className="text-sm font-medium text-gray-700">
-                      Preço *
-                    </Label>
-                    {isEditing ? (
-                      <div className="relative mt-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
+                <CardContent className="space-y-5 p-6 bg-white">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="price" className="text-sm font-semibold text-gray-700 mb-2 block">
+                        Preço *
+                      </Label>
+                      {isEditing ? (
+                        <div className="relative mt-1.5">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">R$</span>
+                          <Input
+                            id="price"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editedProduct?.price || 0}
+                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, price: parseFloat(e.target.value) || 0 } : null)}
+                            placeholder="0.00"
+                            className="pl-12 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] text-lg font-semibold"
+                          />
+                        </div>
+                      ) : (
+                        <p className="mt-1.5 text-2xl font-bold text-[#3e2626]">
+                          {formatPrice(product?.price)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="stock" className="text-sm font-semibold text-gray-700 mb-2 block">
+                        Estoque *
+                      </Label>
+                      {isEditing ? (
                         <Input
-                          id="price"
+                          id="stock"
                           type="number"
-                          step="0.01"
                           min="0"
-                          value={editedProduct?.price || 0}
-                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, price: parseFloat(e.target.value) || 0 } : null)}
-                          placeholder="0.00"
-                          className="pl-10"
+                          value={editedProduct?.stock || 0}
+                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, stock: parseInt(e.target.value) || 0 } : null)}
+                          placeholder="0"
+                          className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] text-lg font-semibold"
                         />
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-2xl font-bold text-[#3e2626]">
-                        {formatPrice(product?.price)}
-                      </p>
-                    )}
+                      ) : (
+                        <div className="mt-1.5 flex items-center space-x-2">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            product?.stock > 10 
+                              ? 'bg-green-100 text-green-800' 
+                              : product?.stock > 0 
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {product?.stock} unidades
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="stock" className="text-sm font-medium text-gray-700">
-                      Estoque
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        id="stock"
-                        type="number"
-                        min="0"
-                        value={editedProduct?.stock || 0}
-                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, stock: parseInt(e.target.value) || 0 } : null)}
-                        placeholder="0"
-                        className="mt-1"
-                      />
-                    ) : (
-                      <div className="mt-1 flex items-center space-x-2">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          product?.stock > 10 
-                            ? 'bg-green-100 text-green-800' 
-                            : product?.stock > 0 
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {product?.stock} unidades
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">
+                    <Label className="text-sm font-semibold text-gray-700 mb-2 block">
                       Status
                     </Label>
                     {isEditing ? (
-                      <div className="mt-2">
+                      <div className="mt-2 space-y-2">
                         <label className="flex items-center">
                           <input
                             type="checkbox"
@@ -1112,7 +1148,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                           />
                           <span className="text-sm text-gray-700">Produto Ativo</span>
                         </label>
-                        <label className="flex items-center ml-4">
+                        <label className="flex items-center">
                           <input
                             type="checkbox"
                             checked={editedProduct?.is3D || false}
@@ -1123,7 +1159,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                         </label>
                       </div>
                     ) : (
-                      <div className="mt-1 space-y-2">
+                      <div className="mt-1.5 space-y-2">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                           product?.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}>
@@ -1142,17 +1178,19 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
 
               {/* Sales Section - Apenas para ADMIN e STORE_MANAGER */}
               {canManageSales && (
-                <Card className="border-2 border-blue-100">
-                  <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <CardTitle className="flex items-center text-lg text-blue-900">
-                      <Percent className="h-5 w-5 mr-2 text-blue-600" />
+                <Card className="border-2 border-blue-100 shadow-md rounded-xl overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 pb-4">
+                    <CardTitle className="text-base font-bold flex items-center text-gray-900">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mr-3">
+                        <Percent className="h-4 w-4 text-white" />
+                      </div>
                       Ofertas e Promoções
                     </CardTitle>
-                    <CardDescription className="text-blue-700">
+                    <CardDescription className="text-blue-700 mt-2">
                       Configure ofertas normais e relâmpago para este produto aparecer na loja
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6 pt-6">
+                  <CardContent className="space-y-6 p-6 bg-white">
                     {/* Oferta Normal */}
                     <div className="border-2 border-green-200 rounded-xl p-5 space-y-4 bg-gradient-to-br from-green-50 to-emerald-50 hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between">
@@ -1290,301 +1328,24 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       )}
                     </div>
 
-                    {/* Oferta Relâmpago */}
-                    <div className="border-2 border-yellow-300 rounded-xl p-5 space-y-4 bg-gradient-to-br from-yellow-50 via-orange-50 to-amber-50 hover:shadow-lg transition-all">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Zap className="h-6 w-6 text-yellow-600 fill-yellow-400 animate-pulse" />
-                          <Label className="text-base font-bold text-gray-900">
-                            Oferta Relâmpago
-                          </Label>
-                          <span className="ml-2 px-2 py-0.5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full">
-                            DESTAQUE
-                          </span>
-                        </div>
-                        {isEditing ? (
-                          <label className="flex items-center cursor-pointer group">
-                            <input
-                              type="checkbox"
-                              checked={editedProduct?.isFlashSale || false}
-                              onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, isFlashSale: e.target.checked } : null)}
-                              className="mr-2 w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500 cursor-pointer"
-                            />
-                            <span className="text-sm font-medium text-gray-700 group-hover:text-yellow-700">
-                              {editedProduct?.isFlashSale ? 'Ativa' : 'Ativar Relâmpago'}
-                            </span>
-                          </label>
-                        ) : (
-                          <span className={`px-4 py-2 rounded-full text-sm font-semibold shadow-sm ${
-                            product?.isFlashSale ? 'bg-yellow-500 text-white animate-pulse' : 'bg-gray-200 text-gray-600'
-                          }`}>
-                            {product?.isFlashSale ? '⚡ Ativa' : 'Inativa'}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Sempre mostrar campos quando estiver editando, ou quando estiver visualizando e a oferta estiver ativa */}
-                      {(isEditing || (!isEditing && product?.isFlashSale)) && (
-                        <div className="space-y-4">
-                          {/* Aviso sobre duração em horas */}
-                          {isEditing && (
-                            <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3">
-                              <p className="text-xs text-yellow-800 font-medium flex items-center gap-2">
-                                <Clock className="h-4 w-4" />
-                                <span>Oferta Relâmpago funciona em HORAS. Configure a data/hora de início e a duração em horas.</span>
-                              </p>
-                            </div>
-                          )}
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                                Tipo de Desconto
-                              </Label>
-                              {isEditing ? (
-                                <div className="flex gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditedProduct((prev: any) => prev ? { ...prev, flashSaleDiscountType: 'percent' } : null)}
-                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-all ${
-                                      editedProduct?.flashSaleDiscountType === 'percent' || !editedProduct?.flashSaleDiscountType
-                                        ? 'bg-yellow-500 text-white border-yellow-600'
-                                        : 'bg-white text-gray-700 border-gray-300 hover:border-yellow-400'
-                                    }`}
-                                  >
-                                    Porcentagem (%)
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditedProduct((prev: any) => prev ? { ...prev, flashSaleDiscountType: 'fixed' } : null)}
-                                    className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-all ${
-                                      editedProduct?.flashSaleDiscountType === 'fixed'
-                                        ? 'bg-yellow-500 text-white border-yellow-600'
-                                        : 'bg-white text-gray-700 border-gray-300 hover:border-yellow-400'
-                                    }`}
-                                  >
-                                    Preço Fixo
-                                  </button>
-                                </div>
-                              ) : (
-                                <p className="mt-1 text-sm text-gray-600">
-                                  {product?.flashSaleDiscountPercent ? 'Porcentagem' : 'Preço Fixo'}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <Label htmlFor="flashSaleDiscount" className="text-sm font-medium text-gray-700">
-                                {isEditing && (editedProduct?.flashSaleDiscountType === 'percent' || !editedProduct?.flashSaleDiscountType)
-                                  ? 'Desconto (%)'
-                                  : 'Preço Relâmpago (R$)'}
-                              </Label>
-                              {isEditing ? (
-                                <div className="relative mt-1">
-                                  {editedProduct?.flashSaleDiscountType === 'percent' || !editedProduct?.flashSaleDiscountType ? (
-                                    <>
-                                      <Input
-                                        id="flashSaleDiscountPercent"
-                                        type="number"
-                                        step="1"
-                                        min="1"
-                                        max="99"
-                                        value={editedProduct?.flashSaleDiscountPercent ?? ''}
-                                        onChange={(e) => {
-                                          const percent = parseInt(e.target.value) || undefined;
-                                          setEditedProduct((prev: any) => {
-                                            if (!prev) return null;
-                                            const newProduct = { ...prev, flashSaleDiscountPercent: percent };
-                                            // Calcular preço baseado no percentual
-                                            if (percent && prev.price) {
-                                              const discount = (prev.price * percent) / 100;
-                                              newProduct.flashSalePrice = prev.price - discount;
-                                            }
-                                            return newProduct;
-                                          });
-                                        }}
-                                        placeholder="Ex: 30"
-                                        className="pr-12 h-14 text-lg font-semibold px-4"
-                                        autoComplete="off"
-                                      />
-                                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-gray-600 font-semibold pointer-events-none">%</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-base">R$</span>
-                                      <Input
-                                        id="flashSalePrice"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={editedProduct?.flashSalePrice || ''}
-                                        onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, flashSalePrice: parseFloat(e.target.value) || undefined } : null)}
-                                        placeholder="0.00"
-                                        className="pl-10 h-14 text-lg font-semibold px-4"
-                                        autoComplete="off"
-                                      />
-                                    </>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="mt-1 text-lg font-semibold text-yellow-600">
-                                  {product?.flashSaleDiscountPercent 
-                                    ? `${product.flashSaleDiscountPercent}% OFF`
-                                    : product?.flashSalePrice 
-                                    ? formatPrice(product.flashSalePrice) 
-                                    : '-'}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="flashSaleStartDate" className="text-sm font-medium text-gray-700">
-                                Data/Hora Início
-                              </Label>
-                              {isEditing ? (
-                                <Input
-                                  id="flashSaleStartDate"
-                                  type="datetime-local"
-                                  value={editedProduct?.flashSaleStartDate 
-                                    ? (typeof editedProduct.flashSaleStartDate === 'string' 
-                                        ? editedProduct.flashSaleStartDate.slice(0, 16)
-                                        : new Date(editedProduct.flashSaleStartDate).toISOString().slice(0, 16))
-                                    : ''}
-                                  onChange={(e) => {
-                                    const startDate = e.target.value;
-                                    setEditedProduct((prev: any) => {
-                                      if (!prev) return null;
-                                      const newProduct = { ...prev, flashSaleStartDate: startDate };
-                                      // Se houver duração em horas, calcular data fim automaticamente
-                                      if (startDate && prev.flashSaleDurationHours) {
-                                        const start = new Date(startDate);
-                                        const end = new Date(start.getTime() + (prev.flashSaleDurationHours * 60 * 60 * 1000));
-                                        newProduct.flashSaleEndDate = end.toISOString();
-                                      }
-                                      return newProduct;
-                                    });
-                                  }}
-                                  className="mt-1 h-12 text-base"
-                                />
-                              ) : (
-                                <div className="mt-1">
-                                  {product?.flashSaleStartDate ? (
-                                    <div className="flex flex-col">
-                                      <p className="text-gray-900 font-medium">
-                                        {new Date(product.flashSaleStartDate).toLocaleDateString('pt-BR', { 
-                                          day: '2-digit', 
-                                          month: '2-digit', 
-                                          year: 'numeric' 
-                                        })}
-                                      </p>
-                                      <p className="text-sm text-gray-500">
-                                        {new Date(product.flashSaleStartDate).toLocaleTimeString('pt-BR', { 
-                                          hour: '2-digit', 
-                                          minute: '2-digit' 
-                                        })}
-                                      </p>
-                                    </div>
-                                  ) : (
-                                    <p className="text-gray-400 italic">Não definida</p>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <Label htmlFor="flashSaleDurationHours" className="text-sm font-medium text-gray-700">
-                                Duração (Horas)
-                              </Label>
-                              {isEditing ? (
-                                <div className="relative mt-1">
-                                  <Input
-                                    id="flashSaleDurationHours"
-                                    type="number"
-                                    step="1"
-                                    min="1"
-                                    max="168"
-                                    value={editedProduct?.flashSaleDurationHours ?? ''}
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      const hours = value === '' ? undefined : parseInt(value);
-                                      setEditedProduct((prev: any) => {
-                                        if (!prev) return null;
-                                        const newProduct = { ...prev, flashSaleDurationHours: hours };
-                                        // Calcular data fim automaticamente baseado na data início + horas
-                                        if (prev.flashSaleStartDate && hours && hours > 0) {
-                                          const start = new Date(prev.flashSaleStartDate);
-                                          const end = new Date(start.getTime() + (hours * 60 * 60 * 1000));
-                                          newProduct.flashSaleEndDate = end.toISOString();
-                                        }
-                                        return newProduct;
-                                      });
-                                    }}
-                                    placeholder="Ex: 24"
-                                    className="pr-24 h-14 text-lg font-semibold px-4"
-                                    autoComplete="off"
-                                    style={{ fontSize: '18px', paddingRight: '80px' }}
-                                  />
-                                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-gray-600 font-semibold pointer-events-none">horas</span>
-                                </div>
-                              ) : (
-                                <div className="mt-1">
-                                  {product?.flashSaleStartDate && product?.flashSaleEndDate ? (
-                                    <div className="flex flex-col">
-                                      <p className="text-gray-900 font-medium">
-                                        {Math.round((new Date(product.flashSaleEndDate).getTime() - new Date(product.flashSaleStartDate).getTime()) / (1000 * 60 * 60))} horas
-                                      </p>
-                                      <p className="text-xs text-gray-500">
-                                        Termina: {new Date(product.flashSaleEndDate).toLocaleString('pt-BR', { 
-                                          day: '2-digit', 
-                                          month: '2-digit', 
-                                          hour: '2-digit', 
-                                          minute: '2-digit' 
-                                        })}
-                                      </p>
-                                    </div>
-                                  ) : (
-                                    <p className="text-gray-400 italic">Não definida</p>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Exibir data fim calculada (somente leitura) */}
-                          {isEditing && editedProduct?.flashSaleStartDate && editedProduct?.flashSaleDurationHours && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                              <p className="text-xs text-blue-800">
-                                <strong>Data/Hora Fim calculada:</strong>{' '}
-                                {editedProduct.flashSaleEndDate 
-                                  ? new Date(editedProduct.flashSaleEndDate).toLocaleString('pt-BR', {
-                                      day: '2-digit',
-                                      month: '2-digit',
-                                      year: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })
-                                  : 'Calculando...'}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    
                   </CardContent>
                 </Card>
               )}
 
               {/* Additional Specifications */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg">
-                    <Hash className="h-5 w-5 mr-2" />
+              <Card className="border border-gray-200 shadow-md rounded-xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 pb-4">
+                  <CardTitle className="text-base font-bold flex items-center text-gray-900">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center mr-3">
+                      <Hash className="h-4 w-4 text-white" />
+                    </div>
                     Especificações Adicionais
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-5 p-6 bg-white">
                   <div>
-                    <Label htmlFor="colorName" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="colorName" className="text-sm font-semibold text-gray-700 mb-2 block">
                       Nome da Cor
                     </Label>
                     {isEditing ? (
@@ -1593,15 +1354,16 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                         value={editedProduct?.colorName || ''}
                         onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, colorName: e.target.value } : null)}
                         placeholder="Nome da cor"
-                        className="mt-1"
+                        className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
                       />
                     ) : (
-                      <p className="mt-1 text-gray-600">{product?.colorName || 'Não especificado'}</p>
+                      <p className="mt-1.5 text-gray-600">{product?.colorName || 'Não especificado'}</p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="supplierId" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="supplierId" className="text-sm font-semibold text-gray-700 mb-2 block flex items-center">
+                      <Building className="h-4 w-4 mr-1.5" />
                       Fornecedor
                     </Label>
                     {isEditing ? (
@@ -1610,49 +1372,41 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                         value={editedProduct?.supplierId || ''}
                         onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, supplierId: e.target.value } : null)}
                         placeholder="ID do fornecedor"
-                        className="mt-1"
+                        className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
                       />
                     ) : (
-                      <p className="mt-1 text-gray-600">{product?.supplier?.name || product?.supplierId || 'Não especificado'}</p>
+                      <p className="mt-1.5 text-gray-600">{product?.supplier?.name || product?.supplierId || 'Não especificado'}</p>
                     )}
                   </div>
 
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">
-                      Dimensões
-                    </Label>
+                    <Label className="text-sm font-semibold text-gray-700 mb-2 block">Dimensões (cm)</Label>
                     {isEditing ? (
-                      <div className="grid grid-cols-3 gap-2 mt-1">
-                        <div>
-                          <Input
-                            id="width"
-                            value={editedProduct?.width || ''}
-                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, width: e.target.value } : null)}
-                            placeholder="Largura (cm)"
-                            className="text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Input
-                            id="height"
-                            value={editedProduct?.height || ''}
-                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, height: e.target.value } : null)}
-                            placeholder="Altura (cm)"
-                            className="text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Input
-                            id="depth"
-                            value={editedProduct?.depth || ''}
-                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, depth: e.target.value } : null)}
-                            placeholder="Profundidade (cm)"
-                            className="text-sm"
-                          />
-                        </div>
+                      <div className="grid grid-cols-3 gap-3 mt-1.5">
+                        <Input
+                          id="width"
+                          value={editedProduct?.width || ''}
+                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, width: e.target.value } : null)}
+                          placeholder="Largura"
+                          className="border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                        />
+                        <Input
+                          id="height"
+                          value={editedProduct?.height || ''}
+                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, height: e.target.value } : null)}
+                          placeholder="Altura"
+                          className="border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                        />
+                        <Input
+                          id="depth"
+                          value={editedProduct?.depth || ''}
+                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, depth: e.target.value } : null)}
+                          placeholder="Profundidade"
+                          className="border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
+                        />
                       </div>
                     ) : (
-                      <p className="mt-1 text-gray-600">
+                      <p className="mt-1.5 text-gray-600">
                         {product?.width && product?.height && product?.depth 
                           ? `${product.width}cm x ${product.height}cm x ${product.depth}cm`
                           : 'Não especificado'
@@ -1662,11 +1416,11 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                   </div>
 
                   <div>
-                    <Label htmlFor="weight" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="weight" className="text-sm font-semibold text-gray-700 mb-2 block">
                       Peso
                     </Label>
                     {isEditing ? (
-                      <div className="relative mt-1">
+                      <div className="relative mt-1.5">
                         <Input
                           id="weight"
                           type="number"
@@ -1675,12 +1429,12 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                           value={editedProduct?.weight || ''}
                           onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, weight: parseFloat(e.target.value) || 0 } : null)}
                           placeholder="Ex: 25.5"
-                          className="pr-8"
+                          className="pr-12 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">kg</span>
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 font-medium text-sm">kg</span>
                       </div>
                     ) : (
-                      <p className="mt-1 text-gray-600">
+                      <p className="mt-1.5 text-gray-600">
                         {product?.weight ? `${product.weight}kg` : 'Não especificado'}
                       </p>
                     )}

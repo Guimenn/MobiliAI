@@ -393,6 +393,8 @@ export default function ProductsPage() {
                 token={token}
                 onProductsChange={onProductsChange}
                 onDeleteProduct={handleDeleteProduct}
+                onViewProduct={handleViewProduct}
+                onEditProduct={handleEditProduct}
                 currentPage={currentPage}
                 totalPages={totalPages}
                 totalProducts={totalProducts}
@@ -417,6 +419,8 @@ export default function ProductsPage() {
                 token={token}
                 onProductsChange={onProductsChange}
                 onDeleteProduct={handleDeleteProduct}
+                onViewProduct={handleViewProduct}
+                onEditProduct={handleEditProduct}
                 currentPage={currentPage}
                 totalPages={totalPages}
                 totalProducts={totalProducts}
@@ -514,6 +518,8 @@ function ProductsSection({
   token, 
   onProductsChange, 
   onDeleteProduct,
+  onViewProduct,
+  onEditProduct,
   currentPage = 1,
   totalPages = 1,
   totalProducts = 0,
@@ -531,40 +537,13 @@ function ProductsSection({
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Função para abrir modal de novo produto
-  const handleCreateProduct = () => {
-    setSelectedProduct(null);
-    setModalMode('create');
-    setIsModalOpen(true);
-  };
-
-  // Função para editar produto (versão simplificada)
-  const handleEditProductById = async (productId: string) => {
-    try {
-      console.log('Editando produto:', productId);
-      const product = products.find((p: any) => p.id === productId);
-      if (product) {
-        setSelectedProduct(product);
-        setModalMode('edit');
-        setIsModalOpen(true);
-      } else {
-        console.error('Produto não encontrado:', productId);
-      }
-    } catch (error) {
-      console.error('Erro ao editar produto:', error);
-      alert('Erro ao editar produto');
+  // Função para editar produto por ID
+  const handleEditProductById = (productId: string) => {
+    const product = products.find((p: any) => p.id === productId);
+    if (product && onEditProduct) {
+      onEditProduct(product);
     }
   };
-
-  // Visualizar produto por ID (não utilizado atualmente)
-  // Mantido como utilitário opcional; prefira handleViewProduct(product)
-  // function handleViewProductById(productId: string) {
-  //   const product = products.find((p: any) => p.id === productId);
-  //   if (product) {
-  //     handleViewProduct(product);
-  //   }
-  // }
-
 
   // Função para verificar se um produto está em oferta relâmpago ativa
   const isFlashSaleActive = (product: any) => {
@@ -635,11 +614,6 @@ function ProductsSection({
     return { label: 'Em Estoque', color: 'bg-green-100 text-green-800' };
   };
 
-  // Estados para o modal de produto
-  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('view');
-  
   // Estados para o visualizador 3D
   const [is3DViewerOpen, setIs3DViewerOpen] = useState(false);
   const [productFor3D, setProductFor3D] = useState<any | null>(null);
@@ -650,24 +624,6 @@ function ProductsSection({
   
   // Estados para o upload direto de 3D
   const [isDirect3DUploadOpen, setIsDirect3DUploadOpen] = useState(false);
-
-
-  const handleViewProduct = (product: any) => {
-    setSelectedProduct(product);
-    setModalMode('view');
-    setIsModalOpen(true);
-  };
-
-  const handleEditProduct = (product: any) => {
-    setSelectedProduct(product);
-    setModalMode('edit');
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedProduct(null);
-  };
 
   const handleView3D = (product: any) => {
     setProductFor3D(product);
@@ -1136,7 +1092,7 @@ function ProductsSection({
                             variant="ghost" 
                             size="sm" 
                             className="h-8 w-8 p-0"
-                            onClick={() => handleViewProduct(product)}
+                            onClick={() => onViewProduct && onViewProduct(product)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -1289,7 +1245,7 @@ function ProductsSection({
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-8 w-8 p-0"
-                                onClick={() => handleViewProduct(product)}
+                                onClick={() => onViewProduct && onViewProduct(product)}
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -1297,7 +1253,7 @@ function ProductsSection({
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-8 w-8 p-0"
-                                onClick={() => handleEditProduct(product)}
+                                onClick={() => onEditProduct && onEditProduct(product)}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
