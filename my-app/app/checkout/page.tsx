@@ -275,7 +275,7 @@ export default function CheckoutPage() {
 
   // Cupom e descontos
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; couponType?: string } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [customerCoupons, setCustomerCoupons] = useState<any[]>([]);
@@ -358,10 +358,15 @@ export default function CheckoutPage() {
   }, [subtotal, selectedShipping]);
 
   const insuranceCost = shippingInsurance ? 5.00 : 0;
-  const discount = appliedCoupon?.discount || 0;
   const tax = subtotal * 0.1; // 10% de impostos estimados
-
-  const total = subtotal + shippingCost + insuranceCost + tax - discount;
+  
+  // Calcular desconto: se for cupom de frete, aplicar apenas ao frete
+  const isShippingCoupon = appliedCoupon?.couponType === 'SHIPPING';
+  const shippingDiscount = isShippingCoupon ? Math.min(appliedCoupon?.discount || 0, shippingCost) : 0;
+  const productDiscount = !isShippingCoupon ? (appliedCoupon?.discount || 0) : 0;
+  const finalShippingCost = Math.max(0, shippingCost - shippingDiscount);
+  
+  const total = subtotal + finalShippingCost + insuranceCost + tax - productDiscount;
 
 
   // Função para parsear endereço completo em partes
@@ -1059,7 +1064,8 @@ export default function CheckoutPage() {
         subtotal,
         productId,
         categoryId,
-        selectedStore || undefined
+        selectedStore || undefined,
+        shippingCost // Passar valor do frete para cálculo correto de cupons de frete
       );
 
       if (validation.valid) {
@@ -1189,13 +1195,15 @@ export default function CheckoutPage() {
         subtotal,
         productId,
         categoryId,
-        selectedStore || undefined
+        selectedStore || undefined,
+        shippingCost // Passar valor do frete para cálculo correto de cupons de frete
       );
 
       if (validation.valid) {
         setAppliedCoupon({
           code: validation.coupon.code,
           discount: validation.discount,
+          couponType: validation.coupon.couponType, // Incluir tipo do cupom
         });
         setCouponError('');
         showAlert('success', `Cupom ${validation.coupon.code} aplicado com sucesso!`);
@@ -2283,13 +2291,26 @@ export default function CheckoutPage() {
                       {selectedShipping === 'pickup' ? 'Retirada na Loja' : 'Frete'}
                     </span>
                     <span className="font-semibold">
-                      {shippingCost === 0 ? (
+                      {finalShippingCost === 0 ? (
                         <span className="text-green-600 flex items-center space-x-1">
                           <CheckCircle className="h-4 w-4" />
                           <span>Grátis</span>
                         </span>
                       ) : (
-                        `R$ ${shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                        <>
+                          {isShippingCoupon && shippingDiscount > 0 && shippingCost > finalShippingCost ? (
+                            <span className="flex items-center space-x-2">
+                              <span className="line-through text-gray-400 text-xs">
+                                R$ {shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-green-600">
+                                R$ {finalShippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            </span>
+                          ) : (
+                            `R$ ${finalShippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          )}
+                        </>
                       )}
                     </span>
                   </div>
@@ -2307,10 +2328,20 @@ export default function CheckoutPage() {
                   </div>
 
                   {appliedCoupon && (
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span>Desconto ({appliedCoupon.code})</span>
-                      <span className="font-semibold">- R$ {appliedCoupon.discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
+                    <>
+                      {isShippingCoupon && shippingDiscount > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Desconto no frete ({appliedCoupon.code})</span>
+                          <span className="font-semibold">- R$ {shippingDiscount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                      {!isShippingCoupon && productDiscount > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Desconto ({appliedCoupon.code})</span>
+                          <span className="font-semibold">- R$ {productDiscount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 

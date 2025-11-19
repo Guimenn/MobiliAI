@@ -276,20 +276,49 @@ export class CouponsService {
       throw new BadRequestException('Cupom não é válido para esta loja');
     }
 
-    // Calcular desconto
-    let discount = 0;
-    if (coupon.discountType === 'PERCENTAGE') {
-      discount = (validateCouponDto.totalAmount * Number(coupon.discountValue)) / 100;
-      if (coupon.maximumDiscount && discount > Number(coupon.maximumDiscount)) {
-        discount = Number(coupon.maximumDiscount);
+    // Verificar se é cupom de primeira compra e se o usuário já fez compras
+    if (coupon.assignmentType === CouponAssignmentType.NEW_ACCOUNTS_ONLY && userId) {
+      const hasMadePurchase = await this.prisma.sale.count({
+        where: { customerId: userId }
+      }) > 0;
+
+      if (hasMadePurchase) {
+        throw new BadRequestException('Este cupom é válido apenas para primeira compra');
       }
-    } else {
-      discount = Number(coupon.discountValue);
     }
 
-    // Garantir que o desconto não seja maior que o total
-    if (discount > validateCouponDto.totalAmount) {
-      discount = validateCouponDto.totalAmount;
+    // Calcular desconto
+    let discount = 0;
+    
+    // Se for cupom de frete, calcular desconto baseado no valor do frete
+    if (coupon.couponType === 'SHIPPING') {
+      const shippingAmount = validateCouponDto.shippingCost || 0;
+      if (coupon.discountType === 'PERCENTAGE') {
+        discount = (shippingAmount * Number(coupon.discountValue)) / 100;
+        if (coupon.maximumDiscount && discount > Number(coupon.maximumDiscount)) {
+          discount = Number(coupon.maximumDiscount);
+        }
+      } else {
+        discount = Number(coupon.discountValue);
+      }
+      // Garantir que o desconto não seja maior que o valor do frete
+      if (discount > shippingAmount) {
+        discount = shippingAmount;
+      }
+    } else {
+      // Para cupons de produto, calcular baseado no totalAmount
+      if (coupon.discountType === 'PERCENTAGE') {
+        discount = (validateCouponDto.totalAmount * Number(coupon.discountValue)) / 100;
+        if (coupon.maximumDiscount && discount > Number(coupon.maximumDiscount)) {
+          discount = Number(coupon.maximumDiscount);
+        }
+      } else {
+        discount = Number(coupon.discountValue);
+      }
+      // Garantir que o desconto não seja maior que o total
+      if (discount > validateCouponDto.totalAmount) {
+        discount = validateCouponDto.totalAmount;
+      }
     }
 
     return {
@@ -300,6 +329,7 @@ export class CouponsService {
         description: coupon.description,
         discountType: coupon.discountType,
         discountValue: Number(coupon.discountValue),
+        couponType: coupon.couponType, // Incluir tipo do cupom
       },
       discount: Math.round(discount * 100) / 100, // Arredondar para 2 casas decimais
       finalAmount: Math.max(0, validateCouponDto.totalAmount - discount),
@@ -381,52 +411,84 @@ export class CouponsService {
     
     const now = new Date();
     
-    // Buscar informações do cliente para verificar se é conta nova
-    const customer = await this.prisma.user.findUnique({
-      where: { id: customerId },
-      select: { createdAt: true }
+    // Verificar se o cliente já fez alguma compra (primeira compra)
+    // Contar todas as vendas onde customerId não é null e está definido
+    // Considerar qualquer venda, independente do status (exceto canceladas)
+    const purchaseCount = await this.prisma.sale.count({
+      where: { 
+        customerId: customerId, // Comparação direta - Prisma já trata null automaticamente
+        // Não considerar vendas canceladas
+        status: {
+          not: 'CANCELLED'
+        }
+      }
     });
 
-    if (!customer) {
-      console.log('❌ Cliente não encontrado:', customerId);
-      return [];
-    }
+    // Buscar algumas vendas para debug (apenas para logs)
+    const sampleSales = await this.prisma.sale.findMany({
+      where: { 
+        customerId: customerId,
+        status: {
+          not: 'CANCELLED'
+        }
+      },
+      select: {
+        id: true,
+        saleNumber: true,
+        status: true,
+        customerId: true,
+        createdAt: true
+      },
+      take: 3,
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
 
-    // Verificar se é conta nova (criada nos últimos 30 dias)
-    const accountAge = now.getTime() - new Date(customer.createdAt).getTime();
-    const isNewAccount = accountAge < (30 * 24 * 60 * 60 * 1000); // 30 dias em milissegundos
+    const hasMadePurchase = purchaseCount > 0;
+    const isFirstPurchase = !hasMadePurchase;
+
+    console.log('🔍 Verificação de compras do cliente:', {
+      customerId,
+      purchaseCount,
+      hasMadePurchase,
+      isFirstPurchase,
+      sampleSales: sampleSales.map(s => ({
+        id: s.id,
+        saleNumber: s.saleNumber,
+        status: s.status,
+        customerId: s.customerId,
+        createdAt: s.createdAt
+      }))
+    });
 
     // Construir filtro de assignmentType
     const assignmentTypeFilter: CouponAssignmentType[] = [CouponAssignmentType.ALL_ACCOUNTS];
-    if (isNewAccount) {
+    if (isFirstPurchase) {
       assignmentTypeFilter.push(CouponAssignmentType.NEW_ACCOUNTS_ONLY);
     }
 
     console.log('🔍 Buscando cupons para cliente:', {
       customerId,
-      isNewAccount,
+      isFirstPurchase,
+      hasMadePurchase,
       assignmentTypeFilter,
       now: now.toISOString()
     });
 
-    // Buscar cupons com ALL_ACCOUNTS ou NEW_ACCOUNTS_ONLY (se for conta nova)
-    // Também incluir cupons com assignmentType NULL (para compatibilidade com cupons antigos)
+    // Buscar cupons com ALL_ACCOUNTS ou NEW_ACCOUNTS_ONLY (se for primeira compra)
+    // Não incluir cupons EXCLUSIVE (esses precisam ser digitados)
+    // Não incluir cupons com assignmentType NULL (tratá-los como EXCLUSIVE por padrão)
+    // Se o cliente já fez compras, buscar apenas ALL_ACCOUNTS
     const whereClause: any = {
       isActive: true,
       validFrom: { lte: now },
       validUntil: { gte: now },
-      OR: [
-        {
-          assignmentType: {
-            in: assignmentTypeFilter
-          }
-        },
-        // Incluir cupons sem assignmentType definido (NULL) se forem ALL_ACCOUNTS por padrão
-        // Mas apenas se não tiverem sido explicitamente marcados como EXCLUSIVE
-        {
-          assignmentType: null
-        }
-      ]
+      assignmentType: {
+        in: hasMadePurchase 
+          ? [CouponAssignmentType.ALL_ACCOUNTS] 
+          : assignmentTypeFilter
+      }
     };
 
     console.log('🔍 Query where clause:', JSON.stringify(whereClause, null, 2));
@@ -455,9 +517,31 @@ export class CouponsService {
       usedCount: c._count.couponUsages
     })));
 
-    // Filtrar cupons que não atingiram o limite de uso
+    // Filtrar cupons
     const filteredCoupons = coupons
       .filter(coupon => {
+        // PROTEÇÃO CRÍTICA: Remover cupons NEW_ACCOUNTS_ONLY se o cliente já fez compras
+        // Esta é uma verificação dupla de segurança além da query
+        if (coupon.assignmentType === CouponAssignmentType.NEW_ACCOUNTS_ONLY) {
+          if (hasMadePurchase || purchaseCount > 0) {
+            console.log('🚫 CUPOM NEW_ACCOUNTS_ONLY REMOVIDO - Cliente já fez compras:', {
+              couponCode: coupon.code,
+              couponId: coupon.id,
+              isFirstPurchase,
+              hasMadePurchase,
+              purchaseCount,
+              customerId
+            });
+            return false;
+          } else {
+            console.log('✅ Cupom NEW_ACCOUNTS_ONLY permitido - primeira compra:', {
+              couponCode: coupon.code,
+              purchaseCount
+            });
+          }
+        }
+        
+        // Filtrar cupons que não atingiram o limite de uso
         if (!coupon.usageLimit) return true;
         const canUse = coupon._count.couponUsages < coupon.usageLimit;
         if (!canUse) {
@@ -490,8 +574,40 @@ export class CouponsService {
         createdAt: coupon.createdAt.toISOString(),
       }));
 
-    console.log('✅ Cupons retornados para o cliente:', filteredCoupons.length, filteredCoupons.map(c => c.code));
-    return filteredCoupons;
+    console.log('✅ Cupons retornados para o cliente:', {
+      total: filteredCoupons.length,
+      cupons: filteredCoupons.map(c => ({
+        code: c.code,
+        assignmentType: c.assignmentType,
+        description: c.description
+      })),
+      hasNewAccountsOnly: filteredCoupons.some(c => c.assignmentType === 'NEW_ACCOUNTS_ONLY'),
+      customerId,
+      purchaseCount,
+      hasMadePurchase
+    });
+    
+    // VERIFICAÇÃO FINAL DE SEGURANÇA: Se ainda houver cupons NEW_ACCOUNTS_ONLY e o cliente já fez compras, remover
+    const finalCoupons = filteredCoupons.filter(coupon => {
+      if (coupon.assignmentType === 'NEW_ACCOUNTS_ONLY' && (hasMadePurchase || purchaseCount > 0)) {
+        console.error('❌ ERRO CRÍTICO: Cupom NEW_ACCOUNTS_ONLY ainda presente após filtro!', {
+          couponCode: coupon.code,
+          purchaseCount,
+          hasMadePurchase
+        });
+        return false;
+      }
+      return true;
+    });
+    
+    if (finalCoupons.length !== filteredCoupons.length) {
+      console.warn('⚠️ Cupons adicionais removidos na verificação final:', {
+        antes: filteredCoupons.length,
+        depois: finalCoupons.length
+      });
+    }
+    
+    return finalCoupons;
   }
 
   async remove(id: string, user: User) {

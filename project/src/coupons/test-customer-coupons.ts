@@ -31,21 +31,26 @@ async function testCustomerCoupons() {
       createdAt: realCustomer.createdAt.toISOString()
     });
 
-    const now = new Date();
-    const accountAge = now.getTime() - new Date(realCustomer.createdAt).getTime();
-    const isNewAccount = accountAge < (30 * 24 * 60 * 60 * 1000);
+    // Verificar se o cliente já fez alguma compra (primeira compra)
+    const hasMadePurchase = await prisma.sale.count({
+      where: { customerId: realCustomer.id }
+    }) > 0;
+
+    const isFirstPurchase = !hasMadePurchase;
 
     console.log('\n📊 Informações do cliente:');
-    console.log('  - É conta nova?', isNewAccount);
-    console.log('  - Idade da conta (dias):', Math.floor(accountAge / (24 * 60 * 60 * 1000)));
+    console.log('  - Já fez compra?', hasMadePurchase);
+    console.log('  - É primeira compra?', isFirstPurchase);
 
     // Construir filtro de assignmentType
     const assignmentTypeFilter: CouponAssignmentType[] = [CouponAssignmentType.ALL_ACCOUNTS];
-    if (isNewAccount) {
+    if (isFirstPurchase) {
       assignmentTypeFilter.push(CouponAssignmentType.NEW_ACCOUNTS_ONLY);
     }
 
     console.log('\n🔍 Filtro de assignmentType:', assignmentTypeFilter);
+
+    const now = new Date();
 
     // Buscar todos os cupons ativos e válidos
     const allCoupons = await prisma.coupon.findMany({

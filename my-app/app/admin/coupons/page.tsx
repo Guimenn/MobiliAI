@@ -528,7 +528,7 @@ export default function CouponsPage() {
                       >
                         {coupon.assignmentType === 'EXCLUSIVE' && '🔒 Exclusivo'}
                         {coupon.assignmentType === 'ALL_ACCOUNTS' && '👥 Todas as Contas'}
-                        {coupon.assignmentType === 'NEW_ACCOUNTS_ONLY' && '🆕 Contas Novas'}
+                        {coupon.assignmentType === 'NEW_ACCOUNTS_ONLY' && '🆕 Primeira Compra'}
                         {!coupon.assignmentType && '🔒 Exclusivo'}
                       </Badge>
                     </div>
@@ -799,13 +799,13 @@ export default function CouponsPage() {
                   <SelectContent>
                     <SelectItem value="EXCLUSIVE">Exclusivo (precisa digitar o código)</SelectItem>
                     <SelectItem value="ALL_ACCOUNTS">Atribuído a qualquer conta</SelectItem>
-                    <SelectItem value="NEW_ACCOUNTS_ONLY">Somente para contas novas</SelectItem>
+                    <SelectItem value="NEW_ACCOUNTS_ONLY">Somente para primeira compra</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-500 mt-1">
                   {formData.assignmentType === 'EXCLUSIVE' && 'O cliente precisa digitar o código do cupom manualmente'}
                   {formData.assignmentType === 'ALL_ACCOUNTS' && 'O cupom aparecerá automaticamente para todos os clientes'}
-                  {formData.assignmentType === 'NEW_ACCOUNTS_ONLY' && 'O cupom aparecerá automaticamente apenas para contas recém-criadas'}
+                  {formData.assignmentType === 'NEW_ACCOUNTS_ONLY' && 'O cupom aparecerá automaticamente apenas para clientes que ainda não fizeram nenhuma compra'}
                 </p>
               </div>
             </div>
