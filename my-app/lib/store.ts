@@ -77,6 +77,11 @@ export interface Product {
   flashSaleDiscountPercent?: number;
   flashSaleStartDate?: string;
   flashSaleEndDate?: string;
+  // Campos para produtos disponíveis em múltiplas lojas
+  availableInStores?: Array<{ storeId: string; storeName?: string; stock: number }>;
+  totalStock?: number; // Estoque total somado de todas as lojas
+  // Estoque por filial (para admin)
+  stockByStore?: Array<{ storeId: string; storeName: string; quantity: number }>;
 }
 
 export interface CartItem {

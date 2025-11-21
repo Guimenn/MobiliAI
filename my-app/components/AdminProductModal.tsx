@@ -1118,16 +1118,41 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                           className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] text-lg font-semibold"
                         />
                       ) : (
-                        <div className="mt-1.5 flex items-center space-x-2">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            product?.stock > 10 
-                              ? 'bg-green-100 text-green-800' 
-                              : product?.stock > 0 
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {product?.stock} unidades
-                          </span>
+                        <div className="mt-1.5 space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              product?.stock > 10 
+                                ? 'bg-green-100 text-green-800' 
+                                : product?.stock > 0 
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {product?.stock || 0} unidades
+                            </span>
+                          </div>
+                          {product?.stockByStore && product.stockByStore.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <Label className="text-xs font-semibold text-gray-600 mb-2 block">
+                                Estoque por Filial
+                              </Label>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {product.stockByStore.map((store: any) => (
+                                  <div key={store.storeId} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                                    <span className="text-sm text-gray-700">{store.storeName}</span>
+                                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                      store.quantity > 10 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : store.quantity > 0 
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {store.quantity}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1222,7 +1247,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                       </div>
 
                       {((isEditing && editedProduct?.isOnSale) || (!isEditing && product?.isOnSale)) && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                           <div>
                             <Label htmlFor="saleDiscountPercent" className="text-sm font-medium text-gray-700">
                               Desconto (%)

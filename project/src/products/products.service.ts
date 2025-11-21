@@ -110,23 +110,101 @@ export class ProductsService {
   async findAll(currentUser: User, storeId?: string): Promise<Product[]> {
     const whereCondition: any = { isActive: true };
 
-    // Se não for admin, filtrar por loja (apenas se tiver storeId)
+    // Determinar loja alvo
+    const targetStoreId = storeId || currentUser.storeId;
+
+    // Se não for admin, filtrar por loja via StoreInventory
     if (currentUser.role !== UserRole.ADMIN) {
-      if (currentUser.storeId) {
-        whereCondition.storeId = currentUser.storeId;
+      if (targetStoreId) {
+        // Produtos que têm storeId direto (antigos) OU estão em StoreInventory da loja
+        whereCondition.OR = [
+          { storeId: targetStoreId }, // Produtos antigos com storeId direto
+          { storeInventory: { some: { storeId: targetStoreId } } } // Produtos novos via StoreInventory
+        ];
       }
     } else if (storeId) {
       // Admin pode filtrar por loja específica se passar storeId
-      whereCondition.storeId = storeId;
+      whereCondition.OR = [
+        { storeId: storeId },
+        { storeInventory: { some: { storeId: storeId } } }
+      ];
     }
     // Se for admin e não passar storeId, mostra todos os produtos (não adiciona storeId ao where)
 
-    return this.prisma.product.findMany({
+    // Se for admin sem storeId, buscar TODOS os StoreInventory para mostrar estoque por filial
+    const includeStoreInventory = currentUser.role === UserRole.ADMIN && !storeId
+      ? {
+          select: {
+            id: true,
+            quantity: true,
+            storeId: true,
+            store: {
+              select: {
+                id: true,
+                name: true,
+                address: true
+              }
+            }
+          }
+        }
+      : targetStoreId ? {
+          where: { storeId: targetStoreId },
+          select: {
+            quantity: true,
+            store: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        } : false;
+
+    const products = await this.prisma.product.findMany({
       where: whereCondition,
       include: {
         store: true,
+        storeInventory: includeStoreInventory
       },
       orderBy: { name: 'asc' },
+    });
+
+    // Processar produtos para usar estoque do StoreInventory quando disponível
+    return products.map((product: any) => {
+      // Se for admin sem storeId, mostrar estoque total e lista por filial
+      if (currentUser.role === UserRole.ADMIN && !storeId && product.storeInventory && product.storeInventory.length > 0) {
+        const totalStock = product.storeInventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0);
+        const stockByStore = product.storeInventory.map((inv: any) => ({
+          storeId: inv.storeId,
+          storeName: inv.store?.name || 'Loja desconhecida',
+          quantity: inv.quantity || 0
+        }));
+
+        return {
+          ...product,
+          stock: totalStock, // Estoque total (soma de todas as lojas)
+          stockByStore: stockByStore, // Lista de estoques por filial
+          storeId: product.store?.id || product.storeId,
+        };
+      }
+      
+      // Se tem targetStoreId, usar estoque da loja específica
+      if (targetStoreId && product.storeInventory && product.storeInventory.length > 0) {
+        const inventory = product.storeInventory[0];
+        return {
+          ...product,
+          stock: inventory.quantity || 0,
+          store: inventory.store || product.store,
+          storeId: inventory.store?.id || targetStoreId,
+        };
+      }
+      
+      // Fallback: usar estoque direto do produto
+      return {
+        ...product,
+        stock: product.stock || 0,
+        storeId: product.store?.id || product.storeId,
+      };
     });
   }
 

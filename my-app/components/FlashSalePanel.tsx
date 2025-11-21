@@ -53,8 +53,9 @@ export default function FlashSalePanel({
     setDiscountPercent(0);
     const now = new Date();
     setStartDate(now.toISOString().split('T')[0]);
-    const nextHour = new Date(now.getTime() + 60 * 60 * 1000);
-    setStartTime(nextHour.toTimeString().split(':', 2).join(':'));
+    // Usar horário atual (não próxima hora)
+    const currentTime = now.toTimeString().split(':', 2).join(':');
+    setStartTime(currentTime);
     setDurationHours(24);
     findActiveFlashSaleProduct();
   }, [products]);
@@ -79,8 +80,9 @@ export default function FlashSalePanel({
         setDiscountPercent(0);
         const now = new Date();
         setStartDate(now.toISOString().split('T')[0]);
-        const nextHour = new Date(now.getTime() + 60 * 60 * 1000);
-        setStartTime(nextHour.toTimeString().split(':', 2).join(':'));
+        // Usar horário atual (não próxima hora)
+        const currentTime = now.toTimeString().split(':', 2).join(':');
+        setStartTime(currentTime);
         setDurationHours(24);
       }
     }
@@ -169,10 +171,28 @@ export default function FlashSalePanel({
       }
 
       const now = new Date();
+      // Permitir horário atual ou futuro (com margem de 1 minuto para tolerância)
       const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+      
       if (startDateTime < oneMinuteAgo) {
-        const diffMinutes = Math.round((oneMinuteAgo.getTime() - startDateTime.getTime()) / 1000 / 60);
-        throw new Error(`A data/hora de início não pode ser no passado. A diferença é de ${diffMinutes} minutos.`);
+        const diffMs = now.getTime() - startDateTime.getTime();
+        const diffMinutes = Math.round(diffMs / 1000 / 60);
+        const diffHours = Math.floor(diffMinutes / 60);
+        const remainingMinutes = diffMinutes % 60;
+        
+        let diffText = '';
+        if (diffHours > 0) {
+          diffText = `${diffHours} hora${diffHours > 1 ? 's' : ''}`;
+          if (remainingMinutes > 0) {
+            diffText += ` e ${remainingMinutes} minuto${remainingMinutes > 1 ? 's' : ''}`;
+          }
+        } else if (diffMinutes > 0) {
+          diffText = `${diffMinutes} minuto${diffMinutes > 1 ? 's' : ''}`;
+        } else {
+          diffText = 'menos de 1 minuto';
+        }
+        
+        throw new Error(`A data/hora de início não pode ser no passado. A diferença é de ${diffText}.`);
       }
 
       if (endDateTime <= startDateTime) {

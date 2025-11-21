@@ -20,7 +20,8 @@
     "seed": "ts-node seed.ts",
     "seed:stores": "ts-node seed-real-stores.ts",
     "seed:furniture": "ts-node seed-furniture-products.ts",
-    "delete:products": "ts-node delete-all-products.ts"
+    "delete:products": "ts-node delete-all-products.ts",
+    "recreate:from-imagekit": "ts-node recreate-products-from-imagekit.ts"
   },
   "engines": {
     "npm": ">=10.0.0",
@@ -47,6 +48,7 @@
     "class-validator": "^0.14.1",
     "cors": "^2.8.5",
     "firebase-admin": "^13.6.0",
+    "imagekit": "^6.0.0",
     "multer": "^1.4.5-lts.1",
     "openai": "^4.28.0",
     "passport": "^0.7.0",

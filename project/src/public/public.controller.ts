@@ -1,12 +1,14 @@
 import { Controller, Get, Query, Param, Post, Body } from '@nestjs/common';
 import { PublicProductsService } from './public-products.service';
 import { PublicSupportService } from './public-support.service';
+import { ImageKitService } from '../upload/imagekit.service';
 
 @Controller('public')
 export class PublicController {
   constructor(
     private readonly publicProductsService: PublicProductsService,
     private readonly publicSupportService: PublicSupportService,
+    private readonly imagekitService: ImageKitService,
   ) {}
 
   @Get('products')
@@ -73,5 +75,28 @@ export class PublicController {
   @Get('support/products/search')
   async searchProducts(@Query('q') query: string) {
     return this.publicSupportService.searchProducts(query);
+  }
+
+  // Endpoints públicos para buscar imagens do ImageKit
+  @Get('product-images/:productId')
+  async getProductImages(@Param('productId') productId: string) {
+    try {
+      const imageUrls = await this.imagekitService.listProductImages(productId);
+      return { imageUrls };
+    } catch (error: any) {
+      console.error('❌ [PublicController] Erro ao buscar imagens:', error);
+      return { imageUrls: [] };
+    }
+  }
+
+  @Get('all-images')
+  async getAllImages() {
+    try {
+      const images = await this.imagekitService.listAllProductImages();
+      return { images };
+    } catch (error: any) {
+      console.error('❌ [PublicController] Erro ao buscar imagens:', error);
+      return { images: [] };
+    }
   }
 }

@@ -12,7 +12,7 @@ import { UserRole } from '@prisma/client';
 
 @Controller('customer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+@Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.CASHIER, UserRole.STORE_MANAGER)
 export class CustomerController {
   constructor(
     private readonly customerService: CustomerService,
@@ -26,16 +26,19 @@ export class CustomerController {
   // ==================== REGISTRO E PERFIL ====================
 
   @Get('profile')
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN) // Apenas clientes podem ver seu próprio perfil
   async getProfile(@Request() req) {
     return this.customerService.getProfile(req.user.id);
   }
 
   @Put('profile')
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN) // Apenas clientes podem atualizar seu próprio perfil
   async updateProfile(@Request() req, @Body() updateData: any) {
     return this.customerService.updateProfile(req.user.id, updateData);
   }
 
   @Put('password')
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN) // Apenas clientes podem mudar sua própria senha
   async changePassword(@Request() req, @Body() data: { currentPassword: string; newPassword: string }) {
     return this.customerService.changePassword(req.user.id, data.currentPassword, data.newPassword);
   }
@@ -43,6 +46,7 @@ export class CustomerController {
   // ==================== DASHBOARD DO CLIENTE ====================
 
   @Get('dashboard')
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN) // Apenas clientes podem ver seu próprio dashboard
   async getCustomerDashboard(@Request() req) {
     return this.customerService.getCustomerDashboard(req.user.id);
   }

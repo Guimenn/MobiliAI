@@ -124,7 +124,7 @@ model Product {
   isAvailable              Boolean                @default(true)
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
-  storeId                  String
+  storeId                  String?  // Opcional: produto pode estar em múltiplas lojas via StoreInventory
   collectionId             String?
   supplierId               String?
   model3DUrl               String?
@@ -147,7 +147,7 @@ model Product {
   reviews                  ProductReview[]
   variants                 ProductVariant[]
   collection               Collection?            @relation(fields: [collectionId], references: [id])
-  store                    Store                  @relation(fields: [storeId], references: [id])
+  store                    Store?                 @relation(fields: [storeId], references: [id])  // Opcional
   supplier                 Supplier?              @relation(fields: [supplierId], references: [id])
   saleItems                SaleItem[]
   storeInventory           StoreInventory[]

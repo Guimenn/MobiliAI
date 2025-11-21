@@ -976,41 +976,80 @@ export default function ProductDetailPage() {
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">Cartões de crédito</h4>
                   <div className="flex items-center gap-3 flex-wrap">
-                    <div className="px-3 py-2 bg-red-100 rounded text-xs font-semibold text-red-700">Hipercard</div>
-                    <div className="px-3 py-2 bg-green-100 rounded text-xs font-semibold text-green-700">ELO</div>
-                    <div className="px-3 py-2 bg-blue-100 rounded text-xs font-semibold text-blue-700">VISA</div>
-                    <div className="px-3 py-2 bg-orange-100 rounded text-xs font-semibold text-orange-700">Mastercard</div>
+                    <div className="h-8 w-auto flex items-center justify-center">
+                      <img 
+                        src="https://down-br.img.susercontent.com/file/a65c5d1c5e556c6197f8fbd607482372" 
+                        alt="Visa" 
+                        className="h-6 w-auto object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    <div className="h-8 w-auto flex items-center justify-center">
+                      <img 
+                        src="https://down-br.img.susercontent.com/file/95d849253f75d5e6e6b867af4f7c65aa" 
+                        alt="Mastercard" 
+                        className="h-6 w-auto object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    <div className="h-8 w-auto flex items-center justify-center">
+                      <img 
+                        src="https://down-br.img.susercontent.com/file/br-11134258-7r98o-lxsovyseln7jc5" 
+                        alt="Elo" 
+                        className="h-6 w-auto object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    <div className="h-8 w-auto flex items-center justify-center">
+                      <img 
+                        src="https://down-br.img.susercontent.com/file/285e5ab6207eb562a9e893a42ff7ee46 " 
+                        alt="American Express" 
+                        className="h-6 w-auto object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* Pix */}
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">Pix</h4>
-                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                    <div className="w-8 h-8 bg-teal-100 rounded flex items-center justify-center">
-                      <Zap className="h-4 w-4 text-teal-600" />
+                  <div className="flex items-center gap-2">
+                    <div className="h-10 w-10 flex items-center justify-center">
+                      <img 
+                        src="https://down-br.img.susercontent.com/file/2a2cfeb34b00ef7b3be23ea516dcd1c5" 
+                        alt="PIX" 
+                        className="h-8 w-auto object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
                     </div>
-                    <span className="text-sm text-gray-700 lowercase">pix</span>
                   </div>
                 </div>
 
                 {/* Boleto bancário */}
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">Boleto bancário</h4>
-                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                    <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">
-                      <div className="w-6 h-4 flex items-center gap-px">
-                        <div className="w-0.5 h-3 bg-gray-700"></div>
-                        <div className="w-0.5 h-2 bg-gray-700"></div>
-                        <div className="w-0.5 h-4 bg-gray-700"></div>
-                        <div className="w-0.5 h-2 bg-gray-700"></div>
-                        <div className="w-0.5 h-3 bg-gray-700"></div>
-                        <div className="w-0.5 h-4 bg-gray-700"></div>
-                        <div className="w-0.5 h-2 bg-gray-700"></div>
-                        <div className="w-0.5 h-3 bg-gray-700"></div>
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-10 w-10 flex items-center justify-center">
+                      <img 
+                        src="https://down-br.img.susercontent.com/file/44734b7fc343eb46237c2d90c6c9ca60" 
+                        alt="Boleto" 
+                        className="h-8 w-auto object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
                     </div>
-                    <span className="text-sm text-gray-700">Boleto</span>
                   </div>
                 </div>
 

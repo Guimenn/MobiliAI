@@ -197,37 +197,80 @@ export class PdvService {
     // Armazenar informações dos produtos para verificação posterior
     const productsToCheck: Array<{ id: string; name: string; stock: number; minStock: number; storeName?: string }> = [];
 
-    // Atualizar estoque
+    // Atualizar estoque (PDV sempre usa a loja do funcionário)
     for (const item of createSaleDto.items) {
       // Buscar produto antes de atualizar
       const product = await this.prisma.product.findUnique({
         where: { id: item.productId },
-        include: { store: { select: { name: true } } }
+        include: { 
+          store: { select: { name: true } },
+          storeInventory: {
+            where: { storeId: userStoreId },
+            select: {
+              id: true,
+              quantity: true,
+              storeId: true,
+              store: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          }
+        }
       });
 
       if (!product) {
         continue;
       }
 
-      // Calcular novo estoque
-      const newStock = product.stock - item.quantity;
+      // Atualizar estoque no StoreInventory se disponível
+      if (product.storeInventory && product.storeInventory.length > 0) {
+        const inventory = product.storeInventory[0]; // Já filtrado por storeId
+        
+        const newQuantity = inventory.quantity - item.quantity;
+        
+        await this.prisma.storeInventory.update({
+          where: { id: inventory.id },
+          data: { quantity: Math.max(0, newQuantity) }
+        });
 
-      // Atualizar estoque
-      await this.prisma.product.update({
-        where: { id: item.productId },
-        data: {
-          stock: newStock,
-        },
-      });
+        // Atualizar estoque total do produto
+        const allInventories = await this.prisma.storeInventory.findMany({
+          where: { productId: item.productId }
+        });
+        const totalStock = allInventories.reduce((sum, inv) => sum + inv.quantity, 0);
+        
+        await this.prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: totalStock }
+        });
 
-      // Armazenar informações do produto para verificação posterior
-      productsToCheck.push({
-        id: product.id,
-        name: product.name,
-        stock: newStock,
-        minStock: product.minStock || 0,
-        storeName: product.store?.name
-      });
+        productsToCheck.push({
+          id: product.id,
+          name: product.name,
+          stock: Math.max(0, newQuantity),
+          minStock: product.minStock || 0,
+          storeName: inventory.store?.name || product.store?.name
+        });
+      } else {
+        // Produto sem StoreInventory - usar estoque direto
+        const newStock = product.stock - item.quantity;
+        
+        await this.prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: Math.max(0, newStock) }
+        });
+
+        productsToCheck.push({
+          id: product.id,
+          name: product.name,
+          stock: Math.max(0, newStock),
+          minStock: product.minStock || 0,
+          storeName: product.store?.name
+        });
+      }
     }
 
     // Atualizar total de vendas do caixa

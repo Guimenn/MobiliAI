@@ -139,20 +139,41 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
         return;
       }
       
+      // Buscar todas as imagens do ImageKit de uma vez (mais eficiente)
+      console.log('🔍 [useProducts] Buscando imagens do ImageKit para priorizar...');
+      const { getAllImageKitImagesByProduct, isImageKitUrl } = await import('../imagekit');
+      const imageKitMap = await getAllImageKitImagesByProduct();
+      console.log(`✅ [useProducts] Encontradas imagens do ImageKit para ${imageKitMap.size} produtos`);
+      
       // Mapear os dados da API para o formato do Product
       const mappedProducts: Product[] = allProducts.map((product: any) => {
-        const imageUrl = (product.imageUrls && product.imageUrls.length > 0) 
-          ? product.imageUrls[0] 
-          : (product.imageUrl || undefined);
-        
-        // Debug: log das URLs de imagem para os primeiros produtos
-        if (allProducts.indexOf(product) < 3) {
-          console.log(`📸 Produto ${product.name}:`, {
-            imageUrl: product.imageUrl,
-            imageUrls: product.imageUrls,
-            finalImageUrl: imageUrl
-          });
-        }
+          // SEMPRE usar ImageKit quando disponível
+          let imageUrl: string | undefined = undefined;
+          const imageKitUrls = imageKitMap.get(product.id);
+          if (imageKitUrls && imageKitUrls.length > 0) {
+            imageUrl = imageKitUrls[0];
+          }
+          
+          // Se não tem ImageKit, verificar URL do banco (mas NUNCA Supabase)
+          if (!imageUrl) {
+            const originalUrl = (product.imageUrls && product.imageUrls.length > 0) 
+              ? product.imageUrls[0] 
+              : (product.imageUrl || undefined);
+            
+            // Se já é ImageKit, usar direto
+            if (originalUrl && isImageKitUrl(originalUrl)) {
+              imageUrl = originalUrl;
+            } 
+            // Se é do Supabase, NÃO usar (removido completamente)
+            else if (originalUrl && originalUrl.includes('supabase.co')) {
+              // Não usar URLs do Supabase - elas não existem mais
+              imageUrl = undefined;
+            } 
+            // Outras URLs (não Supabase), usar
+            else if (originalUrl) {
+              imageUrl = originalUrl;
+            }
+          }
         
         return {
           id: product.id,
@@ -170,7 +191,26 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
           weight: product.weight,
           style: product.style,
           imageUrl: imageUrl,
-          imageUrls: product.imageUrls || (imageUrl ? [imageUrl] : []), // Preservar array de imagens
+          // SEMPRE usar ImageKit quando disponível, manter ordem
+          imageUrls: (() => {
+            const imageKitUrls = imageKitMap.get(product.id) || [];
+            
+            // Se tem ImageKit, usar apenas ImageKit (manter ordem)
+            if (imageKitUrls.length > 0) {
+              return imageKitUrls;
+            }
+            
+            // Se não tem ImageKit, verificar URLs do banco (mas NUNCA Supabase)
+            const originalUrls = product.imageUrls || [];
+            const validUrls = originalUrls.filter((url: string) => {
+              // NÃO incluir URLs do Supabase
+              if (url.includes('supabase.co')) return false;
+              // Incluir apenas ImageKit e outras URLs válidas
+              return true;
+            });
+            
+            return validUrls.length > 0 ? validUrls : (imageUrl ? [imageUrl] : []);
+          })(),
           storeId: product.store?.id || product.storeId || '',
           rating: product.rating ? Number(product.rating) : 0,
           reviewCount: product.reviewCount ? Number(product.reviewCount) : 0,
@@ -191,7 +231,98 @@ export const useProducts = (options: UseProductsOptions = {}): UseProductsReturn
         };
       });
 
-      setProducts(mappedProducts);
+      // Agrupar produtos duplicados APENAS se tiverem EXATAMENTE as mesmas imagens
+      // Isso evita agrupar produtos diferentes que por acaso têm o mesmo nome
+      const groupedProducts = new Map<string, Product>();
+      
+      // Contar produtos por categoria ANTES do agrupamento
+      const beforeGrouping = {
+        sofa: mappedProducts.filter(p => p.category === 'sofa').length,
+        mesa: mappedProducts.filter(p => p.category === 'mesa').length,
+        cadeira: mappedProducts.filter(p => p.category === 'cadeira').length,
+        luminaria: mappedProducts.filter(p => p.category === 'iluminacao').length,
+        mesa_centro: mappedProducts.filter(p => p.category === 'mesa_centro').length,
+      };
+      console.log(`📊 [useProducts] Produtos ANTES do agrupamento:`, beforeGrouping);
+      
+      mappedProducts.forEach((product) => {
+        // Criar chave única baseada em nome, categoria e TODAS as imagens (não só a primeira)
+        // Isso garante que só agrupa produtos realmente idênticos
+        const allImages = product.imageUrls && product.imageUrls.length > 0 
+          ? product.imageUrls.sort().join('|') 
+          : (product.imageUrl || '');
+        const productKey = `${product.name}_${product.category}_${allImages}`.toLowerCase();
+        
+        if (groupedProducts.has(productKey)) {
+          // Produto já existe (mesmo nome, categoria E mesmas imagens), adicionar esta loja à lista
+          const existingProduct = groupedProducts.get(productKey)!;
+          
+          // Inicializar arrays se não existirem
+          if (!existingProduct.availableInStores) {
+            existingProduct.availableInStores = [{
+              storeId: existingProduct.storeId,
+              storeName: existingProduct.storeName,
+              stock: existingProduct.stock,
+            }];
+            existingProduct.totalStock = existingProduct.stock;
+          }
+          
+          // Adicionar nova loja (se ainda não estiver na lista)
+          const storeExists = existingProduct.availableInStores.some(
+            s => s.storeId === product.storeId
+          );
+          
+          if (!storeExists) {
+            existingProduct.availableInStores.push({
+              storeId: product.storeId,
+              storeName: product.storeName,
+              stock: product.stock,
+            });
+            existingProduct.totalStock = (existingProduct.totalStock || 0) + product.stock;
+          } else {
+            // Atualizar estoque da loja existente
+            const storeIndex = existingProduct.availableInStores.findIndex(
+              s => s.storeId === product.storeId
+            );
+            if (storeIndex >= 0) {
+              existingProduct.availableInStores[storeIndex].stock = product.stock;
+              // Recalcular estoque total
+              existingProduct.totalStock = existingProduct.availableInStores.reduce(
+                (sum, s) => sum + s.stock, 0
+              );
+            }
+          }
+          
+          // Atualizar estoque total do produto
+          existingProduct.stock = existingProduct.totalStock || existingProduct.stock;
+        } else {
+          // Primeira ocorrência deste produto
+          product.availableInStores = [{
+            storeId: product.storeId,
+            storeName: product.storeName,
+            stock: product.stock,
+          }];
+          product.totalStock = product.stock;
+          groupedProducts.set(productKey, product);
+        }
+      });
+      
+      // Converter Map para Array e manter ordem original
+      const uniqueProducts = Array.from(groupedProducts.values());
+      
+      // Contar produtos por categoria DEPOIS do agrupamento
+      const afterGrouping = {
+        sofa: uniqueProducts.filter(p => p.category === 'sofa').length,
+        mesa: uniqueProducts.filter(p => p.category === 'mesa').length,
+        cadeira: uniqueProducts.filter(p => p.category === 'cadeira').length,
+        luminaria: uniqueProducts.filter(p => p.category === 'iluminacao').length,
+        mesa_centro: uniqueProducts.filter(p => p.category === 'mesa_centro').length,
+      };
+      
+      console.log(`✅ [useProducts] Produtos agrupados: ${mappedProducts.length} -> ${uniqueProducts.length} únicos`);
+      console.log(`📊 [useProducts] Categorias DEPOIS do agrupamento:`, afterGrouping);
+      
+      setProducts(uniqueProducts);
     } catch (err: any) {
       console.error('Erro ao buscar produtos:', err);
       

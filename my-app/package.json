@@ -40,6 +40,7 @@
     "firebase": "^12.5.0",
     "firebase-admin": "^13.6.0",
     "framer-motion": "^11.0.8",
+    "imagekit": "^6.0.0",
     "lucide-react": "^0.544.0",
     "motion": "^12.23.24",
     "next": "^15.5.3",

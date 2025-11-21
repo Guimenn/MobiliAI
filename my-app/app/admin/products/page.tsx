@@ -1060,7 +1060,7 @@ function ProductsSection({
                         </div>
                         <div className="flex items-center space-x-2 text-sm text-gray-600">
                           <Package className="h-4 w-4" />
-                          <span>Estoque: {product.stock} unidades</span>
+                          <span>Estoque: {product.stock || 0} unidades</span>
                         </div>
                         {product.sku && (
                           <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -1215,8 +1215,8 @@ function ProductsSection({
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm text-gray-900">{product.stock}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-900">{product.stock || 0}</span>
                               <Badge className={stockStatus.color}>
                                 {stockStatus.label}
                               </Badge>

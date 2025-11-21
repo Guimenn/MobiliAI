@@ -16,8 +16,12 @@ export class PublicProductsService {
       };
       
       // Filtrar por loja se storeId for fornecido
+      // Se o produto tiver storeId direto (produtos antigos) OU estiver em StoreInventory
       if (storeId) {
-        where.storeId = storeId;
+        where.OR = [
+          { storeId: storeId }, // Produtos antigos com storeId direto
+          { storeInventory: { some: { storeId: storeId } } } // Produtos novos via StoreInventory
+        ];
       }
       
       if (search) {
@@ -97,6 +101,19 @@ export class PublicProductsService {
                   name: true, 
                   address: true 
                 } 
+              },
+              storeInventory: {
+                select: {
+                  quantity: true,
+                  storeId: true,
+                  store: {
+                    select: {
+                      id: true,
+                      name: true,
+                      address: true
+                    }
+                  }
+                }
               }
             },
             orderBy: [
@@ -167,6 +184,19 @@ export class PublicProductsService {
                       name: true, 
                       address: true 
                     } 
+                  },
+                  storeInventory: {
+                    select: {
+                      quantity: true,
+                      storeId: true,
+                      store: {
+                        select: {
+                          id: true,
+                          name: true,
+                          address: true
+                        }
+                      }
+                    }
                   }
                 },
                 orderBy: [
@@ -188,8 +218,59 @@ export class PublicProductsService {
         }
       }
 
+      // Processar produtos para usar estoque do StoreInventory quando disponível
+      const processedProducts = products.map((product: any) => {
+        // Se o produto tem StoreInventory
+        if (product.storeInventory && product.storeInventory.length > 0) {
+          // Se storeId foi fornecido, usar estoque da loja específica
+          if (storeId) {
+            const inventory = product.storeInventory.find((inv: any) => inv.storeId === storeId);
+            if (inventory) {
+              return {
+                ...product,
+                stock: inventory.quantity || 0, // Usar estoque da loja específica
+                store: inventory.store || product.store, // Usar loja do inventory ou fallback
+                storeId: inventory.storeId || storeId,
+              };
+            }
+            // Se não encontrou para a loja específica, usar primeiro disponível
+            const firstInventory = product.storeInventory[0];
+            return {
+              ...product,
+              stock: firstInventory?.quantity || 0,
+              store: firstInventory?.store || product.store,
+              storeId: firstInventory?.storeId || storeId,
+            };
+          }
+          
+          // Se não há storeId, SOMAR todos os estoques de todas as lojas
+          const totalStock = product.storeInventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0);
+          const firstInventory = product.storeInventory[0];
+          return {
+            ...product,
+            stock: totalStock || 0, // Soma total de todas as lojas (garantir mínimo 0)
+            store: firstInventory?.store || product.store, // Usar primeira loja como referência
+            storeId: firstInventory?.storeId || product.store?.id || product.storeId,
+          };
+        }
+        
+        // Produto antigo com storeId direto ou sem StoreInventory
+        // Usar estoque do produto diretamente
+        return {
+          ...product,
+          stock: product.stock || 0, // Garantir que sempre tem um valor
+          storeId: product.store?.id || product.storeId,
+        };
+      });
+      
+      // Log para debug (apenas se houver produtos sem estoque)
+      const productsWithoutStock = processedProducts.filter((p: any) => !p.stock || p.stock === 0);
+      if (productsWithoutStock.length > 0) {
+        console.warn(`⚠️ [PublicProductsService] ${productsWithoutStock.length} produtos sem estoque encontrados`);
+      }
+
       return {
-        products,
+        products: processedProducts,
         pagination: {
           page,
           limit,
@@ -266,6 +347,20 @@ export class PublicProductsService {
               name: true, 
               address: true 
             } 
+          },
+          storeInventory: {
+            select: {
+              id: true,
+              quantity: true,
+              storeId: true,
+              store: {
+                select: {
+                  id: true,
+                  name: true,
+                  isActive: true
+                }
+              }
+            }
           }
         }
       });
@@ -274,7 +369,30 @@ export class PublicProductsService {
         throw new Error('Produto não encontrado');
       }
 
-      return product;
+      // Processar estoque do mesmo jeito que getProducts
+      let processedProduct: any = { ...product };
+      
+      // Se o produto tem StoreInventory, calcular estoque total
+      if (product.storeInventory && product.storeInventory.length > 0) {
+        // Somar todos os estoques de todas as lojas ativas
+        const totalStock = product.storeInventory
+          .filter((inv: any) => inv.store?.isActive)
+          .reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0);
+        
+        processedProduct.stock = totalStock || 0;
+        processedProduct.stockByStore = product.storeInventory
+          .filter((inv: any) => inv.store?.isActive)
+          .map((inv: any) => ({
+            storeId: inv.storeId,
+            storeName: inv.store?.name || 'Loja desconhecida',
+            quantity: inv.quantity || 0
+          }));
+      } else {
+        // Produto antigo sem StoreInventory, usar estoque direto
+        processedProduct.stock = product.stock || 0;
+      }
+
+      return processedProduct;
     } catch (error: any) {
       // Em caso de erro de conexão, tentar reconectar e tentar novamente
       if (error.code === 'P1017' || error.message?.includes('Server has closed the connection') || error.message?.includes('db_termination')) {
@@ -333,6 +451,20 @@ export class PublicProductsService {
                   name: true, 
                   address: true 
                 } 
+              },
+              storeInventory: {
+                select: {
+                  id: true,
+                  quantity: true,
+                  storeId: true,
+                  store: {
+                    select: {
+                      id: true,
+                      name: true,
+                      isActive: true
+                    }
+                  }
+                }
               }
             }
           });
@@ -341,7 +473,30 @@ export class PublicProductsService {
             throw new Error('Produto não encontrado');
           }
 
-          return product;
+          // Processar estoque do mesmo jeito que getProducts
+          let processedProduct: any = { ...product };
+          
+          // Se o produto tem StoreInventory, calcular estoque total
+          if (product.storeInventory && product.storeInventory.length > 0) {
+            // Somar todos os estoques de todas as lojas ativas
+            const totalStock = product.storeInventory
+              .filter((inv: any) => inv.store?.isActive)
+              .reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0);
+            
+            processedProduct.stock = totalStock || 0;
+            processedProduct.stockByStore = product.storeInventory
+              .filter((inv: any) => inv.store?.isActive)
+              .map((inv: any) => ({
+                storeId: inv.storeId,
+                storeName: inv.store?.name || 'Loja desconhecida',
+                quantity: inv.quantity || 0
+              }));
+          } else {
+            // Produto antigo sem StoreInventory, usar estoque direto
+            processedProduct.stock = product.stock || 0;
+          }
+
+          return processedProduct;
         } catch (retryError) {
           console.error('Erro ao reconectar:', retryError);
           throw new Error('Erro ao buscar produto. Tente novamente mais tarde.');

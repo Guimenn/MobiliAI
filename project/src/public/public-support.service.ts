@@ -25,28 +25,40 @@ export class PublicSupportService {
   }
 
   async getStores() {
-    const stores = await this.prisma.store.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        address: true,
-        city: true,
-        state: true,
-        zipCode: true,
-        phone: true,
-        email: true,
-        workingHours: true,
-        openingTime: true,
-        closingTime: true,
-        workingDays: true,
-      },
-    });
+    try {
+      const stores = await this.prisma.store.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          city: true,
+          state: true,
+          zipCode: true,
+          phone: true,
+          email: true,
+          workingHours: true,
+          openingTime: true,
+          closingTime: true,
+          workingDays: true,
+          isActive: true,
+        },
+      });
 
-    return {
-      success: true,
-      stores,
-    };
+      console.log(`📦 [PublicSupportService] Encontradas ${stores.length} lojas ativas`);
+
+      return {
+        success: true,
+        stores,
+      };
+    } catch (error: any) {
+      console.error('❌ [PublicSupportService] Erro ao buscar lojas:', error);
+      return {
+        success: false,
+        stores: [],
+        error: error.message,
+      };
+    }
   }
 
   async searchProducts(query: string) {

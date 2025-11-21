@@ -565,7 +565,36 @@ export default function CheckoutPage() {
         console.log('🔑 Token:', token ? 'Presente' : 'Ausente');
         console.log('🔐 Autenticado:', isAuthenticated);
         
-        const storesData = await storesAPI.getAll();
+        // Usar endpoint público para buscar lojas (não requer autenticação)
+        let storesData = [];
+        try {
+          const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+          const response = await fetch(`${apiBaseUrl}/public/support/stores`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            storesData = data.stores || data || [];
+          } else {
+            console.warn('⚠️ Erro ao buscar lojas do endpoint público, tentando endpoint autenticado...');
+            // Fallback: tentar endpoint autenticado se disponível
+            if (isAuthenticated && token) {
+              storesData = await storesAPI.getAll();
+            }
+          }
+        } catch (error) {
+          console.error('❌ Erro ao buscar lojas:', error);
+          // Fallback: tentar endpoint autenticado se disponível
+          if (isAuthenticated && token) {
+            try {
+              storesData = await storesAPI.getAll();
+            } catch (fallbackError) {
+              console.error('❌ Erro no fallback:', fallbackError);
+            }
+          }
+        }
         console.log('📦 Dados recebidos da API:', storesData);
         console.log('📊 Tipo de dados:', typeof storesData);
         console.log('📊 É array?', Array.isArray(storesData));
@@ -591,12 +620,25 @@ export default function CheckoutPage() {
         
         console.log(`✅ Lojas ativas encontradas: ${availableStores.length} de ${storesData.length}`);
         
-        // SEMPRE filtrar lojas que têm os produtos do checkout
+        // Filtrar lojas que têm os produtos do checkout (com estoque)
         if (checkoutItems.length > 0) {
           // Extrair todos os storeIds únicos dos produtos no carrinho
+          // Agora os produtos podem ter stockByStore ou storeId direto
           const productStoreIds = new Set<string>();
           checkoutItems.forEach((item: any) => {
-            const productStoreId = item.product?.storeId || (item.product as any)?.store?.id || (item.product as any)?.storeId;
+            const product = item.product;
+            
+            // Verificar se o produto tem stockByStore (novo formato)
+            if (product?.stockByStore && Array.isArray(product.stockByStore)) {
+              product.stockByStore.forEach((storeStock: any) => {
+                if (storeStock.quantity > 0) {
+                  productStoreIds.add(storeStock.storeId);
+                }
+              });
+            }
+            
+            // Fallback: verificar storeId direto (formato antigo)
+            const productStoreId = product?.storeId || (product as any)?.store?.id || (product as any)?.storeId;
             if (productStoreId) {
               productStoreIds.add(productStoreId);
             }
@@ -606,28 +648,28 @@ export default function CheckoutPage() {
           console.log(`🛍️ Produtos no carrinho:`, checkoutItems.map((item: any) => ({
             productId: item.product?.id,
             productName: item.product?.name,
-            storeId: item.product?.storeId || (item.product as any)?.store?.id || (item.product as any)?.storeId
+            storeId: item.product?.storeId || (item.product as any)?.store?.id || (item.product as any)?.storeId,
+            stockByStore: item.product?.stockByStore
           })));
           
-          // Filtrar apenas lojas que têm pelo menos um produto do carrinho
-          const storesWithProducts = availableStores.filter((store: any) => {
-            return productStoreIds.has(store.id);
-          });
-          
-          console.log(`🛍️ Lojas com produtos do carrinho: ${storesWithProducts.length}`);
-          
-          // SEMPRE usar apenas as lojas com produtos (não mostrar todas se não houver produtos)
-          if (storesWithProducts.length > 0) {
-            availableStores = storesWithProducts;
+          // Se encontrou lojas com produtos, filtrar apenas essas
+          if (productStoreIds.size > 0) {
+            const storesWithProducts = availableStores.filter((store: any) => {
+              return productStoreIds.has(store.id);
+            });
+            
+            console.log(`🛍️ Lojas com produtos do carrinho: ${storesWithProducts.length}`);
+            
+            if (storesWithProducts.length > 0) {
+              availableStores = storesWithProducts;
+            } else {
+              // Se nenhuma loja tem os produtos, mostrar todas as lojas disponíveis (pode ter estoque em outras lojas)
+              console.warn('⚠️ Nenhuma loja encontrada com os produtos do carrinho, mostrando todas as lojas disponíveis');
+            }
           } else {
-            // Se nenhuma loja tem os produtos, mostrar array vazio
-            availableStores = [];
-            console.warn('⚠️ Nenhuma loja encontrada com os produtos do carrinho');
+            // Se não encontrou storeIds, mostrar todas as lojas disponíveis
+            console.log('ℹ️ Não foi possível identificar lojas específicas dos produtos, mostrando todas as lojas disponíveis');
           }
-        } else {
-          // Se não há produtos no carrinho, não mostrar lojas
-          availableStores = [];
-          console.log('ℹ️ Nenhum produto no carrinho, não exibindo lojas');
         }
         
         console.log(`📍 Lojas finais disponíveis: ${availableStores.length}`);
@@ -639,76 +681,24 @@ export default function CheckoutPage() {
           console.warn('  2. Todas as lojas estão inativas (isActive: false)');
           console.warn('  3. O usuário não tem permissão para ver lojas');
           console.warn('  4. Erro na consulta ao banco de dados');
+          setStores([]);
+          setStoresWithDistance([]);
+          setIsLoadingStores(false);
+          return;
         }
         
-        // Se temos localização do usuário, calcular distâncias e ordenar
-        if (userLocation && availableStores.length > 0) {
-          console.log('🌍 Calculando distâncias com localização do usuário...');
-          // Processar lojas sequencialmente com delay para não sobrecarregar a API
-          const storesWithCoords = [];
-          for (let i = 0; i < availableStores.length; i++) {
-            const store = availableStores[i];
-            // Adicionar delay de 1 segundo entre requisições (Nominatim tem limite de rate)
-            if (i > 0) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-            
-            try {
-              const coords = await geocodeAddress(
-                store.address,
-                store.city,
-                store.state,
-                store.zipCode
-              );
-              
-              if (coords) {
-                const distance = calculateDistance(
-                  userLocation.lat,
-                  userLocation.lng,
-                  coords.lat,
-                  coords.lng
-                );
-                storesWithCoords.push({ ...store, distance, coordinates: coords });
-              } else {
-                storesWithCoords.push({ ...store, distance: null, coordinates: null });
-              }
-            } catch (error) {
-              console.error(`Erro ao geocodificar loja ${store.name}:`, error);
-              storesWithCoords.push({ ...store, distance: null, coordinates: null });
-            }
-          }
-          
-          // Ordenar por distância (lojas sem distância vão para o final)
-          const sortedStores = storesWithCoords.sort((a, b) => {
-            if (a.distance === null) return 1;
-            if (b.distance === null) return -1;
-            return a.distance - b.distance;
-          });
-          
-          console.log(`✅ Lojas ordenadas por distância: ${sortedStores.length}`);
-          setStoresWithDistance(sortedStores);
-          setStores(sortedStores);
-          
-          // Selecionar automaticamente a loja mais próxima
-          setSelectedStore((current) => {
-            if (current) return current; // Manter seleção atual se já existir
-            const nearestStore = sortedStores.find((s: any) => s.distance !== null);
-            if (nearestStore) return nearestStore.id;
-            if (sortedStores.length > 0) return sortedStores[0].id;
-            return '';
-          });
-        } else {
-          // Sem localização, apenas definir as lojas
-          console.log('📍 Sem localização, exibindo todas as lojas ativas');
-          setStoresWithDistance(availableStores.map((s: any) => ({ ...s, distance: null })));
-          setStores(availableStores);
-          
-          setSelectedStore((current) => {
-            if (current) return current;
-            if (availableStores.length > 0) return availableStores[0].id;
-            return '';
-          });
-        }
+        // Simplificar: não calcular distâncias agora (pode ser feito depois se necessário)
+        // Apenas definir as lojas disponíveis
+        console.log('📍 Exibindo todas as lojas ativas');
+        setStoresWithDistance(availableStores.map((s: any) => ({ ...s, distance: null })));
+        setStores(availableStores);
+        
+        // Selecionar automaticamente a primeira loja se não houver seleção
+        setSelectedStore((current) => {
+          if (current) return current;
+          if (availableStores.length > 0) return availableStores[0].id;
+          return '';
+        });
       } catch (error: any) {
         console.error('❌ Erro ao carregar lojas:', error);
         console.error('Detalhes do erro:', error.response?.data || error.message);
@@ -2425,10 +2415,15 @@ export default function CheckoutPage() {
               <Card className="shadow-xl border-2 border-gray-200">
                 <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white rounded-t-lg">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center space-x-2">
-                      <CreditCard className="h-5 w-5" />
-                      <span>Método de Pagamento</span>
-                    </CardTitle>
+                    <div>
+                      <CardTitle className="flex items-center space-x-2">
+                        <CreditCard className="h-5 w-5" />
+                        <span>Pagamento</span>
+                      </CardTitle>
+                      <CardDescription className="text-white/80 mt-1">
+                        Formas de pagamento aceitas
+                      </CardDescription>
+                    </div>
                     <Badge className="bg-white text-[#3e2626]">2 de 3</Badge>
                   </div>
                 </CardHeader>
@@ -3022,13 +3017,6 @@ export default function CheckoutPage() {
                       <p className="text-sm text-gray-600 mt-1 leading-relaxed">
                         Suas informações são protegidas com criptografia e só são compartilhadas com provedores de pagamento confiáveis.
                       </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {['Visa','Mastercard','ID Check','SafeKey','JCB','Verified by Visa','SecureCode','American Express'].map((flag) => (
-                          <span key={flag} className="text-[11px] px-2 py-1 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
-                            {flag}
-                          </span>
-                        ))}
-                      </div>
                     </div>
                   </div>
 

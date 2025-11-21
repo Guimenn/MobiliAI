@@ -79,10 +79,29 @@ export class SalesService {
       // Criar os itens da venda e atualizar estoque
       const productsToCheck: Array<{ id: string; name: string; stock: number; minStock: number; storeName?: string }> = [];
       
+      // Determinar loja da venda (vendas diretas usam a loja do funcionário)
+      const targetStoreId = currentUser.storeId || sale.storeId;
+      
       for (const item of createSaleDto.items) {
         const product = await tx.product.findUnique({ 
           where: { id: item.productId },
-          include: { store: { select: { name: true } } }
+          include: { 
+            store: { select: { name: true } },
+            storeInventory: {
+              where: targetStoreId ? { storeId: targetStoreId } : undefined,
+              select: {
+                id: true,
+                quantity: true,
+                storeId: true,
+                store: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            }
+          }
         });
         
         if (!product) {
@@ -97,23 +116,73 @@ export class SalesService {
           },
         });
 
-        // Atualizar estoque
-        const newStock = product.stock - item.quantity;
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: newStock,
-          },
-        });
+        // Atualizar estoque no StoreInventory se disponível
+        if (product.storeInventory && product.storeInventory.length > 0 && targetStoreId) {
+          const inventory = product.storeInventory[0]; // Já filtrado por storeId
+          
+          if (inventory) {
+            const newQuantity = inventory.quantity - item.quantity;
+            
+            await tx.storeInventory.update({
+              where: { id: inventory.id },
+              data: { quantity: Math.max(0, newQuantity) }
+            });
 
-        // Armazenar informações do produto para verificação posterior
-        productsToCheck.push({
-          id: product.id,
-          name: product.name,
-          stock: newStock,
-          minStock: product.minStock || 0,
-          storeName: product.store?.name
-        });
+            // Atualizar estoque total do produto (somar todos os inventários)
+            const allInventories = await tx.storeInventory.findMany({
+              where: { productId: item.productId }
+            });
+            const totalStock = allInventories.reduce((sum, inv) => {
+              if (inv.id === inventory.id) {
+                return sum + Math.max(0, newQuantity);
+              }
+              return sum + inv.quantity;
+            }, 0);
+            
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: totalStock }
+            });
+
+            productsToCheck.push({
+              id: product.id,
+              name: product.name,
+              stock: Math.max(0, newQuantity),
+              minStock: product.minStock || 0,
+              storeName: inventory.store?.name || product.store?.name
+            });
+          } else {
+            // Fallback: atualizar estoque direto
+            const newStock = product.stock - item.quantity;
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: Math.max(0, newStock) }
+            });
+
+            productsToCheck.push({
+              id: product.id,
+              name: product.name,
+              stock: Math.max(0, newStock),
+              minStock: product.minStock || 0,
+              storeName: product.store?.name
+            });
+          }
+        } else {
+          // Produto sem StoreInventory ou sem loja específica - usar estoque direto
+          const newStock = product.stock - item.quantity;
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: Math.max(0, newStock) }
+          });
+
+          productsToCheck.push({
+            id: product.id,
+            name: product.name,
+            stock: Math.max(0, newStock),
+            minStock: product.minStock || 0,
+            storeName: product.store?.name
+          });
+        }
       }
 
       // Retornar a venda completa

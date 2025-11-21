@@ -711,15 +711,55 @@ export class AdminService {
         take: limit,
         include: {
           store: { select: { id: true, name: true } },
-          supplier: { select: { id: true, name: true } }
+          supplier: { select: { id: true, name: true } },
+          storeInventory: {
+            select: {
+              id: true,
+              quantity: true,
+              storeId: true,
+              store: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true
+                }
+              }
+            }
+          }
         },
         orderBy: { createdAt: 'desc' }
       }),
       this.prisma.product.count({ where })
     ]);
 
+    // Processar produtos para calcular estoque total e lista por filial
+    const processedProducts = products.map((product: any) => {
+      let totalStock = product.stock || 0;
+      const stockByStore: Array<{ storeId: string; storeName: string; quantity: number }> = [];
+
+      if (product.storeInventory && product.storeInventory.length > 0) {
+        // Calcular estoque total a partir do StoreInventory
+        totalStock = product.storeInventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0);
+        
+        // Criar lista de estoques por filial
+        product.storeInventory.forEach((inv: any) => {
+          stockByStore.push({
+            storeId: inv.storeId,
+            storeName: inv.store?.name || 'Loja desconhecida',
+            quantity: inv.quantity || 0
+          });
+        });
+      }
+
+      return {
+        ...product,
+        stock: totalStock, // Estoque total (soma de todas as lojas)
+        stockByStore: stockByStore, // Lista de estoques por filial
+      };
+    });
+
     return {
-      products,
+      products: processedProducts,
       pagination: {
         page,
         limit,

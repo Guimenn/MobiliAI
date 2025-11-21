@@ -1,4 +1,4 @@
-# 🚀 Configuração do Supabase - ARQUIVO .env.local
+# 🚀 Configuração do Ambiente - ARQUIVO .env.local
 
 ## ⚠️ IMPORTANTE: Você precisa criar o arquivo .env.local manualmente
 
@@ -10,13 +10,12 @@ my-app/.env.local
 ### 📝 **Conteúdo do arquivo .env.local:**
 
 ```env
-# Configuração do Supabase
+# Configuração do ImageKit (para upload de imagens de produtos)
+NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/ujp6mp5if
+
+# Configuração do Supabase (para banco de dados)
 NEXT_PUBLIC_SUPABASE_URL=https://duvgptwzoodyyjbdhepa.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1dmdwdHd6b29keXlqYmRoZXBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2MTU4MDcsImV4cCI6MjA3MzE5MTgwN30.g3q7AnhX3i2TBQdN0HJ7CvKZ8dVmnZSCQdyycyuTJ_g
-
-# Access Keys para Storage (que você já tem)
-SUPABASE_ACCESS_KEY_ID=fccd7837833870fc3c9469a29f7f8a38
-SUPABASE_SECRET_ACCESS_KEY=ce72988a69e14fc882e70f224f9b3201daf5a44cf4ec274e9c249398d6ea1328
 ```
 
 ## 🔑 **Para encontrar a chave anônima:**

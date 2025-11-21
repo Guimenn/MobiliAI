@@ -1008,57 +1008,63 @@ export default function CartPage() {
               <CardContent className="p-6">
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                   {/* Mastercard */}
-                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer group">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-6 h-6 rounded-full bg-red-500"></div>
-                      <div className="w-6 h-6 rounded-full bg-orange-500 -ml-2"></div>
-                    </div>
-                    <span className="text-xs font-semibold text-gray-700 ml-1 group-hover:text-[#3e2626]">MC</span>
+                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
+                    <img 
+                      src="https://down-br.img.susercontent.com/file/95d849253f75d5e6e6b867af4f7c65aa" 
+                      alt="Mastercard" 
+                      className="h-6 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
                   </div>
 
                   {/* Visa */}
-                  <div className="flex items-center justify-center p-3 bg-[#1a1f71] rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <span className="text-white font-bold text-xs">VISA</span>
-                  </div>
-
-                  {/* Maestro */}
-                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer group">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-6 h-6 rounded-full bg-red-500"></div>
-                      <div className="w-6 h-6 rounded-full bg-blue-400 -ml-2"></div>
-                    </div>
-                    <span className="text-xs font-semibold text-gray-700 ml-1 group-hover:text-[#3e2626]">M</span>
-                  </div>
-
-                  {/* Diners Club */}
-                  <div className="flex items-center justify-center p-3 bg-[#0079be] rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <span className="text-white font-semibold text-[10px]">DINERS</span>
+                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
+                    <img 
+                      src="https://down-br.img.susercontent.com/file/a65c5d1c5e556c6197f8fbd607482372" 
+                      alt="Visa" 
+                      className="h-6 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
                   </div>
 
                   {/* American Express */}
-                  <div className="flex items-center justify-center p-3 bg-[#006fcf] rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <span className="text-white font-bold text-[9px]">AMEX</span>
+                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
+                    <img 
+                      src="https://down-br.img.susercontent.com/file/285e5ab6207eb562a9e893a42ff7ee46 " 
+                      alt="American Express" 
+                      className="h-6 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
                   </div>
 
                   {/* Elo */}
-                  <div className="flex items-center justify-center p-3 bg-black rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <span className="text-white font-bold text-xs">elo</span>
-                  </div>
-
-                  {/* Hipercard */}
-                  <div className="flex items-center justify-center p-3 bg-[#c41230] rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <span className="text-white font-semibold text-[10px]">HIPERCARD</span>
+                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
+                    <img 
+                      src="https://down-br.img.susercontent.com/file/br-11134258-7r98o-lxsovyseln7jc5" 
+                      alt="Elo" 
+                      className="h-6 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
                   </div>
 
                   {/* Boleto */}
-                  <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <div className="w-full h-4 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300 rounded mb-1"></div>
-                    <span className="text-black font-semibold text-[10px]">BOLETO</span>
-                  </div>
-
-                  {/* PayPal */}
-                  <div className="flex items-center justify-center p-3 bg-[#003087] rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <span className="text-white font-bold text-xs">PayPal</span>
+                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
+                    <img 
+                      src="https://down-br.img.susercontent.com/file/44734b7fc343eb46237c2d90c6c9ca60" 
+                      alt="Boleto" 
+                      className="h-6 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
                   </div>
 
                   {/* Parcelamento */}

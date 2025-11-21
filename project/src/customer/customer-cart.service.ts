@@ -409,30 +409,215 @@ export class CustomerCartService {
         // Buscar produto antes de atualizar
         const product = await this.prisma.product.findUnique({
           where: { id: item.productId },
-          include: { store: { select: { name: true } } }
+          include: { 
+            store: { select: { name: true } },
+            storeInventory: {
+              select: {
+                id: true,
+                quantity: true,
+                storeId: true,
+                store: {
+                  select: {
+                    id: true,
+                    name: true,
+                    isActive: true
+                  }
+                }
+              }
+            }
+          }
         });
 
         if (!product) {
           return;
         }
 
-        // Calcular novo estoque
-        const newStock = product.stock - item.quantity;
+        // Determinar de qual loja será tirado o estoque
+        let targetStoreId = validStoreId;
+        
+        // Se for venda online, escolher a loja mais próxima do cliente
+        if (isOnlineOrder && product.storeInventory && product.storeInventory.length > 0 && shippingInfo) {
+          // Buscar todas as lojas de uma vez (mais eficiente)
+          const storeIds = product.storeInventory
+            .filter(inv => inv.store?.isActive)
+            .map(inv => inv.storeId);
+          
+          const stores = await this.prisma.store.findMany({
+            where: {
+              id: { in: storeIds },
+              isActive: true
+            },
+            select: {
+              id: true,
+              name: true,
+              city: true,
+              state: true,
+              zipCode: true,
+              address: true
+            }
+          });
 
-        // Atualizar estoque
-        await this.prisma.product.update({
-          where: { id: item.productId },
-          data: { stock: newStock }
-        });
+          // Combinar inventário com dados da loja
+          const storesWithAddress = product.storeInventory
+            .filter(inv => inv.store?.isActive)
+            .map(inv => {
+              const store = stores.find(s => s.id === inv.storeId);
+              return {
+                inventory: inv,
+                store: store
+              };
+            })
+            .filter(item => item.store); // Remover lojas não encontradas
 
-        // Armazenar informações do produto para verificação posterior
-        productsToCheck.push({
-          id: product.id,
-          name: product.name,
-          stock: newStock,
-          minStock: product.minStock || 0,
-          storeName: product.store?.name
-        });
+          // Função para calcular prioridade de proximidade
+          const calculateProximityScore = (store: any) => {
+            if (!store) return 999; // Prioridade baixa se não tiver dados
+            
+            let score = 0;
+            
+            // Prioridade 1: Mesma cidade E mesmo estado
+            if (store.city?.toLowerCase() === shippingInfo.city?.toLowerCase() &&
+                store.state?.toUpperCase() === shippingInfo.state?.toUpperCase()) {
+              score = 1;
+            }
+            // Prioridade 2: Mesmo estado (diferente cidade)
+            else if (store.state?.toUpperCase() === shippingInfo.state?.toUpperCase()) {
+              score = 2;
+            }
+            // Prioridade 3: Estados diferentes
+            else {
+              score = 3;
+            }
+            
+            return score;
+          };
+
+          // Filtrar lojas com estoque suficiente
+          const storesWithStock = storesWithAddress
+            .filter(storeItem => storeItem.inventory.quantity >= item.quantity)
+            .map(storeItem => ({
+              ...storeItem,
+              proximityScore: calculateProximityScore(storeItem.store)
+            }))
+            .sort((a, b) => {
+              // Ordenar por proximidade primeiro, depois por estoque
+              if (a.proximityScore !== b.proximityScore) {
+                return a.proximityScore - b.proximityScore;
+              }
+              return b.inventory.quantity - a.inventory.quantity;
+            });
+
+          if (storesWithStock.length > 0) {
+            // Usar a loja mais próxima (mesma cidade > mesmo estado > qualquer outra)
+            targetStoreId = storesWithStock[0].store?.id || storesWithStock[0].inventory.storeId;
+            await this.prisma.sale.update({
+              where: { id: sale.id },
+              data: { storeId: targetStoreId }
+            });
+          } else {
+            // Se nenhuma loja tem estoque suficiente, usar a mais próxima disponível
+            const anyStore = storesWithAddress
+              .map(storeItem => ({
+                ...storeItem,
+                proximityScore: calculateProximityScore(storeItem.store)
+              }))
+              .sort((a, b) => {
+                if (a.proximityScore !== b.proximityScore) {
+                  return a.proximityScore - b.proximityScore;
+                }
+                return b.inventory.quantity - a.inventory.quantity;
+              })[0];
+            
+            if (anyStore) {
+              targetStoreId = anyStore.store?.id || anyStore.inventory.storeId;
+              await this.prisma.sale.update({
+                where: { id: sale.id },
+                data: { storeId: targetStoreId }
+              });
+            }
+          }
+        } else if (isOnlineOrder && product.storeInventory && product.storeInventory.length > 0) {
+          // Fallback: se não tiver shippingInfo, usar loja com mais estoque
+          const availableStores = product.storeInventory
+            .filter(inv => inv.store?.isActive && inv.quantity >= item.quantity)
+            .sort((a, b) => b.quantity - a.quantity);
+          
+          if (availableStores.length > 0) {
+            targetStoreId = availableStores[0].storeId;
+            await this.prisma.sale.update({
+              where: { id: sale.id },
+              data: { storeId: targetStoreId }
+            });
+          }
+        }
+
+        // Atualizar estoque no StoreInventory se o produto tiver
+        if (product.storeInventory && product.storeInventory.length > 0) {
+          const inventory = product.storeInventory.find(inv => inv.storeId === targetStoreId);
+          
+          if (inventory) {
+            // Atualizar StoreInventory da loja específica
+            const newQuantity = inventory.quantity - item.quantity;
+            
+            await this.prisma.storeInventory.update({
+              where: { id: inventory.id },
+              data: { quantity: Math.max(0, newQuantity) } // Não permitir negativo
+            });
+
+            // Atualizar também o estoque total do produto (soma de todas as lojas)
+            const totalStock = product.storeInventory.reduce((sum, inv) => {
+              if (inv.id === inventory.id) {
+                return sum + Math.max(0, newQuantity);
+              }
+              return sum + inv.quantity;
+            }, 0);
+
+            await this.prisma.product.update({
+              where: { id: item.productId },
+              data: { stock: totalStock }
+            });
+
+            const targetStore = product.storeInventory.find(inv => inv.storeId === targetStoreId)?.store;
+            
+            productsToCheck.push({
+              id: product.id,
+              name: product.name,
+              stock: Math.max(0, newQuantity),
+              minStock: product.minStock || 0,
+              storeName: targetStore?.name || 'Loja desconhecida'
+            });
+          } else {
+            // Se não encontrou inventory para a loja, usar estoque do produto (fallback)
+            const newStock = product.stock - item.quantity;
+            await this.prisma.product.update({
+              where: { id: item.productId },
+              data: { stock: Math.max(0, newStock) }
+            });
+
+            productsToCheck.push({
+              id: product.id,
+              name: product.name,
+              stock: Math.max(0, newStock),
+              minStock: product.minStock || 0,
+              storeName: product.store?.name
+            });
+          }
+        } else {
+          // Produto antigo sem StoreInventory - usar estoque direto
+          const newStock = product.stock - item.quantity;
+          await this.prisma.product.update({
+            where: { id: item.productId },
+            data: { stock: Math.max(0, newStock) }
+          });
+
+          productsToCheck.push({
+            id: product.id,
+            name: product.name,
+            stock: Math.max(0, newStock),
+            minStock: product.minStock || 0,
+            storeName: product.store?.name
+          });
+        }
       });
     }
 

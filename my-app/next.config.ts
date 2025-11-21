@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     domains: [
       'duvgptwzoodyyjbdhepa.supabase.co',
       'via.placeholder.com',
+      'ik.imagekit.io',
     ],
     remotePatterns: [
       {
@@ -24,6 +25,12 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'via.placeholder.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ik.imagekit.io',
         port: '',
         pathname: '/**',
       },
