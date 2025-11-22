@@ -11,7 +11,9 @@ import {
   Query,
   UseInterceptors,
   UploadedFile,
-  UploadedFiles
+  UploadedFiles,
+  UsePipes,
+  ValidationPipe
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
@@ -85,6 +87,7 @@ export class ProductsController {
   }
 
   @Patch(':id')
+  @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false }))
   update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto, @Request() req) {
     return this.productsService.update(id, updateProductDto, req.user);
   }

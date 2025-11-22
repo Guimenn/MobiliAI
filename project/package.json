@@ -21,7 +21,10 @@
     "seed:stores": "ts-node seed-real-stores.ts",
     "seed:furniture": "ts-node seed-furniture-products.ts",
     "delete:products": "ts-node delete-all-products.ts",
-    "recreate:from-imagekit": "ts-node recreate-products-from-imagekit.ts"
+    "recreate:from-imagekit": "ts-node recreate-products-from-imagekit.ts",
+    "assign:store-to-products": "ts-node src/scripts/assign-store-to-products.ts",
+    "add:products-to-stores": "ts-node src/scripts/add-products-to-all-stores.ts",
+    "duplicate:products-to-stores": "ts-node src/scripts/duplicate-products-to-all-stores.ts"
   },
   "engines": {
     "npm": ">=10.0.0",

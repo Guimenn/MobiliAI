@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, UsePipes, ValidationPipe } from '@nestjs/common';
 import { ManagerService } from './manager.service';
 import { ManagerInventoryService } from './manager-inventory.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -107,11 +107,28 @@ export class ManagerController {
   }
 
   @Put('products/:id')
+  @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false }))
   async updateStoreProduct(
     @Request() req,
     @Param('id') id: string,
     @Body() productData: any
   ) {
+    console.log('🔵 [ManagerController] PUT /manager/products/:id chamado', {
+      productId: id,
+      managerId: req.user?.id,
+      managerRole: req.user?.role,
+      managerStoreId: req.user?.storeId,
+      hasProductData: !!productData,
+      productDataKeys: Object.keys(productData || {}),
+      stockValue: productData?.stock,
+      stockType: typeof productData?.stock
+    });
+
+    if (!req.user) {
+      console.error('❌ [ManagerController] Usuário não autenticado');
+      throw new Error('Usuário não autenticado');
+    }
+
     return this.managerService.updateStoreProduct(req.user.id, id, productData);
   }
 

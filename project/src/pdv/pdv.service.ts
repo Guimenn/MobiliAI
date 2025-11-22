@@ -111,23 +111,54 @@ export class PdvService {
     }
 
     // Verificar produtos e estoque
+    // Buscar produtos que estão na loja via storeId OU via StoreInventory
     const products = await this.prisma.product.findMany({
       where: {
         id: { in: createSaleDto.items.map(item => item.productId) },
-        storeId: userStoreId,
+        OR: [
+          { storeId: userStoreId }, // Produtos com storeId da loja
+          { storeInventory: { some: { storeId: userStoreId } } } // Produtos via StoreInventory
+        ],
         isActive: true,
       },
+      include: {
+        storeInventory: {
+          where: { storeId: userStoreId },
+          select: {
+            id: true,
+            quantity: true,
+            storeId: true
+          }
+        }
+      }
     });
 
     if (products.length !== createSaleDto.items.length) {
       throw new BadRequestException('Alguns produtos não foram encontrados ou estão inativos');
     }
 
-    // Verificar estoque
+    // Verificar estoque (usar StoreInventory.quantity se disponível, senão product.stock)
     for (const item of createSaleDto.items) {
       const product = products.find(p => p.id === item.productId);
-      if (product.stock < item.quantity) {
-        throw new BadRequestException(`Estoque insuficiente para o produto ${product.name}`);
+      if (!product) {
+        throw new BadRequestException(`Produto ${item.productId} não encontrado`);
+      }
+
+      // Determinar estoque disponível
+      const isProductInStore = product.storeId === userStoreId;
+      const isProductInStoreInventory = product.storeInventory && product.storeInventory.length > 0;
+      
+      let availableStock = 0;
+      if (isProductInStore) {
+        // Produto está diretamente na loja, usar product.stock
+        availableStock = product.stock || 0;
+      } else if (isProductInStoreInventory) {
+        // Produto está via StoreInventory, usar StoreInventory.quantity
+        availableStock = product.storeInventory[0].quantity || 0;
+      }
+
+      if (availableStock < item.quantity) {
+        throw new BadRequestException(`Estoque insuficiente para o produto ${product.name}. Disponível: ${availableStock}, Solicitado: ${item.quantity}`);
       }
     }
 
@@ -321,7 +352,7 @@ export class PdvService {
           }
         }
       } catch (error) {
-        console.error('Erro ao notificar usuários sobre nova venda no PDV:', error);
+        // Erro ao notificar usuários sobre nova venda no PDV (silencioso)
       }
     });
 

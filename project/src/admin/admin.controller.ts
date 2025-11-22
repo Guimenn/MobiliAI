@@ -761,6 +761,24 @@ export class AdminController {
     );
   }
 
+  @Post('products/:productId/add-to-stores')
+  @Roles(UserRole.ADMIN)
+  async addProductToMultipleStores(
+    @Param('productId') productId: string,
+    @Body() data: { 
+      storeIds: string[];
+      initialQuantity?: number;
+      minStock?: number;
+    }
+  ) {
+    return this.adminService.addProductToMultipleStores(
+      productId,
+      data.storeIds,
+      data.initialQuantity || 0,
+      data.minStock || 0
+    );
+  }
+
   @Delete('stores/:id/inventory/:productId')
   @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
   async removeProductFromStore(

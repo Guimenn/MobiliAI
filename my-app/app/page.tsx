@@ -1189,7 +1189,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-6 gap-6 h-[800px]">
             
             {/* Sofá - 3x2 (colunas 1-3, linhas 1-2) */}
-            <Link href={`/products?category=${categories[0].id}`} className="md:col-span-3 md:row-span-2">
+            <Link href={`/products?category=${categories[0].id}`} className="md:col-span-3 md:row-span-2 relative z-0">
               <div className="group relative h-full bg-gradient-to-br from-[#3e2626] via-[#8B4513] to-[#A0522D] rounded-3xl overflow-hidden cursor-pointer shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.02]">
                 {/* Background Image */}
                 <div
@@ -1197,16 +1197,16 @@ export default function HomePage() {
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[0].id]})` }}
                 ></div>
                 {/* Background Pattern */}
-                <div className="absolute inset-0 opacity-20">
+                <div className="absolute inset-0 opacity-20 pointer-events-none">
                   <div className="absolute inset-0" style={{
                     backgroundImage: `radial-gradient(circle at 30px 30px, rgba(255,255,255,0.05) 2px, transparent 2px)`,
                     backgroundSize: '60px 60px'
                   }}></div>
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none"></div>
                 
                 {/* Conteúdo Principal */}
-                <div className="relative z-10 p-8 h-full flex flex-col justify-between">
+                <div className="relative z-10 p-8 h-full flex flex-col justify-between pointer-events-auto">
                   <div>
                     <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
                       <h3 className="text-4xl md:text-5xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
@@ -1220,25 +1220,25 @@ export default function HomePage() {
                 </div>
                 
                 {/* Efeito de brilho animado */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out pointer-events-none"></div>
                 
                 {/* Decoração flutuante */}
-                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
-                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
+                <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+                <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg pointer-events-none"></div>
               </div>
             </Link>
 
             {/* Poltrona - 2x2 (colunas 4-5, linhas 1-2) */}
-            <Link href={`/products?category=${categories[5].id}`} className="md:col-span-2 md:row-span-2">
+            <Link href={`/products?category=${categories[5].id}`} className="md:col-span-2 md:row-span-2 relative z-0">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
                   className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.4]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[5].id]})` }}
                 ></div>
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[5].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[5].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-6 h-full flex flex-col justify-start">
+                <div className="relative z-10 p-6 h-full flex flex-col justify-start pointer-events-auto">
                   <div>
                     <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
                       <h4 className="text-2xl md:text-3xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
@@ -1258,21 +1258,21 @@ export default function HomePage() {
                 <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
                 <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 
-                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/20 rounded-2xl transition-all duration-300"></div>
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/20 rounded-2xl transition-all duration-300 pointer-events-none"></div>
               </div>
             </Link>
 
             {/* Cadeiras - 1x2 (coluna 6, linhas 1-2) */}
-            <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-2">
+            <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-2 relative z-0">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
                   className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[2].id]})` }}
                 ></div>
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex flex-col justify-end items-center">
+                <div className="relative z-10 p-4 h-full flex flex-col justify-end items-center pointer-events-auto">
                   <div className="text-center">
                     <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
                       <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
@@ -1296,16 +1296,16 @@ export default function HomePage() {
             </Link>
 
             {/* Mesa - 2x2 (colunas 1-2, linhas 3-4) */}
-            <Link href={`/products?category=${categories[1].id}`} className="md:col-span-2 md:row-span-2">
+            <Link href={`/products?category=${categories[1].id}`} className="md:col-span-2 md:row-span-2 relative z-0">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
                   className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.36]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[1].id]})` }}
                 ></div>
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[1].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[1].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-6 h-full flex flex-col justify-start">
+                <div className="relative z-10 p-6 h-full flex flex-col justify-start pointer-events-auto">
                   <div>
                     <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
                       <h4 className="text-2xl md:text-3xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
@@ -1324,21 +1324,21 @@ export default function HomePage() {
                 <div className="absolute top-8 right-8 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
                 <div className="absolute bottom-8 left-8 w-12 h-12 bg-white/10 rounded-full blur-lg"></div>
                 
-                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/20 rounded-2xl transition-all duration-300"></div>
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#3e2626]/20 rounded-2xl transition-all duration-300 pointer-events-none"></div>
               </div>
             </Link>
 
             {/* Estante - 2x1 (colunas 3-4, linha 3) */}
-            <Link href={`/products?category=${categories[4].id}`} className="md:col-span-2 md:row-span-1">
+            <Link href={`/products?category=${categories[4].id}`} className="md:col-span-2 md:row-span-1 relative z-0">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
                   className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[1.85]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[4].id]})` }}
                 ></div>
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[4].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[4].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex flex-col justify-end">
+                <div className="relative z-10 p-4 h-full flex flex-col justify-end pointer-events-auto">
                   <div className="text-left">
                     <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
                       <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
@@ -1363,16 +1363,16 @@ export default function HomePage() {
             </Link>
 
             {/* Quadro - 2x1 (coluna 6, linha 3) */}
-            <Link href={`/products?category=${categories[6].id}`} className="md:col-span-2 md:row-span-1">
+            <Link href={`/products?category=${categories[6].id}`} className="md:col-span-2 md:row-span-1 relative z-0">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
                   className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.8]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[6].id]})` }}
                 ></div>
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex flex-col justify-end">
+                <div className="relative z-10 p-4 h-full flex flex-col justify-end pointer-events-auto">
                   <div className="text-left">
                     <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
                       <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
@@ -1399,16 +1399,16 @@ export default function HomePage() {
            
 
             {/* Luminária - 2x1 (colunas 3-4, linha 4) */}
-            <Link href={`/products?category=${categories[7].id}`} className="md:col-span-2 md:row-span-1">
+            <Link href={`/products?category=${categories[7].id}`} className="md:col-span-2 md:row-span-1 relative z-0">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
                   className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[1.8]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[7].id]})` }}
                 ></div>
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[7].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[7].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex flex-col justify-end">
+                <div className="relative z-10 p-4 h-full flex flex-col justify-end pointer-events-auto">
                   <div className="text-left">
                     <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
                       <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
@@ -1433,16 +1433,16 @@ export default function HomePage() {
             </Link>
 
             {/* Mesa de centro - 1x1 (coluna 6, linha 4) */}
-            <Link href={`/products?category=${categories[8].id}`} className="md:col-span-1 md:row-span-1">
+            <Link href={`/products?category=${categories[8].id}`} className="md:col-span-1 md:row-span-1 relative z-0">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
                   className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.4]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[8].id]})` }}
                 ></div>
-                <div className={`absolute inset-0 bg-gradient-to-br ${categories[8].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-br ${categories[8].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-3 h-full flex flex-col justify-end items-center">
+                <div className="relative z-10 p-3 h-full flex flex-col justify-end items-center pointer-events-auto">
                   <div className="text-center">
                     <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
                       <h4 className="text-base md:text-lg font-light text-black mb-2 leading-tight tracking-[0.08em]">
@@ -1758,7 +1758,11 @@ export default function HomePage() {
           {!productsLoading && !productsError && (
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {featuredProducts.map((product) => (
-                <div key={product.id} className="group relative bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
+                <div 
+                  key={product.id} 
+                  onClick={() => router.push(`/products/${product.id}`)}
+                  className="group relative bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+                >
                   {/* Product Image Container */}
                   <div className="relative overflow-hidden">
                     <div className="aspect-[4/3] flex items-center justify-center relative bg-gray-100">
@@ -1820,7 +1824,10 @@ export default function HomePage() {
                         )}
                       </div>
                       <Button 
-                        onClick={() => addToCart(product.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(product.id);
+                        }}
                         className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-lg w-10 h-10 p-0"
                       >
                         <ShoppingCart className="h-4 w-4" />

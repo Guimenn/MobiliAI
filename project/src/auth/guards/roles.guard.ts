@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '@prisma/client';
 
@@ -7,6 +7,9 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const { method, url } = request;
+    
     // Pegar roles do handler (método) primeiro, depois da classe
     // getAllAndOverride retorna o valor do handler se existir, senão da classe
     const handlerRoles = this.reflector.get<UserRole[]>('roles', context.getHandler());
@@ -19,27 +22,47 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest();
+    const { user } = request;
+    
+    console.log('🔐 [RolesGuard] Verificando permissões:', {
+      method,
+      url,
+      userRole: user?.role,
+      requiredRoles,
+      hasUser: !!user
+    });
     
     if (!user) {
-      console.log('❌ [RolesGuard] Usuário não autenticado');
-      return false;
+      console.error('❌ [RolesGuard] Usuário não autenticado');
+      throw new ForbiddenException('Usuário não autenticado');
     }
 
     const hasRole = requiredRoles.some((role) => {
       // Normalizar roles para comparação (pode ser string ou enum)
       const userRole = (user.role as string)?.toUpperCase();
       const requiredRole = (role as string)?.toUpperCase();
-      return userRole === requiredRole;
+      const matches = userRole === requiredRole;
+      
+      console.log('🔍 [RolesGuard] Comparando roles:', {
+        userRole,
+        requiredRole,
+        matches
+      });
+      
+      return matches;
     });
 
     if (!hasRole) {
-      console.log('❌ [RolesGuard] Usuário não tem role necessária:', {
+      console.error('❌ [RolesGuard] Usuário não tem role necessária:', {
         userRole: user.role,
-        requiredRoles
+        requiredRoles,
+        method,
+        url
       });
+      throw new ForbiddenException(`Acesso negado. Role necessária: ${requiredRoles.join(' ou ')}`);
     }
 
-    return hasRole;
+    console.log('✅ [RolesGuard] Permissão concedida');
+    return true;
   }
 }

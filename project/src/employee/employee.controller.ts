@@ -44,6 +44,23 @@ export class EmployeeController {
     return this.employeeInventoryService.getInventoryAlerts(req.user.id);
   }
 
+  @Get('products')
+  async getStoreProducts(
+    @Request() req,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('search') search: string = '',
+    @Query('category') category?: string
+  ) {
+    return this.employeeInventoryService.getStoreProducts(
+      req.user.id,
+      parseInt(page),
+      parseInt(limit),
+      search,
+      category
+    );
+  }
+
   @Get('inventory/products')
   async getProductsByCategory(
     @Request() req,

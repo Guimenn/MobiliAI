@@ -104,13 +104,28 @@ export class EmployeeService {
   }
 
   private async getTotalInventoryValue(storeId: string) {
+    // Buscar produtos considerando StoreInventory
     const products = await this.prisma.product.findMany({
-      where: { storeId },
-      select: { price: true, stock: true }
+      where: {
+        OR: [
+          { storeId: storeId },
+          { storeInventory: { some: { storeId: storeId } } }
+        ],
+        isActive: true
+      },
+      include: {
+        storeInventory: {
+          where: { storeId: storeId },
+          select: { quantity: true }
+        }
+      }
     });
 
-    return products.reduce((total, product) => {
-      return total + (Number(product.price) * product.stock);
+    return products.reduce((total, product: any) => {
+      const stock = product.storeInventory?.length > 0 
+        ? product.storeInventory[0].quantity 
+        : product.stock || 0;
+      return total + (Number(product.price) * stock);
     }, 0);
   }
 
@@ -180,47 +195,86 @@ export class EmployeeService {
 
     const storeId = employee.store.id;
 
-    const [
-      totalProducts,
-      lowStock,
-      outOfStock,
-      totalValue
-    ] = await Promise.all([
-      this.prisma.product.count({ where: { storeId } }),
-      this.prisma.product.count({ 
-        where: { 
-          storeId,
-          stock: { lte: this.prisma.product.fields.minStock }
+    // Buscar produtos considerando StoreInventory (igual ao manager)
+    const where: any = {
+      OR: [
+        { storeId: storeId },
+        { storeInventory: { some: { storeId: storeId } } }
+      ],
+      isActive: true
+    };
+
+    // Buscar todos os produtos para calcular estatísticas corretas
+    const products = await this.prisma.product.findMany({
+      where,
+      include: {
+        storeInventory: {
+          where: { storeId: storeId },
+          select: { quantity: true, minStock: true }
         }
-      }),
-      this.prisma.product.count({ 
-        where: { 
-          storeId,
-          stock: 0
-        }
-      }),
-      this.getTotalInventoryValue(storeId)
-    ]);
+      }
+    });
+
+    // Processar produtos para usar estoque do StoreInventory quando disponível
+    const processedProducts = products.map((product: any) => {
+      const stock = product.storeInventory?.length > 0 
+        ? product.storeInventory[0].quantity 
+        : product.stock || 0;
+      const minStock = product.storeInventory?.length > 0 
+        ? product.storeInventory[0].minStock 
+        : product.minStock || 0;
+      
+      return { stock, minStock, price: product.price };
+    });
+
+    const totalProducts = processedProducts.length;
+    const lowStock = processedProducts.filter((p: any) => p.stock <= p.minStock).length;
+    const outOfStock = processedProducts.filter((p: any) => p.stock === 0).length;
+    const totalValue = processedProducts.reduce((total, p: any) => 
+      total + (Number(p.price) * p.stock), 0
+    );
+    const averageStock = totalProducts > 0 
+      ? processedProducts.reduce((sum, p: any) => sum + p.stock, 0) / totalProducts 
+      : 0;
 
     return {
       totalProducts,
       lowStock,
       outOfStock,
       totalValue,
-      averageStock: totalProducts > 0 ? await this.getAverageStock(storeId) : 0
+      averageStock
     };
   }
 
   private async getAverageStock(storeId: string) {
+    // Buscar produtos considerando StoreInventory
     const products = await this.prisma.product.findMany({
-      where: { storeId },
-      select: { stock: true }
+      where: {
+        OR: [
+          { storeId: storeId },
+          { storeInventory: { some: { storeId: storeId } } }
+        ],
+        isActive: true
+      },
+      include: {
+        storeInventory: {
+          where: { storeId: storeId },
+          select: { quantity: true }
+        }
+      }
     });
 
     if (products.length === 0) return 0;
 
-    const totalStock = products.reduce((sum, product) => sum + product.stock, 0);
-    return totalStock / products.length;
+    // Processar produtos para usar estoque do StoreInventory quando disponível
+    const processedProducts = products.map((product: any) => {
+      return product.storeInventory?.length > 0 
+        ? product.storeInventory[0].quantity 
+        : product.stock || 0;
+    });
+
+    const totalStock = processedProducts.reduce((sum, stock) => sum + stock, 0);
+    return totalStock / processedProducts.length;
   }
 
   // ==================== PEDIDOS ONLINE DA LOJA ====================

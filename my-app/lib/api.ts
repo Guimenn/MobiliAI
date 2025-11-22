@@ -20,6 +20,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
     return config;
   },
   (error) => {
@@ -31,6 +32,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle 403 errors
+    if (error.response?.status === 403) {
+      // Log error silently or handle as needed
+    }
     // Silenciar erros 500 em endpoints opcionais (como checkFavorite)
     const isOptionalEndpoint = error.config?.url?.includes('/favorites/check');
     
@@ -1397,6 +1402,14 @@ export const notificationsAPI = {
 
 // Employee API
 export const employeeAPI = {
+  // Products (apenas da loja do funcionário)
+  getStoreProducts: async (page = 1, limit = 10, search = '', category?: string) => {
+    const response = await api.get('/employee/products', {
+      params: { page, limit, search, category }
+    });
+    return response.data;
+  },
+
   // Online Orders (apenas da loja do funcionário)
   getStoreOnlineOrders: async (page: number = 1, limit: number = 50, status?: string) => {
     const params: any = { page, limit };

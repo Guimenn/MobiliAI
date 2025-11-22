@@ -2878,6 +2878,61 @@ export class AdminService {
     }
   }
 
+  /**
+   * Adiciona um produto a múltiplas lojas de uma vez
+   * Permite que o mesmo produto (com storeId principal) esteja disponível em várias lojas
+   */
+  async addProductToMultipleStores(
+    productId: string,
+    storeIds: string[],
+    initialQuantity: number = 0,
+    minStock: number = 0
+  ) {
+    // Verificar se o produto existe
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId }
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produto não encontrado');
+    }
+
+    // Verificar se todas as lojas existem
+    const stores = await this.prisma.store.findMany({
+      where: { id: { in: storeIds } },
+      select: { id: true, name: true }
+    });
+
+    if (stores.length !== storeIds.length) {
+      const foundStoreIds = stores.map(s => s.id);
+      const missingStoreIds = storeIds.filter(id => !foundStoreIds.includes(id));
+      throw new NotFoundException(`Lojas não encontradas: ${missingStoreIds.join(', ')}`);
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Adicionar produto a cada loja
+    for (const storeId of storeIds) {
+      try {
+        const result = await this.addProductToStore(storeId, productId, initialQuantity, minStock);
+        results.push({ storeId, success: true, data: result });
+      } catch (error: any) {
+        errors.push({ storeId, error: error.message });
+      }
+    }
+
+    return {
+      productId,
+      productName: product.name,
+      totalStores: storeIds.length,
+      success: results.length,
+      failed: errors.length,
+      results,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
+
   async addProductToStore(storeId: string, productId: string, initialQuantity: number = 0, minStock: number = 0) {
     // Verificar se a loja existe
     const store = await this.prisma.store.findUnique({

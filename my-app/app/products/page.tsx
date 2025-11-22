@@ -81,7 +81,9 @@ export default function ProductsPage() {
 
   // Estado inicial via URL
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
-  const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('cat') || 'all');
+  // Ler tanto 'category' quanto 'cat' para compatibilidade
+  const categoryParam = searchParams.get('category') || searchParams.get('cat') || 'all';
+  const [selectedCategory, setSelectedCategory] = useState<string>(categoryParam);
   const [selectedColor, setSelectedColor] = useState<string>(searchParams.get('color') || '');
   const [minPrice, setMinPrice] = useState<string>(searchParams.get('min') || '');
   const [maxPrice, setMaxPrice] = useState<string>(searchParams.get('max') || '');
@@ -102,6 +104,14 @@ export default function ProductsPage() {
   const [specialOfferProduct, setSpecialOfferProduct] = useState<Product | null>(null);
   const OFFER_DURATION = 30; // segundos por produto
   const [offerSecondsLeft, setOfferSecondsLeft] = useState(OFFER_DURATION);
+
+  // Atualizar categoria quando a URL mudar (ex: quando vem da home)
+  useEffect(() => {
+    const categoryFromUrl = searchParams.get('category') || searchParams.get('cat') || 'all';
+    if (categoryFromUrl !== selectedCategory) {
+      setSelectedCategory(categoryFromUrl);
+    }
+  }, [searchParams, selectedCategory]);
 
   // Debounce de busca
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);

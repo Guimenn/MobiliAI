@@ -188,7 +188,8 @@ export class ManagerService {
           phone: true,
           address: true,
           isActive: true,
-          createdAt: true
+          createdAt: true,
+          avatarUrl: true
         },
         orderBy: { createdAt: 'desc' }
       }),
@@ -451,13 +452,27 @@ export class ManagerService {
     const storeId = manager.store.id;
     const skip = (page - 1) * limit;
     
-    const where: any = { storeId };
+    // IMPORTANTE: Manager vê produtos de duas formas:
+    // 1. Produtos com storeId da sua loja
+    // 2. Produtos disponíveis via StoreInventory da sua loja
+    // Isso permite que os 90 produtos originais sejam compartilhados, mas com estoques independentes
+    const where: any = {
+      OR: [
+        { storeId: storeId }, // Produtos com storeId da loja
+        { storeInventory: { some: { storeId: storeId } } } // Produtos via StoreInventory
+      ],
+      isActive: true
+    };
     
     if (search) {
-      where.OR = [
+      where.AND = [
+        {
+          OR: [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
         { brand: { contains: search, mode: 'insensitive' } }
+          ]
+        }
       ];
     }
     
@@ -471,15 +486,46 @@ export class ManagerService {
         skip,
         take: limit,
         include: {
-          supplier: { select: { id: true, name: true } }
+          supplier: { select: { id: true, name: true } },
+          storeInventory: {
+            where: { storeId: storeId },
+            select: {
+              quantity: true,
+              minStock: true
+            }
+          }
         },
         orderBy: { createdAt: 'desc' }
       }),
       this.prisma.product.count({ where })
     ]);
 
+    // Processar produtos para usar estoque do StoreInventory quando disponível
+    // Se o produto está via StoreInventory, usar quantity do StoreInventory
+    // Se o produto tem storeId da loja, usar stock do produto
+    const processedProducts = products.map((product: any) => {
+      // Se o produto está no StoreInventory da loja, usar quantity do StoreInventory
+      if (product.storeInventory && product.storeInventory.length > 0) {
+        const inventory = product.storeInventory[0];
     return {
-      products,
+          ...product,
+          stock: inventory.quantity || 0,
+          minStock: inventory.minStock || product.minStock || 0,
+          availableViaStoreInventory: true,
+          originalStoreId: product.storeId
+        };
+      }
+      
+      // Se o produto tem storeId da loja, usar stock do produto
+      return {
+        ...product,
+        stock: product.stock || 0,
+        availableViaStoreInventory: false
+      };
+    });
+
+    return {
+      products: processedProducts,
       pagination: {
         page,
         limit,
@@ -612,18 +658,51 @@ export class ManagerService {
   }
 
   async updateStoreProduct(managerId: string, productId: string, productData: any) {
+    // Garantir que stock seja um número se estiver presente
+    if (productData.stock !== undefined && productData.stock !== null) {
+      productData.stock = Number(productData.stock);
+      if (isNaN(productData.stock)) {
+        throw new BadRequestException('Estoque deve ser um número válido');
+      }
+    }
+
     // Verificar se o gerente tem uma loja atribuída
     const manager = await this.prisma.user.findUnique({
       where: { id: managerId },
-      include: { store: true }
+      select: {
+        id: true,
+        name: true,
+        storeId: true,
+        role: true,
+        store: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
     });
 
-    if (!manager || !manager.store) {
-      throw new NotFoundException('Gerente não encontrado ou sem loja atribuída');
+    if (!manager) {
+      throw new NotFoundException('Gerente não encontrado');
+    }
+
+    // Usar storeId diretamente se a relação store não estiver disponível
+    const managerStoreId = manager.store?.id || manager.storeId;
+    
+    if (!managerStoreId) {
+      throw new NotFoundException('Gerente não está associado a nenhuma loja');
     }
 
     const product = await this.prisma.product.findUnique({
-      where: { id: productId }
+      where: { id: productId },
+      select: {
+        id: true,
+        name: true,
+        storeId: true,
+        stock: true,
+        minStock: true,
+      }
     });
 
     if (!product) {
@@ -631,11 +710,285 @@ export class ManagerService {
     }
 
     // Verificar se o produto pertence à loja do gerente
-    if (product.storeId !== manager.store.id) {
-      throw new ForbiddenException('Você só pode editar produtos da sua própria loja');
+    // Normalizar IDs para string para comparação correta (removendo espaços e convertendo para lowercase)
+    const productStoreId = product.storeId ? String(product.storeId).trim().toLowerCase() : null;
+    const managerStoreIdStr = String(managerStoreId).trim().toLowerCase();
+
+    // Verificar se o produto está disponível na loja do manager de duas formas:
+    // 1. Produto tem storeId da loja do manager
+    // 2. Produto está no StoreInventory da loja do manager
+    const isProductInManagerStore = productStoreId === managerStoreIdStr;
+    
+    // Verificar se o produto está no StoreInventory da loja do manager
+    // IMPORTANTE: Usar managerStoreId (não managerStoreIdStr) para a busca
+    const storeInventory = await this.prisma.storeInventory.findUnique({
+      where: {
+        storeId_productId: {
+          storeId: managerStoreId,  // Usar o ID direto, não a string normalizada
+          productId: productId
+        }
+      }
+    });
+
+    const isProductInStoreInventory = !!storeInventory;
+
+    // Se o produto não está na loja do manager nem via storeId nem via StoreInventory
+    if (!isProductInManagerStore && !isProductInStoreInventory) {
+      // Se o produto não está no StoreInventory, criar um registro para permitir edição
+      // Isso pode acontecer se o script não foi executado ou se o produto foi adicionado recentemente
+      try {
+        const newInventory = await this.prisma.storeInventory.create({
+          data: {
+            storeId: managerStoreId,
+            productId: productId,
+            quantity: productData.stock !== undefined ? Number(productData.stock) : (product.stock || 0),
+            minStock: productData.minStock !== undefined ? Number(productData.minStock) : (product.minStock || 0)
+          },
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+                category: true,
+                description: true,
+                imageUrl: true,
+                imageUrls: true
+              }
+            },
+            store: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        });
+        
+        return {
+          ...newInventory.product,
+          stock: newInventory.quantity,
+          minStock: newInventory.minStock,
+          store: newInventory.store,
+          storeId: newInventory.store.id,
+          availableViaStoreInventory: true
+        };
+      } catch (createError: any) {
+        // Se o erro for de registro duplicado, tentar buscar novamente
+        if (createError.code === 'P2002') {
+          const existingInventory = await this.prisma.storeInventory.findUnique({
+            where: {
+              storeId_productId: {
+                storeId: managerStoreId,
+                productId: productId
+              }
+            },
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  category: true,
+                  description: true,
+                  imageUrl: true,
+                  imageUrls: true
+                }
+              },
+              store: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          });
+          
+          if (existingInventory) {
+            // Atualizar o StoreInventory existente
+            const updatedInventory = await this.prisma.storeInventory.update({
+              where: {
+                storeId_productId: {
+                  storeId: managerStoreId,
+                  productId: productId
+                }
+              },
+              data: {
+                quantity: productData.stock !== undefined ? Number(productData.stock) : existingInventory.quantity,
+                minStock: productData.minStock !== undefined ? Number(productData.minStock) : existingInventory.minStock
+              },
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    category: true,
+                    description: true,
+                    imageUrl: true,
+                    imageUrls: true
+                  }
+                },
+                store: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            });
+            
+            return {
+              ...updatedInventory.product,
+              stock: updatedInventory.quantity,
+              minStock: updatedInventory.minStock,
+              store: updatedInventory.store,
+              storeId: updatedInventory.store.id,
+              availableViaStoreInventory: true
+            };
+          }
+        }
+        
+        // Se chegou aqui, não conseguiu criar nem encontrar o StoreInventory
+        // Tentar criar novamente com valores padrão
+        try {
+          const fallbackInventory = await this.prisma.storeInventory.create({
+            data: {
+              storeId: managerStoreId,
+              productId: productId,
+              quantity: 0,
+              minStock: 0
+            },
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  category: true,
+                  description: true,
+                  imageUrl: true,
+                  imageUrls: true
+                }
+              },
+              store: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          });
+          
+          // Atualizar com os dados do productData se fornecidos
+          if (productData.stock !== undefined || productData.minStock !== undefined) {
+            const updated = await this.prisma.storeInventory.update({
+              where: {
+                storeId_productId: {
+                  storeId: managerStoreId,
+                  productId: productId
+                }
+              },
+              data: {
+                quantity: productData.stock !== undefined ? Number(productData.stock) : 0,
+                minStock: productData.minStock !== undefined ? Number(productData.minStock) : 0
+              },
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    category: true,
+                    description: true,
+                    imageUrl: true,
+                    imageUrls: true
+                  }
+                },
+                store: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            });
+            
+            return {
+              ...updated.product,
+              stock: updated.quantity,
+              minStock: updated.minStock,
+              store: updated.store,
+              storeId: updated.store.id,
+              availableViaStoreInventory: true
+            };
+          }
+          
+          return {
+            ...fallbackInventory.product,
+            stock: fallbackInventory.quantity,
+            minStock: fallbackInventory.minStock,
+            store: fallbackInventory.store,
+            storeId: fallbackInventory.store.id,
+            availableViaStoreInventory: true
+          };
+        } catch (finalError: any) {
+          throw new ForbiddenException(
+            'Você só pode editar produtos da sua própria loja. ' +
+            'Este produto não está disponível na sua loja. Entre em contato com o administrador.'
+          );
+        }
+      }
     }
 
-    return this.prisma.product.update({
+    // Se o produto está no StoreInventory da loja, atualizar o StoreInventory em vez do produto principal
+    // Isso mantém os 90 produtos originais e permite estoques independentes por loja
+    if (isProductInStoreInventory && !isProductInManagerStore) {
+      // Atualizar o StoreInventory da loja (não afeta outras lojas)
+      const updatedInventory = await this.prisma.storeInventory.update({
+        where: {
+          storeId_productId: {
+            storeId: managerStoreId,
+            productId: productId
+          }
+        },
+        data: {
+          quantity: productData.stock !== undefined ? Number(productData.stock) : storeInventory.quantity,
+          minStock: productData.minStock !== undefined ? Number(productData.minStock) : storeInventory.minStock
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              price: true,
+              category: true,
+              description: true,
+              imageUrl: true,
+              imageUrls: true
+            }
+          },
+          store: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      // Retornar o produto com o estoque atualizado do StoreInventory
+      return {
+        ...updatedInventory.product,
+        stock: updatedInventory.quantity,
+        minStock: updatedInventory.minStock,
+        store: updatedInventory.store,
+        storeId: updatedInventory.store.id,
+        availableViaStoreInventory: true
+      };
+    }
+
+    const updatedProduct = await this.prisma.product.update({
       where: { id: productId },
       data: productData,
       include: {
@@ -643,6 +996,14 @@ export class ManagerService {
         supplier: { select: { id: true, name: true } }
       }
     });
+
+    // Garantir que o stock seja retornado corretamente
+    // Se o produto retornado não tiver stock, usar o valor que foi enviado
+    if (updatedProduct.stock === undefined || updatedProduct.stock === null) {
+      updatedProduct.stock = productData.stock;
+    }
+
+    return updatedProduct;
   }
 
   async deleteStoreProduct(managerId: string, productId: string) {

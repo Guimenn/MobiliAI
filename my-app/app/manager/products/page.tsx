@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
-import { productsAPI } from '@/lib/api';
+import { productsAPI, managerAPI } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -122,7 +122,7 @@ export default function ManagerProductsPage() {
     setFilteredProducts(getFilteredProducts());
   }, [searchTerm, products, activeTab]);
 
-  const loadProducts = async () => {
+  const loadProducts = async (forceReload = false) => {
     if (!user?.storeId) {
       console.warn('⚠️ Usuário não tem storeId associado:', user);
       return;
@@ -130,7 +130,34 @@ export default function ManagerProductsPage() {
     
     try {
       setIsLoading(true);
-      const productsData = await productsAPI.getAll(user.storeId);
+      console.log('🔄 [Manager] Carregando produtos da loja...', { 
+        storeId: user.storeId,
+        forceReload,
+        timestamp: new Date().toISOString()
+      });
+      
+      // IMPORTANTE: Usar o endpoint do manager que filtra APENAS produtos da loja do manager
+      // Não usar productsAPI.getAll() que pode retornar produtos de outras lojas
+      const response = await managerAPI.getStoreProducts(1, 1000, '', undefined);
+      const productsData = response.products || [];
+      
+      console.log('📦 [Manager] Produtos carregados da loja:', {
+        count: productsData?.length,
+        storeId: user.storeId,
+        products: productsData?.slice(0, 5).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          stock: p.stock,
+          storeId: p.storeId,
+          originalStoreId: p.originalStoreId,
+          availableViaStoreInventory: p.availableViaStoreInventory
+        }))
+      });
+      
+      // IMPORTANTE: Produtos podem ter storeId diferente se estiverem via StoreInventory
+      // Isso é normal - o produto pode ter storeId de outra loja mas estar disponível
+      // na loja do manager através do StoreInventory
+      // Não é um erro, é o comportamento esperado para produtos em múltiplas lojas
       setProducts(productsData);
       setFilteredProducts(productsData);
     } catch (error) {
@@ -282,9 +309,21 @@ export default function ManagerProductsPage() {
           productData.isOnSale = false;
         }
 
-        await productsAPI.create(productData);
+        await managerAPI.createStoreProduct(productData);
         toast.success('Produto criado com sucesso!');
       } else if (productModalMode === 'edit') {
+        // IMPORTANTE: Não validar storeId no frontend
+        // O backend verifica se o produto está disponível na loja do manager
+        // de duas formas: via storeId direto OU via StoreInventory
+        // Se o produto aparece na lista do manager, ele pode ser editado
+        console.log('🔍 [Manager] Preparando para editar produto:', {
+          productId: editedProduct.id,
+          productName: editedProduct.name,
+          productStoreId: editedProduct.storeId,
+          managerStoreId: user.storeId,
+          availableViaStoreInventory: editedProduct.availableViaStoreInventory
+        });
+
         const updateData: any = {
           name: editedProduct.name.trim(),
           description: editedProduct.description?.trim() || '',
@@ -341,11 +380,71 @@ export default function ManagerProductsPage() {
           }
         }
 
-        await productsAPI.update(editedProduct.id, updateData);
+        console.log('📤 [Manager] Enviando atualização do produto:', {
+          productId: editedProduct.id,
+          updateData
+        });
+
+        const updatedProduct = await managerAPI.updateStoreProduct(editedProduct.id, updateData);
+        console.log('✅ [Manager] Produto atualizado no backend:', {
+          productId: updatedProduct?.id,
+          productName: updatedProduct?.name,
+          stock: updatedProduct?.stock,
+          stockFromResponse: updatedProduct?.stock
+        });
+        
+        // Usar o produto retornado do backend para atualizar o estado
+        // Isso garante que estamos usando os dados corretos do servidor
+        // IMPORTANTE: Preferir o stock do produto retornado do backend
+        const finalStock = updatedProduct?.stock !== undefined ? updatedProduct.stock : Number(updateData.stock);
+        
+        setProducts(prevProducts => {
+          const updated = prevProducts.map(p => {
+            if (p.id === editedProduct.id) {
+              const newProduct = { 
+                ...p, 
+                ...updatedProduct,
+                stock: finalStock // Garantir que o stock seja o valor correto
+              };
+              console.log('📝 [Manager] Atualizando produto no estado com dados do backend:', {
+                beforeStock: p.stock,
+                afterStock: newProduct.stock,
+                stockFromResponse: updatedProduct?.stock,
+                stockFromUpdateData: updateData.stock,
+                finalStock: finalStock,
+                productId: p.id,
+                productName: p.name
+              });
+              return newProduct;
+            }
+            return p;
+          });
+          return updated;
+        });
+        setFilteredProducts(prevFiltered => {
+          const updated = prevFiltered.map(p => {
+            if (p.id === editedProduct.id) {
+              return { 
+                ...p, 
+                ...updatedProduct,
+                stock: finalStock // Garantir que o stock seja o valor correto
+              };
+            }
+            return p;
+          });
+          return updated;
+        });
+        
         toast.success('Produto atualizado com sucesso!');
+        
+        // Não recarregar imediatamente - usar os dados retornados da atualização
+        // O recarregamento será feito quando o usuário recarregar a página ou navegar
+        // Isso evita sobrescrever o estado com dados antigos
+      } else {
+        // Para criação de produto, recarregar normalmente
+        await loadProducts();
       }
 
-      await loadProducts();
       handleCloseModal();
     } catch (error: any) {
       console.error('Erro ao salvar produto:', error);
@@ -365,7 +464,7 @@ export default function ManagerProductsPage() {
 
     try {
       setIsLoading(true);
-      await productsAPI.delete(product.id);
+      await managerAPI.deleteStoreProduct(product.id);
       toast.success('Produto excluído com sucesso!');
       await loadProducts();
     } catch (error) {

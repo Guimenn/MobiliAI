@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
-import { productsAPI } from '@/lib/api';
+import { productsAPI, employeeAPI } from '@/lib/api';
 import { useProductsHeader } from '@/components/products-header-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -99,28 +99,30 @@ export default function EmployeeProductsPage() {
   }, []);
 
   useEffect(() => {
+    // Filtrar produtos válidos (não nulos) antes de aplicar filtros
+    const validProducts = products.filter(p => p != null && typeof p === 'object');
+    
     if (searchTerm) {
-      const filtered = products.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const filtered = validProducts.filter(product =>
+        product && product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredProducts(filtered);
     } else {
-      setFilteredProducts(products);
+      setFilteredProducts(validProducts);
     }
   }, [searchTerm, products]);
 
   const loadProducts = async () => {
     if (!user?.storeId) {
-      console.warn('⚠️ Usuário não tem storeId associado:', user);
       return;
     }
     
-    console.log('📦 Carregando produtos para a filial:', user.storeId, user.store?.name);
-    
     try {
       setIsLoading(true);
-      const productsData = await productsAPI.getAll(user.storeId);
-      console.log('✅ Produtos carregados:', productsData.length);
+      // IMPORTANTE: Usar o endpoint do employee que filtra APENAS produtos da loja do funcionário
+      // e considera StoreInventory (igual ao manager)
+      const response = await employeeAPI.getStoreProducts(1, 1000, '', undefined);
+      const productsData = response.products || [];
       setProducts(productsData);
       setFilteredProducts(productsData);
     } catch (error) {
@@ -173,14 +175,11 @@ export default function EmployeeProductsPage() {
 
   const handleSaveProduct = async () => {
     if (!user?.storeId || !editedProduct) {
-      console.error('❌ Erro: usuário não tem storeId:', { user, editedProduct });
       toast.error('Erro ao criar produto', {
         description: 'Você não está associado a nenhuma filial',
       });
       return;
     }
-
-    console.log('📝 Criando produto para a filial:', user.storeId, user.store?.name);
 
     try {
       setIsLoading(true);
@@ -214,7 +213,6 @@ export default function EmployeeProductsPage() {
           storeId: user.storeId
         };
 
-        console.log('📦 Dados do produto sendo criado:', productData);
 
         // Adicionar campos opcionais
         if (editedProduct.sku?.trim()) {
@@ -278,7 +276,6 @@ export default function EmployeeProductsPage() {
       await loadProducts();
       handleCloseModal();
     } catch (error: any) {
-      console.error('Erro ao salvar produto:', error);
       toast.error('Erro ao salvar produto', {
         description: error.message || 'Tente novamente mais tarde.',
       });
@@ -288,7 +285,7 @@ export default function EmployeeProductsPage() {
   };
 
   const handleDeleteProduct = async (product: Product) => {
-    const confirmed = await showConfirm(`Tem certeza que deseja excluir o produto "${product.name}"? Esta ação não pode ser desfeita.`);
+    const confirmed = await showConfirm(`Tem certeza que deseja excluir o produto "${product?.name || 'este produto'}"? Esta ação não pode ser desfeita.`);
     if (!confirmed) {
       return;
     }
@@ -299,7 +296,6 @@ export default function EmployeeProductsPage() {
       toast.success('Produto excluído com sucesso!');
       await loadProducts();
     } catch (error) {
-      console.error('Erro ao excluir produto:', error);
       toast.error('Erro ao excluir produto');
     } finally {
       setIsLoading(false);
@@ -321,10 +317,21 @@ export default function EmployeeProductsPage() {
     }).format(value);
   };
 
-  const totalProducts = products.length;
-  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= 10).length;
-  const outOfStockProducts = products.filter(p => p.stock === 0).length;
-  const inStockProducts = products.filter(p => p.stock > 10).length;
+  // Filtrar produtos válidos (não nulos) e garantir que stock seja um número
+  const validProducts = products.filter(p => p != null && typeof p === 'object');
+  const totalProducts = validProducts.length;
+  const lowStockProducts = validProducts.filter(p => {
+    const stock = typeof p.stock === 'number' ? p.stock : 0;
+    return stock > 0 && stock <= 10;
+  }).length;
+  const outOfStockProducts = validProducts.filter(p => {
+    const stock = typeof p.stock === 'number' ? p.stock : 0;
+    return stock === 0;
+  }).length;
+  const inStockProducts = validProducts.filter(p => {
+    const stock = typeof p.stock === 'number' ? p.stock : 0;
+    return stock > 10;
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -411,13 +418,13 @@ export default function EmployeeProductsPage() {
         </Card>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
+          {filteredProducts.filter(product => product != null).map((product) => (
             <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 rounded-2xl group">
-              {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) ? (
+              {(product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product?.imageUrl) ? (
                 <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
                   <img
-                    src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl}
-                    alt={product.name}
+                    src={product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product?.imageUrl}
+                    alt={product?.name || 'Produto'}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                   {product.imageUrls && product.imageUrls.length > 1 && (
@@ -427,13 +434,13 @@ export default function EmployeeProductsPage() {
                   )}
                   <div className="absolute top-3 right-3">
                     <Badge className={
-                      product.stock > 10 
+                      (product?.stock ?? 0) > 10 
                         ? 'bg-green-500 text-white border-0 shadow-md' 
-                        : product.stock > 0 
+                        : (product?.stock ?? 0) > 0 
                         ? 'bg-orange-500 text-white border-0 shadow-md' 
                         : 'bg-red-500 text-white border-0 shadow-md'
                     }>
-                      {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
+                      {(product?.stock ?? 0) > 10 ? 'OK' : (product?.stock ?? 0) > 0 ? 'BAIXO' : 'ZERO'}
                     </Badge>
                   </div>
                 </div>
@@ -442,22 +449,22 @@ export default function EmployeeProductsPage() {
                   <Package className="h-16 w-16 text-gray-300" />
                   <div className="absolute top-3 right-3">
                     <Badge className={
-                      product.stock > 10 
+                      (product?.stock ?? 0) > 10 
                         ? 'bg-green-500 text-white border-0 shadow-md' 
-                        : product.stock > 0 
+                        : (product?.stock ?? 0) > 0 
                         ? 'bg-orange-500 text-white border-0 shadow-md' 
                         : 'bg-red-500 text-white border-0 shadow-md'
                     }>
-                      {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
+                      {(product?.stock ?? 0) > 10 ? 'OK' : (product?.stock ?? 0) > 0 ? 'BAIXO' : 'ZERO'}
                     </Badge>
                   </div>
                 </div>
               )}
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg font-bold text-gray-900 line-clamp-2 mb-2 min-h-[3.5rem]">
-                  {product.name}
+                  {product?.name || 'Produto sem nome'}
                 </CardTitle>
-                {product.description && (
+                {product?.description && (
                   <CardDescription className="line-clamp-2 text-sm text-gray-600 min-h-[2.5rem]">
                     {product.description}
                   </CardDescription>
@@ -466,11 +473,11 @@ export default function EmployeeProductsPage() {
               <CardContent className="space-y-4 pt-0">
                 <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
                   <span className="text-sm font-medium text-gray-600">Preço</span>
-                  <span className="font-bold text-xl text-[#3e2626]">{formatCurrency(product.price)}</span>
+                  <span className="font-bold text-xl text-[#3e2626]">{formatCurrency(product?.price ?? 0)}</span>
                 </div>
                 <div className="flex items-center justify-between py-2 px-4 bg-gray-50 rounded-lg">
                   <span className="text-sm font-medium text-gray-600">Estoque</span>
-                  <span className="font-semibold text-gray-900">{product.stock} unidades</span>
+                  <span className="font-semibold text-gray-900">{product?.stock ?? 0} unidades</span>
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button 
@@ -507,16 +514,16 @@ export default function EmployeeProductsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredProducts.map((product) => (
+          {filteredProducts.filter(product => product != null).map((product) => (
             <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-200 rounded-xl group">
               <div className="flex flex-col sm:flex-row">
                 {/* Imagem */}
                 <div className="w-full sm:w-48 h-48 flex-shrink-0 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
-                  {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) ? (
+                  {(product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product?.imageUrl) ? (
                     <>
                       <img
-                        src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl}
-                        alt={product.name}
+                        src={product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product?.imageUrl}
+                        alt={product?.name || 'Produto'}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                       {product.imageUrls && product.imageUrls.length > 1 && (
@@ -532,13 +539,13 @@ export default function EmployeeProductsPage() {
                   )}
                   <div className="absolute top-2 right-2">
                     <Badge className={
-                      product.stock > 10 
+                      (product?.stock ?? 0) > 10 
                         ? 'bg-green-500 text-white border-0 shadow-md' 
-                        : product.stock > 0 
+                        : (product?.stock ?? 0) > 0 
                         ? 'bg-orange-500 text-white border-0 shadow-md' 
                         : 'bg-red-500 text-white border-0 shadow-md'
                     }>
-                      {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
+                      {(product?.stock ?? 0) > 10 ? 'OK' : (product?.stock ?? 0) > 0 ? 'BAIXO' : 'ZERO'}
                     </Badge>
                   </div>
                 </div>
@@ -547,9 +554,9 @@ export default function EmployeeProductsPage() {
                 <div className="flex-1 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex-1">
                     <CardTitle className="text-xl font-bold text-gray-900 mb-2">
-                      {product.name}
+                      {product?.name || 'Produto sem nome'}
                     </CardTitle>
-                    {product.description && (
+                    {product?.description && (
                       <CardDescription className="text-sm text-gray-600 mb-3 line-clamp-2">
                         {product.description}
                       </CardDescription>
@@ -557,13 +564,13 @@ export default function EmployeeProductsPage() {
                     <div className="flex flex-wrap items-center gap-4 mt-3">
                       <div className="flex items-center space-x-2">
                         <span className="text-sm font-medium text-gray-600">Preço:</span>
-                        <span className="font-bold text-lg text-[#3e2626]">{formatCurrency(product.price)}</span>
+                        <span className="font-bold text-lg text-[#3e2626]">{formatCurrency(product?.price ?? 0)}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="text-sm font-medium text-gray-600">Estoque:</span>
-                        <span className="font-semibold text-gray-900">{product.stock} unidades</span>
+                        <span className="font-semibold text-gray-900">{product?.stock ?? 0} unidades</span>
                       </div>
-                      {product.brand && (
+                      {product?.brand && (
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-medium text-gray-600">Marca:</span>
                           <span className="text-sm text-gray-900">{product.brand}</span>
