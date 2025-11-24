@@ -24,16 +24,7 @@ export class RolesGuard implements CanActivate {
 
     const { user } = request;
     
-    console.log('🔐 [RolesGuard] Verificando permissões:', {
-      method,
-      url,
-      userRole: user?.role,
-      requiredRoles,
-      hasUser: !!user
-    });
-    
     if (!user) {
-      console.error('❌ [RolesGuard] Usuário não autenticado');
       throw new ForbiddenException('Usuário não autenticado');
     }
 
@@ -41,28 +32,13 @@ export class RolesGuard implements CanActivate {
       // Normalizar roles para comparação (pode ser string ou enum)
       const userRole = (user.role as string)?.toUpperCase();
       const requiredRole = (role as string)?.toUpperCase();
-      const matches = userRole === requiredRole;
-      
-      console.log('🔍 [RolesGuard] Comparando roles:', {
-        userRole,
-        requiredRole,
-        matches
-      });
-      
-      return matches;
+      return userRole === requiredRole;
     });
 
     if (!hasRole) {
-      console.error('❌ [RolesGuard] Usuário não tem role necessária:', {
-        userRole: user.role,
-        requiredRoles,
-        method,
-        url
-      });
       throw new ForbiddenException(`Acesso negado. Role necessária: ${requiredRoles.join(' ou ')}`);
     }
 
-    console.log('✅ [RolesGuard] Permissão concedida');
     return true;
   }
 }

@@ -500,23 +500,23 @@ export default function ProductDetailPage() {
         <Breadcrumb className="mb-6">
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/" className="text-brand-700 hover:text-brand-800">
+              <BreadcrumbLink href="/" className="text-[#3e2626] hover:text-[#2d1a1a]">
                 Início
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
-              <ChevronRight className="h-4 w-4 text-brand-700" />
+              <ChevronRight className="h-4 w-4 text-[#3e2626]" />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/products" className="text-brand-700 hover:text-brand-800">
+              <BreadcrumbLink href="/products" className="text-[#3e2626] hover:text-[#2d1a1a]">
                 Produtos
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
-              <ChevronRight className="h-4 w-4 text-brand-700" />
+              <ChevronRight className="h-4 w-4 text-[#3e2626]" />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <span className="font-medium text-brand-700">{product.name}</span>
+              <span className="font-medium text-[#3e2626]">{product.name}</span>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -526,18 +526,24 @@ export default function ProductDetailPage() {
           {/* Galeria de Imagens */}
           <div className="lg:col-span-7 space-y-4">
             {/* Imagem Principal */}
-            <div className="relative aspect-square bg-white rounded-2xl overflow-hidden border-2 border-brand-100 shadow-lg group">
+            <div className="relative aspect-square bg-white rounded-2xl overflow-hidden border-2 border-[#3e2626]/20 shadow-lg group">
               {productImages[selectedImageIndex] ? (
-                <Image
-                  src={productImages[selectedImageIndex]}
-                  alt={product.name}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  unoptimized
-                />
+                <>
+                  <Image
+                    src={productImages[selectedImageIndex]}
+                    alt={product.name}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    unoptimized
+                  />
+                  {/* Overlay marrom sutil na imagem */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#3e2626]/5 via-[#3e2626]/3 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  {/* Borda marrom sutil no hover */}
+                  <div className="absolute inset-0 border-2 border-[#3e2626]/0 group-hover:border-[#3e2626]/30 transition-all duration-300 rounded-2xl"></div>
+                </>
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                  <Package className="h-24 w-24 text-gray-300" />
+                <div className="w-full h-full flex items-center justify-center bg-[#3e2626]/5">
+                  <Package className="h-24 w-24 text-[#3e2626]/30" />
                 </div>
               )}
               
@@ -566,22 +572,22 @@ export default function ProductDetailPage() {
                 <>
                   <button
                     onClick={() => setSelectedImageIndex((prev) => (prev - 1 + productImages.length) % productImages.length)}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-[#3e2626]/5 rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity border border-[#3e2626]/20"
                   >
-                    <ChevronLeft className="h-5 w-5 text-brand-700" />
+                    <ChevronLeft className="h-5 w-5 text-[#3e2626]" />
                   </button>
                   <button
                     onClick={() => setSelectedImageIndex((prev) => (prev + 1) % productImages.length)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-[#3e2626]/5 rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity border border-[#3e2626]/20"
                   >
-                    <ChevronRight className="h-5 w-5 text-brand-700" />
+                    <ChevronRight className="h-5 w-5 text-[#3e2626]" />
                   </button>
                 </>
               )}
 
               {/* Indicador de zoom */}
-              <div className="absolute bottom-4 right-4 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                <Eye className="h-4 w-4 text-brand-700" />
+              <div className="absolute bottom-4 right-4 bg-white/90 hover:bg-[#3e2626]/5 rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity border border-[#3e2626]/20">
+                <Eye className="h-4 w-4 text-[#3e2626]" />
               </div>
             </div>
 
@@ -593,8 +599,8 @@ export default function ProductDetailPage() {
                     key={index}
                     onClick={() => setSelectedImageIndex(index)}
                     className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${selectedImageIndex === index
-                        ? 'border-brand-700 ring-2 ring-brand-700/20'
-                        : 'border-gray-200 hover:border-brand-300'
+                        ? 'border-[#3e2626] ring-2 ring-[#3e2626]/20 bg-[#3e2626]/5'
+                        : 'border-[#3e2626]/20 hover:border-[#3e2626]/40'
                     }`}
                   >
                     <Image
@@ -604,17 +610,99 @@ export default function ProductDetailPage() {
                       className="object-cover"
                       unoptimized
                     />
+                    {selectedImageIndex === index && (
+                      <div className="absolute inset-0 bg-[#3e2626]/5"></div>
+                    )}
                   </button>
                 ))}
               </div>
             )}
 
             {/* Descrição e Avaliações (lado esquerdo) */}
-            <div className="space-y-5 pt-4 border-t border-gray-200">
+            <div className="space-y-5 pt-4 border-t border-[#3e2626]/20">
               {product.description && (
-            <div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-2">Descrição</h2>
-                <p className="text-gray-700 leading-relaxed">{product.description}</p>
+            <div className="bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl p-6 border border-[#3e2626]/10">
+                  <h2 className="text-xl font-bold text-[#3e2626] mb-4 flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-[#3e2626]" />
+                    Descrição do Produto
+                  </h2>
+                <p className="text-gray-700 leading-relaxed mb-4">{product.description}</p>
+                
+                {/* Informações adicionais expandidas */}
+                <div className="mt-4 space-y-3 pt-4 border-t border-[#3e2626]/10">
+                  <h3 className="text-lg font-semibold text-[#3e2626] mb-3">Detalhes Adicionais</h3>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {product.material && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#3e2626] mt-2 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-sm font-medium text-[#3e2626]">Material:</span>
+                          <p className="text-sm text-gray-700">{product.material}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {product.color && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#3e2626] mt-2 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-sm font-medium text-[#3e2626]">Cor:</span>
+                          <p className="text-sm text-gray-700">{product.color}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {product.style && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#3e2626] mt-2 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-sm font-medium text-[#3e2626]">Estilo:</span>
+                          <p className="text-sm text-gray-700">{product.style}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {product.brand && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#3e2626] mt-2 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-sm font-medium text-[#3e2626]">Marca:</span>
+                          <p className="text-sm text-gray-700">{product.brand}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Texto descritivo adicional */}
+                  <div className="mt-4 pt-4 border-t border-[#3e2626]/10">
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      Este produto foi cuidadosamente selecionado para oferecer qualidade e durabilidade. 
+                      {product.material && ` Fabricado em ${product.material.toLowerCase()}, `}
+                      {product.style && `com estilo ${product.style.toLowerCase()}, `}
+                      este item combina funcionalidade e design para atender às suas necessidades.
+                    </p>
+                  </div>
+                  
+                  {/* Garantias e cuidados */}
+                  <div className="mt-4 pt-4 border-t border-[#3e2626]/10">
+                    <h4 className="text-sm font-semibold text-[#3e2626] mb-2">Garantias e Cuidados</h4>
+                    <ul className="space-y-1.5 text-sm text-gray-600">
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-[#3e2626] mt-0.5 flex-shrink-0" />
+                        <span>Produto com garantia de qualidade</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-[#3e2626] mt-0.5 flex-shrink-0" />
+                        <span>Entrega rápida e segura</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-[#3e2626] mt-0.5 flex-shrink-0" />
+                        <span>Suporte pós-venda especializado</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -624,52 +712,55 @@ export default function ProductDetailPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                   <div className="lg:col-span-7">
                     <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-3">Características</h3>
+                      <h3 className="text-xl font-semibold text-[#3e2626] mb-3 flex items-center gap-2">
+                        <Package className="h-5 w-5 text-[#3e2626]" />
+                        Características
+                      </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {product.dimensions && (
-                <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
-                            <div className="bg-brand-100 rounded-lg p-2"><Ruler className="h-5 w-5 text-brand-700" /></div>
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
+                            <div className="bg-[#3e2626]/10 rounded-lg p-2"><Ruler className="h-5 w-5 text-[#3e2626]" /></div>
                   <div>
-                    <p className="text-xs text-gray-500">Dimensões</p>
-                    <p className="text-sm font-semibold text-gray-900">{product.dimensions}</p>
+                    <p className="text-xs text-[#3e2626] font-medium">Dimensões</p>
+                    <p className="text-sm font-semibold text-[#3e2626]">{product.dimensions}</p>
                   </div>
                 </div>
               )}
               {product.weight && (
-                <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
-                            <div className="bg-brand-100 rounded-lg p-2"><Weight className="h-5 w-5 text-brand-700" /></div>
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
+                            <div className="bg-[#3e2626]/10 rounded-lg p-2"><Weight className="h-5 w-5 text-[#3e2626]" /></div>
                   <div>
-                    <p className="text-xs text-gray-500">Peso</p>
-                    <p className="text-sm font-semibold text-gray-900">{product.weight}</p>
+                    <p className="text-xs text-[#3e2626] font-medium">Peso</p>
+                    <p className="text-sm font-semibold text-[#3e2626]">{product.weight}</p>
                   </div>
                 </div>
               )}
               {product.material && (
-                <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
-                            <div className="bg-brand-100 rounded-lg p-2"><Package className="h-5 w-5 text-brand-700" /></div>
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
+                            <div className="bg-[#3e2626]/10 rounded-lg p-2"><Package className="h-5 w-5 text-[#3e2626]" /></div>
                   <div>
-                    <p className="text-xs text-gray-500">Material</p>
-                    <p className="text-sm font-semibold text-gray-900">{product.material}</p>
+                    <p className="text-xs text-[#3e2626] font-medium">Material</p>
+                    <p className="text-sm font-semibold text-[#3e2626]">{product.material}</p>
                   </div>
                 </div>
               )}
               {product.color && (
-                <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
-                            <div className="bg-brand-100 rounded-lg p-2"><Palette className="h-5 w-5 text-brand-700" /></div>
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
+                            <div className="bg-[#3e2626]/10 rounded-lg p-2"><Palette className="h-5 w-5 text-[#3e2626]" /></div>
                   <div>
-                    <p className="text-xs text-gray-500">Cor</p>
-                    <p className="text-sm font-semibold text-gray-900">{product.color}</p>
+                    <p className="text-xs text-[#3e2626] font-medium">Cor</p>
+                    <p className="text-sm font-semibold text-[#3e2626]">{product.color}</p>
                   </div>
                 </div>
               )}
               {product.storeName && (
-                <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200">
-                  <div className="bg-brand-100 rounded-lg p-2"><Store className="h-5 w-5 text-brand-700" /></div>
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
+                  <div className="bg-[#3e2626]/10 rounded-lg p-2"><Store className="h-5 w-5 text-[#3e2626]" /></div>
                   <div>
-                    <p className="text-xs text-gray-500">Loja/Filial</p>
-                    <p className="text-sm font-semibold text-gray-900">{product.storeName}</p>
+                    <p className="text-xs text-[#3e2626] font-medium">Loja/Filial</p>
+                    <p className="text-sm font-semibold text-[#3e2626]">{product.storeName}</p>
                     {product.storeAddress && (
-                      <p className="text-xs text-gray-500 mt-1">{product.storeAddress}</p>
+                      <p className="text-xs text-[#3e2626]/70 mt-1">{product.storeAddress}</p>
                     )}
                   </div>
                 </div>
@@ -682,28 +773,19 @@ export default function ProductDetailPage() {
 
               {/* Seção de Avaliações */}
               <div className="mt-8 space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-gray-900">Avaliações e Comentários</h3>
-                  {isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER' && (
-                    <Button
-                      onClick={() => setShowReviewForm(!showReviewForm)}
-                      variant={showReviewForm ? 'outline' : 'default'}
-                      className="bg-brand-700 hover:bg-brand-800 text-white"
-                    >
-                      {showReviewForm ? 'Cancelar Avaliação' : 'Avaliar Produto'}
-                    </Button>
-                  )}
+                <div>
+                  <h3 className="text-xl font-semibold text-[#3e2626]">Avaliações e Comentários</h3>
                 </div>
 
                 {/* Resumo de Avaliações */}
-                <div className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-200">
+                <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20">
                   <div className="flex items-center gap-2">
                     <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
-                    <span className="text-2xl font-bold text-gray-900">
+                    <span className="text-2xl font-bold text-[#3e2626]">
                       {rating > 0 ? rating.toFixed(1) : 'N/A'}
                     </span>
                   </div>
-                  <span className="text-gray-600">
+                  <span className="text-[#3e2626] font-medium">
                     {reviews} {reviews === 1 ? 'avaliação' : 'avaliações'}
                   </span>
                 </div>
@@ -726,33 +808,33 @@ export default function ProductDetailPage() {
           {/* Sidebar de compra (fixa) */}
           <div className="lg:col-span-5 space-y-4">
             {/* Categoria / Marca / Título e rating */}
-            <div className="space-y-2">
+            <div className="space-y-2 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl p-4 border border-[#3e2626]/20">
               <div className="flex items-center gap-3 flex-wrap">
                 {product.category && (
-                  <Badge variant="outline" className="border-brand-200 text-brand-700">
+                  <Badge variant="outline" className="border-[#3e2626]/30 text-[#3e2626] bg-[#3e2626]/5">
                     {categoryNames[product.category.toUpperCase()] || product.category}
                   </Badge>
                 )}
                 {product.brand && (
-                  <Badge variant="outline" className="border-brand-200 text-brand-700">{product.brand}</Badge>
+                  <Badge variant="outline" className="border-[#3e2626]/30 text-[#3e2626] bg-[#3e2626]/5">{product.brand}</Badge>
                 )}
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">{product.name}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-[#3e2626] leading-tight">{product.name}</h1>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1">
                   <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  <span className="text-base font-semibold text-gray-900">{rating.toFixed(1)}</span>
+                  <span className="text-base font-semibold text-[#3e2626]">{rating.toFixed(1)}</span>
                 </div>
-                <span className="text-sm text-gray-500">({reviews} avaliações)</span>
+                <span className="text-sm text-[#3e2626]">({reviews} avaliações)</span>
               </div>
               {/* Informação da Loja */}
               {product.storeName && (
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
-                  <Store className="h-4 w-4 text-brand-700" />
+                <div className="flex items-center gap-2 pt-2 border-t border-[#3e2626]/20">
+                  <Store className="h-4 w-4 text-[#3e2626]" />
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-900">Loja: {product.storeName}</span>
+                    <span className="text-sm font-medium text-[#3e2626]">Loja: {product.storeName}</span>
                     {product.storeAddress && (
-                      <span className="text-xs text-gray-500">{product.storeAddress}</span>
+                      <span className="text-xs text-[#3e2626]/70">{product.storeAddress}</span>
                     )}
                   </div>
                 </div>
@@ -760,13 +842,13 @@ export default function ProductDetailPage() {
             </div>
 
             <div className="lg:top-24">
-              <Card className="border-2 border-brand-100 shadow-sm">
+              <Card className="border-2 border-[#3e2626]/20 shadow-sm bg-gradient-to-br from-white to-[#3e2626]/5">
                 <CardContent className="p-6 space-y-6">
                   {/* Preço */}
-                  <div className={`bg-gradient-to-br ${isFlashSaleActive ? 'from-yellow-50 to-yellow-100 border-yellow-300' : 'from-brand-50 to-brand-100 border-brand-200'} rounded-2xl p-5 border-2`}>
+                  <div className={`bg-gradient-to-br ${isFlashSaleActive ? 'from-yellow-50 to-yellow-100 border-yellow-300' : 'from-[#3e2626]/5 to-[#3e2626]/10 border-[#3e2626]/30'} rounded-2xl p-5 border-2`}>
                     <div className="flex items-baseline gap-3 flex-wrap">
-                      <span className="text-sm font-medium text-gray-600">Por apenas</span>
-                      <span className="text-4xl font-black text-brand-700">
+                      <span className="text-sm font-medium text-[#3e2626]">Por apenas</span>
+                      <span className="text-4xl font-black text-[#3e2626]">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice)}
                       </span>
                     </div>
@@ -797,51 +879,51 @@ export default function ProductDetailPage() {
 
                   {/* Quantidade */}
               <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-gray-700">Quantidade:</span>
-                <div className="flex items-center gap-2 border-2 border-brand-200 rounded-xl">
-                      <button onClick={() => handleQuantityChange(-1)} disabled={quantity <= 1} className="p-2 hover:bg-brand-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                    <Minus className="h-4 w-4 text-brand-700" />
+                <span className="text-sm font-medium text-[#3e2626]">Quantidade:</span>
+                <div className="flex items-center gap-2 border-2 border-[#3e2626]/30 rounded-xl bg-white">
+                      <button onClick={() => handleQuantityChange(-1)} disabled={quantity <= 1} className="p-2 hover:bg-[#3e2626]/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    <Minus className="h-4 w-4 text-[#3e2626]" />
                   </button>
-                      <span className="px-4 py-2 text-lg font-semibold text-gray-900 min-w-[3rem] text-center">{quantity}</span>
-                      <button onClick={() => handleQuantityChange(1)} className="p-2 hover:bg-brand-50 transition-colors">
-                    <Plus className="h-4 w-4 text-brand-700" />
+                      <span className="px-4 py-2 text-lg font-semibold text-[#3e2626] min-w-[3rem] text-center">{quantity}</span>
+                      <button onClick={() => handleQuantityChange(1)} className="p-2 hover:bg-[#3e2626]/5 transition-colors">
+                    <Plus className="h-4 w-4 text-[#3e2626]" />
                   </button>
                 </div>
               </div>
 
                   {/* Ações */}
               <div className="flex flex-col sm:flex-row gap-3">
-                    <Button id="add-to-cart-btn" onClick={handleAddToCart} className="flex-1 bg-brand-700 hover:bg-brand-800 text-black cursor-pointer h-12 text-base font-semibold shadow-md">
+                    <Button id="add-to-cart-btn" onClick={handleAddToCart} className="flex-1 bg-[#3e2626] hover:bg-[#2d1a1a] text-white cursor-pointer h-12 text-base font-semibold shadow-md">
                   <ShoppingCart className="h-5 w-5 mr-2" />
                   Adicionar ao Carrinho
                 </Button>
-                    <Button onClick={handleBuyNow} variant="outline" className="h-12 px-6 border-2 border-brand-300 hover:border-brand-400 hover:bg-brand-50">Comprar agora</Button>
-                    <Button variant="outline" onClick={handleToggleFavorite} className="h-12 px-4 border-2 border-brand-200 hover:border-brand-300 hover:bg-brand-50">
-                      <Heart className={`${isFavorite ? 'fill-red-500 text-red-500' : 'text-brand-700'} h-5 w-5`} />
+                    <Button onClick={handleBuyNow} variant="outline" className="h-12 px-6 border-2 border-[#3e2626]/40 hover:border-[#3e2626] hover:bg-[#3e2626]/5 text-[#3e2626]">Comprar agora</Button>
+                    <Button variant="outline" onClick={handleToggleFavorite} className="h-12 px-4 border-2 border-[#3e2626]/30 hover:border-[#3e2626]/40 hover:bg-[#3e2626]/5">
+                      <Heart className={`${isFavorite ? 'fill-red-500 text-red-500' : 'text-[#3e2626]'} h-5 w-5`} />
                 </Button>
               </div>
 
                   <Separator />
 
                   {/* Frete / CEP */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-gray-700">
-                      <MapPin className="h-4 w-4 text-brand-700" />
+                  <div className="space-y-2 bg-[#3e2626]/5 rounded-lg p-3 border border-[#3e2626]/20">
+                    <div className="flex items-center gap-2 text-sm text-[#3e2626]">
+                      <MapPin className="h-4 w-4 text-[#3e2626]" />
                       <span>Informe seu CEP para calcular o frete</span>
                     </div>
                     <div className="flex gap-2">
-                      <Input value={cep} onChange={(e) => setCep(e.target.value)} placeholder="00000-000" className="h-10" />
-                      <Button onClick={handleCalcShipping} variant="outline" className="h-10 px-4">Calcular</Button>
+                      <Input value={cep} onChange={(e) => setCep(e.target.value)} placeholder="00000-000" className="h-10 border-[#3e2626]/30 focus:border-[#3e2626]" />
+                      <Button onClick={handleCalcShipping} variant="outline" className="h-10 px-4 border-[#3e2626]/40 text-[#3e2626] hover:bg-[#3e2626]/10">Calcular</Button>
                     </div>
                     {shippingInfo && (
-                      <p className="text-sm text-gray-700 flex items-center gap-2"><Truck className="h-4 w-4 text-brand-700" /> {shippingInfo}</p>
+                      <p className="text-sm text-[#3e2626] flex items-center gap-2"><Truck className="h-4 w-4 text-[#3e2626]" /> {shippingInfo}</p>
                     )}
             </div>
 
                   {/* Disponibilidade */}
-                  <div className="flex items-center justify-between p-3 rounded-xl border-2 border-brand-100 bg-white">
+                  <div className="flex items-center justify-between p-3 rounded-xl border-2 border-[#3e2626]/20 bg-gradient-to-br from-white to-[#3e2626]/5">
                     <div>
-                      <p className="text-sm text-gray-600">Estoque disponível</p>
+                      <p className="text-sm text-[#3e2626] font-medium">Estoque disponível</p>
                       <p className={`${(product.stock || 0) > 0 ? 'text-green-600' : 'text-red-600'} text-base font-bold`}>
                         {(product.stock || 0) > 0 ? `${product.stock} unidades` : 'Esgotado'}
                       </p>
@@ -850,10 +932,10 @@ export default function ProductDetailPage() {
               </div>
 
                   {/* Pagamentos e Garantias */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600"><CreditCard className="h-4 w-4 text-brand-700" /><span>Cartão em até 18x</span></div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600"><Zap className="h-4 w-4 text-brand-700" /><span>Pix com desconto</span></div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600"><Shield className="h-4 w-4 text-brand-700" /><span>Compra garantida</span></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[#3e2626]/20">
+                    <div className="flex items-center gap-2 text-sm text-[#3e2626] bg-[#3e2626]/5 p-2 rounded-lg"><CreditCard className="h-4 w-4 text-[#3e2626]" /><span>Cartão em até 18x</span></div>
+                    <div className="flex items-center gap-2 text-sm text-[#3e2626] bg-[#3e2626]/5 p-2 rounded-lg"><Zap className="h-4 w-4 text-[#3e2626]" /><span>Pix com desconto</span></div>
+                    <div className="flex items-center gap-2 text-sm text-[#3e2626] bg-[#3e2626]/5 p-2 rounded-lg"><Shield className="h-4 w-4 text-[#3e2626]" /><span>Compra garantida</span></div>
               </div>
                 </CardContent>
               </Card>

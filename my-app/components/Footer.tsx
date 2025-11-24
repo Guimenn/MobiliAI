@@ -57,16 +57,10 @@ export default function Footer() {
                   Nossas Lojas
                 </Link>
                 <Link 
-                  href="/careers" 
+                  href="/faq" 
                   className="block text-white/70 hover:text-white text-sm transition-colors duration-200 hover:translate-x-1 transform"
                 >
-                  Carreiras
-                </Link>
-                <Link 
-                  href="/blog" 
-                  className="block text-white/70 hover:text-white text-sm transition-colors duration-200 hover:translate-x-1 transform"
-                >
-                  Blog
+                  Perguntas Frequentes
                 </Link>
               </nav>
             </div>
@@ -102,12 +96,7 @@ export default function Footer() {
                 >
                   Garantia
                 </Link>
-                <Link 
-                  href="/faq" 
-                  className="block text-white/70 hover:text-white text-sm transition-colors duration-200 hover:translate-x-1 transform"
-                >
-                  Perguntas Frequentes
-                </Link>
+                
               </nav>
             </div>
 

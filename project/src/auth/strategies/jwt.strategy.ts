@@ -19,22 +19,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     try {
-      console.log('🎫 [JwtStrategy] Validando token:', {
-        payloadSub: payload.sub,
-        payloadStoreId: payload.storeId,
-        payloadRole: payload.role
-      });
-
       const user = await this.authService.findUserById(payload.sub);
-      
-      console.log('👤 [JwtStrategy] Usuário encontrado no banco:', {
-        userId: user?.id,
-        userStoreId: user?.storeId,
-        userStoreIdType: typeof user?.storeId,
-        userStoreFromRelation: (user as any)?.store?.id,
-        payloadStoreId: payload.storeId,
-        storeIdsMatch: user?.storeId === payload.storeId
-      });
 
       if (!user || !user.isActive) {
         throw new UnauthorizedException();
