@@ -6,6 +6,7 @@ import { useProducts } from '@/lib/hooks/useProducts';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import FavoriteTooltip from '@/components/FavoriteTooltip';
+import ProductCard from '@/components/ProductCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -1170,231 +1171,16 @@ export default function ProductsPage() {
               <>
                 {/* Grid de produtos estilo Mercado Livre */}
                 <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                  {paginatedProducts.map((product) => {
-                    const rating = product.rating || 0;
-                    const reviews = product.reviewCount || 0;
-                    const hasActiveSale = isSaleActive(product);
-                    const isFlashSaleActive = hasActiveSale && product.isFlashSale;
-                    const isNormalSaleActive = hasActiveSale && product.isOnSale && !product.isFlashSale;
-                    const currentPrice = getCurrentPrice(product);
-                    const originalPrice = product.price;
-                    // Usar percentual de desconto se disponível, senão calcular
-                    const discountPercent = isFlashSaleActive && product.flashSaleDiscountPercent
-                      ? product.flashSaleDiscountPercent
-                      : isNormalSaleActive && product.saleDiscountPercent
-                      ? product.saleDiscountPercent
-                      : hasActiveSale && originalPrice > currentPrice
-                      ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
-                      : 0;
-                    
-                    return (
-                      <div
-                        key={product.id}
-                        className={`bg-white rounded-lg border-2 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer ${
-                          isFlashSaleActive 
-                            ? 'border-yellow-400 hover:border-yellow-500 shadow-yellow-100' 
-                            : isNormalSaleActive
-                            ? 'border-green-300 hover:border-green-400 shadow-green-100'
-                            : 'border-brand-100 hover:border-brand-300'
-                        }`}
-                        onClick={() => router.push(`/products/${product.id}`)}
-                      >
-                        {/* Imagem do produto */}
-                        <div className="relative aspect-square bg-gray-100 overflow-hidden group">
-                        {(() => {
-                          const imageUrl = product.imageUrls && product.imageUrls.length > 0 
-                            ? product.imageUrls[0] 
-                            : product.imageUrl;
-                          
-                          return imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={product.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              onError={(e) => {
-                                console.error('Erro ao carregar imagem:', imageUrl);
-                                e.currentTarget.style.display = 'none';
-                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                              Sem imagem
-                            </div>
-                          );
-                        })()}
-                        <div className="hidden w-full h-full flex items-center justify-center text-gray-400">
-                          Erro ao carregar imagem
-                        </div>
-                          {/* Badge de Oferta Relâmpago */}
-                          {isFlashSaleActive && (
-                            <div className="absolute top-2 left-2 z-10">
-                              <Badge className="bg-yellow-500 text-white font-bold shadow-lg flex items-center gap-1 animate-pulse">
-                                <Zap className="h-3 w-3 fill-white" />
-                                {discountPercent > 0 ? `-${discountPercent}%` : 'Relâmpago'}
-                              </Badge>
-                            </div>
-                          )}
-                          {/* Badge de Oferta Normal */}
-                          {isNormalSaleActive && discountPercent > 0 && (
-                            <div className="absolute top-2 left-2 z-10">
-                              <Badge className="bg-green-600 text-white font-bold shadow-lg">
-                                -{discountPercent}%
-                              </Badge>
-                            </div>
-                          )}
-                          {/* Favorite Tooltip */}
-                          <FavoriteTooltip productId={product.id} />
-                        </div>
-
-                        {/* Conteúdo do produto */}
-                        <div className="p-4 space-y-3">
-                          {/* Título */}
-                          <h3 className="text-sm font-medium text-gray-900 line-clamp-2 min-h-[2.5rem]">
-                            {product.name}
-                          </h3>
-
-                          {/* Marca, categoria e loja */}
-                          <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
-                            {product.brand && <span>{product.brand}</span>}
-                            {product.category && (
-                              <>
-                                <span>•</span>
-                                <span>{product.category}</span>
-                              </>
-                            )}
-                            {product.storeName && (
-                              <>
-                                <span>•</span>
-                                <div className="flex items-center gap-1 text-brand-700">
-                                  <Store className="h-3 w-3" />
-                                  <span>{product.storeName}</span>
-                                </div>
-                              </>
-                            )}
-                          </div>
-
-                          {/* Rating */}
-                          {(rating > 0 || reviews > 0) && (
-                            <div className="flex items-center gap-2">
-                              {rating > 0 ? (
-                                <>
-                                  <div className="flex items-center">
-                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                    <span className="text-sm font-medium text-gray-900 ml-1">
-                                      {rating.toFixed(1)}
-                                    </span>
-                                  </div>
-                                  {reviews > 0 && (
-                                    <span className="text-xs text-gray-500">
-                                      ({reviews > 1000 ? `${(reviews / 1000).toFixed(1)}k` : reviews} {reviews === 1 ? 'avaliação' : 'avaliações'})
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                reviews > 0 && (
-                                  <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 text-gray-300" />
-                                    <span className="text-xs text-gray-500">
-                                      {reviews > 1000 ? `${(reviews / 1000).toFixed(1)}k` : reviews} {reviews === 1 ? 'avaliação' : 'avaliações'}
-                                    </span>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          )}
-
-                          {/* Preço */}
-                          <div className="space-y-1">
-                            {(() => {
-                              const originalPriceNum = Number(originalPrice);
-                              let calculatedPrice = currentPrice;
-                              
-                              // Se for oferta relâmpago e tiver flashSaleDiscountPercent, calcular desconto
-                              if (isFlashSaleActive && product.flashSaleDiscountPercent && product.flashSaleDiscountPercent > 0) {
-                                const discount = (originalPriceNum * product.flashSaleDiscountPercent) / 100;
-                                calculatedPrice = originalPriceNum - discount;
-                              }
-                              
-                              // Sempre mostrar preço com desconto se houver oferta ativa e preços diferentes
-                              if (hasActiveSale && originalPriceNum > calculatedPrice) {
-                                return (
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-lg font-bold text-gray-900">
-                                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedPrice)}
-                                    </span>
-                                    <span className="text-xs text-gray-500 line-through">
-                                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalPriceNum)}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              
-                              // Se não houver desconto, mostrar apenas o preço atual
-                              return (
-                                <span className="text-lg font-bold text-gray-900">
-                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedPrice)}
-                                </span>
-                              );
-                            })()}
-                            {/* Informação adicional de oferta */}
-                            {isFlashSaleActive && (
-                              <div className="flex items-center gap-1 text-xs text-yellow-600 font-medium">
-                                <Zap className="h-3 w-3" />
-                                <span>Oferta Relâmpago Ativa</span>
-                              </div>
-                            )}
-                            {isNormalSaleActive && (
-                              <div className="text-xs text-green-600 font-medium">
-                                Oferta Especial
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Parcelamento */}
-                          <div className="text-xs text-green-600 font-medium">
-                            18x {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice / 18)} sem juros
-                          </div>
-
-                          {/* Badges */}
-                          <div className="flex flex-wrap gap-2">
-                            {(product.stock || 0) > 10 && (
-                              <div className="flex items-center gap-1 text-xs text-green-600">
-                                <Truck className="h-3 w-3" />
-                                <span>Frete grátis</span>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-1 text-xs text-brand-700">
-                              <CheckCircle2 className="h-3 w-3" />
-                              <span>Compra garantida</span>
-                        </div>
-                      </div>
-
-                          {/* Botão de adicionar ao carrinho */}
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddToCart(product);
-                            }}
-                            disabled={(product.stock || 0) === 0}
-                            className="w-full bg-brand-700 hover:bg-brand-800 text-white shadow-md hover:shadow-lg transition-all"
-                            size="sm"
-                          >
-                            <ShoppingCart className="h-4 w-4 mr-2" />
-                            {(product.stock || 0) === 0 ? 'Sem estoque' : 'Adicionar ao carrinho'}
-                        </Button>
-
-                          {/* Estoque */}
-                          {(product.stock || 0) > 0 && (product.stock || 0) <= 10 && (
-                            <div className="text-xs text-orange-600 font-medium">
-                              Restam apenas {product.stock} em estoque!
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
+                  {paginatedProducts.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      variant="default"
+                      showFavorite={true}
+                      showAddToCart={true}
+                    />
+                  ))}
+                </div>
 
             {/* Paginação */}
                 {totalPages > 1 && (

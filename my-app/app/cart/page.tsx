@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import FavoriteTooltip from '@/components/FavoriteTooltip';
+import ProductCard from '@/components/ProductCard';
 import AITestModal from '@/components/AITestModal';
 import { 
   ShoppingCart,
@@ -407,9 +408,9 @@ export default function CartPage() {
     const fetchRecommendedProducts = async () => {
       try {
         setIsLoadingRecommended(true);
-        // Buscar produtos públicos do banco, limitando a 3 produtos
+        // Buscar produtos públicos do banco, limitando a 4 produtos
         const params = new URLSearchParams({
-          limit: '3',
+          limit: '4',
           page: '1',
         });
         
@@ -441,8 +442,8 @@ export default function CartPage() {
         }
         
         if (productsArray.length > 0) {
-          // Mapear produtos do backend para o formato esperado (limitar a 3 produtos)
-          const mappedProducts = productsArray.slice(0, 3).map((product: any) => ({
+          // Mapear produtos do backend para o formato esperado (limitar a 4 produtos)
+          const mappedProducts = productsArray.slice(0, 4).map((product: any) => ({
             id: product.id,
             name: product.name,
             description: product.description,
@@ -526,94 +527,17 @@ export default function CartPage() {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626]"></div>
               </div>
             ) : recommendedProducts.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {recommendedProducts.map((product) => (
-                  <Card key={product.id} className="group relative overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
-                    <div className="relative">
-                      {product.imageUrl ? (
-                        <div className="aspect-square relative overflow-hidden">
-                          <img 
-                            src={product.imageUrl} 
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
-                        </div>
-                      ) : (
-                        <div 
-                          className="aspect-square flex items-center justify-center relative"
-                          style={{ backgroundColor: product.color }}
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-black/20"></div>
-                          <div className="relative z-10 text-center">
-                            {renderCategoryIcon(product.category)}
-                            <p className="text-white font-semibold text-sm mt-2">Móvel Premium</p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Discount Badge */}
-                      {product.originalPrice && (
-                        <div className="absolute top-4 left-4 z-20">
-                          <Badge className="bg-red-500 text-white">
-                            -{calculateDiscount(product.originalPrice, product.price)}%
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                  
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-bold text-lg text-[#3e2626]">
-                        {product.name}
-                      </h3>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => addToFavorites(product)}
-                        className="text-gray-400 hover:text-red-500"
-                      >
-                        <Heart className="h-5 w-5" />
-                      </Button>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 mb-4">
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        {product.rating} ({product.reviews} avaliações)
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xl font-bold text-[#3e2626]">
-                          R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                        {product.originalPrice && (
-                          <span className="text-sm text-gray-500 line-through">
-                            R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <Button 
-                        onClick={() => addToCart(product as any, 1)}
-                        className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-full w-10 h-10 p-0 hover:scale-110 transition-all duration-300"
-                      >
-                        <ShoppingCart className="h-5 w-5" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  <ProductCard
+                    key={product.id}
+                    product={product as any}
+                    variant="default"
+                    showFavorite={true}
+                    showAddToCart={true}
+                  />
+                ))}
+              </div>
             ) : (
               <div className="text-center py-12 text-gray-500">
                 <p>Nenhum produto disponível no momento.</p>
@@ -1104,7 +1028,7 @@ export default function CartPage() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626]"></div>
             </div>
           ) : recommendedProducts.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {recommendedProducts.map((product) => (
                 <Card key={product.id} className="group relative overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
                   <div className="relative">

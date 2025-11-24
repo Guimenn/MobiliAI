@@ -174,7 +174,7 @@ const geocodeAddress = async (address: string, city: string, state: string, zipC
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { cart, user, isAuthenticated, token } = useAppStore();
+  const { cart, user, isAuthenticated, token, clearCart } = useAppStore();
   
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
@@ -1718,7 +1718,8 @@ export default function CheckoutPage() {
         const expiresAt = coupon.validUntil || coupon.expiresAt;
         const isExpired = expiresAt ? new Date(expiresAt) <= new Date() : false;
         const hasMinPurchase = subtotal >= minPurchase;
-        const hasUsageLimit = coupon.usageLimit ? (coupon.usedCount || 0) < coupon.usageLimit : true;
+        // Nota: Limite de uso agora é por cliente, a validação será feita no backend
+        // Removendo verificação de limite global no frontend
         
         // Obter informações dos produtos no carrinho
         const cartProductIds = checkoutItems.map(item => item.product?.id).filter(Boolean);
@@ -1797,12 +1798,11 @@ export default function CheckoutPage() {
           }
         }
         
-        const isAvailable = hasMinPurchase && !isExpired && hasUsageLimit && isStoreValid && isCategoryValid && isProductValid;
+        const isAvailable = hasMinPurchase && !isExpired && isStoreValid && isCategoryValid && isProductValid;
         
         console.log(`    Disponibilidade:`, {
           hasMinPurchase,
           isExpired,
-          hasUsageLimit,
           isStoreValid,
           storeReason,
           isCategoryValid,
@@ -1827,9 +1827,7 @@ export default function CheckoutPage() {
             unavailableReason.push(`Cupom expirado em ${new Date(expiresAt).toLocaleDateString('pt-BR')}`);
           }
           
-          if (!hasUsageLimit) {
-            unavailableReason.push('Cupom já utilizado (limite atingido)');
-          }
+          // Nota: Limite de uso por cliente será verificado no backend
           
           if (!isStoreValid && storeReason) {
             unavailableReason.push(storeReason);
@@ -2016,6 +2014,16 @@ export default function CheckoutPage() {
         couponCode: appliedCoupon?.code,
         notes: notes,
       });
+
+      // Limpar carrinho do frontend imediatamente após checkout bem-sucedido
+      // O backend já limpou o carrinho, mas precisamos sincronizar o frontend
+      console.log('✅ Checkout realizado com sucesso. Limpando carrinho do frontend...');
+      clearCart();
+
+      // Salvar ID da venda no sessionStorage para a página de sucesso
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('last-sale-id', saleResponse.id);
+      }
 
       // Redirecionar para a página de pagamento apropriada
       if (selectedPaymentMethod === 'card') {

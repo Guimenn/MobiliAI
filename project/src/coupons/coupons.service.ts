@@ -120,6 +120,11 @@ export class CouponsService {
       productId: createCouponDto.productId
     });
 
+    // Se for cupom de primeira compra, garantir que o limite seja 1
+    const finalUsageLimit = createCouponDto.assignmentType === 'NEW_ACCOUNTS_ONLY' 
+      ? 1 
+      : createCouponDto.usageLimit;
+
     const coupon = await this.prisma.coupon.create({
       data: {
         code: createCouponDto.code.toUpperCase(),
@@ -128,7 +133,7 @@ export class CouponsService {
         discountValue: createCouponDto.discountValue,
         minimumPurchase: createCouponDto.minimumPurchase,
         maximumDiscount: createCouponDto.maximumDiscount,
-        usageLimit: createCouponDto.usageLimit,
+        usageLimit: finalUsageLimit,
         validFrom,
         validUntil,
         applicableTo: createCouponDto.applicableTo || 'ALL',
@@ -289,20 +294,6 @@ export class CouponsService {
     console.log('  - requestCategoryId:', validateCouponDto.categoryId);
     console.log('  - requestProductId:', validateCouponDto.productId);
 
-    // Verificar se o usuário já usou este cupom (se fornecido)
-    if (userId) {
-      const existingUsage = await this.prisma.couponUsage.findFirst({
-        where: {
-          couponId: coupon.id,
-          userId: userId,
-        },
-      });
-
-      if (existingUsage) {
-        throw new BadRequestException('Você já utilizou este cupom');
-      }
-    }
-
     if (!coupon.isActive) {
       throw new BadRequestException('Cupom está inativo');
     }
@@ -332,13 +323,20 @@ export class CouponsService {
       throw new BadRequestException(`Cupom expirado em ${validUntil.toLocaleDateString('pt-BR')}`);
     }
 
-    // Verificar limite de uso
-    const usageCount = await this.prisma.couponUsage.count({
-      where: { couponId: coupon.id },
-    });
+    // Verificar limite de uso por cliente (se fornecido)
+    if (userId && coupon.usageLimit) {
+      const userUsageCount = await this.prisma.couponUsage.count({
+        where: {
+          couponId: coupon.id,
+          userId: userId,
+        },
+      });
 
-    if (coupon.usageLimit && usageCount >= coupon.usageLimit) {
-      throw new BadRequestException('Cupom atingiu o limite de uso');
+      if (userUsageCount >= coupon.usageLimit) {
+        throw new BadRequestException(
+          `Você já utilizou este cupom o máximo de ${coupon.usageLimit} vez${coupon.usageLimit > 1 ? 'es' : ''} permitida${coupon.usageLimit > 1 ? 's' : ''}`
+        );
+      }
     }
 
     // Verificar valor mínimo
@@ -583,15 +581,25 @@ export class CouponsService {
     if (updateData.discountValue !== undefined) updatePayload.discountValue = updateData.discountValue;
     if (updateData.minimumPurchase !== undefined) updatePayload.minimumPurchase = updateData.minimumPurchase;
     if (updateData.maximumDiscount !== undefined) updatePayload.maximumDiscount = updateData.maximumDiscount;
-    if (updateData.usageLimit !== undefined) updatePayload.usageLimit = updateData.usageLimit;
+    
+    // Tratar storeId corretamente
+    const applicableTo = updateData.applicableTo || coupon.applicableTo;
+    
+    // Determinar assignmentType (pode estar sendo atualizado ou usar o atual)
+    const finalAssignmentType = updateData.assignmentType || coupon.assignmentType;
+    
+    // Se for cupom de primeira compra, garantir que o limite seja 1
+    if (finalAssignmentType === 'NEW_ACCOUNTS_ONLY') {
+      updatePayload.usageLimit = 1;
+    } else if (updateData.usageLimit !== undefined) {
+      updatePayload.usageLimit = updateData.usageLimit;
+    }
+    
     if (updateData.validFrom) updatePayload.validFrom = new Date(updateData.validFrom);
     if (updateData.validUntil) updatePayload.validUntil = new Date(updateData.validUntil);
     if (updateData.applicableTo) updatePayload.applicableTo = updateData.applicableTo;
     if (updateData.categoryId !== undefined) updatePayload.categoryId = updateData.categoryId;
     if (updateData.productId !== undefined) updatePayload.productId = updateData.productId;
-    
-    // Tratar storeId corretamente
-    const applicableTo = updateData.applicableTo || coupon.applicableTo;
     
     console.log('🔍 Processando storeId:', {
       updateDataStoreId: updateData.storeId,
@@ -672,7 +680,13 @@ export class CouponsService {
     }
     
     if (updateData.isActive !== undefined) updatePayload.isActive = updateData.isActive;
-    if (updateData.assignmentType !== undefined) updatePayload.assignmentType = updateData.assignmentType;
+    if (updateData.assignmentType !== undefined) {
+      updatePayload.assignmentType = updateData.assignmentType;
+      // Se está mudando para NEW_ACCOUNTS_ONLY, forçar usageLimit = 1
+      if (updateData.assignmentType === 'NEW_ACCOUNTS_ONLY') {
+        updatePayload.usageLimit = 1;
+      }
+    }
     if (updateData.couponType !== undefined) updatePayload.couponType = updateData.couponType;
 
     // Verificação final: garantir que storeId está no payload se applicableTo for STORE
@@ -942,12 +956,22 @@ export class CouponsService {
           }
         }
         
-        // Filtrar cupons que não atingiram o limite de uso
+        // Filtrar cupons que não atingiram o limite de uso por cliente
         if (!coupon.usageLimit) return true;
-        const canUse = coupon._count.couponUsages < coupon.usageLimit;
+        
+        // Contar quantas vezes este cliente específico usou o cupom
+        const userUsageCount = await this.prisma.couponUsage.count({
+          where: {
+            couponId: coupon.id,
+            userId: customerId,
+          },
+        });
+        
+        const canUse = userUsageCount < coupon.usageLimit;
         if (!canUse) {
-          console.log('⚠️ Cupom excluído por limite de uso:', coupon.code, {
-            used: coupon._count.couponUsages,
+          console.log('⚠️ Cupom excluído por limite de uso por cliente:', coupon.code, {
+            customerId,
+            usedByCustomer: userUsageCount,
             limit: coupon.usageLimit
           });
         }

@@ -13,6 +13,7 @@ import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import { BackendStatus } from '@/components/BackendStatus';
 import FavoriteTooltip from '@/components/FavoriteTooltip';
+import ProductCard from '@/components/ProductCard';
 import { showAlert } from '@/lib/alerts';
 import { 
   Search,
@@ -965,73 +966,66 @@ export default function HomePage() {
         <div className="relative z-10 w-full container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[90vh]">
             
-            {/* LADO ESQUERDO - Conteúdo minimalista e impactante */}
-            <div className="text-white space-y-8 mt-10 animate-in fade-in slide-in-from-left duration-1000">
+            {/* LADO ESQUERDO - Conteúdo focado em experiência */}
+            <div className="text-white space-y-10 mt-10 animate-in fade-in slide-in-from-left duration-1000">
 
-              {/* Título ultra impactante - MENOS TEXTO */}
-              <div className="space-y-3">
+              {/* Título principal */}
+              <div className="space-y-4">
                 <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold leading-[0.95] tracking-tight">
-                  <span className="block text-white mb-1 drop-shadow-2xl">
-                    Transforme
+                  <span className="block text-white drop-shadow-2xl">
+                    Não é só
                   </span>
-                  <span className="block text-transparent bg-clip-text bg-gradient-to-r from-white via-white/90 to-white/70">
-                    seu espaço
+                  <span className="block text-white drop-shadow-2xl">
+                    mobília.
                   </span>
-                  <span className="block mt-2 text-white drop-shadow-2xl">
-                    com IA.
+                  <span className="block text-white drop-shadow-2xl mt-2 md:mt-3">
+                    <span className="">É</span> experiência.
                   </span>
                 </h1>
               </div>
 
-              {/* Descrição MUITO curta e direta */}
-              <p className="text-xl md:text-2xl text-white/90 leading-tight max-w-lg font-light">
-                Visualize móveis e cores no seu ambiente <span className="font-semibold text-white">em segundos</span>.
-              </p>
-
-              {/* Botões ULTRA chamativos e apelativos */}
-              <div className="flex flex-col sm:flex-row gap-4 pt-2">
-                <Button 
-                  onClick={() => router.push('/products')}
-                  className="group relative bg-gradient-to-r from-white to-white/95 text-[#3e2626] hover:from-white hover:to-white rounded-full px-8 py-6 text-lg font-bold transition-all duration-300 shadow-[0_20px_60px_rgba(0,0,0,0.5)] hover:shadow-[0_25px_80px_rgba(0,0,0,0.6)] hover:scale-110 active:scale-95 overflow-hidden border-2 border-white/20"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                  <span className="relative flex items-center gap-3">
-                    <Camera className="h-6 w-6 group-hover:scale-125 transition-transform duration-300" />
-                    <span>EXPERIMENTAR AGORA</span>
-                    <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                  </span>
-                </Button>
-                <Button 
-                  onClick={() => router.push('/products')}
-                  className="group relative bg-transparent border-3 border-white/60 text-white hover:bg-white/20 hover:border-white rounded-full px-8 py-6 text-lg font-bold backdrop-blur-xl transition-all duration-300 hover:scale-110 active:scale-95 shadow-lg"
-                >
-                  <span className="flex items-center gap-3">
-                    <Play className="h-5 w-5 group-hover:scale-125 transition-transform duration-300" />
-                    <span>VER DEMO</span>
-                  </span>
-                </Button>
+              {/* Descrição focada em experiência */}
+              <div className="space-y-3 max-w-lg">
+                <p className="text-lg md:text-xl text-white/85 leading-relaxed font-light">
+                  Transforme seu ambiente com nossa tecnologia de visualização. Veja como cada peça se encaixa perfeitamente no seu espaço antes de decidir.
+                </p>
+                <div className="flex items-center gap-6 text-sm text-white/70 pt-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-white/60" />
+                    <span>Visualização instantânea</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-white/60" />
+                    <span>Resultados precisos</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Features visuais - apenas ícones grandes */}
-              <div className="flex items-center gap-8 pt-6">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
-                    <Zap className="h-6 w-6 text-white" />
-                  </div>
-                  <span className="text-xs text-white/80 font-medium">Instantâneo</span>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
-                    <Wand2 className="h-6 w-6 text-white" />
-                  </div>
-                  <span className="text-xs text-white/80 font-medium">IA Avançada</span>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
-                    <Award className="h-6 w-6 text-white" />
-                  </div>
-                  <span className="text-xs text-white/80 font-medium">Premium</span>
-                </div>
+              {/* Botões */}
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                <Button 
+                  onClick={() => router.push('/IA')}
+                  size="lg"
+                  className="group relative bg-white text-[#3e2626] hover:bg-white/95 rounded-full px-10 py-7 text-base font-bold transition-all duration-300 shadow-[0_20px_60px_rgba(0,0,0,0.3)] hover:shadow-[0_25px_80px_rgba(0,0,0,0.4)] hover:scale-105 active:scale-95 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                  <span className="relative flex items-center gap-3">
+                    <Camera className="h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
+                    <span>EXPERIMENTAR</span>
+                    <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+                  </span>
+                </Button>
+                <Button 
+                  onClick={() => router.push('/products')}
+                  size="lg"
+                  variant="outline"
+                  className="group relative bg-transparent border-2 border-white/50 text-white hover:bg-white/10 hover:border-white/70 rounded-full px-10 py-7 text-base font-bold backdrop-blur-sm transition-all duration-300 hover:scale-105 active:scale-95"
+                >
+                  <span className="flex items-center gap-3">
+                    <Eye className="h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
+                    <span>EXPLORAR PRODUTOS</span>
+                  </span>
+                </Button>
               </div>
             </div>
 
@@ -1758,83 +1752,13 @@ export default function HomePage() {
           {!productsLoading && !productsError && (
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {featuredProducts.map((product) => (
-                <div 
-                  key={product.id} 
-                  onClick={() => router.push(`/products/${product.id}`)}
-                  className="group relative bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
-                >
-                  {/* Product Image Container */}
-                  <div className="relative overflow-hidden">
-                    <div className="aspect-[4/3] flex items-center justify-center relative bg-gray-100">
-                      {/* Product Image - if available */}
-                      {(() => {
-                        const imageUrl = product.imageUrls && product.imageUrls.length > 0 
-                          ? product.imageUrls[0] 
-                          : product.imageUrl;
-                        
-                        return imageUrl ? (
-                          <Image
-                            src={imageUrl}
-                            alt={product.name}
-                            width={600}
-                            height={450}
-                            className="w-full h-full object-cover"
-                            unoptimized
-                            onError={(e) => {
-                              console.error('Erro ao carregar imagem:', imageUrl);
-                            }}
-                          />
-                        ) : (
-                          <div className="text-center text-gray-400">Sem imagem</div>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Favorite Tooltip */}
-                    <FavoriteTooltip productId={product.id} />
-                  </div>
-
-                  {/* Product Info Footer - Clean */}
-                  <div className="bg-white p-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-base font-semibold text-[#3e2626] leading-tight">{product.name}</h3>
-                      {(product.rating || 0) > 0 && (
-                        <div className="flex items-center space-x-1 text-yellow-500">
-                          <Star className="h-4 w-4 fill-current" />
-                          <span className="text-xs font-medium text-gray-600">
-                            {product.rating?.toFixed(1) || '0.0'}
-                          </span>
-                          {product.reviews && product.reviews > 0 && (
-                            <span className="text-xs text-gray-500 ml-1">
-                              ({product.reviews})
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-lg font-bold text-[#3e2626]">
-                          R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                        {product.originalPrice && (
-                          <span className="text-xs text-gray-500 line-through">
-                            R$ {product.originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        )}
-                      </div>
-                      <Button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addToCart(product.id);
-                        }}
-                        className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-lg w-10 h-10 p-0"
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  variant="default"
+                  showFavorite={true}
+                  showAddToCart={true}
+                />
               ))}
             </div>
           )}

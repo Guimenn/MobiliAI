@@ -1,45 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { adminAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import ClientOnly from '@/components/ClientOnly';
-import HydrationBoundary from '@/components/HydrationBoundary';
-import NoSSR from '@/components/NoSSR';
-import UserAvatarUpload from '@/components/UserAvatarUpload';
+import { toast } from 'sonner';
 import { 
   Users, 
-  Store,      
-  Building,
-  UserCheck,
-  Search, 
   UserPlus,
+  Search, 
   Edit, 
   Trash2, 
   Eye, 
   RefreshCw,
-  X,
-  FileText,
-  User,
-  Grid3X3,
   Shield,
-  MapPin,
-  Phone,
-  Settings
+  UserCheck,
+  ArrowUpRight,
 } from 'lucide-react';
 import EditUserModal from '@/components/EditUserModal';
 import ViewUserModal from '@/components/ViewUserModal';
 import DeleteUserConfirmDialog from '@/components/DeleteUserConfirmDialog';
+import UserAvatarUpload from '@/components/UserAvatarUpload';
 import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
-import { toast } from 'sonner';
 
 export default function UsersPage() {
   const router = useRouter();
@@ -63,21 +51,13 @@ export default function UsersPage() {
     try {
       setIsLoading(true);
       
-      console.log('Carregando dados de usuários do banco...');
-      
-      // Carregar dados reais da API
       const [usersData, storesData] = await Promise.all([
         adminAPI.getUsers(),
         adminAPI.getStores()
       ]);
 
-          console.log('Dados de usuários recebidos:', usersData);
-      console.log('Dados de lojas recebidos:', storesData);
-          
-          // Verificar se os dados estão em usersData.users ou se é um array direto
       const usersArray = Array.isArray(usersData) ? usersData : (usersData?.users || []);
       
-      // Filtrar apenas admins, gerentes e caixas (excluir clientes)
       const filteredUsers = usersArray.filter((user: any) => 
         user.role === 'ADMIN' || 
         user.role === 'STORE_MANAGER' || 
@@ -86,19 +66,18 @@ export default function UsersPage() {
       );
       
       setUsers(filteredUsers);
-          
-          // Verificar se os dados estão em storesData.stores ou se é um array direto
+      
       const storesArray = Array.isArray(storesData) ? storesData : (storesData?.stores || []);
       setStores(storesArray);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
+      toast.error('Erro ao carregar usuários');
       setUsers([]);
       setStores([]);
     } finally {
       setIsLoading(false);
     }
   };
-
 
   const handleEditUserModal = (user: any) => {
     setEditingUser(user);
@@ -107,7 +86,6 @@ export default function UsersPage() {
 
   const handleSaveUser = async (userId: string, userData: any) => {
     try {
-      // Usar fetch direto para atualizar usuário
       const response = await fetch(`http://localhost:3001/api/admin/users/${userId}`, {
         method: 'PUT',
         headers: {
@@ -122,9 +100,7 @@ export default function UsersPage() {
         setEditingUser(null);
         toast.success('Usuário atualizado com sucesso!', {
           description: `${userData.name} foi atualizado.`,
-          duration: 4000,
         });
-        // Recarregar a lista após um pequeno delay para evitar conflitos
         setTimeout(() => {
           loadUsersData();
         }, 100);
@@ -133,10 +109,8 @@ export default function UsersPage() {
         throw new Error(errorData.message || 'Erro ao atualizar usuário');
       }
     } catch (error: any) {
-      console.error('Erro ao salvar usuário:', error);
       toast.error('Erro ao salvar usuário', {
         description: error.message || 'Tente novamente mais tarde.',
-        duration: 4000,
       });
     }
   };
@@ -163,20 +137,17 @@ export default function UsersPage() {
     setIsEditModalOpen(true);
   };
 
-  // Abrir modal de confirmação de exclusão
   const handleDeleteUser = (userId: string) => {
     const user = users.find(u => u.id === userId);
     setUserToDelete(user);
     setIsDeleteDialogOpen(true);
   };
 
-  // Confirmar exclusão
   const handleConfirmDelete = async () => {
     if (!userToDelete) return;
 
     setIsDeleting(true);
     try {
-      console.log('Deletando usuário:', userToDelete.id);
       const response = await fetch(`http://localhost:3001/api/admin/users/${userToDelete.id}`, {
         method: 'DELETE',
         headers: {
@@ -188,11 +159,9 @@ export default function UsersPage() {
       if (response.ok) {
         toast.success('Usuário deletado com sucesso!', {
           description: `${userToDelete.name} foi removido do sistema.`,
-          duration: 4000,
         });
         setIsDeleteDialogOpen(false);
         setUserToDelete(null);
-        // Recarregar após um pequeno delay
         setTimeout(() => {
           loadUsersData();
         }, 100);
@@ -200,40 +169,45 @@ export default function UsersPage() {
         const errorData = await response.json();
         toast.error('Erro ao deletar usuário', {
           description: errorData.message || 'Erro desconhecido',
-          duration: 4000,
         });
       }
     } catch (error) {
-      console.error('Erro ao deletar usuário:', error);
       toast.error('Erro ao deletar usuário', {
         description: 'Tente novamente mais tarde.',
-        duration: 4000,
       });
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Cancelar exclusão
   const handleCancelDelete = () => {
     setIsDeleteDialogOpen(false);
     setUserToDelete(null);
   };
 
-  return (
-    <div className="space-y-6">
-            <UsersSection 
-              users={users}
-              isLoading={isLoading}
-              stores={stores}
-              token={token}
-              onUsersChange={loadUsersData}
-              onViewUser={handleViewUser}
-              onEditUser={handleEditUserModal}
-              onDeleteUser={handleDeleteUser}
-          />
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/40">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-b-primary" />
+          <p className="text-sm text-muted-foreground">Carregando usuários...</p>
+        </div>
+      </div>
+    );
+  }
 
-      {/* Modal de Edição */}
+  return (
+    <div className="space-y-8">
+      <UsersSection 
+        users={users}
+        stores={stores}
+        token={token}
+        onUsersChange={loadUsersData}
+        onViewUser={handleViewUser}
+        onEditUser={handleEditUserModal}
+        onDeleteUser={handleDeleteUser}
+      />
+
       <EditUserModal
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
@@ -241,7 +215,6 @@ export default function UsersPage() {
         onSave={handleSaveUser}
       />
 
-      {/* Modal de Visualização */}
       <ViewUserModal
         isOpen={isViewModalOpen}
         onClose={handleCloseViewModal}
@@ -250,7 +223,6 @@ export default function UsersPage() {
         onEdit={handleEditFromView}
       />
 
-      {/* Modal de Confirmação de Exclusão */}
       <DeleteUserConfirmDialog
         isOpen={isDeleteDialogOpen}
         onClose={handleCancelDelete}
@@ -263,17 +235,13 @@ export default function UsersPage() {
   );
 }
 
-// Componente da seção de usuários - código exato do dashboard
-function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUser, onEditUser, onDeleteUser }: any) {
-  // Estados para filtros
+function UsersSection({ users, stores, token, onUsersChange, onViewUser, onEditUser, onDeleteUser }: any) {
   const [userFilters, setUserFilters] = useState({
     role: 'all',
     status: 'all',
     search: ''
   });
 
-
-  // Estados para modal de novo usuário
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newUser, setNewUser] = useState({
     name: '',
@@ -292,11 +260,8 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
   });
   const [userAvatar, setUserAvatar] = useState<File | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Função para lidar com mudanças nos inputs com formatação
   const handleInputChange = (field: string, value: string) => {
-    // Formatar valor baseado no campo
     let formattedValue = value;
     switch (field) {
       case 'name':
@@ -330,137 +295,110 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
     setNewUser({ ...newUser, [field]: formattedValue });
   };
 
-  // Função para criar novo usuário
   const handleCreateUser = async () => {
-    // Validar campos obrigatórios
     if (!newUser.name || !newUser.email || !newUser.password) {
       toast.error('Campos obrigatórios', {
         description: 'Nome, e-mail e senha são obrigatórios.',
-        duration: 3000,
       });
       return;
     }
 
-    // Validar role
     const validRoles = ['ADMIN', 'STORE_MANAGER', 'CASHIER', 'CUSTOMER', 'EMPLOYEE'];
     if (!newUser.role || !validRoles.includes(newUser.role)) {
       toast.error('Role inválido', {
-        description: 'Selecione um role válido (ADMIN, STORE_MANAGER, CASHIER, CUSTOMER ou EMPLOYEE).',
-        duration: 3000,
+        description: 'Selecione um role válido.',
       });
       return;
     }
 
     setIsCreating(true);
     try {
-      console.log('Criando usuário no banco:', newUser);
-      
-       // Preparar dados para envio
-       const userData = {
-         name: newUser.name,
-         email: newUser.email,
-         password: newUser.password,
-         role: newUser.role,
-         isActive: newUser.isActive,
-         cpf: newUser.cpf || undefined,
-         phone: newUser.phone || undefined,
-         address: newUser.address || undefined,
-         city: newUser.city || undefined,
-         state: newUser.state || undefined,
-         zipCode: newUser.zipCode || undefined,
-         storeId: newUser.storeId || undefined,
-         avatarUrl: newUser.avatarUrl || undefined
-       };
+      const userData = {
+        name: newUser.name,
+        email: newUser.email,
+        password: newUser.password,
+        role: newUser.role,
+        isActive: newUser.isActive,
+        cpf: newUser.cpf || undefined,
+        phone: newUser.phone || undefined,
+        address: newUser.address || undefined,
+        city: newUser.city || undefined,
+        state: newUser.state || undefined,
+        zipCode: newUser.zipCode || undefined,
+        storeId: newUser.storeId || undefined,
+        avatarUrl: newUser.avatarUrl || undefined
+      };
 
-      console.log('Dados do usuário a serem enviados:', userData);
-
-       // Chamar API para criar usuário
-       const createdUser = await adminAPI.createUser(userData);
-         console.log('Usuário criado com sucesso:', createdUser);
-         
-         // Upload do avatar se fornecido
-         if (userAvatar) {
-           console.log('Enviando avatar:', userAvatar.name);
-           try {
-             const { uploadUserAvatar } = await import('@/lib/supabase');
-             const avatarUrl = await uploadUserAvatar(userAvatar, createdUser.id);
-             
-             if (avatarUrl) {
-               console.log('Avatar enviado com sucesso:', avatarUrl);
-               // Atualizar o usuário com a URL do avatar
-               await adminAPI.updateUser(createdUser.id, { avatarUrl });
-               console.log('Usuário atualizado com avatar');
-             }
-           } catch (error) {
-             console.error('Erro ao fazer upload do avatar:', error);
-             // Não falhar a criação do usuário por causa do avatar
-           }
-         }
+      const createdUser = await adminAPI.createUser(userData);
         
-        toast.success('Usuário criado com sucesso!', {
-          description: `${createdUser.name} foi adicionado ao sistema.`,
-          duration: 4000,
-        });
-        setIsModalOpen(false);
-         setNewUser({
-           name: '',
-           email: '',
-           password: '',
-           role: 'CASHIER',
-           isActive: true,
-           cpf: '',
-           phone: '',
-           address: '',
-           city: '',
-           state: '',
-           zipCode: '',
-           storeId: '',
-           avatarUrl: ''
-         });
-        setUserAvatar(null);
+      if (userAvatar) {
+        try {
+          const { uploadUserAvatar } = await import('@/lib/supabase');
+          const avatarUrl = await uploadUserAvatar(userAvatar, createdUser.id);
+          
+          if (avatarUrl) {
+            await adminAPI.updateUser(createdUser.id, { avatarUrl });
+          }
+        } catch (error) {
+          console.error('Erro ao fazer upload do avatar:', error);
+        }
+      }
         
-        // Recarregar dados do banco após um pequeno delay
-        setTimeout(() => {
-          onUsersChange();
-        }, 100);
+      toast.success('Usuário criado com sucesso!', {
+        description: `${createdUser.name} foi adicionado ao sistema.`,
+      });
+      setIsModalOpen(false);
+      setNewUser({
+        name: '',
+        email: '',
+        password: '',
+        role: 'CASHIER',
+        isActive: true,
+        cpf: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        storeId: '',
+        avatarUrl: ''
+      });
+      setUserAvatar(null);
+        
+      setTimeout(() => {
+        onUsersChange();
+      }, 100);
     } catch (error) {
-      console.error('Erro ao criar usuário:', error);
       toast.error('Erro ao criar usuário', {
         description: 'Verifique os dados e tente novamente.',
-        duration: 4000,
       });
     } finally {
       setIsCreating(false);
     }
   };
 
-  // Função para fechar modal
   const handleCloseModal = () => {
     setIsModalOpen(false);
-         setNewUser({
-           name: '',
-           email: '',
-           password: '',
-           role: 'CASHIER',
-           isActive: true,
-           cpf: '',
-           phone: '',
-           address: '',
-           city: '',
-           state: '',
-           zipCode: '',
-           storeId: '',
-           avatarUrl: ''
-         });
+    setNewUser({
+      name: '',
+      email: '',
+      password: '',
+      role: 'CASHIER',
+      isActive: true,
+      cpf: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      storeId: '',
+      avatarUrl: ''
+    });
     setUserAvatar(null);
   };
 
-  // Função para editar usuário
   const handleEditUserById = async (userId: string) => {
     try {
-      console.log('Editando usuário:', userId);
-      
-      // Buscar dados completos do usuário
       const response = await fetch(`http://localhost:3001/api/admin/users/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token || ''}`,
@@ -475,17 +413,13 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
         throw new Error('Erro ao buscar dados do usuário');
       }
     } catch (error) {
-      console.error('Erro ao editar usuário:', error);
       toast.error('Erro ao carregar dados do usuário', {
         description: 'Tente novamente mais tarde.',
-        duration: 3000,
       });
     }
   };
 
-
-  // Função para filtrar usuários
-  const getFilteredUsers = () => {
+  const getFilteredUsers = useMemo(() => {
     if (!Array.isArray(users)) return [];
     
     return users
@@ -493,23 +427,19 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
         index === self.findIndex((u: any) => u.email === user.email)
       )
       .filter((user: any) => {
-        // Excluir clientes sempre
         if (user.role === 'CUSTOMER') {
           return false;
         }
         
-        // Filtro por role
         if (userFilters.role !== 'all' && user.role !== userFilters.role) {
           return false;
         }
         
-        // Filtro por status
         if (userFilters.status !== 'all') {
           if (userFilters.status === 'active' && !user.isActive) return false;
           if (userFilters.status === 'inactive' && user.isActive) return false;
         }
         
-        // Filtro por busca
         if (userFilters.search) {
           const searchTerm = userFilters.search.toLowerCase();
           return (
@@ -524,428 +454,275 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
         const roleOrder = { 'ADMIN': 0, 'STORE_MANAGER': 1, 'CASHIER': 2, 'EMPLOYEE': 3 };
         return (roleOrder[a.role as keyof typeof roleOrder] || 4) - (roleOrder[b.role as keyof typeof roleOrder] || 4);
       });
-  };
+  }, [users, userFilters]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando usuários...</p>
-        </div>
-      </div>
-    );
-  }
+  const stats = useMemo(() => {
+    return {
+      total: users.length,
+      admins: users.filter((u: any) => u.role === 'ADMIN').length,
+      managers: users.filter((u: any) => u.role === 'STORE_MANAGER').length,
+      cashiers: users.filter((u: any) => u.role === 'CASHIER').length,
+      employees: users.filter((u: any) => u.role === 'EMPLOYEE').length,
+      active: users.filter((u: any) => u.isActive).length,
+    };
+  }, [users]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100"> 
+    <>
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white py-12 px-4 rounded-2xl mb-8 shadow-xl">
-        <div className="w-full">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Users className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-left">
-                  <h1 className="text-3xl font-bold">Gestão de Usuários</h1>
-                  <p className="text-white/80 text-lg">Gerencie funcionários, gerentes e administradores do sistema</p>
-                </div>
-              </div>
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl space-y-4">
+            <Badge
+              variant="outline"
+              className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+            >
+              Gestão de Usuários
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+                Gerenciar Usuários
+              </h1>
+              <p className="text-sm text-primary-foreground/80 lg:text-base">
+                Gerencie funcionários, gerentes e administradores do sistema. Controle permissões e acesso de cada usuário.
+              </p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                onClick={() => setIsModalOpen(true)}
+                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Novo Usuário
+              </Button>
               <Button
-                onClick={() => window.location.reload()}
-                variant="outline" 
-                size="sm"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                variant="outline"
+                className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                onClick={onUsersChange}
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Atualizar
               </Button>
-              <Button 
-                onClick={() => setIsModalOpen(true)}
-                className="bg-white text-[#3e2626] hover:bg-white/90 font-semibold px-6 py-2 rounded-xl"
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-              Novo Usuário
-            </Button>
+            </div>
+          </div>
+
+          <div className="grid w-full max-w-md grid-cols-2 gap-4 sm:grid-cols-3 lg:max-w-2xl">
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <Users className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.total}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total</p>
+            </div>
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <Shield className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.admins}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Admins</p>
+            </div>
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <UserCheck className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.managers}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Gerentes</p>
+            </div>
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <Users className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.cashiers}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Caixas</p>
+            </div>
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <Users className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.employees}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Funcionários</p>
+            </div>
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <UserCheck className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.active}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Ativos</p>
+            </div>
           </div>
         </div>
-          </div>
-        </div>
+      </section>
 
-      {/* Stats Cards - Brand Colors */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg hover:shadow-xl hover:border-[#3e2626]/30 transition-all duration-300">
-            <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Administradores</p>
-                <p className="text-3xl font-bold text-[#3e2626]">
-                  {users.filter((u: any) => u.role === 'ADMIN').length}
-                </p>
-                <p className="text-xs text-[#3e2626]/70">Acesso total</p>
-                </div>
-              <div className="w-12 h-12 bg-[#3e2626]/10 rounded-xl flex items-center justify-center">
-                <Shield className="h-6 w-6 text-[#3e2626]" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-        <Card className="bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-2 border-blue-500/20 shadow-lg hover:shadow-xl hover:border-blue-500/30 transition-all duration-300">
-            <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-blue-600 uppercase tracking-wide">Gerentes</p>
-                <p className="text-3xl font-bold text-blue-600">
-                  {users.filter((u: any) => u.role === 'STORE_MANAGER').length}
-                </p>
-                <p className="text-xs text-blue-600/70">Por loja</p>
-                </div>
-              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center">
-                <UserCheck className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-        <Card className="bg-gradient-to-br from-green-500/5 to-green-500/10 border-2 border-green-500/20 shadow-lg hover:shadow-xl hover:border-green-500/30 transition-all duration-300">
-            <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-green-600 uppercase tracking-wide">Caixas</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {users.filter((u: any) => u.role === 'CASHIER').length}
-                </p>
-                <p className="text-xs text-green-600/70">Ativos</p>
-                </div>
-              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
-                <Users className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-        </div>
-
-      {/* Filtros e Controles */}
-      <Card className="mb-8">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="role-filter" className="text-sm font-medium text-gray-700">
-                  Função:
-                </Label>
-                <select
-                  id="role-filter"
-                  value={userFilters.role}
-                  onChange={(e) => setUserFilters({ ...userFilters, role: e.target.value })}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3e2626]/20 focus:border-[#3e2626]"
-                >
-                  <option value="all">Todas</option>
-                  <option value="ADMIN">Administrador</option>
-                  <option value="STORE_MANAGER">Gerente</option>
-                  <option value="CASHIER">Caixa</option>
-                  <option value="EMPLOYEE">Funcionário</option>
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="status-filter" className="text-sm font-medium text-gray-700">
-                  Status:
-                </Label>
-                <select
-                  id="status-filter"
-                  value={userFilters.status}
-                  onChange={(e) => setUserFilters({ ...userFilters, status: e.target.value })}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3e2626]/20 focus:border-[#3e2626]"
-                >
-                  <option value="all">Todos</option>
-                  <option value="active">Ativo</option>
-                  <option value="inactive">Inativo</option>
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Search className="h-4 w-4 text-gray-400" />
+      {/* Search and Filters */}
+      <Card className="border border-border shadow-sm">
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder="Buscar usuários..."
+                  placeholder="Buscar usuários por nome ou e-mail..."
                   value={userFilters.search}
                   onChange={(e) => setUserFilters({ ...userFilters, search: e.target.value })}
-                  className="w-64"
+                  className="pl-10"
                 />
               </div>
             </div>
-
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-                className="flex items-center space-x-2"
+            <div className="md:w-48">
+              <select
+                value={userFilters.role}
+                onChange={(e) => setUserFilters({ ...userFilters, role: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <Grid3X3 className="h-4 w-4" />
-                <span>Grade</span>
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-                className="flex items-center space-x-2"
+                <option value="all">Todas as funções</option>
+                <option value="ADMIN">Administrador</option>
+                <option value="STORE_MANAGER">Gerente</option>
+                <option value="CASHIER">Caixa</option>
+                <option value="EMPLOYEE">Funcionário</option>
+              </select>
+            </div>
+            <div className="md:w-48">
+              <select
+                value={userFilters.status}
+                onChange={(e) => setUserFilters({ ...userFilters, status: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <FileText className="h-4 w-4" />
-                <span>Lista</span>
-              </Button>
+                <option value="all">Todos os status</option>
+                <option value="active">Ativo</option>
+                <option value="inactive">Inativo</option>
+              </select>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Lista de Usuários */}
-      <div className="space-y-6">
-        {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {getFilteredUsers().map((user: any) => (
-              <Card key={user.id} className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="bg-gradient-to-r from-[#3e2626]/5 to-[#3e2626]/10 p-6">
-                   <div className="flex items-center space-x-4">
-                       <Avatar className="h-12 w-12">
-                         {user.avatarUrl ? (
-                           <img 
-                             src={user.avatarUrl} 
-                             alt={user.name}
-                             className="w-full h-full object-cover rounded-full"
-                           />
-                         ) : (
-                           <AvatarFallback className="bg-[#3e2626] text-white text-lg font-semibold">
-                             {user.name?.charAt(0) || 'U'}
-                           </AvatarFallback>
-                         )}
-                       </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
-                          {user.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 truncate">
-                          {user.email}
-                        </p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge 
-                            variant={user.role === 'ADMIN' ? 'default' : 
-                                   user.role === 'STORE_MANAGER' ? 'secondary' : 
-                                   user.role === 'CASHIER' ? 'outline' : 'destructive'}
-                            className="text-xs"
-                          >
-                            {user.role === 'ADMIN' ? 'Admin' :
-                             user.role === 'STORE_MANAGER' ? 'Gerente' :
-                             user.role === 'CASHIER' ? 'Caixa' :
-                             user.role === 'EMPLOYEE' ? 'Funcionário' : user.role}
-                        </Badge>
-                          <Badge 
-                            variant={user.isActive ? 'default' : 'secondary'}
-                            className={`text-xs ${user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
-                          >
-                          {user.isActive ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </div>
-                      </div>
-                    </div>
-                        </div>
-                  
-                  <div className="p-6 space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2 text-sm text-gray-600">
-                        <Phone className="h-4 w-4" />
-                        <span>{user.phone || 'Não informado'}</span>
-                          </div>
-                      <div className="flex items-center space-x-2 text-sm text-gray-600">
-                        <MapPin className="h-4 w-4" />
-                        <span className="truncate">{user.city}, {user.state}</span>
-                      </div>
-                      {user.storeId && (
-                        <div className="flex items-center space-x-2 text-sm text-gray-600">
-                          <Store className="h-4 w-4" />
-                          <span>Loja: {stores.find((s: any) => s.id === user.storeId)?.name || 'N/A'}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <Separator />
-
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-gray-500">
-                        Criado em {new Date(user.createdAt).toLocaleDateString('pt-BR')}
-                  </div>
-                   <div className="flex items-center space-x-2">
-                         <Button 
-                           variant="ghost" 
-                           size="sm" 
-                           className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
-                           onClick={() => onViewUser(user)}
-                           title="Visualizar usuário"
-                         >
-                       <Eye className="h-4 w-4" />
-                     </Button>
-                     <Button 
-                       variant="outline" 
-                       size="sm"
-                       onClick={() => handleEditUserById(user.id)}
-                       title="Editar usuário"
-                     >
-                       <Edit className="h-4 w-4" />
-                     </Button>
-                         <Button 
-                           variant="ghost" 
-                           size="sm" 
-                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                           onClick={() => onDeleteUser(user.id)}
-                           title="Deletar usuário"
-                         >
-                       <Trash2 className="h-4 w-4" />
-                     </Button>
-                   </div>
-                </div>
-                  </div>
-                </CardContent>
-              </Card>
-              ))}
-            </div>
-        ) : (
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Usuário
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Função
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Loja
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Criado em
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {getFilteredUsers().map((user: any) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                           <div className="flex items-center">
-                             <Avatar className="h-10 w-10">
-                               {user.avatarUrl ? (
-                                 <img 
-                                   src={user.avatarUrl} 
-                                   alt={user.name}
-                                   className="w-full h-full object-cover rounded-full"
-                                 />
-                               ) : (
-                                 <AvatarFallback className="bg-[#3e2626] text-white">
-                                   {user.name?.charAt(0) || 'U'}
-                                 </AvatarFallback>
-                               )}
-                             </Avatar>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {user.name}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {user.email}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge 
-                            variant={user.role === 'ADMIN' ? 'default' : 
-                                   user.role === 'STORE_MANAGER' ? 'secondary' : 
-                                   user.role === 'CASHIER' ? 'outline' : 'destructive'}
-                          >
-                            {user.role === 'ADMIN' ? 'Admin' :
-                             user.role === 'STORE_MANAGER' ? 'Gerente' :
-                             user.role === 'CASHIER' ? 'Caixa' :
-                             user.role === 'EMPLOYEE' ? 'Funcionário' : user.role}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge 
-                            variant={user.isActive ? 'default' : 'secondary'}
-                            className={user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
-                          >
-                            {user.isActive ? 'Ativo' : 'Inativo'}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {user.storeId ? stores.find((s: any) => s.id === user.storeId)?.name || 'N/A' : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(user.createdAt).toLocaleDateString('pt-BR')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                   <div className="flex items-center space-x-2">
-                             <Button 
-                               variant="ghost" 
-                               size="sm" 
-                               className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
-                               onClick={() => onViewUser(user)}
-                               title="Visualizar usuário"
-                             >
-                       <Eye className="h-4 w-4" />
-                     </Button>
-                             <Button 
-                               variant="ghost" 
-                               size="sm" 
-                               className="h-8 w-8 p-0"
-                               onClick={() => handleEditUserById(user.id)}
-                               title="Editar usuário"
-                             >
-                       <Edit className="h-4 w-4" />
-                     </Button>
-                             <Button 
-                               variant="ghost" 
-                               size="sm" 
-                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                               onClick={() => onDeleteUser(user.id)}
-                               title="Deletar usuário"
-                             >
-                       <Trash2 className="h-4 w-4" />
-                     </Button>
-                   </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      {/* Users List */}
+      {getFilteredUsers.length === 0 ? (
+        <Card className="border border-border shadow-sm">
+          <CardContent className="py-12 text-center">
+            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">Nenhum usuário encontrado</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {userFilters.search || userFilters.role !== 'all' || userFilters.status !== 'all'
+                ? 'Tente ajustar os filtros para encontrar usuários.'
+                : 'Comece criando seu primeiro usuário.'}
+            </p>
+            {!userFilters.search && userFilters.role === 'all' && userFilters.status === 'all' && (
+              <Button onClick={() => setIsModalOpen(true)} className="bg-[#3e2626] hover:bg-[#5a3a3a]">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Criar Primeiro Usuário
+              </Button>
+            )}
           </CardContent>
         </Card>
-        )}
-      </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {getFilteredUsers.map((user: any) => (
+            <Card key={user.id} className="border border-border shadow-sm transition hover:shadow-md">
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      {user.avatarUrl ? (
+                        <img 
+                          src={user.avatarUrl} 
+                          alt={user.name}
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      ) : (
+                        <AvatarFallback className="bg-muted text-foreground">
+                          {user.name?.charAt(0) || 'U'}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-foreground truncate">
+                        {user.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {user.email}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Badge 
+                      variant="outline" 
+                      className="border-border bg-muted/50 text-muted-foreground"
+                    >
+                      {user.role === 'ADMIN' ? 'Admin' :
+                       user.role === 'STORE_MANAGER' ? 'Gerente' :
+                       user.role === 'CASHIER' ? 'Caixa' :
+                       user.role === 'EMPLOYEE' ? 'Funcionário' : user.role}
+                    </Badge>
+                    <Badge 
+                      variant="outline" 
+                      className={
+                        user.isActive 
+                          ? 'border-border bg-muted/50 text-foreground' 
+                          : 'border-border bg-muted/50 text-muted-foreground'
+                      }
+                    >
+                      {user.isActive ? 'Ativo' : 'Inativo'}
+                    </Badge>
+                  </div>
+
+                  {user.storeId && (
+                    <div className="text-sm text-muted-foreground">
+                      Loja: {stores.find((s: any) => s.id === user.storeId)?.name || 'N/A'}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-3 border-t border-border">
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => onViewUser(user)}
+                        title="Visualizar usuário"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleEditUserById(user.id)}
+                        title="Editar usuário"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        onClick={() => onDeleteUser(user.id)}
+                        title="Deletar usuário"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Modal de Novo Usuário */}
       {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(62, 38, 38, 0.5)' }}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-background/80 backdrop-blur-sm">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white">
+            <CardHeader className="bg-[#3e2626] text-primary-foreground">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-xl">Novo Usuário</CardTitle>
-                  <CardDescription className="text-white/80">
+                  <CardDescription className="text-primary-foreground/80">
                     Preencha os dados para criar um novo usuário
                   </CardDescription>
                 </div>
@@ -953,19 +730,15 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                   variant="ghost"
                   size="sm"
                   onClick={handleCloseModal}
-                  className="text-white hover:bg-white/20"
+                  className="text-primary-foreground hover:bg-primary-foreground/20"
                 >
-                  <X className="h-4 w-4" />
+                  ×
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="p-6 space-y-8">
-              {/* Informações Básicas */}
+            <CardContent className="p-6 space-y-6">
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <User className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Informações Básicas
-                </h3>
+                <h3 className="text-lg font-semibold text-foreground">Informações Básicas</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Nome Completo *</Label>
@@ -987,7 +760,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Telefone *</Label>
+                    <Label htmlFor="phone">Telefone</Label>
                     <Input
                       id="phone"
                       value={newUser.phone}
@@ -1008,12 +781,8 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                 </div>
               </div>
 
-              {/* Informações Profissionais */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Building className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Informações Profissionais
-                </h3>
+                <h3 className="text-lg font-semibold text-foreground">Informações Profissionais</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="role">Função</Label>
@@ -1021,7 +790,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                       id="role"
                       value={newUser.role}
                       onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3e2626]/20 focus:border-[#3e2626]"
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
                     >
                       <option value="CASHIER">Caixa</option>
                       <option value="STORE_MANAGER">Gerente</option>
@@ -1035,7 +804,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                       id="storeId"
                       value={newUser.storeId}
                       onChange={(e) => setNewUser({ ...newUser, storeId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3e2626]/20 focus:border-[#3e2626]"
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
                     >
                       <option value="">Selecione uma loja</option>
                       {stores.map((store: any) => (
@@ -1048,21 +817,16 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                 </div>
               </div>
 
-              {/* Informações Pessoais */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <MapPin className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Informações Pessoais
-                </h3>
+                <h3 className="text-lg font-semibold text-foreground">Informações Pessoais</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="cpf">CPF *</Label>
+                    <Label htmlFor="cpf">CPF</Label>
                     <Input
                       id="cpf"
                       value={newUser.cpf}
                       onChange={(e) => handleInputChange('cpf', e.target.value)}
                       placeholder="000.000.000-00"
-                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -1104,12 +868,8 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                 </div>
               </div>
 
-              {/* Avatar e Status */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Settings className="h-5 w-5 mr-2 text-[#3e2626]" />
-                  Avatar e Status
-                </h3>
+                <h3 className="text-lg font-semibold text-foreground">Avatar e Status</h3>
                 <div className="space-y-2">
                   <UserAvatarUpload
                     onAvatarChange={setUserAvatar}
@@ -1125,7 +885,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                     id="isActive"
                     checked={newUser.isActive}
                     onChange={(e) => setNewUser({ ...newUser, isActive: e.target.checked })}
-                    className="rounded border-gray-300 text-[#3e2626] focus:ring-[#3e2626]"
+                    className="h-4 w-4"
                   />
                   <Label htmlFor="isActive" className="text-sm">
                     Usuário ativo
@@ -1140,7 +900,7 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
               <Button 
                 onClick={handleCreateUser}
                 disabled={isCreating}
-                className="bg-[#3e2626] hover:bg-[#4a2f2f]"
+                className="bg-[#3e2626] hover:bg-[#5a3a3a]"
               >
                 {isCreating ? (
                   <>
@@ -1155,10 +915,9 @@ function UsersSection({ users, isLoading, stores, token, onUsersChange, onViewUs
                 )}
               </Button>
             </div>
-        </Card>
-      </div>
+          </Card>
+        </div>
       )}
-
-    </div>
+    </>
   );
 }

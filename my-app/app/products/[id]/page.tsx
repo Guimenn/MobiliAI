@@ -7,6 +7,7 @@ import { useProducts } from '@/lib/hooks/useProducts';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import FavoriteTooltip from '@/components/FavoriteTooltip';
+import ProductCard from '@/components/ProductCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -863,89 +864,15 @@ export default function ProductDetailPage() {
               <div className="space-y-4 mt-6">
                 <h3 className="text-xl font-semibold text-gray-900">Produtos Relacionados</h3>
                 <div className="flex flex-col gap-4">
-                  {relatedProducts.map((relatedProduct) => {
-                    // Calcular preço antigo e desconto (simulado)
-                    const originalPrice = relatedProduct.price * 1.5;
-                    const discountPercent = Math.floor(((originalPrice - relatedProduct.price) / originalPrice) * 100);
-                    const installmentValue = (relatedProduct.price / 18).toFixed(2);
-
-                    return (
-                      <div
-                        key={relatedProduct.id}
-                        onClick={() => router.push(`/products/${relatedProduct.id}`)}
-                        className="w-full text-left bg-white border border-gray-200 hover:border-brand-300 hover:shadow-md rounded-lg p-2.5 transition-all cursor-pointer"
-                      >
-                        <div className="flex gap-2.5">
-                          {/* Imagem do produto - maior para ocupar mais espaço */}
-                          <div className="relative w-56 h-56 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-200 group">
-                            {(() => {
-                              const imageUrl = (relatedProduct.imageUrls && relatedProduct.imageUrls.length > 0) 
-                                ? relatedProduct.imageUrls[0] 
-                                : relatedProduct.imageUrl;
-                              return imageUrl ? (
-                                <Image
-                                  src={imageUrl}
-                                  alt={relatedProduct.name}
-                                  fill
-                                  className="object-cover"
-                                  unoptimized
-                                  onError={(e) => {
-                                    console.error('Erro ao carregar imagem:', imageUrl);
-                                  }}
-                                />
-                              ) : null;
-                            })()}
-                            {(() => {
-                              const imageUrl = (relatedProduct.imageUrls && relatedProduct.imageUrls.length > 0) 
-                                ? relatedProduct.imageUrls[0] 
-                                : relatedProduct.imageUrl;
-                              return !imageUrl ? (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <Package className="h-8 w-8 text-gray-300" />
-                                </div>
-                              ) : null;
-                            })()}
-                            {/* Favorite Tooltip */}
-                            <FavoriteTooltip productId={relatedProduct.id} />
-                          </div>
-
-                          {/* Informações do produto - layout otimizado */}
-                          <div className="flex-1 min-w-0 flex flex-col gap-4">
-                            {/* Título */}
-                            <h4 className="text-xl font-medium text-gray-900 line-clamp-2 leading-snug">
-                              {relatedProduct.name}
-                            </h4>
-
-                            {/* Preços em linha */}
-                            <div className="flex items-baseline gap-2">
-                              <p className="text-md text-gray-400 line-through">
-                                R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                              <p className="text-2xl font-bold text-gray-900">
-                                R$ {relatedProduct.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                            </div>
-
-                            {/* Desconto e Parcelamento em linha */}
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-md font-semibold text-green-600">
-                                {discountPercent}% OFF no Pix
-                              </p>
-                              <span className="text-gray-300">•</span>
-                              <p className="text-md text-gray-700">
-                                18x R$ {installmentValue} sem juros
-                              </p>
-                            </div>
-
-                            {/* Frete grátis */}
-                            <p className="text-sm font-medium text-green-600">
-                              Frete grátis
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {relatedProducts.map((relatedProduct) => (
+                    <ProductCard
+                      key={relatedProduct.id}
+                      product={relatedProduct}
+                      variant="compact"
+                      showFavorite={true}
+                      showAddToCart={false}
+                    />
+                  ))}
                 </div>
             </div>
         )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,8 @@ export default function AdminLayout({
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const notificationsButtonRef = useRef<HTMLButtonElement>(null);
+  const [notificationPosition, setNotificationPosition] = useState<{ top: number; right: number } | null>(null);
 
   const notificationDateFormatter = useMemo(
     () =>
@@ -196,6 +199,32 @@ export default function AdminLayout({
     return () => clearInterval(interval);
   }, [isAuthenticated, user, loadNotifications]);
 
+  // Atualizar posição do dropdown quando necessário
+  useEffect(() => {
+    if (notificationsOpen && notificationsButtonRef.current) {
+      const updatePosition = () => {
+        const rect = notificationsButtonRef.current?.getBoundingClientRect();
+        if (rect) {
+          setNotificationPosition({
+            top: rect.bottom + 12,
+            right: window.innerWidth - rect.right
+          });
+        }
+      };
+      
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    } else {
+      setNotificationPosition(null);
+    }
+  }, [notificationsOpen]);
+
   useEffect(() => {
     if (!notificationsOpen) {
       return;
@@ -204,7 +233,9 @@ export default function AdminLayout({
     const handleClickOutside = (event: MouseEvent) => {
       if (
         notificationsRef.current &&
-        !notificationsRef.current.contains(event.target as Node)
+        !notificationsRef.current.contains(event.target as Node) &&
+        notificationsButtonRef.current &&
+        !notificationsButtonRef.current.contains(event.target as Node)
       ) {
         setNotificationsOpen(false);
       }
@@ -327,6 +358,16 @@ export default function AdminLayout({
       const next = !prev;
       if (!prev) {
         void loadNotifications(false);
+        // Calcular posição do dropdown quando abrir
+        if (notificationsButtonRef.current) {
+          const rect = notificationsButtonRef.current.getBoundingClientRect();
+          setNotificationPosition({
+            top: rect.bottom + 12,
+            right: window.innerWidth - rect.right
+          });
+        }
+      } else {
+        setNotificationPosition(null);
       }
       return next;
     });
@@ -512,6 +553,7 @@ export default function AdminLayout({
             <div className="flex items-center gap-3">
               <div className="relative" ref={notificationsRef}>
                 <Button
+                  ref={notificationsButtonRef}
                   variant="ghost"
                   size="icon"
                   className="relative rounded-full"
@@ -524,8 +566,17 @@ export default function AdminLayout({
                   )}
                 </Button>
 
-                {notificationsOpen && (
-                  <div className="absolute right-0 top-full z-50 mt-3 w-96 rounded-2xl border border-border bg-popover p-4 shadow-2xl">
+                {notificationsOpen && isMounted && notificationPosition && createPortal(
+                  <div 
+                    className="fixed w-96 rounded-2xl border border-border bg-popover p-4 shadow-2xl"
+                    style={{
+                      top: `${notificationPosition.top}px`,
+                      right: `${notificationPosition.right}px`,
+                      zIndex: 99999,
+                      position: 'fixed',
+                    }}
+                    ref={notificationsRef}
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-foreground">Notificações</p>
@@ -614,7 +665,8 @@ export default function AdminLayout({
                         ))
                       )}
                     </div>
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
 

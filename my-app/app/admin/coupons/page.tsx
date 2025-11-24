@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,6 @@ import {
   Edit,
   Trash2,
   Search,
-  Calendar,
   Percent,
   DollarSign,
   CheckCircle,
@@ -24,6 +23,8 @@ import {
   Clock,
   Copy,
   Check,
+  ArrowUpRight,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Dialog,
@@ -150,7 +151,7 @@ export default function CouponsPage() {
         let page = 1;
         let hasMore = true;
         
-        while (hasMore && page <= 5) { // Limitar a 5 páginas (500 produtos)
+        while (hasMore && page <= 5) {
           const productsData = await adminAPI.getProducts(page, 100);
           if (productsData?.products && productsData.products.length > 0) {
             allProducts = [...allProducts, ...productsData.products];
@@ -186,15 +187,6 @@ export default function CouponsPage() {
     try {
       setIsLoading(true);
       const data = await adminAPI.getCoupons();
-      console.log('📋 Cupons carregados:', {
-        total: data.length,
-        cuponsComLoja: data.filter((c: Coupon) => c.applicableTo === 'STORE').map((c: Coupon) => ({
-          code: c.code,
-          storeId: c.storeId,
-          storeName: c.store?.name || 'Não encontrada',
-          storeExists: !!c.store
-        }))
-      });
       setCoupons(data);
     } catch (error: any) {
       toast.error('Erro ao carregar cupons', {
@@ -206,12 +198,10 @@ export default function CouponsPage() {
   };
 
   const handleCreate = () => {
-    // Definir data de início como agora e data de fim como 30 dias a partir de agora
     const now = new Date();
     const oneMonthLater = new Date(now);
     oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
     
-    // Converter para formato datetime-local (YYYY-MM-DDTHH:mm)
     const formatForInput = (date: Date) => {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -244,16 +234,10 @@ export default function CouponsPage() {
   };
 
   const handleEdit = (coupon: Coupon) => {
-    console.log('✏️ Editando cupom:', {
-      code: coupon.code,
-      applicableTo: coupon.applicableTo,
-      storeId: coupon.storeId,
-      storeIdType: typeof coupon.storeId,
-      store: coupon.store,
-      storeName: coupon.store?.name
-    });
-    
     setSelectedCoupon(coupon);
+    const assignmentType = (coupon as any).assignmentType || 'EXCLUSIVE';
+    const usageLimit = assignmentType === 'NEW_ACCOUNTS_ONLY' ? 1 : (coupon.usageLimit || undefined);
+    
     setFormData({
       code: coupon.code,
       description: coupon.description || '',
@@ -261,9 +245,7 @@ export default function CouponsPage() {
       discountValue: Number(coupon.discountValue),
       minimumPurchase: coupon.minimumPurchase ? Number(coupon.minimumPurchase) : undefined,
       maximumDiscount: coupon.maximumDiscount ? Number(coupon.maximumDiscount) : undefined,
-      usageLimit: coupon.usageLimit || undefined,
-      // Converter de UTC para datetime-local (formato YYYY-MM-DDTHH:mm)
-      // Ajustar para timezone local
+      usageLimit: usageLimit,
       validFrom: (() => {
         const validFromDate = new Date(coupon.validFrom);
         const localValidFrom = new Date(validFromDate.getTime() - validFromDate.getTimezoneOffset() * 60000);
@@ -279,7 +261,7 @@ export default function CouponsPage() {
       productId: coupon.productId || '',
       storeId: coupon.storeId || '',
       isActive: coupon.isActive,
-      assignmentType: (coupon as any).assignmentType || 'EXCLUSIVE',
+      assignmentType: assignmentType,
       couponType: (coupon as any).couponType || 'PRODUCT',
     });
     setIsEditModalOpen(true);
@@ -287,7 +269,6 @@ export default function CouponsPage() {
 
   const handleSubmit = async () => {
     try {
-      // Validar campos obrigatórios baseado no tipo de aplicabilidade
       if (formData.applicableTo === 'CATEGORY' && !formData.categoryId) {
         toast.error('Por favor, selecione uma categoria');
         return;
@@ -301,53 +282,33 @@ export default function CouponsPage() {
         return;
       }
 
-      // Log para debug
-      console.log('📝 Dados do formulário antes de enviar:', {
-        applicableTo: formData.applicableTo,
-        storeId: formData.storeId,
-        storeIdType: typeof formData.storeId,
-        storesAvailable: stores.length,
-        selectedStore: stores.find(s => s.id === formData.storeId)
-      });
-
-      // Converter datetime-local para ISO string corretamente
-      // datetime-local retorna "YYYY-MM-DDTHH:mm" sem timezone
-      // Quando você cria new Date("2025-11-17T16:00"), o JavaScript interpreta como horário local
-      // Mas quando converte para ISO, vira UTC, causando diferença de timezone
-      
-      // Solução: tratar como horário local e converter manualmente para UTC
       const validFromLocal = new Date(formData.validFrom);
       const validUntilLocal = new Date(formData.validUntil);
-      
-      // Se validFrom for no futuro muito próximo (menos de 1 minuto), usar agora
-      // Isso garante que cupons criados "para agora" funcionem imediatamente
       const now = new Date();
       const oneMinuteFromNow = new Date(now.getTime() + 60000);
       
       let validFromISO: string;
       if (validFromLocal <= oneMinuteFromNow) {
-        // Se a data de início é muito próxima de agora ou no passado, usar agora
         validFromISO = now.toISOString();
       } else {
         validFromISO = validFromLocal.toISOString();
       }
       
       const validUntilISO = validUntilLocal.toISOString();
+      const finalUsageLimit = formData.assignmentType === 'NEW_ACCOUNTS_ONLY' ? 1 : formData.usageLimit;
       
       const payload: any = {
         ...formData,
+        usageLimit: finalUsageLimit,
         validFrom: validFromISO,
         validUntil: validUntilISO,
       };
 
-      // Remover campos vazios
       if (!payload.minimumPurchase) delete payload.minimumPurchase;
       if (!payload.maximumDiscount) delete payload.maximumDiscount;
       if (!payload.usageLimit) delete payload.usageLimit;
       if (!payload.description) delete payload.description;
       
-      // Remover campos de aplicabilidade apenas se não forem necessários
-      // IMPORTANTE: Não remover storeId se applicableTo for 'STORE'
       if (payload.applicableTo !== 'CATEGORY') {
         if (!payload.categoryId) delete payload.categoryId;
       }
@@ -357,61 +318,18 @@ export default function CouponsPage() {
       if (payload.applicableTo !== 'STORE') {
         if (!payload.storeId) delete payload.storeId;
       } else {
-        // Se for cupom de loja, garantir que storeId está presente e não vazio
         if (!payload.storeId || payload.storeId.trim() === '') {
-          console.error('❌ ERRO: storeId vazio para cupom de loja!', {
-            applicableTo: payload.applicableTo,
-            storeId: payload.storeId,
-            formDataStoreId: formData.storeId
-          });
           toast.error('Por favor, selecione uma loja válida');
           return;
         }
-        // Garantir que storeId seja uma string válida
         payload.storeId = payload.storeId.trim();
-        console.log('✅ storeId preservado para cupom de loja:', {
-          storeId: payload.storeId,
-          storeName: stores.find(s => s.id === payload.storeId)?.name
-        });
       }
 
-      // Log final do payload
-      console.log('📤 Payload final enviado ao backend:', {
-        code: payload.code,
-        applicableTo: payload.applicableTo,
-        storeId: payload.storeId || 'NÃO ENVIADO',
-        storeIdType: typeof payload.storeId,
-        storeIdRaw: payload.storeId,
-        storeIdIsUndefined: payload.storeId === undefined,
-        storeIdIsNull: payload.storeId === null,
-        storeIdIsEmpty: payload.storeId === '',
-        categoryId: payload.categoryId || 'NÃO ENVIADO',
-        productId: payload.productId || 'NÃO ENVIADO',
-        discountType: payload.discountType,
-        discountValue: payload.discountValue,
-        validFrom: payload.validFrom,
-        validUntil: payload.validUntil,
-        isActive: payload.isActive,
-        assignmentType: payload.assignmentType,
-        couponType: payload.couponType,
-        payloadKeys: Object.keys(payload),
-        payloadJSON: JSON.stringify(payload)
-      });
-
-      let createdCoupon;
       if (selectedCoupon) {
-        createdCoupon = await adminAPI.updateCoupon(selectedCoupon.id, payload);
+        await adminAPI.updateCoupon(selectedCoupon.id, payload);
         toast.success('Cupom atualizado com sucesso!');
       } else {
-        createdCoupon = await adminAPI.createCoupon(payload);
-        console.log('✅ Resposta do backend após criar cupom:', {
-          id: createdCoupon?.id,
-          code: createdCoupon?.code,
-          applicableTo: createdCoupon?.applicableTo,
-          storeId: createdCoupon?.storeId,
-          store: createdCoupon?.store,
-          storeName: createdCoupon?.store?.name || 'Loja não encontrada na resposta'
-        });
+        await adminAPI.createCoupon(payload);
         toast.success('Cupom criado com sucesso!');
       }
 
@@ -420,12 +338,6 @@ export default function CouponsPage() {
       setSelectedCoupon(null);
       loadCoupons();
     } catch (error: any) {
-      console.error('❌ Erro ao salvar cupom:', {
-        error,
-        response: error.response?.data,
-        message: error.response?.data?.message || error.message,
-        status: error.response?.status
-      });
       toast.error('Erro ao salvar cupom', {
         description: error.response?.data?.message || error.message,
       });
@@ -459,10 +371,12 @@ export default function CouponsPage() {
     }
   };
 
-  const filteredCoupons = coupons.filter((coupon) =>
-    coupon.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    coupon.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCoupons = useMemo(() => {
+    return coupons.filter((coupon) =>
+      coupon.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      coupon.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [coupons, searchTerm]);
 
   const getStatusBadge = (coupon: Coupon) => {
     const now = new Date();
@@ -470,22 +384,18 @@ export default function CouponsPage() {
     const validUntil = new Date(coupon.validUntil);
 
     if (!coupon.isActive) {
-      return <Badge variant="destructive">Inativo</Badge>;
+      return <Badge variant="outline" className="border-border bg-muted/50 text-muted-foreground">Inativo</Badge>;
     }
 
     if (now < validFrom) {
-      return <Badge variant="secondary">Aguardando</Badge>;
+      return <Badge variant="outline" className="border-border bg-muted/50 text-muted-foreground">Aguardando</Badge>;
     }
 
     if (now > validUntil) {
-      return <Badge variant="outline">Expirado</Badge>;
+      return <Badge variant="outline" className="border-border bg-muted/50 text-muted-foreground">Expirado</Badge>;
     }
 
-    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
-      return <Badge variant="outline">Esgotado</Badge>;
-    }
-
-    return <Badge className="bg-green-500">Ativo</Badge>;
+    return <Badge variant="outline" className="border-border bg-muted/50 text-foreground">Ativo</Badge>;
   };
 
   const formatCurrency = (value: number) => {
@@ -505,34 +415,104 @@ export default function CouponsPage() {
     });
   };
 
+  const stats = useMemo(() => {
+    const now = new Date();
+    const active = coupons.filter(c => {
+      if (!c.isActive) return false;
+      const validFrom = new Date(c.validFrom);
+      const validUntil = new Date(c.validUntil);
+      return now >= validFrom && now <= validUntil;
+    }).length;
+    const expired = coupons.filter(c => {
+      const validUntil = new Date(c.validUntil);
+      return now > validUntil;
+    }).length;
+    const totalUsed = coupons.reduce((sum, c) => sum + c.usedCount, 0);
+    
+    return { total: coupons.length, active, expired, totalUsed };
+  }, [coupons]);
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626]"></div>
+      <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/40">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-b-primary" />
+          <p className="text-sm text-muted-foreground">Carregando cupons...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8" style={{ position: 'relative', zIndex: 1 }}>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-[#3e2626] flex items-center gap-2">
-            <Ticket className="h-8 w-8" />
-            Gerenciar Cupons
-          </h1>
-          <p className="text-gray-600 mt-1">Crie e gerencie cupons de desconto</p>
-        </div>
-        <Button onClick={handleCreate} className="bg-[#3e2626] hover:bg-[#5a3a3a]">
-          <Plus className="h-4 w-4 mr-2" />
-          Criar Cupom
-        </Button>
-      </div>
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl space-y-4">
+            <Badge
+              variant="outline"
+              className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+            >
+              Gestão de Promoções
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+                Gerenciar Cupons de Desconto
+              </h1>
+              <p className="text-sm text-primary-foreground/80 lg:text-base">
+                Crie e gerencie cupons promocionais para produtos, categorias ou lojas específicas.
+                Configure descontos percentuais ou valores fixos com controle total sobre validade e uso.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                onClick={handleCreate} 
+                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Novo Cupom
+              </Button>
+            </div>
+          </div>
 
-      <Card className="mb-6" style={{ zIndex: 1 }}>
+          <div className="grid w-full max-w-md grid-cols-2 gap-4 sm:grid-cols-2 lg:max-w-xl">
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <Ticket className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.total}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total de cupons</p>
+            </div>
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <CheckCircle className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.active}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Cupons ativos</p>
+            </div>
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <XCircle className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.expired}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Expirados</p>
+            </div>
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <DollarSign className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-semibold leading-tight">{stats.totalUsed}</p>
+              <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Usos totais</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Search Card */}
+      <Card className="border border-border shadow-sm">
         <CardContent className="pt-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Buscar cupons por código ou descrição..."
               value={searchTerm}
@@ -543,43 +523,56 @@ export default function CouponsPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4">
-        {filteredCoupons.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Ticket className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Nenhum cupom encontrado</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredCoupons.map((coupon) => (
-            <Card key={coupon.id} className="hover:shadow-lg transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-semibold text-[#3e2626]">{coupon.code}</h3>
-                      {getStatusBadge(coupon)}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopyCode(coupon.code)}
-                        className="h-8 w-8 p-0"
-                      >
-                        {copiedCode === coupon.code ? (
-                          <Check className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
+      {/* Coupons List */}
+      {filteredCoupons.length === 0 ? (
+        <Card className="border border-border shadow-sm">
+          <CardContent className="py-12 text-center">
+            <Ticket className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">Nenhum cupom encontrado</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {searchTerm ? 'Tente ajustar os termos de busca.' : 'Comece criando seu primeiro cupom de desconto.'}
+            </p>
+            {!searchTerm && (
+              <Button onClick={handleCreate} className="bg-[#3e2626] hover:bg-[#5a3a3a]">
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Primeiro Cupom
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6">
+          {filteredCoupons.map((coupon) => (
+            <Card key={coupon.id} className="border border-border shadow-sm transition hover:shadow-md">
+              <CardContent className="p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-foreground">{coupon.code}</h3>
+                          {getStatusBadge(coupon)}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyCode(coupon.code)}
+                            className="h-8 w-8 p-0"
+                          >
+                            {copiedCode === coupon.code ? (
+                              <Check className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        {coupon.description && (
+                          <p className="text-sm text-muted-foreground">{coupon.description}</p>
                         )}
-                      </Button>
+                      </div>
                     </div>
-                    {coupon.description && (
-                      <p className="text-gray-600 mb-3">{coupon.description}</p>
-                    )}
                     
-                    {/* Mostrar aplicabilidade específica */}
                     {coupon.applicableTo !== 'ALL' && (
-                      <div className="mb-3">
+                      <div>
                         <Badge variant="outline" className="mr-2">
                           {coupon.applicableTo === 'CATEGORY' && 'Categoria: '}
                           {coupon.applicableTo === 'PRODUCT' && 'Produto: '}
@@ -599,38 +592,29 @@ export default function CouponsPage() {
                       </div>
                     )}
                     
-                    {/* Mostrar tipo de cupom e atribuição */}
-                    <div className="mb-3 flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Badge 
                         variant="outline" 
-                        className={
-                          (coupon as any).couponType === 'SHIPPING' ? 'border-orange-500 text-orange-700 bg-orange-50' :
-                          'border-blue-500 text-blue-700 bg-blue-50'
-                        }
+                        className="border-border bg-muted/50 text-muted-foreground"
                       >
-                        {(coupon as any).couponType === 'SHIPPING' ? '🚚 Frete' : '📦 Produtos'}
-                        {!(coupon as any).couponType && '📦 Produtos'}
+                        {(coupon as any).couponType === 'SHIPPING' ? 'Frete' : 'Produtos'}
+                        {!(coupon as any).couponType && 'Produtos'}
                       </Badge>
                       <Badge 
                         variant="outline" 
-                        className={
-                          coupon.assignmentType === 'EXCLUSIVE' ? 'border-blue-500 text-blue-700' :
-                          coupon.assignmentType === 'ALL_ACCOUNTS' ? 'border-green-500 text-green-700' :
-                          coupon.assignmentType === 'NEW_ACCOUNTS_ONLY' ? 'border-purple-500 text-purple-700' :
-                          'border-gray-500 text-gray-700'
-                        }
+                        className="border-border bg-muted/50 text-muted-foreground"
                       >
-                        {coupon.assignmentType === 'EXCLUSIVE' && '🔒 Exclusivo'}
-                        {coupon.assignmentType === 'ALL_ACCOUNTS' && '👥 Todas as Contas'}
-                        {coupon.assignmentType === 'NEW_ACCOUNTS_ONLY' && '🆕 Primeira Compra'}
-                        {!coupon.assignmentType && '🔒 Exclusivo'}
+                        {coupon.assignmentType === 'EXCLUSIVE' && 'Exclusivo'}
+                        {coupon.assignmentType === 'ALL_ACCOUNTS' && 'Todas as Contas'}
+                        {coupon.assignmentType === 'NEW_ACCOUNTS_ONLY' && 'Primeira Compra'}
+                        {!coupon.assignmentType && 'Exclusivo'}
                       </Badge>
                     </div>
                     
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-500">Desconto:</span>
-                        <p className="font-semibold text-[#3e2626]">
+                    <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                      <div className="rounded-xl border border-border bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Desconto</p>
+                        <p className="text-base font-semibold text-foreground">
                           {coupon.discountType === 'PERCENTAGE' ? (
                             <>{coupon.discountValue}%</>
                           ) : (
@@ -639,28 +623,33 @@ export default function CouponsPage() {
                         </p>
                       </div>
                       {coupon.minimumPurchase && (
-                        <div>
-                          <span className="text-gray-500">Compra mínima:</span>
-                          <p className="font-semibold">{formatCurrency(coupon.minimumPurchase)}</p>
+                        <div className="rounded-xl border border-border bg-muted/30 p-3">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Compra mínima</p>
+                          <p className="text-base font-semibold text-foreground">{formatCurrency(coupon.minimumPurchase)}</p>
                         </div>
                       )}
-                      <div>
-                        <span className="text-gray-500">Usos:</span>
-                        <p className="font-semibold">
-                          {coupon.usedCount} / {coupon.usageLimit || '∞'}
+                      <div className="rounded-xl border border-border bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Usos</p>
+                        <p className="text-base font-semibold text-foreground">
+                          {coupon.usedCount} total
+                          {coupon.usageLimit && (
+                            <span className="text-xs text-muted-foreground block">Limite: {coupon.usageLimit}x/cliente</span>
+                          )}
                         </p>
                       </div>
-                      <div>
-                        <span className="text-gray-500">Válido até:</span>
-                        <p className="font-semibold">{formatDate(coupon.validUntil)}</p>
+                      <div className="rounded-xl border border-border bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Válido até</p>
+                        <p className="text-base font-semibold text-foreground">{formatDate(coupon.validUntil)}</p>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2 ml-4">
+                  
+                  <div className="flex gap-2 lg:flex-col lg:ml-4">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleEdit(coupon)}
+                      className="flex-1 lg:flex-none"
                     >
                       <Edit className="h-4 w-4 mr-2" />
                       Editar
@@ -669,6 +658,7 @@ export default function CouponsPage() {
                       variant="destructive"
                       size="sm"
                       onClick={() => handleDelete(coupon)}
+                      className="flex-1 lg:flex-none"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Deletar
@@ -677,9 +667,9 @@ export default function CouponsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Create/Edit Modal */}
       <Dialog open={isCreateModalOpen || isEditModalOpen} onOpenChange={(open) => {
@@ -687,7 +677,7 @@ export default function CouponsPage() {
           setIsCreateModalOpen(false);
           setIsEditModalOpen(false);
           setSelectedCoupon(null);
-          setProductSearchTerm(''); // Limpar busca ao fechar modal
+          setProductSearchTerm('');
         }
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -793,7 +783,7 @@ export default function CouponsPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="usageLimit">Limite de Uso</Label>
+                <Label htmlFor="usageLimit">Limite de Uso por Cliente</Label>
                 <Input
                   id="usageLimit"
                   type="number"
@@ -806,7 +796,15 @@ export default function CouponsPage() {
                     })
                   }
                   placeholder="Opcional"
+                  disabled={formData.assignmentType === 'NEW_ACCOUNTS_ONLY'}
+                  className={formData.assignmentType === 'NEW_ACCOUNTS_ONLY' ? 'bg-muted cursor-not-allowed' : ''}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.assignmentType === 'NEW_ACCOUNTS_ONLY' 
+                    ? 'Para cupons de primeira compra, o limite é automaticamente 1 uso por cliente'
+                    : 'Número máximo de vezes que cada cliente pode usar este cupom'
+                  }
+                </p>
               </div>
             </div>
 
@@ -839,12 +837,10 @@ export default function CouponsPage() {
                   setFormData({ 
                     ...formData, 
                     applicableTo: value,
-                    // Limpar seleções quando mudar o tipo
                     categoryId: value !== 'CATEGORY' ? '' : formData.categoryId,
                     productId: value !== 'PRODUCT' ? '' : formData.productId,
                     storeId: value !== 'STORE' ? '' : formData.storeId,
                   });
-                  // Limpar busca quando mudar de produto para outro tipo
                   if (value !== 'PRODUCT') {
                     setProductSearchTerm('');
                   }
@@ -879,7 +875,7 @@ export default function CouponsPage() {
                     <SelectItem value="SHIPPING">Para Frete</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {formData.couponType === 'PRODUCT' && 'Desconto aplicado nos produtos'}
                   {formData.couponType === 'SHIPPING' && 'Desconto aplicado no frete'}
                 </p>
@@ -888,9 +884,14 @@ export default function CouponsPage() {
                 <Label htmlFor="assignmentType">Tipo de Atribuição *</Label>
                 <Select
                   value={formData.assignmentType}
-                  onValueChange={(value: 'EXCLUSIVE' | 'ALL_ACCOUNTS' | 'NEW_ACCOUNTS_ONLY') =>
-                    setFormData({ ...formData, assignmentType: value })
-                  }
+                  onValueChange={(value: 'EXCLUSIVE' | 'ALL_ACCOUNTS' | 'NEW_ACCOUNTS_ONLY') => {
+                    const newFormData = {
+                      ...formData,
+                      assignmentType: value,
+                      usageLimit: value === 'NEW_ACCOUNTS_ONLY' ? 1 : formData.usageLimit,
+                    };
+                    setFormData(newFormData);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -901,15 +902,14 @@ export default function CouponsPage() {
                     <SelectItem value="NEW_ACCOUNTS_ONLY">Somente para primeira compra</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {formData.assignmentType === 'EXCLUSIVE' && 'O cliente precisa digitar o código do cupom manualmente'}
                   {formData.assignmentType === 'ALL_ACCOUNTS' && 'O cupom aparecerá automaticamente para todos os clientes'}
-                  {formData.assignmentType === 'NEW_ACCOUNTS_ONLY' && 'O cupom aparecerá automaticamente apenas para clientes que ainda não fizeram nenhuma compra'}
+                  {formData.assignmentType === 'NEW_ACCOUNTS_ONLY' && 'O cupom aparecerá automaticamente apenas para clientes que ainda não fizeram nenhuma compra. O limite de uso será automaticamente 1.'}
                 </p>
               </div>
             </div>
 
-            {/* Campo condicional para Categoria */}
             {formData.applicableTo === 'CATEGORY' && (
               <div>
                 <Label htmlFor="categoryId">Selecione a Categoria *</Label>
@@ -933,28 +933,26 @@ export default function CouponsPage() {
               </div>
             )}
 
-            {/* Campo condicional para Produto */}
             {formData.applicableTo === 'PRODUCT' && (
               <div>
                 <Label htmlFor="productId">Selecione o Produto *</Label>
                 {isLoadingOptions ? (
-                  <div className="text-sm text-gray-500">Carregando produtos...</div>
+                  <div className="text-sm text-muted-foreground">Carregando produtos...</div>
                 ) : (
                   <Select
                     value={formData.productId}
                     onValueChange={(value) => {
                       setFormData({ ...formData, productId: value });
-                      setProductSearchTerm(''); // Limpar busca após seleção
+                      setProductSearchTerm('');
                     }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um produto" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[400px] p-0">
-                      {/* Barra de pesquisa dentro do Select */}
-                      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-2">
+                      <div className="sticky top-0 z-10 bg-background border-b border-border p-2">
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none" />
                           <Input
                             placeholder="Buscar produto por nome..."
                             value={productSearchTerm}
@@ -968,7 +966,6 @@ export default function CouponsPage() {
                             }}
                             onKeyDown={(e) => {
                               e.stopPropagation();
-                              // Permitir navegação com setas e Enter
                               if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
                                 e.stopPropagation();
                               }
@@ -982,21 +979,19 @@ export default function CouponsPage() {
                         </div>
                       </div>
                       
-                      {/* Lista de produtos filtrados */}
                       <div className="max-h-[300px] overflow-y-auto">
                         {products.length === 0 ? (
-                          <div className="px-2 py-6 text-center text-sm text-gray-500">
+                          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
                             Nenhum produto encontrado
                           </div>
                         ) : (() => {
-                          // Filtrar produtos baseado no termo de busca
                           const filteredProducts = products.filter((product) =>
                             product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
                           );
                           
                           if (filteredProducts.length === 0) {
                             return (
-                              <div className="px-2 py-6 text-center text-sm text-gray-500">
+                              <div className="px-2 py-6 text-center text-sm text-muted-foreground">
                                 Nenhum produto encontrado com "{productSearchTerm}"
                               </div>
                             );
@@ -1015,12 +1010,11 @@ export default function CouponsPage() {
               </div>
             )}
 
-            {/* Campo condicional para Loja */}
             {formData.applicableTo === 'STORE' && (
               <div>
                 <Label htmlFor="storeId">Selecione a Loja *</Label>
                 {isLoadingOptions ? (
-                  <div className="text-sm text-gray-500">Carregando lojas...</div>
+                  <div className="text-sm text-muted-foreground">Carregando lojas...</div>
                 ) : (
                   <Select
                     value={formData.storeId}
@@ -1080,4 +1074,3 @@ export default function CouponsPage() {
     </div>
   );
 }
-

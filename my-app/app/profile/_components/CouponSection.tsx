@@ -199,7 +199,7 @@ export default function CouponSection() {
                       )}
                       {coupon.usageLimit && (
                         <span>
-                          Uso restante: {Math.max((coupon.usageLimit ?? 0) - (coupon.usedCount ?? 0), 0)}x
+                          Limite de uso: {coupon.usageLimit}x por cliente
                         </span>
                       )}
                     </div>

@@ -1,30 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
 import { 
   Settings, 
   Save, 
-  ArrowLeft,
   Shield,
   Bell,
+  Store,
   Database,
   Mail,
-  Globe,
   Lock,
-  Users,
-  Store,
-  Package,
-  DollarSign,
-  Bell as NotificationIcon,
   Key,
-  Trash2,
-  Download,
-  Upload
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -63,392 +58,400 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     try {
       setIsLoading(true);
-      // Aqui você implementaria a lógica para salvar as configurações
       console.log('Salvando configurações:', settings);
-      // Simular delay de salvamento
       await new Promise(resolve => setTimeout(resolve, 1000));
+      toast.success('Configurações salvas com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
+      toast.error('Erro ao salvar configurações');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const tabs = [
-    { id: 'company', label: 'Empresa', icon: Store },
-    { id: 'system', label: 'Sistema', icon: Settings },
-    { id: 'notifications', label: 'Notificações', icon: Bell },
-    { id: 'security', label: 'Segurança', icon: Shield }
-  ];
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.back()}
-                className="flex items-center"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-                <p className="text-sm text-gray-600">Gerencie as configurações do sistema</p>
-              </div>
-            </div>
-            <Button 
-              className="bg-[#3e2626] hover:bg-[#8B4513]"
-              onClick={saveSettings}
-              disabled={isLoading}
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl space-y-4">
+            <Badge
+              variant="outline"
+              className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
             >
-              <Save className="h-4 w-4 mr-2" />
-              {isLoading ? 'Salvando...' : 'Salvar'}
-            </Button>
+              Configurações
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+                Configurações do Sistema
+              </h1>
+              <p className="text-sm text-primary-foreground/80 lg:text-base">
+                Gerencie as configurações da empresa, sistema, notificações e segurança.
+              </p>
+            </div>
           </div>
+          <Button 
+            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+            onClick={saveSettings}
+            disabled={isLoading}
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {isLoading ? 'Salvando...' : 'Salvar Alterações'}
+          </Button>
         </div>
-      </div>
+      </section>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Categorias</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <nav className="space-y-1">
-                  {tabs.map((tab) => {
-                    const IconComponent = tab.icon;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`w-full flex items-center px-4 py-3 text-left text-sm font-medium rounded-none ${
-                          activeTab === tab.id
-                            ? 'bg-[#3e2626] text-white'
-                            : 'text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        <IconComponent className="h-4 w-4 mr-3" />
-                        {tab.label}
-                      </button>
-                    );
+      {/* Settings Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsTrigger value="company" className="flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Empresa
+          </TabsTrigger>
+          <TabsTrigger value="system" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Sistema
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notificações
+          </TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Segurança
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Company Settings */}
+        <TabsContent value="company" className="mt-6">
+          <Card className="border border-border shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5" />
+                Informações da Empresa
+              </CardTitle>
+              <CardDescription>
+                Configure os dados da sua empresa
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company-name">Nome da Empresa</Label>
+                  <Input
+                    id="company-name"
+                    value={settings.company.name}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      company: { ...settings.company, name: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-cnpj">CNPJ</Label>
+                  <Input
+                    id="company-cnpj"
+                    value={settings.company.cnpj}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      company: { ...settings.company, cnpj: e.target.value }
+                    })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="company-email">Email</Label>
+                <Input
+                  id="company-email"
+                  type="email"
+                  value={settings.company.email}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    company: { ...settings.company, email: e.target.value }
                   })}
-                </nav>
-              </CardContent>
-            </Card>
-          </div>
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company-phone">Telefone</Label>
+                  <Input
+                    id="company-phone"
+                    value={settings.company.phone}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      company: { ...settings.company, phone: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-address">Endereço</Label>
+                  <Input
+                    id="company-address"
+                    value={settings.company.address}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      company: { ...settings.company, address: e.target.value }
+                    })}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          {/* Content */}
-          <div className="lg:col-span-3">
-            {/* Company Settings */}
-            {activeTab === 'company' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Informações da Empresa</CardTitle>
-                  <CardDescription>Configure os dados da sua empresa</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Nome da Empresa
-                      </label>
-                      <Input
-                        value={settings.company.name}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          company: { ...settings.company, name: e.target.value }
-                        })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        CNPJ
-                      </label>
-                      <Input
-                        value={settings.company.cnpj}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          company: { ...settings.company, cnpj: e.target.value }
-                        })}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
-                    <Input
-                      value={settings.company.email}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        company: { ...settings.company, email: e.target.value }
-                      })}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Telefone
-                      </label>
-                      <Input
-                        value={settings.company.phone}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          company: { ...settings.company, phone: e.target.value }
-                        })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Endereço
-                      </label>
-                      <Input
-                        value={settings.company.address}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          company: { ...settings.company, address: e.target.value }
-                        })}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+        {/* System Settings */}
+        <TabsContent value="system" className="mt-6">
+          <Card className="border border-border shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Configurações do Sistema
+              </CardTitle>
+              <CardDescription>
+                Configure o comportamento do sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="maintenance-mode">Modo de Manutenção</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Ativar modo de manutenção do sistema
+                  </p>
+                </div>
+                <Switch
+                  id="maintenance-mode"
+                  checked={settings.system.maintenanceMode}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    system: { ...settings.system, maintenanceMode: checked }
+                  })}
+                />
+              </div>
 
-            {/* System Settings */}
-            {activeTab === 'system' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configurações do Sistema</CardTitle>
-                  <CardDescription>Configure o comportamento do sistema</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Modo de Manutenção</h3>
-                      <p className="text-sm text-gray-500">Ativar modo de manutenção do sistema</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.system.maintenanceMode}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          system: { ...settings.system, maintenanceMode: e.target.checked }
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="auto-backup">Backup Automático</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Fazer backup automático dos dados
+                  </p>
+                </div>
+                <Switch
+                  id="auto-backup"
+                  checked={settings.system.autoBackup}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    system: { ...settings.system, autoBackup: checked }
+                  })}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Backup Automático</h3>
-                      <p className="text-sm text-gray-500">Fazer backup automático dos dados</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.system.autoBackup}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          system: { ...settings.system, autoBackup: e.target.checked }
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="session-timeout">Timeout de Sessão (minutos)</Label>
+                <Input
+                  id="session-timeout"
+                  type="number"
+                  value={settings.system.sessionTimeout}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    system: { ...settings.system, sessionTimeout: parseInt(e.target.value) || 30 }
+                  })}
+                />
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Timeout de Sessão (minutos)
-                    </label>
-                    <Input
-                      type="number"
-                      value={settings.system.sessionTimeout}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        system: { ...settings.system, sessionTimeout: parseInt(e.target.value) }
-                      })}
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="max-login-attempts">Máximo de Tentativas de Login</Label>
+                <Input
+                  id="max-login-attempts"
+                  type="number"
+                  value={settings.system.maxLoginAttempts}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    system: { ...settings.system, maxLoginAttempts: parseInt(e.target.value) || 5 }
+                  })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Máximo de Tentativas de Login
-                    </label>
-                    <Input
-                      type="number"
-                      value={settings.system.maxLoginAttempts}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        system: { ...settings.system, maxLoginAttempts: parseInt(e.target.value) }
-                      })}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+        {/* Notifications Settings */}
+        <TabsContent value="notifications" className="mt-6">
+          <Card className="border border-border shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Configurações de Notificações
+              </CardTitle>
+              <CardDescription>
+                Configure como receber notificações
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="email-notifications">Notificações por Email</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receber notificações por email
+                  </p>
+                </div>
+                <Switch
+                  id="email-notifications"
+                  checked={settings.notifications.emailNotifications}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    notifications: { ...settings.notifications, emailNotifications: checked }
+                  })}
+                />
+              </div>
 
-            {/* Notifications Settings */}
-            {activeTab === 'notifications' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configurações de Notificações</CardTitle>
-                  <CardDescription>Configure como receber notificações</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Notificações por Email</h3>
-                      <p className="text-sm text-gray-500">Receber notificações por email</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.notifications.emailNotifications}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          notifications: { ...settings.notifications, emailNotifications: e.target.checked }
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="sms-notifications">Notificações por SMS</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receber notificações por SMS
+                  </p>
+                </div>
+                <Switch
+                  id="sms-notifications"
+                  checked={settings.notifications.smsNotifications}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    notifications: { ...settings.notifications, smsNotifications: checked }
+                  })}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Alertas de Vendas</h3>
-                      <p className="text-sm text-gray-500">Notificar sobre novas vendas</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.notifications.salesAlerts}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          notifications: { ...settings.notifications, salesAlerts: e.target.checked }
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="push-notifications">Notificações Push</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receber notificações push no navegador
+                  </p>
+                </div>
+                <Switch
+                  id="push-notifications"
+                  checked={settings.notifications.pushNotifications}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    notifications: { ...settings.notifications, pushNotifications: checked }
+                  })}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Alertas de Estoque Baixo</h3>
-                      <p className="text-sm text-gray-500">Notificar quando o estoque estiver baixo</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.notifications.lowStockAlerts}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          notifications: { ...settings.notifications, lowStockAlerts: e.target.checked }
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="sales-alerts">Alertas de Vendas</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Notificar sobre novas vendas
+                  </p>
+                </div>
+                <Switch
+                  id="sales-alerts"
+                  checked={settings.notifications.salesAlerts}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    notifications: { ...settings.notifications, salesAlerts: checked }
+                  })}
+                />
+              </div>
 
-            {/* Security Settings */}
-            {activeTab === 'security' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configurações de Segurança</CardTitle>
-                  <CardDescription>Configure as políticas de segurança do sistema</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Autenticação de Dois Fatores</h3>
-                      <p className="text-sm text-gray-500">Requerer 2FA para todos os usuários</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.security.twoFactorAuth}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          security: { ...settings.security, twoFactorAuth: e.target.checked }
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="low-stock-alerts">Alertas de Estoque Baixo</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Notificar quando o estoque estiver baixo
+                  </p>
+                </div>
+                <Switch
+                  id="low-stock-alerts"
+                  checked={settings.notifications.lowStockAlerts}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    notifications: { ...settings.notifications, lowStockAlerts: checked }
+                  })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Expiração de Senha (dias)
-                    </label>
-                    <Input
-                      type="number"
-                      value={settings.security.passwordExpiration}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        security: { ...settings.security, passwordExpiration: parseInt(e.target.value) }
-                      })}
-                    />
-                  </div>
+        {/* Security Settings */}
+        <TabsContent value="security" className="mt-6">
+          <Card className="border border-border shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Configurações de Segurança
+              </CardTitle>
+              <CardDescription>
+                Configure as políticas de segurança do sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="two-factor-auth">Autenticação de Dois Fatores</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Requerer 2FA para todos os usuários
+                  </p>
+                </div>
+                <Switch
+                  id="two-factor-auth"
+                  checked={settings.security.twoFactorAuth}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    security: { ...settings.security, twoFactorAuth: checked }
+                  })}
+                />
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Lista de IPs Permitidos (separados por vírgula)
-                    </label>
-                    <Input
-                      value={settings.security.ipWhitelist}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        security: { ...settings.security, ipWhitelist: e.target.value }
-                      })}
-                      placeholder="192.168.1.1, 10.0.0.1"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="password-expiration">Expiração de Senha (dias)</Label>
+                <Input
+                  id="password-expiration"
+                  type="number"
+                  value={settings.security.passwordExpiration}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    security: { ...settings.security, passwordExpiration: parseInt(e.target.value) || 90 }
+                  })}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Log de Auditoria</h3>
-                      <p className="text-sm text-gray-500">Registrar todas as ações dos usuários</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.security.auditLog}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          security: { ...settings.security, auditLog: e.target.checked }
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-      </div>
+              <div className="space-y-2">
+                <Label htmlFor="ip-whitelist">Lista de IPs Permitidos (separados por vírgula)</Label>
+                <Input
+                  id="ip-whitelist"
+                  value={settings.security.ipWhitelist}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    security: { ...settings.security, ipWhitelist: e.target.value }
+                  })}
+                  placeholder="192.168.1.1, 10.0.0.1"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="audit-log">Log de Auditoria</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Registrar todas as ações dos usuários
+                  </p>
+                </div>
+                <Switch
+                  id="audit-log"
+                  checked={settings.security.auditLog}
+                  onCheckedChange={(checked) => setSettings({
+                    ...settings,
+                    security: { ...settings.security, auditLog: checked }
+                  })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

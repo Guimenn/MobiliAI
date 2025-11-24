@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { X, Zap, Search, Clock, Percent, Package } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { X, Zap, Search, Clock, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminAPI } from '@/lib/api';
 import { showConfirm } from '@/lib/alerts';
@@ -32,7 +33,6 @@ export default function FlashSalePanel({
   const [isSaving, setIsSaving] = useState(false);
   const [activeFlashSaleProduct, setActiveFlashSaleProduct] = useState<any | null>(null);
 
-  // Função para encontrar produto com oferta relâmpago ativa
   const findActiveFlashSaleProduct = () => {
     const now = new Date();
     const activeProduct = products.find((product: any) => {
@@ -46,21 +46,18 @@ export default function FlashSalePanel({
     setActiveFlashSaleProduct(activeProduct || null);
   };
 
-  // Resetar formulário quando o componente montar e buscar produto com oferta ativa
   useEffect(() => {
     setSearchTerm('');
     setSelectedProduct(null);
     setDiscountPercent(0);
     const now = new Date();
     setStartDate(now.toISOString().split('T')[0]);
-    // Usar horário atual (não próxima hora)
     const currentTime = now.toTimeString().split(':', 2).join(':');
     setStartTime(currentTime);
     setDurationHours(24);
     findActiveFlashSaleProduct();
   }, [products]);
 
-  // Carregar dados da oferta quando um produto for selecionado
   useEffect(() => {
     if (selectedProduct) {
       if (selectedProduct.isFlashSale && selectedProduct.flashSaleDiscountPercent) {
@@ -80,7 +77,6 @@ export default function FlashSalePanel({
         setDiscountPercent(0);
         const now = new Date();
         setStartDate(now.toISOString().split('T')[0]);
-        // Usar horário atual (não próxima hora)
         const currentTime = now.toTimeString().split(':', 2).join(':');
         setStartTime(currentTime);
         setDurationHours(24);
@@ -88,7 +84,6 @@ export default function FlashSalePanel({
     }
   }, [selectedProduct]);
 
-  // Filtrar produtos
   const filteredProducts = products.filter((product: any) => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
@@ -99,7 +94,6 @@ export default function FlashSalePanel({
     );
   });
 
-  // Calcular preço com desconto
   const calculateSalePrice = () => {
     if (!selectedProduct || !discountPercent) return null;
     const originalPrice = Number(selectedProduct.price);
@@ -107,7 +101,6 @@ export default function FlashSalePanel({
     return originalPrice - discount;
   };
 
-  // Calcular data/hora de fim
   const calculateEndDateTime = () => {
     if (!startDate || !startTime || !durationHours) return null;
     try {
@@ -126,7 +119,6 @@ export default function FlashSalePanel({
     if (!selectedProduct) {
       toast.error('Selecione um produto', {
         description: 'Por favor, escolha um produto para a oferta relâmpago.',
-        duration: 4000,
       });
       return;
     }
@@ -134,7 +126,6 @@ export default function FlashSalePanel({
     if (discountPercent <= 0 || discountPercent >= 100) {
       toast.error('Desconto inválido', {
         description: 'O desconto deve estar entre 1% e 99%.',
-        duration: 4000,
       });
       return;
     }
@@ -142,7 +133,6 @@ export default function FlashSalePanel({
     if (!startDate || !startTime) {
       toast.error('Data/hora inválida', {
         description: 'Por favor, defina a data e hora de início da oferta.',
-        duration: 4000,
       });
       return;
     }
@@ -150,7 +140,6 @@ export default function FlashSalePanel({
     if (durationHours <= 0) {
       toast.error('Duração inválida', {
         description: 'A duração deve ser maior que 0 horas.',
-        duration: 4000,
       });
       return;
     }
@@ -171,7 +160,6 @@ export default function FlashSalePanel({
       }
 
       const now = new Date();
-      // Permitir horário atual ou futuro (com margem de 1 minuto para tolerância)
       const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
       
       if (startDateTime < oneMinuteAgo) {
@@ -254,7 +242,6 @@ export default function FlashSalePanel({
 
       toast.success('Oferta relâmpago configurada!', {
         description: `${selectedProduct.name} está em oferta com ${discountPercent}% de desconto.`,
-        duration: 4000,
       });
 
       onProductUpdated();
@@ -265,7 +252,6 @@ export default function FlashSalePanel({
       console.error('Erro ao configurar oferta relâmpago:', error);
       toast.error('Erro ao configurar oferta', {
         description: error.message || 'Tente novamente mais tarde.',
-        duration: 4000,
       });
     } finally {
       setIsSaving(false);
@@ -327,7 +313,6 @@ export default function FlashSalePanel({
 
       toast.success('Oferta removida!', {
         description: `A oferta relâmpago de ${selectedProduct.name} foi removida.`,
-        duration: 4000,
       });
 
       onProductUpdated();
@@ -339,7 +324,6 @@ export default function FlashSalePanel({
       console.error('Erro ao remover oferta relâmpago:', error);
       toast.error('Erro ao remover oferta', {
         description: error.message || 'Tente novamente mais tarde.',
-        duration: 4000,
       });
     } finally {
       setIsSaving(false);
@@ -357,297 +341,295 @@ export default function FlashSalePanel({
   const endDateTime = calculateEndDateTime();
 
   return (
-    <div className="w-full space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <Card className="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
-                <Zap className="h-6 w-6 text-white fill-white" />
-              </div>
-              <div>
-                <CardTitle className="text-2xl font-bold text-gray-900">Oferta Relâmpago</CardTitle>
-                <CardDescription className="text-sm text-gray-600">
-                  Configure ofertas relâmpago para produtos
-                </CardDescription>
-              </div>
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground">
+              <Zap className="h-6 w-6" />
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onClose}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div>
+              <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+                Oferta Relâmpago
+              </h1>
+              <p className="text-sm text-primary-foreground/80 lg:text-base mt-1">
+                Configure ofertas relâmpago para produtos
+              </p>
+            </div>
           </div>
-        </CardHeader>
-      </Card>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={onClose}
+            className="h-10 w-10 text-primary-foreground hover:bg-primary-foreground/20"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+      </section>
 
-      {/* Content */}
-      <div className="space-y-6">
-        {/* Aviso sobre produto com oferta ativa */}
-        {activeFlashSaleProduct && activeFlashSaleProduct.id !== selectedProduct?.id && (
-          <Card className="border-2 border-orange-300 bg-orange-50">
-            <CardContent className="pt-6">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  <Zap className="h-5 w-5 text-orange-600 fill-orange-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-orange-900 mb-1">
-                    Oferta Relâmpago Ativa
-                  </h3>
-                  <p className="text-sm text-orange-800">
-                    <strong>{activeFlashSaleProduct.name}</strong> está atualmente em oferta relâmpago.
-                    Ao configurar uma nova oferta, a oferta atual será automaticamente substituída.
-                  </p>
-                </div>
+      {/* Aviso sobre produto com oferta ativa */}
+      {activeFlashSaleProduct && activeFlashSaleProduct.id !== selectedProduct?.id && (
+        <Card className="border border-border shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <Zap className="h-5 w-5 text-foreground" />
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Seleção de Produto */}
-        <Card className="border-2 border-yellow-200">
-          <CardHeader>
-            <CardTitle className="flex items-center text-lg">
-              <Package className="h-5 w-5 mr-2 text-yellow-600" />
-              Selecionar Produto
-            </CardTitle>
-            <CardDescription>
-              {activeFlashSaleProduct 
-                ? `Apenas um produto pode estar em oferta relâmpago por vez. Produto atual: ${activeFlashSaleProduct.name}`
-                : 'Busque e selecione o produto da sua loja que deseja colocar em oferta relâmpago'
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Busca */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar produto por nome, categoria ou SKU..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            {/* Lista de Produtos */}
-            <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
-              {filteredProducts.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  Nenhum produto encontrado
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-200">
-                  {filteredProducts.map((product: any) => {
-                    const isSelected = selectedProduct?.id === product.id;
-                    const hasFlashSale = product.isFlashSale;
-                    
-                    let isFlashSaleActive = false;
-                    if (hasFlashSale && product.flashSaleStartDate && product.flashSaleEndDate) {
-                      const now = new Date();
-                      const start = new Date(product.flashSaleStartDate);
-                      const end = new Date(product.flashSaleEndDate);
-                      isFlashSaleActive = now >= start && now <= end;
-                    }
-                    
-                    return (
-                      <div
-                        key={product.id}
-                        onClick={() => setSelectedProduct(product)}
-                        className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                          isSelected ? 'bg-yellow-50 border-l-4 border-yellow-500' : ''
-                        } ${hasFlashSale ? (isFlashSaleActive ? 'bg-green-50 border-l-2 border-green-500' : 'bg-orange-50') : ''}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 flex-wrap gap-1">
-                              <h3 className="font-semibold text-gray-900">{product.name}</h3>
-                              {hasFlashSale && (
-                                <span className={`px-2 py-1 text-white text-xs font-bold rounded-full ${
-                                  isFlashSaleActive ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
-                                }`}>
-                                  {isFlashSaleActive ? '⚡ ATIVA AGORA' : 'OFERTA CONFIGURADA'}
-                                </span>
-                              )}
-                              {hasFlashSale && product.flashSaleDiscountPercent && (
-                                <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
-                                  -{product.flashSaleDiscountPercent}%
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-600">{product.category}</p>
-                            <div className="flex items-center space-x-2 mt-1">
-                              {hasFlashSale && product.flashSalePrice ? (
-                                <>
-                                  <p className="text-sm font-semibold text-green-600">
-                                    {formatPrice(Number(product.flashSalePrice))}
-                                  </p>
-                                  <p className="text-xs text-gray-500 line-through">
-                                    {formatPrice(Number(product.price))}
-                                  </p>
-                                </>
-                              ) : (
-                                <p className="text-sm font-semibold text-gray-900">
-                                  {formatPrice(Number(product.price))}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="ml-4">
-                            {(product.imageUrl || (product.imageUrls && product.imageUrls.length > 0)) && (
-                              <img
-                                src={product.imageUrl || product.imageUrls[0]}
-                                alt={product.name}
-                                className="w-16 h-16 object-cover rounded-lg border border-gray-200"
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="flex-1">
+                <h3 className="font-semibold text-foreground mb-1">
+                  Oferta Relâmpago Ativa
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  <strong>{activeFlashSaleProduct.name}</strong> está atualmente em oferta relâmpago.
+                  Ao configurar uma nova oferta, a oferta atual será automaticamente substituída.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        {/* Configuração da Oferta */}
-        {selectedProduct && (
-          <Card className="border-2 border-yellow-300 bg-gradient-to-br from-yellow-50 to-orange-50">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg">
-                <Zap className="h-5 w-5 mr-2 text-yellow-600 fill-yellow-400" />
-                Configurar Oferta Relâmpago
-              </CardTitle>
-              <CardDescription>
-                Produto selecionado: <strong>{selectedProduct.name}</strong>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Desconto */}
+      {/* Seleção de Produto */}
+      <Card className="border border-border shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Selecionar Produto
+          </CardTitle>
+          <CardDescription>
+            {activeFlashSaleProduct 
+              ? `Apenas um produto pode estar em oferta relâmpago por vez. Produto atual: ${activeFlashSaleProduct.name}`
+              : 'Busque e selecione o produto da sua loja que deseja colocar em oferta relâmpago'
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar produto por nome, categoria ou SKU..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          <div className="max-h-64 overflow-y-auto border border-border rounded-lg">
+            {filteredProducts.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                Nenhum produto encontrado
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {filteredProducts.map((product: any) => {
+                  const isSelected = selectedProduct?.id === product.id;
+                  const hasFlashSale = product.isFlashSale;
+                  
+                  let isFlashSaleActive = false;
+                  if (hasFlashSale && product.flashSaleStartDate && product.flashSaleEndDate) {
+                    const now = new Date();
+                    const start = new Date(product.flashSaleStartDate);
+                    const end = new Date(product.flashSaleEndDate);
+                    isFlashSaleActive = now >= start && now <= end;
+                  }
+                  
+                  return (
+                    <div
+                      key={product.id}
+                      onClick={() => setSelectedProduct(product)}
+                      className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
+                        isSelected ? 'bg-muted border-l-4 border-primary' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <h3 className="font-semibold text-foreground">{product.name}</h3>
+                            {hasFlashSale && (
+                              <Badge 
+                                variant="outline" 
+                                className={
+                                  isFlashSaleActive 
+                                    ? 'border-border bg-muted/50 text-foreground' 
+                                    : 'border-border bg-muted/50 text-muted-foreground'
+                                }
+                              >
+                                {isFlashSaleActive ? '⚡ ATIVA AGORA' : 'OFERTA CONFIGURADA'}
+                              </Badge>
+                            )}
+                            {hasFlashSale && product.flashSaleDiscountPercent && (
+                              <Badge variant="outline" className="border-border bg-muted/50 text-foreground">
+                                -{product.flashSaleDiscountPercent}%
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-1">{product.category}</p>
+                          <div className="flex items-center gap-2">
+                            {hasFlashSale && product.flashSalePrice ? (
+                              <>
+                                <p className="text-sm font-semibold text-foreground">
+                                  {formatPrice(Number(product.flashSalePrice))}
+                                </p>
+                                <p className="text-xs text-muted-foreground line-through">
+                                  {formatPrice(Number(product.price))}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-sm font-semibold text-foreground">
+                                {formatPrice(Number(product.price))}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {(product.imageUrl || (product.imageUrls && product.imageUrls.length > 0)) && (
+                            <img
+                              src={product.imageUrl || product.imageUrls[0]}
+                              alt={product.name}
+                              className="w-16 h-16 object-cover rounded-lg border border-border"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Configuração da Oferta */}
+      {selectedProduct && (
+        <Card className="border border-border shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Configurar Oferta Relâmpago
+            </CardTitle>
+            <CardDescription>
+              Produto selecionado: <strong>{selectedProduct.name}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <Label htmlFor="discount" className="text-sm font-medium">
+                Desconto (%)
+              </Label>
+              <div className="relative mt-1">
+                <Input
+                  id="discount"
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="99"
+                  value={discountPercent || ''}
+                  onChange={(e) => setDiscountPercent(parseInt(e.target.value) || 0)}
+                  placeholder="Ex: 30"
+                  className="pr-12 h-12 text-lg font-semibold"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-muted-foreground font-semibold pointer-events-none">
+                  %
+                </span>
+              </div>
+              {discountPercent > 0 && salePrice && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Preço original: <span className="line-through">{formatPrice(Number(selectedProduct.price))}</span>{' '}
+                  → Preço com desconto: <span className="font-bold text-foreground">{formatPrice(salePrice)}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="discount" className="text-sm font-medium text-gray-700">
-                  Desconto (%)
+                <Label htmlFor="startDate" className="text-sm font-medium">
+                  Data de Início
                 </Label>
-                <div className="relative mt-1">
-                  <Input
-                    id="discount"
-                    type="number"
-                    step="1"
-                    min="1"
-                    max="99"
-                    value={discountPercent || ''}
-                    onChange={(e) => setDiscountPercent(parseInt(e.target.value) || 0)}
-                    placeholder="Ex: 30"
-                    className="pr-12 h-12 text-lg font-semibold px-4"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-gray-600 font-semibold pointer-events-none">
-                    %
-                  </span>
-                </div>
-                {discountPercent > 0 && salePrice && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    Preço original: <span className="line-through">{formatPrice(Number(selectedProduct.price))}</span>{' '}
-                    → Preço com desconto: <span className="font-bold text-green-600">{formatPrice(salePrice)}</span>
-                  </p>
-                )}
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="mt-1 h-12"
+                />
               </div>
-
-              {/* Data e Hora de Início */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="startDate" className="text-sm font-medium text-gray-700">
-                    Data de Início
-                  </Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="mt-1 h-12"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="startTime" className="text-sm font-medium text-gray-700">
-                    Hora de Início
-                  </Label>
-                  <Input
-                    id="startTime"
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="mt-1 h-12 bg-gray-50"
-                  />
-                </div>
-              </div>
-
-              {/* Duração */}
               <div>
-                <Label htmlFor="duration" className="text-sm font-medium text-gray-700">
-                  Duração (Horas)
+                <Label htmlFor="startTime" className="text-sm font-medium">
+                  Hora de Início
                 </Label>
-                <div className="relative mt-1">
-                  <Input
-                    id="duration"
-                    type="number"
-                    step="1"
-                    min="1"
-                    max="168"
-                    value={durationHours || ''}
-                    onChange={(e) => setDurationHours(parseInt(e.target.value) || 0)}
-                    placeholder="Ex: 24"
-                    className="pr-24 h-12 text-lg font-semibold px-4"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-gray-600 font-semibold pointer-events-none">
-                    horas
-                  </span>
-                </div>
-                {endDateTime && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    A oferta termina em:{' '}
-                    <span className="font-semibold text-gray-900">
-                      {endDateTime.toLocaleString('pt-BR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </p>
-                )}
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="mt-1 h-12"
+                />
               </div>
+            </div>
 
-              {/* Resumo da Oferta */}
-              {discountPercent > 0 && startDate && startTime && durationHours > 0 && (
-                <div className="bg-white border-2 border-yellow-400 rounded-lg p-4 space-y-2">
-                  <h4 className="font-semibold text-gray-900 flex items-center">
-                    <Clock className="h-4 w-4 mr-2 text-yellow-600" />
+            <div>
+              <Label htmlFor="duration" className="text-sm font-medium">
+                Duração (Horas)
+              </Label>
+              <div className="relative mt-1">
+                <Input
+                  id="duration"
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="168"
+                  value={durationHours || ''}
+                  onChange={(e) => setDurationHours(parseInt(e.target.value) || 0)}
+                  placeholder="Ex: 24"
+                  className="pr-24 h-12 text-lg font-semibold"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base text-muted-foreground font-semibold pointer-events-none">
+                  horas
+                </span>
+              </div>
+              {endDateTime && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  A oferta termina em:{' '}
+                  <span className="font-semibold text-foreground">
+                    {endDateTime.toLocaleString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </p>
+              )}
+            </div>
+
+            {discountPercent > 0 && startDate && startTime && durationHours > 0 && (
+              <Card className="border border-border bg-muted/30">
+                <CardContent className="pt-6">
+                  <h4 className="font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <Clock className="h-4 w-4" />
                     Resumo da Oferta
                   </h4>
-                  <div className="space-y-1 text-sm text-gray-700">
+                  <div className="space-y-2 text-sm text-muted-foreground">
                     <p>
-                      <strong>Produto:</strong> {selectedProduct.name}
+                      <strong className="text-foreground">Produto:</strong> {selectedProduct.name}
                     </p>
                     <p>
-                      <strong>Desconto:</strong> {discountPercent}%
+                      <strong className="text-foreground">Desconto:</strong> {discountPercent}%
                     </p>
                     <p>
-                      <strong>Preço original:</strong> {formatPrice(Number(selectedProduct.price))}
+                      <strong className="text-foreground">Preço original:</strong> {formatPrice(Number(selectedProduct.price))}
                     </p>
                     <p>
-                      <strong>Preço com desconto:</strong>{' '}
-                      <span className="font-bold text-green-600">{formatPrice(salePrice || 0)}</span>
+                      <strong className="text-foreground">Preço com desconto:</strong>{' '}
+                      <span className="font-bold text-foreground">{formatPrice(salePrice || 0)}</span>
                     </p>
                     <p>
-                      <strong>Início:</strong>{' '}
+                      <strong className="text-foreground">Início:</strong>{' '}
                       {new Date(`${startDate}T${startTime}:00`).toLocaleString('pt-BR', {
                         day: '2-digit',
                         month: '2-digit',
@@ -658,7 +640,7 @@ export default function FlashSalePanel({
                     </p>
                     {endDateTime && (
                       <p>
-                        <strong>Término:</strong>{' '}
+                        <strong className="text-foreground">Término:</strong>{' '}
                         {endDateTime.toLocaleString('pt-BR', {
                           day: '2-digit',
                           month: '2-digit',
@@ -669,67 +651,67 @@ export default function FlashSalePanel({
                       </p>
                     )}
                     <p>
-                      <strong>Duração:</strong> {durationHours} horas
+                      <strong className="text-foreground">Duração:</strong> {durationHours} horas
                     </p>
                   </div>
-                </div>
-              )}
+                </CardContent>
+              </Card>
+            )}
 
-              {/* Botão para remover oferta existente */}
-              {selectedProduct.isFlashSale && (
-                <div className="pt-4 border-t border-yellow-300">
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
-                    <p className="text-sm text-orange-800 font-semibold mb-1">
+            {selectedProduct.isFlashSale && (
+              <div className="pt-4 border-t border-border">
+                <Card className="border border-border bg-muted/30 mb-4">
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-foreground font-semibold mb-1">
                       ⚠️ Este produto já possui uma oferta relâmpago configurada
                     </p>
-                    <p className="text-xs text-orange-700">
+                    <p className="text-xs text-muted-foreground">
                       Ao configurar uma nova oferta, a oferta anterior será substituída automaticamente.
                     </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={handleRemoveFlashSale}
-                    disabled={isSaving}
-                    className="w-full border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Remover Oferta Relâmpago
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
-          <Button variant="outline" onClick={onClose} disabled={isSaving} type="button">
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isSaving || !selectedProduct || discountPercent <= 0 || !startDate || !startTime}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold"
-            type="button"
-          >
-            {isSaving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Configurando...
-              </>
-            ) : (
-              <>
-                <Zap className="h-4 w-4 mr-2" />
-                {activeFlashSaleProduct && activeFlashSaleProduct.id !== selectedProduct?.id
-                  ? 'Substituir Oferta Atual'
-                  : 'Configurar Oferta Relâmpago'
-                }
-              </>
+                  </CardContent>
+                </Card>
+                <Button
+                  variant="outline"
+                  onClick={handleRemoveFlashSale}
+                  disabled={isSaving}
+                  className="w-full border-border hover:bg-destructive hover:text-destructive-foreground"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Remover Oferta Relâmpago
+                </Button>
+              </div>
             )}
-          </Button>
-        </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+        <Button variant="outline" onClick={onClose} disabled={isSaving} type="button">
+          Cancelar
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={isSaving || !selectedProduct || discountPercent <= 0 || !startDate || !startTime}
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+          type="button"
+        >
+          {isSaving ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
+              Configurando...
+            </>
+          ) : (
+            <>
+              <Zap className="h-4 w-4 mr-2" />
+              {activeFlashSaleProduct && activeFlashSaleProduct.id !== selectedProduct?.id
+                ? 'Substituir Oferta Atual'
+                : 'Configurar Oferta Relâmpago'
+              }
+            </>
+          )}
+        </Button>
       </div>
     </div>
   );
 }
-
