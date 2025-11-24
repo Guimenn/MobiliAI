@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "ol/ol.css";
 import { Toaster } from "@/components/ui/sonner";
 import ClientProviders from "@/components/ClientProviders";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider";
