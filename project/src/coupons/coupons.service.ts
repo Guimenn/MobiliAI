@@ -933,8 +933,9 @@ export class CouponsService {
     })));
 
     // Filtrar cupons
-    const filteredCoupons = coupons
-      .filter(coupon => {
+    // Primeiro, verificar quais cupons devem ser mantidos (operações assíncronas)
+    const couponValidityChecks = await Promise.all(
+      coupons.map(async (coupon) => {
         // PROTEÇÃO CRÍTICA: Remover cupons NEW_ACCOUNTS_ONLY se o cliente já fez compras
         // Esta é uma verificação dupla de segurança além da query
         if (coupon.assignmentType === CouponAssignmentType.NEW_ACCOUNTS_ONLY) {
@@ -947,7 +948,7 @@ export class CouponsService {
               purchaseCount,
               customerId
             });
-            return false;
+            return { coupon, isValid: false };
           } else {
             console.log('✅ Cupom NEW_ACCOUNTS_ONLY permitido - primeira compra:', {
               couponCode: coupon.code,
@@ -957,7 +958,9 @@ export class CouponsService {
         }
         
         // Filtrar cupons que não atingiram o limite de uso por cliente
-        if (!coupon.usageLimit) return true;
+        if (!coupon.usageLimit) {
+          return { coupon, isValid: true };
+        }
         
         // Contar quantas vezes este cliente específico usou o cupom
         const userUsageCount = await this.prisma.couponUsage.count({
@@ -975,8 +978,14 @@ export class CouponsService {
             limit: coupon.usageLimit
           });
         }
-        return canUse;
+        return { coupon, isValid: canUse };
       })
+    );
+    
+    // Filtrar cupons baseado nos resultados das verificações assíncronas
+    const filteredCoupons = couponValidityChecks
+      .filter(check => check.isValid)
+      .map(check => check.coupon)
       .map(coupon => ({
         id: coupon.id,
         code: coupon.code,
