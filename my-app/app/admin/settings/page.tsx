@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,14 +15,15 @@ import {
   Shield,
   Bell,
   Store,
-  Database,
-  Mail,
-  Lock,
-  Key,
 } from 'lucide-react';
+import { useAppStore } from '@/lib/store';
+import { env } from '@/lib/env';
+
+const API_BASE_URL = env.API_URL;
+const SETTINGS_STORAGE_KEY = 'app_settings';
 
 export default function SettingsPage() {
-  const router = useRouter();
+  const { token } = useAppStore();
   const [settings, setSettings] = useState({
     company: {
       name: 'PintAI',
@@ -34,19 +34,14 @@ export default function SettingsPage() {
     },
     system: {
       maintenanceMode: false,
-      autoBackup: true,
       sessionTimeout: 30,
       maxLoginAttempts: 5
     },
     notifications: {
-      emailNotifications: true,
-      smsNotifications: false,
-      pushNotifications: true,
       salesAlerts: true,
       lowStockAlerts: true
     },
     security: {
-      twoFactorAuth: false,
       passwordExpiration: 90,
       ipWhitelist: '',
       auditLog: true
@@ -55,15 +50,211 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('company');
 
-  const saveSettings = async () => {
+  // Carregar configurações do backend ao montar o componente
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        if (token) {
+          // Tentar carregar do backend
+          const response = await fetch(`${API_BASE_URL}/admin/system/settings`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const backendSettings = await response.json();
+            console.log('Configurações carregadas do backend:', backendSettings);
+            
+            // Garantir que todas as propriedades estejam presentes
+            const mergedSettings = {
+              company: { 
+                name: backendSettings.company?.name || settings.company.name,
+                email: backendSettings.company?.email || settings.company.email,
+                phone: backendSettings.company?.phone || settings.company.phone,
+                address: backendSettings.company?.address || settings.company.address,
+                cnpj: backendSettings.company?.cnpj || settings.company.cnpj
+              },
+              system: { 
+                maintenanceMode: backendSettings.system?.maintenanceMode ?? settings.system.maintenanceMode,
+                sessionTimeout: backendSettings.system?.sessionTimeout ?? settings.system.sessionTimeout,
+                maxLoginAttempts: backendSettings.system?.maxLoginAttempts ?? settings.system.maxLoginAttempts
+              },
+              notifications: { 
+                salesAlerts: backendSettings.notifications?.salesAlerts ?? settings.notifications.salesAlerts,
+                lowStockAlerts: backendSettings.notifications?.lowStockAlerts ?? settings.notifications.lowStockAlerts
+              },
+              security: { 
+                passwordExpiration: backendSettings.security?.passwordExpiration ?? settings.security.passwordExpiration,
+                ipWhitelist: backendSettings.security?.ipWhitelist ?? settings.security.ipWhitelist,
+                auditLog: backendSettings.security?.auditLog ?? settings.security.auditLog
+              }
+            };
+            
+            setSettings(mergedSettings);
+            // Também salvar no localStorage como backup
+            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(mergedSettings));
+            return;
+          } else {
+            const errorText = await response.text();
+            console.error('Erro ao carregar configurações:', response.status, response.statusText, errorText);
+          }
+        }
+        
+        // Fallback: carregar do localStorage
+        const savedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+        if (savedSettings) {
+          try {
+            const parsed = JSON.parse(savedSettings);
+            console.log('Configurações carregadas do localStorage:', parsed);
+            setSettings(prev => ({
+              company: { ...prev.company, ...(parsed.company || {}) },
+              system: { ...prev.system, ...(parsed.system || {}) },
+              notifications: { ...prev.notifications, ...(parsed.notifications || {}) },
+              security: { ...prev.security, ...(parsed.security || {}) }
+            }));
+          } catch (error) {
+            console.error('Erro ao carregar configurações do localStorage:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar configurações do servidor:', error);
+        // Fallback: carregar do localStorage
+        const savedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+        if (savedSettings) {
+          try {
+            const parsed = JSON.parse(savedSettings);
+            setSettings(prev => ({
+              company: { ...prev.company, ...(parsed.company || {}) },
+              system: { ...prev.system, ...(parsed.system || {}) },
+              notifications: { ...prev.notifications, ...(parsed.notifications || {}) },
+              security: { ...prev.security, ...(parsed.security || {}) }
+            }));
+          } catch (err) {
+            console.error('Erro ao carregar configurações:', err);
+          }
+        }
+      }
+    };
+
+    loadSettings();
+  }, [token]);
+
+  const saveSettings = async (showToast = true) => {
     try {
       setIsLoading(true);
-      console.log('Salvando configurações:', settings);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success('Configurações salvas com sucesso!');
-    } catch (error) {
+      
+      // Salvar no localStorage
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      
+      // Tentar salvar no backend se houver token
+      if (token) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/admin/system/settings`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(settings)
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Erro ao salvar no servidor');
+          }
+          
+          const result = await response.json();
+          
+          if (showToast) {
+            toast.success('Configurações salvas com sucesso!');
+          }
+          
+          return true;
+        } catch (error: any) {
+          console.error('Erro ao salvar no servidor:', error);
+          if (showToast) {
+            toast.error(error.message || 'Erro ao salvar configurações no servidor');
+          }
+          return false;
+        }
+      } else {
+        if (showToast) {
+          toast.success('Configurações salvas localmente!');
+        }
+        return true;
+      }
+    } catch (error: any) {
       console.error('Erro ao salvar configurações:', error);
-      toast.error('Erro ao salvar configurações');
+      if (showToast) {
+        toast.error('Erro ao salvar configurações');
+      }
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMaintenanceModeChange = async (checked: boolean) => {
+    // Confirmar ação antes de mudar
+    if (checked) {
+      const confirmed = window.confirm(
+        '⚠️ ATENÇÃO: Ao ativar o modo de manutenção, todos os usuários não-admin serão bloqueados.\n\n' +
+        'Você tem certeza que deseja ativar o modo de manutenção?'
+      );
+      
+      if (!confirmed) {
+        return; // Não fazer nada se cancelado
+      }
+    }
+
+    // Atualizar estado local
+    const newSettings = {
+      ...settings,
+      system: { ...settings.system, maintenanceMode: checked }
+    };
+    setSettings(newSettings);
+
+    // Salvar automaticamente
+    setIsLoading(true);
+    try {
+      // Salvar no localStorage primeiro
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+      
+      // Tentar salvar no backend
+      if (token) {
+        const response = await fetch(`${API_BASE_URL}/admin/system/settings`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(newSettings)
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Modo de manutenção salvo:', result);
+          
+          if (checked) {
+            toast.success('✅ Modo de manutenção ATIVADO. Usuários não-admin serão bloqueados.');
+          } else {
+            toast.success('✅ Modo de manutenção DESATIVADO. Sistema normalizado.');
+          }
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Erro ao salvar no servidor:', response.status, errorData);
+          toast.warning('⚠️ Configuração salva localmente, mas houve erro ao salvar no servidor.');
+        }
+      } else {
+        toast.success('✅ Configuração salva localmente!');
+      }
+    } catch (error: any) {
+      console.error('Erro ao salvar modo de manutenção:', error);
+      toast.error('❌ Erro ao alterar modo de manutenção. Tente novamente.');
+      // Reverter se falhou
+      setSettings(settings);
     } finally {
       setIsLoading(false);
     }
@@ -92,7 +283,7 @@ export default function SettingsPage() {
           </div>
           <Button 
             className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-            onClick={saveSettings}
+            onClick={() => saveSettings(true)}
             disabled={isLoading}
           >
             <Save className="h-4 w-4 mr-2" />
@@ -216,33 +407,14 @@ export default function SettingsPage() {
                 <div className="space-y-0.5">
                   <Label htmlFor="maintenance-mode">Modo de Manutenção</Label>
                   <p className="text-sm text-muted-foreground">
-                    Ativar modo de manutenção do sistema
+                    Ativar modo de manutenção do sistema (bloqueia acesso de usuários não-admin)
                   </p>
                 </div>
                 <Switch
                   id="maintenance-mode"
                   checked={settings.system.maintenanceMode}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    system: { ...settings.system, maintenanceMode: checked }
-                  })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="auto-backup">Backup Automático</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Fazer backup automático dos dados
-                  </p>
-                </div>
-                <Switch
-                  id="auto-backup"
-                  checked={settings.system.autoBackup}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    system: { ...settings.system, autoBackup: checked }
-                  })}
+                  onCheckedChange={handleMaintenanceModeChange}
+                  disabled={isLoading}
                 />
               </div>
 
@@ -251,12 +423,17 @@ export default function SettingsPage() {
                 <Input
                   id="session-timeout"
                   type="number"
+                  min="5"
+                  max="480"
                   value={settings.system.sessionTimeout}
                   onChange={(e) => setSettings({
                     ...settings,
                     system: { ...settings.system, sessionTimeout: parseInt(e.target.value) || 30 }
                   })}
                 />
+                <p className="text-sm text-muted-foreground">
+                  Tempo de inatividade antes de desconectar o usuário (5-480 minutos)
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -264,12 +441,17 @@ export default function SettingsPage() {
                 <Input
                   id="max-login-attempts"
                   type="number"
+                  min="3"
+                  max="10"
                   value={settings.system.maxLoginAttempts}
                   onChange={(e) => setSettings({
                     ...settings,
                     system: { ...settings.system, maxLoginAttempts: parseInt(e.target.value) || 5 }
                   })}
                 />
+                <p className="text-sm text-muted-foreground">
+                  Número máximo de tentativas de login antes de bloquear (3-10)
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -284,66 +466,15 @@ export default function SettingsPage() {
                 Configurações de Notificações
               </CardTitle>
               <CardDescription>
-                Configure como receber notificações
+                Configure as preferências de alertas do sistema
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="email-notifications">Notificações por Email</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receber notificações por email
-                  </p>
-                </div>
-                <Switch
-                  id="email-notifications"
-                  checked={settings.notifications.emailNotifications}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    notifications: { ...settings.notifications, emailNotifications: checked }
-                  })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="sms-notifications">Notificações por SMS</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receber notificações por SMS
-                  </p>
-                </div>
-                <Switch
-                  id="sms-notifications"
-                  checked={settings.notifications.smsNotifications}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    notifications: { ...settings.notifications, smsNotifications: checked }
-                  })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="push-notifications">Notificações Push</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receber notificações push no navegador
-                  </p>
-                </div>
-                <Switch
-                  id="push-notifications"
-                  checked={settings.notifications.pushNotifications}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    notifications: { ...settings.notifications, pushNotifications: checked }
-                  })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
                   <Label htmlFor="sales-alerts">Alertas de Vendas</Label>
                   <p className="text-sm text-muted-foreground">
-                    Notificar sobre novas vendas
+                    Exibir notificações quando novas vendas forem registradas
                   </p>
                 </div>
                 <Switch
@@ -360,7 +491,7 @@ export default function SettingsPage() {
                 <div className="space-y-0.5">
                   <Label htmlFor="low-stock-alerts">Alertas de Estoque Baixo</Label>
                   <p className="text-sm text-muted-foreground">
-                    Notificar quando o estoque estiver baixo
+                    Exibir notificações quando produtos estiverem com estoque baixo
                   </p>
                 </div>
                 <Switch
@@ -389,54 +520,31 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="two-factor-auth">Autenticação de Dois Fatores</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Requerer 2FA para todos os usuários
-                  </p>
-                </div>
-                <Switch
-                  id="two-factor-auth"
-                  checked={settings.security.twoFactorAuth}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    security: { ...settings.security, twoFactorAuth: checked }
-                  })}
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="password-expiration">Expiração de Senha (dias)</Label>
                 <Input
                   id="password-expiration"
                   type="number"
+                  min="30"
+                  max="365"
                   value={settings.security.passwordExpiration}
                   onChange={(e) => setSettings({
                     ...settings,
                     security: { ...settings.security, passwordExpiration: parseInt(e.target.value) || 90 }
                   })}
                 />
+                <p className="text-sm text-muted-foreground">
+                  Número de dias antes de exigir alteração de senha (30-365 dias)
+                </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="ip-whitelist">Lista de IPs Permitidos (separados por vírgula)</Label>
-                <Input
-                  id="ip-whitelist"
-                  value={settings.security.ipWhitelist}
-                  onChange={(e) => setSettings({
-                    ...settings,
-                    security: { ...settings.security, ipWhitelist: e.target.value }
-                  })}
-                  placeholder="192.168.1.1, 10.0.0.1"
-                />
-              </div>
+            
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="audit-log">Log de Auditoria</Label>
                   <p className="text-sm text-muted-foreground">
-                    Registrar todas as ações dos usuários
+                    Registrar todas as ações importantes dos usuários no sistema
                   </p>
                 </div>
                 <Switch

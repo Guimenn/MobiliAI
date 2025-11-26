@@ -9,47 +9,47 @@ datasource db {
 }
 
 model User {
-  id                String              @id @default(uuid())
-  email             String              @unique
-  password          String
-  name              String
-  phone             String?
-  address           String?
-  city              String?
-  state             String?
-  zipCode           String?
-  role              UserRole            @default(CUSTOMER)
-  isActive          Boolean             @default(true)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  storeId           String?
-  cpf               String?             @unique
-  workingHours      Json?
-  avatarUrl         String?
-  cartItems         CartItem[]
-  cashExpenses      CashExpense[]
-  cashFlows         CashFlow[]
-  chatSessions      ChatSession[]
-  colorAnalyses     ColorAnalysis[]
-  comparisons       Comparison[]
-  dailyCash         DailyCash[]
-  favorites         Favorite[]
-  furnitureAnalyses FurnitureAnalysis[]
-  moodboards        Moodboard[]
-  notifications     Notification[]
-  passwordResets    PasswordReset[]
-  reviews           ProductReview[]
-  reports           Report[]
-  purchases         Sale[]              @relation("CustomerSales")
-  sales             Sale[]              @relation("EmployeeSales")
-  shippingAddresses ShippingAddress[]
-  systemLogs        SystemLog[]
-  timeClockRecords  TimeClock[]
-  medicalCertificates MedicalCertificate[] @relation("EmployeeCertificates")
+  id                     String               @id @default(uuid())
+  email                  String               @unique
+  password               String
+  name                   String
+  phone                  String?
+  address                String?
+  city                   String?
+  state                  String?
+  zipCode                String?
+  role                   UserRole             @default(CUSTOMER)
+  isActive               Boolean              @default(true)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  storeId                String?
+  cpf                    String?              @unique
+  workingHours           Json?
+  avatarUrl              String?
+  cartItems              CartItem[]
+  cashExpenses           CashExpense[]
+  cashFlows              CashFlow[]
+  chatSessions           ChatSession[]
+  colorAnalyses          ColorAnalysis[]
+  comparisons            Comparison[]
+  dailyCash              DailyCash[]
+  favorites              Favorite[]
+  furnitureAnalyses      FurnitureAnalysis[]
+  moodboards             Moodboard[]
+  notifications          Notification[]
+  passwordResets         PasswordReset[]
+  reviews                ProductReview[]
+  reports                Report[]
+  purchases              Sale[]               @relation("CustomerSales")
+  sales                  Sale[]               @relation("EmployeeSales")
+  shippingAddresses      ShippingAddress[]
+  systemLogs             SystemLog[]
+  timeClockRecords       TimeClock[]
+  medicalCertificates    MedicalCertificate[] @relation("EmployeeCertificates")
   registeredCertificates MedicalCertificate[] @relation("RegisteredByCertificates")
-  createdCoupons    Coupon[]              @relation("CouponCreator")
-  couponUsages      CouponUsage[]
-  store             Store?              @relation(fields: [storeId], references: [id])
+  createdCoupons         Coupon[]             @relation("CouponCreator")
+  couponUsages           CouponUsage[]
+  store                  Store?               @relation(fields: [storeId], references: [id])
 
   @@map("users")
 }
@@ -124,7 +124,7 @@ model Product {
   isAvailable              Boolean                @default(true)
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
-  storeId                  String?  // Opcional: produto pode estar em múltiplas lojas via StoreInventory
+  storeId                  String? // Opcional: produto pode estar em múltiplas lojas via StoreInventory
   collectionId             String?
   supplierId               String?
   model3DUrl               String?
@@ -147,7 +147,7 @@ model Product {
   reviews                  ProductReview[]
   variants                 ProductVariant[]
   collection               Collection?            @relation(fields: [collectionId], references: [id])
-  store                    Store?                 @relation(fields: [storeId], references: [id])  // Opcional
+  store                    Store?                 @relation(fields: [storeId], references: [id]) // Opcional
   supplier                 Supplier?              @relation(fields: [supplierId], references: [id])
   saleItems                SaleItem[]
   storeInventory           StoreInventory[]
@@ -429,6 +429,17 @@ model CashFlow {
   @@map("cash_flows")
 }
 
+model SystemSettings {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+
+  @@map("system_settings")
+}
+
 model SystemLog {
   id        String   @id @default(cuid())
   level     String
@@ -557,23 +568,23 @@ model PasswordReset {
 }
 
 model MedicalCertificate {
-  id              String                   @id @default(uuid())
-  employeeId      String
-  startDate       DateTime
-  endDate         DateTime
-  type            MedicalCertificateType
-  reason          String
-  doctorName      String
-  doctorCrm       String
-  clinicName      String
-  status          MedicalCertificateStatus @default(PENDING)
-  notes           String?
-  attachmentUrl   String?
-  registeredById  String
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  employee        User                     @relation("EmployeeCertificates", fields: [employeeId], references: [id], onDelete: Cascade)
-  registeredBy    User                     @relation("RegisteredByCertificates", fields: [registeredById], references: [id])
+  id             String                   @id @default(uuid())
+  employeeId     String
+  startDate      DateTime
+  endDate        DateTime
+  type           MedicalCertificateType
+  reason         String
+  doctorName     String
+  doctorCrm      String
+  clinicName     String
+  status         MedicalCertificateStatus @default(PENDING)
+  notes          String?
+  attachmentUrl  String?
+  registeredById String
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  employee       User                     @relation("EmployeeCertificates", fields: [employeeId], references: [id], onDelete: Cascade)
+  registeredBy   User                     @relation("RegisteredByCertificates", fields: [registeredById], references: [id])
 
   @@map("medical_certificates")
 }
@@ -617,42 +628,42 @@ model ShippingAddress {
 }
 
 model Coupon {
-  id                String        @id @default(uuid())
-  code              String         @unique
-  description       String?
-  discountType      CouponDiscountType
-  discountValue     Decimal        @db.Decimal(10, 2)
-  minimumPurchase   Decimal?       @db.Decimal(10, 2)
-  maximumDiscount   Decimal?       @db.Decimal(10, 2)
-  usageLimit        Int?
-  usedCount         Int            @default(0)
-  isActive          Boolean        @default(true)
-  validFrom         DateTime
-  validUntil        DateTime
-  applicableTo      CouponApplicableTo @default(ALL)
-  categoryId        String?
-  productId         String?
-  storeId           String?
-  assignmentType    CouponAssignmentType?
-  couponType        CouponType?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  createdBy         String
-  creator           User           @relation("CouponCreator", fields: [createdBy], references: [id])
-  store             Store?         @relation(fields: [storeId], references: [id])
-  couponUsages      CouponUsage[]
+  id              String                @id @default(uuid())
+  code            String                @unique
+  description     String?
+  discountType    CouponDiscountType
+  discountValue   Decimal               @db.Decimal(10, 2)
+  minimumPurchase Decimal?              @db.Decimal(10, 2)
+  maximumDiscount Decimal?              @db.Decimal(10, 2)
+  usageLimit      Int?
+  usedCount       Int                   @default(0)
+  isActive        Boolean               @default(true)
+  validFrom       DateTime
+  validUntil      DateTime
+  applicableTo    CouponApplicableTo    @default(ALL)
+  categoryId      String?
+  productId       String?
+  storeId         String?
+  assignmentType  CouponAssignmentType?
+  couponType      CouponType?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  createdBy       String
+  creator         User                  @relation("CouponCreator", fields: [createdBy], references: [id])
+  store           Store?                @relation(fields: [storeId], references: [id])
+  couponUsages    CouponUsage[]
 
   @@map("coupons")
 }
 
 model CouponUsage {
-  id        String   @id @default(uuid())
-  couponId  String
-  userId    String
-  saleId    String?
-  usedAt    DateTime @default(now())
-  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id])
+  id       String   @id @default(uuid())
+  couponId String
+  userId   String
+  saleId   String?
+  usedAt   DateTime @default(now())
+  coupon   Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
 
   @@unique([couponId, userId, saleId])
   @@map("coupon_usages")

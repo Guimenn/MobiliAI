@@ -67,6 +67,23 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<{ user: UserWithoutPassword; token: string }> {
     const { email, password } = loginDto;
 
+    // Verificar modo de manutenção ANTES de processar login
+    const maintenanceMode = await this.getMaintenanceMode();
+    if (maintenanceMode) {
+      // Buscar usuário para verificar se é admin
+      const user = await this.prisma.user.findUnique({ 
+        where: { email },
+        select: { role: true }
+      });
+      
+      // Bloquear login se não for admin
+      if (!user || user.role !== 'ADMIN') {
+        throw new UnauthorizedException(
+          'O sistema está em modo de manutenção. Apenas administradores podem fazer login no momento. Tente novamente mais tarde.'
+        );
+      }
+    }
+
     // Buscar usuário
     const user = await this.prisma.user.findUnique({ 
       where: { email },
@@ -462,6 +479,23 @@ export class AuthService {
       }
       
       throw new UnauthorizedException('Erro ao autenticar com Google. Tente novamente.');
+    }
+  }
+
+  private async getMaintenanceMode(): Promise<boolean> {
+    try {
+      const settings = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+      
+      if (settings && settings.value) {
+        const value = settings.value as any;
+        return value?.system?.maintenanceMode || false;
+      }
+      return false;
+    } catch (error) {
+      console.error('Erro ao verificar modo de manutenção:', error);
+      return false;
     }
   }
 

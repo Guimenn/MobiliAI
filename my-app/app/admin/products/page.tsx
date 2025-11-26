@@ -408,10 +408,14 @@ function ProductsStats({ products, totalProducts }: any) {
       return now >= start && now <= end;
     };
 
+    const productsOnSale = products.filter((p: any) => isFlashSaleActive(p));
+    const firstProductOnSale = productsOnSale.length > 0 ? productsOnSale[0] : null;
+
     return {
       total: totalProducts > 0 ? totalProducts : products.length,
       active: products.filter((p: any) => p.isActive).length,
-      onSale: products.filter((p: any) => isFlashSaleActive(p)).length,
+      onSale: productsOnSale.length,
+      onSaleProduct: firstProductOnSale,
       totalValue: products.reduce((sum: number, p: any) => sum + (p.price * (p.stock || 0)), 0),
     };
   }, [products, totalProducts]);
@@ -443,7 +447,9 @@ function ProductsStats({ products, totalProducts }: any) {
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
           <Zap className="h-5 w-5" />
         </div>
-        <p className="text-2xl font-semibold leading-tight">{stats.onSale}</p>
+        <p className="text-base font-semibold leading-tight line-clamp-2 min-h-[2.5rem]">
+          {stats.onSaleProduct ? stats.onSaleProduct.name : 'Nenhum'}
+        </p>
         <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Em Oferta</p>
       </div>
       <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">

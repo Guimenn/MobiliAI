@@ -2,6 +2,7 @@ import { Controller, Get, Query, Param, Post, Body } from '@nestjs/common';
 import { PublicProductsService } from './public-products.service';
 import { PublicSupportService } from './public-support.service';
 import { ImageKitService } from '../upload/imagekit.service';
+import { AdminSystemService } from '../admin/admin-system.service';
 
 @Controller('public')
 export class PublicController {
@@ -9,6 +10,7 @@ export class PublicController {
     private readonly publicProductsService: PublicProductsService,
     private readonly publicSupportService: PublicSupportService,
     private readonly imagekitService: ImageKitService,
+    private readonly adminSystemService: AdminSystemService,
   ) {}
 
   @Get('products')
@@ -97,6 +99,18 @@ export class PublicController {
     } catch (error: any) {
       console.error('❌ [PublicController] Erro ao buscar imagens:', error);
       return { images: [] };
+    }
+  }
+
+  // Endpoint público para verificar modo de manutenção
+  @Get('maintenance-mode')
+  async getMaintenanceMode() {
+    try {
+      const maintenanceMode = await this.adminSystemService.getMaintenanceMode();
+      return { maintenanceMode };
+    } catch (error) {
+      console.error('Erro ao verificar modo de manutenção:', error);
+      return { maintenanceMode: false };
     }
   }
 }

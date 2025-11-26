@@ -5,6 +5,7 @@ import { AdminCategoriesService } from './admin-categories.service';
 import { AdminSystemService } from './admin-system.service';
 import { AdminNotificationsService } from './admin-notifications.service';
 import { MedicalCertificateCronService } from './medical-certificate-cron.service';
+import { MaintenanceGuard } from './guards/maintenance.guard';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
 import { ProductsModule } from '../products/products.module';
@@ -28,7 +29,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     NotificationsModule,
   ],
   controllers: [AdminController],
-  providers: [AdminService, AdminCategoriesService, AdminSystemService, AdminNotificationsService, MedicalCertificateCronService],
-  exports: [AdminService, AdminCategoriesService, AdminSystemService, AdminNotificationsService],
+  providers: [AdminService, AdminCategoriesService, AdminSystemService, AdminNotificationsService, MedicalCertificateCronService, MaintenanceGuard],
+  exports: [AdminService, AdminCategoriesService, AdminSystemService, AdminNotificationsService, MaintenanceGuard],
 })
 export class AdminModule {}

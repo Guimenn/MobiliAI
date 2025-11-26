@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
+import { useSessionTimeout } from '@/hooks/useSessionTimeout';
+import { env } from '@/lib/env';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -14,13 +16,42 @@ export default function AuthGuard({ children, requiredRole, redirectTo }: AuthGu
   const { user, isAuthenticated, token, logout } = useAppStore();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
+  
+  // Ativar timeout de sessão
+  useSessionTimeout();
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       // Se não está autenticado ou não tem token, redirecionar para login
       if (!isAuthenticated || !user || !token) {
         router.replace('/login');
         return;
+      }
+
+      // Verificar modo de manutenção (exceto para admins)
+      if (user.role !== 'ADMIN' && user.role !== 'admin') {
+        try {
+          const response = await fetch(`${env.API_URL}/public/maintenance-mode`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const maintenanceData = await response.json();
+            if (maintenanceData?.maintenanceMode === true) {
+              console.log('Modo de manutenção ativo, bloqueando usuário não-admin');
+              logout();
+              router.replace('/login?maintenance=true');
+              return;
+            }
+          } else {
+            console.warn('Erro ao verificar modo de manutenção:', response.status);
+          }
+        } catch (error) {
+          console.error('Erro ao verificar modo de manutenção:', error);
+        }
       }
 
       // Se tem role específico requerido e não é o role correto
@@ -58,7 +89,7 @@ export default function AuthGuard({ children, requiredRole, redirectTo }: AuthGu
 
     // Verificar autenticação
     checkAuth();
-  }, [isAuthenticated, user, token, requiredRole, redirectTo, router]);
+  }, [isAuthenticated, user, token, requiredRole, redirectTo, router, logout]);
 
   if (isChecking) {
     return (

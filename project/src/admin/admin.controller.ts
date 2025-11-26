@@ -580,8 +580,9 @@ export class AdminController {
   }
 
   @Put('system/settings')
-  async updateSystemSettings(@Body() settings: any) {
-    return this.adminSystemService.updateSystemSettings(settings);
+  async updateSystemSettings(@Body() settings: any, @Request() req: any) {
+    const userId = req.user?.id;
+    return this.adminSystemService.updateSystemSettings(settings, userId);
   }
 
   @Post('system/backup')

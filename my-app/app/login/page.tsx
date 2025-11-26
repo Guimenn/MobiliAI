@@ -85,9 +85,15 @@ export default function LoginPage() {
   useEffect(() => {
     // Só inicializar conversa se não estiver logado
     if (!isAuthenticated || !user) {
-      const initialMessage = messageParam 
+      const maintenanceMode = searchParams.get('maintenance');
+      let initialMessage = messageParam 
         ? messageParam 
         : 'Olá! 👋 Digite seu e-mail para entrar ou criar uma conta:';
+      
+      // Se veio redirecionado por modo de manutenção, mostrar mensagem especial
+      if (maintenanceMode === 'true') {
+        initialMessage = '⚠️ O sistema está em modo de manutenção.\n\nApenas administradores podem fazer login no momento.\n\nTente novamente mais tarde ou entre em contato com o suporte.';
+      }
       
       const initialMessages: ChatMessage[] = [
         {
@@ -99,7 +105,7 @@ export default function LoginPage() {
       ];
       setMessages(initialMessages);
     }
-  }, [isAuthenticated, user, messageParam]);
+  }, [isAuthenticated, user, messageParam, searchParams]);
 
   const generateUniqueId = () => {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -574,6 +580,55 @@ export default function LoginPage() {
       setCredentials(prev => ({ ...prev, password: userInput }));
       setLoginStep('processing');
       
+      // Verificar modo de manutenção ANTES de fazer login
+      try {
+        simulateTyping('Verificando sistema...', 800);
+        const maintenanceCheck = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/public/maintenance-mode`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (maintenanceCheck.ok) {
+          const maintenanceData = await maintenanceCheck.json();
+          if (maintenanceData?.maintenanceMode === true) {
+            // Verificar se é admin antes de bloquear
+            // Tentar fazer login primeiro para verificar se é admin
+            try {
+              const response = await authAPI.login(credentials.email, userInput);
+              // Se chegou aqui, é admin (backend permitiu)
+              setUser(response.user);
+              setToken(response.token);
+              setAuthenticated(true);
+              simulateTyping('✅ Login realizado com sucesso!', 1000);
+              simulateTyping('🚀 Redirecionando...', 1500);
+              setLoginStep('complete');
+              
+              setTimeout(() => {
+                router.replace('/admin');
+              }, 2500);
+              return;
+            } catch (loginError: any) {
+              // Se não conseguiu fazer login, verificar se é erro de manutenção
+              const errorMsg = loginError?.response?.data?.message || '';
+              if (errorMsg.includes('manutenção') || errorMsg.includes('manutenção')) {
+                simulateTyping('⚠️ O sistema está em modo de manutenção.', 1500);
+                simulateTyping('Apenas administradores podem fazer login no momento.', 1500);
+                simulateTyping('Tente novamente mais tarde ou entre em contato com o suporte.', 2000);
+                setLoginStep('email');
+                return;
+              }
+              // Se não for erro de manutenção, continuar com o tratamento normal de erro
+              throw loginError;
+            }
+          }
+        }
+      } catch (maintenanceError) {
+        console.error('Erro ao verificar modo de manutenção:', maintenanceError);
+        // Continuar com login normal se não conseguir verificar
+      }
+      
       // Mostrar que está verificando
       simulateTyping('Verificando credenciais...', 1000);
 
@@ -624,6 +679,9 @@ export default function LoginPage() {
             needsEmailReset = true;
           } else if (backendMessage.includes('Usuário inativo')) {
             errorMessage = '❌ Sua conta está desativada. Entre em contato com o suporte para reativar.';
+            needsEmailReset = true;
+          } else if (backendMessage.includes('manutenção') || backendMessage.toLowerCase().includes('maintenance')) {
+            errorMessage = '⚠️ O sistema está em modo de manutenção. Apenas administradores podem fazer login no momento. Tente novamente mais tarde.';
             needsEmailReset = true;
           } else {
             errorMessage = `❌ ${backendMessage}`;

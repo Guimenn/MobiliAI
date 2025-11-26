@@ -241,31 +241,133 @@ export class AdminSystemService {
   // ==================== CONFIGURAÇÕES DO SISTEMA ====================
 
   async getSystemSettings() {
-    // Em produção, você teria uma tabela de configurações
-    return {
-      systemName: 'MobiliAI',
-      version: '1.0.0',
-      maintenanceMode: false,
-      maxUsers: 1000,
-      maxStores: 50,
-      maxProducts: 10000,
-      backupFrequency: 'daily',
-      logRetentionDays: 30,
-      features: {
-        aiEnabled: true,
-        chatbotEnabled: true,
-        analyticsEnabled: true,
-        backupEnabled: true
+    try {
+      // Buscar configurações do banco
+      const settingsRecord = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+
+      if (settingsRecord) {
+        return settingsRecord.value as any;
       }
-    };
+
+      // Retornar valores padrão se não existir
+      const defaultSettings = {
+        company: {
+          name: 'PintAI',
+          email: 'contato@pintai.com',
+          phone: '(11) 99999-9999',
+          address: 'Rua das Tintas, 123 - São Paulo, SP',
+          cnpj: '12.345.678/0001-90'
+        },
+        system: {
+          maintenanceMode: false,
+          sessionTimeout: 30,
+          maxLoginAttempts: 5
+        },
+        notifications: {
+          salesAlerts: true,
+          lowStockAlerts: true
+        },
+        security: {
+          passwordExpiration: 90,
+          ipWhitelist: '',
+          auditLog: true
+        }
+      };
+
+      // Criar registro padrão
+      await this.prisma.systemSettings.create({
+        data: {
+          key: 'system_settings',
+          value: defaultSettings,
+          description: 'Configurações gerais do sistema'
+        }
+      });
+
+      return defaultSettings;
+    } catch (error) {
+      console.error('Erro ao buscar configurações:', error);
+      // Retornar valores padrão em caso de erro
+      return {
+        company: {
+          name: 'PintAI',
+          email: 'contato@pintai.com',
+          phone: '(11) 99999-9999',
+          address: 'Rua das Tintas, 123 - São Paulo, SP',
+          cnpj: '12.345.678/0001-90'
+        },
+        system: {
+          maintenanceMode: false,
+          sessionTimeout: 30,
+          maxLoginAttempts: 5
+        },
+        notifications: {
+          salesAlerts: true,
+          lowStockAlerts: true
+        },
+        security: {
+          passwordExpiration: 90,
+          ipWhitelist: '',
+          auditLog: true
+        }
+      };
+    }
   }
 
-  async updateSystemSettings(settings: any) {
-    // Em produção, você salvaria isso na tabela de configurações
-    return {
-      message: 'Configurações atualizadas com sucesso',
-      settings
-    };
+  async updateSystemSettings(settings: any, userId?: string) {
+    try {
+      // Atualizar ou criar configurações
+      await this.prisma.systemSettings.upsert({
+        where: { key: 'system_settings' },
+        update: {
+          value: settings,
+          updatedBy: userId,
+          updatedAt: new Date()
+        },
+        create: {
+          key: 'system_settings',
+          value: settings,
+          description: 'Configurações gerais do sistema',
+          updatedBy: userId
+        }
+      });
+
+      return {
+        message: 'Configurações atualizadas com sucesso',
+        settings
+      };
+    } catch (error) {
+      console.error('Erro ao atualizar configurações:', error);
+      throw new Error('Erro ao atualizar configurações');
+    }
+  }
+
+  async getMaintenanceMode(): Promise<boolean> {
+    try {
+      const settings = await this.getSystemSettings();
+      return settings?.system?.maintenanceMode || false;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async getMaxLoginAttempts(): Promise<number> {
+    try {
+      const settings = await this.getSystemSettings();
+      return settings?.system?.maxLoginAttempts || 5;
+    } catch (error) {
+      return 5;
+    }
+  }
+
+  async getSessionTimeout(): Promise<number> {
+    try {
+      const settings = await this.getSystemSettings();
+      return settings?.system?.sessionTimeout || 30;
+    } catch (error) {
+      return 30;
+    }
   }
 
   // ==================== MONITORAMENTO ====================

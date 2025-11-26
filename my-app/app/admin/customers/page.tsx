@@ -22,6 +22,7 @@ import {
   Mail,
   Phone,
   Calendar,
+  ShoppingCart,
 } from 'lucide-react';
 
 export default function CustomersPage() {
@@ -67,6 +68,25 @@ export default function CustomersPage() {
     }
   };
 
+  const [totalOrders, setTotalOrders] = useState(0);
+
+  useEffect(() => {
+    const fetchTotalOrders = async () => {
+      try {
+        const sales = await adminAPI.getSales();
+        const salesArray = Array.isArray(sales) ? sales : (sales?.sales || sales?.data || []);
+        setTotalOrders(salesArray.length);
+      } catch (error) {
+        console.error('Erro ao buscar total de pedidos:', error);
+        setTotalOrders(0);
+      }
+    };
+    
+    if (customers.length > 0) {
+      fetchTotalOrders();
+    }
+  }, [customers]);
+
   const stats = useMemo(() => {
     const activeCustomers = customers.filter((customer: any) => customer.isActive !== false).length;
     const newCustomers = customers.filter((customer: any) => {
@@ -77,33 +97,13 @@ export default function CustomersPage() {
       return createdAt > thirtyDaysAgo;
     }).length;
     
-    let totalSpent = 0;
-    if (customers.length > 0) {
-      try {
-        adminAPI.getSales().then((sales) => {
-          if (Array.isArray(sales) && sales.length > 0) {
-            customers.forEach((customer: any) => {
-              const customerSales = sales.filter((sale: any) => sale.customerId === customer.id);
-              const customerTotal = customerSales.reduce((sum: number, sale: any) => {
-                const saleAmount = sale.totalAmount ?? sale.total ?? sale.totalValue ?? 0;
-                return sum + (Number(saleAmount) || 0);
-              }, 0);
-              totalSpent += customerTotal;
-            });
-          }
-        }).catch(() => {});
-      } catch (salesError) {
-        console.error('Erro ao calcular total gasto:', salesError);
-      }
-    }
-    
     return {
       totalCustomers: customers.length,
       activeCustomers,
       newCustomers,
-      totalSpent
+      totalOrders
     };
-  }, [customers]);
+  }, [customers, totalOrders]);
 
   const filteredCustomers = useMemo(() => {
     return customers.filter(customer => {
@@ -116,12 +116,6 @@ export default function CustomersPage() {
     });
   }, [customers, searchTerm, filterStatus]);
 
-  const formatPrice = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
 
   if (isLoading) {
     return (
@@ -156,7 +150,7 @@ export default function CustomersPage() {
             </div>
           </div>
 
-          <CustomersStats stats={stats} formatPrice={formatPrice} />
+          <CustomersStats stats={stats} />
         </div>
       </section>
 
@@ -288,7 +282,7 @@ export default function CustomersPage() {
   );
 }
 
-function CustomersStats({ stats, formatPrice }: any) {
+function CustomersStats({ stats }: any) {
   return (
     <div className="grid w-full max-w-md grid-cols-2 gap-4 sm:grid-cols-2 lg:max-w-xl">
       <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
@@ -314,10 +308,10 @@ function CustomersStats({ stats, formatPrice }: any) {
       </div>
       <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
-          <DollarSign className="h-5 w-5" />
+          <ShoppingCart className="h-5 w-5" />
         </div>
-        <p className="text-2xl font-semibold leading-tight">{formatPrice(stats.totalSpent)}</p>
-        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total Gasto</p>
+        <p className="text-2xl font-semibold leading-tight">{stats.totalOrders}</p>
+        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total Pedidos</p>
       </div>
     </div>
   );
