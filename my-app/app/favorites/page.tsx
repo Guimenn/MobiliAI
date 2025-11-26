@@ -50,7 +50,7 @@ interface FavoriteProduct {
     store: {
       name: string;
       id: string;
-    };
+    } | null;
   };
   createdAt: string;
 }
@@ -434,11 +434,13 @@ export default function FavoritesPage() {
                       </h3>
 
                       {/* Vendedor - Estilo Mercado Livre */}
-                      <div className="flex items-center gap-1 text-xs text-gray-600">
-                        <span>Por</span>
-                        <span className="font-semibold text-[#3e2626]">{favorite.product.store.name}</span>
-                        <CheckCircle2 className="w-3 h-3 text-blue-500" />
-                      </div>
+                      {favorite.product.store && (
+                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                          <span>Por</span>
+                          <span className="font-semibold text-[#3e2626]">{favorite.product.store.name}</span>
+                          <CheckCircle2 className="w-3 h-3 text-blue-500" />
+                        </div>
+                      )}
 
                       {/* Preços - Estilo Mercado Livre */}
                       <div className="space-y-1">
@@ -501,11 +503,13 @@ export default function FavoritesPage() {
                             <h3 className="font-semibold text-gray-900 text-lg mb-1 line-clamp-2">
                               {favorite.product.name}
                             </h3>
-                            <div className="flex items-center gap-1 text-sm text-gray-600">
-                              <span>Por</span>
-                              <span className="font-semibold text-[#3e2626]">{favorite.product.store.name}</span>
-                              <CheckCircle2 className="w-4 h-4 text-blue-500" />
-                            </div>
+                            {favorite.product.store && (
+                              <div className="flex items-center gap-1 text-sm text-gray-600">
+                                <span>Por</span>
+                                <span className="font-semibold text-[#3e2626]">{favorite.product.store.name}</span>
+                                <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                              </div>
+                            )}
                           </div>
 
                           {/* Preços - Estilo Mercado Livre */}
