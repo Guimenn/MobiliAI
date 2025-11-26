@@ -11,6 +11,7 @@ export function useSessionTimeout() {
   const router = useRouter();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const storageCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -25,20 +26,58 @@ export function useSessionTimeout() {
     }
 
     // Carregar timeout de sessão das configurações
-    const loadSessionTimeout = async () => {
+    const loadSessionTimeout = () => {
       try {
         const savedSettings = localStorage.getItem('app_settings');
         if (savedSettings) {
           const settings = JSON.parse(savedSettings);
           const timeoutMinutes = settings?.system?.sessionTimeout || 30;
           localStorage.setItem(SESSION_TIMEOUT_KEY, timeoutMinutes.toString());
+          return timeoutMinutes;
         }
       } catch (error) {
         console.error('Erro ao carregar timeout de sessão:', error);
       }
+      return 30; // Valor padrão
     };
 
+    // Observar mudanças no localStorage para atualizar timeout em tempo real
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'app_settings' && e.newValue) {
+        try {
+          const settings = JSON.parse(e.newValue);
+          const timeoutMinutes = settings?.system?.sessionTimeout || 30;
+          localStorage.setItem(SESSION_TIMEOUT_KEY, timeoutMinutes.toString());
+        } catch (error) {
+          console.error('Erro ao atualizar timeout de sessão:', error);
+        }
+      }
+    };
+
+    // Observar mudanças no mesmo tab (quando localStorage é atualizado)
+    const handleLocalStorageChange = () => {
+      const savedSettings = localStorage.getItem('app_settings');
+      if (savedSettings) {
+        try {
+          const settings = JSON.parse(savedSettings);
+          const timeoutMinutes = settings?.system?.sessionTimeout || 30;
+          localStorage.setItem(SESSION_TIMEOUT_KEY, timeoutMinutes.toString());
+        } catch (error) {
+          console.error('Erro ao atualizar timeout de sessão:', error);
+        }
+      }
+    };
+
+    // Carregar inicialmente
     loadSessionTimeout();
+
+    // Adicionar listeners
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Observar mudanças no mesmo tab (usando um intervalo para verificar)
+    storageCheckIntervalRef.current = setInterval(() => {
+      handleLocalStorageChange();
+    }, 5000); // Verificar a cada 5 segundos
 
     // Atualizar última atividade
     const updateLastActivity = () => {
@@ -48,7 +87,20 @@ export function useSessionTimeout() {
     // Verificar inatividade periodicamente
     const checkInactivity = () => {
       const lastActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
-      const timeoutMinutes = parseInt(localStorage.getItem(SESSION_TIMEOUT_KEY) || '30');
+      // Recarregar timeout das configurações a cada verificação (para pegar mudanças)
+      const savedSettings = localStorage.getItem('app_settings');
+      let timeoutMinutes = 30;
+      if (savedSettings) {
+        try {
+          const settings = JSON.parse(savedSettings);
+          timeoutMinutes = settings?.system?.sessionTimeout || 30;
+        } catch (error) {
+          console.error('Erro ao ler timeout:', error);
+        }
+      } else {
+        timeoutMinutes = parseInt(localStorage.getItem(SESSION_TIMEOUT_KEY) || '30');
+      }
+      
       const timeoutMs = timeoutMinutes * 60 * 1000;
 
       if (lastActivity) {
@@ -56,7 +108,7 @@ export function useSessionTimeout() {
         
         if (timeSinceLastActivity >= timeoutMs) {
           // Sessão expirada
-          toast.warning('Sua sessão expirou por inatividade. Faça login novamente.');
+          toast.warning(`Sua sessão expirou por inatividade (${timeoutMinutes} minutos). Faça login novamente.`);
           logout();
           router.push('/login');
         }
@@ -89,11 +141,16 @@ export function useSessionTimeout() {
         window.removeEventListener(event, handleActivity);
       });
       
+      window.removeEventListener('storage', handleStorageChange);
+      
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current);
+      }
+      if (storageCheckIntervalRef.current) {
+        clearInterval(storageCheckIntervalRef.current);
       }
     };
   }, [token, logout, router]);

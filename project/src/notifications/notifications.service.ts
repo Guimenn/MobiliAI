@@ -340,6 +340,13 @@ export class NotificationsService {
    * Notifica admins sobre nova venda
    */
   async notifyAdminsNewSale(saleId: string, saleNumber: string, totalAmount: number, storeName?: string, customerName?: string) {
+    // Verificar se alertas de vendas estão habilitados
+    const salesAlertsEnabled = await this.getSalesAlertsEnabled();
+    if (!salesAlertsEnabled) {
+      console.log('[NOTIFICATIONS] Alertas de vendas desabilitados. Notificação não será criada.');
+      return null;
+    }
+
     return this.notifyAllAdmins(
       NotificationType.ADMIN_NEW_SALE,
       'Nova Venda Realizada',
@@ -392,6 +399,13 @@ export class NotificationsService {
    * Notifica admins sobre estoque baixo
    */
   async notifyAdminsLowStock(productId: string, productName: string, stock: number, minStock: number, storeName?: string) {
+    // Verificar se alertas de estoque baixo estão habilitados
+    const lowStockAlertsEnabled = await this.getLowStockAlertsEnabled();
+    if (!lowStockAlertsEnabled) {
+      console.log('[NOTIFICATIONS] Alertas de estoque baixo desabilitados. Notificação não será criada.');
+      return null;
+    }
+
     return this.notifyAllAdmins(
       NotificationType.ADMIN_LOW_STOCK,
       'Estoque Baixo',
@@ -405,6 +419,13 @@ export class NotificationsService {
    * Notifica admins sobre produto sem estoque
    */
   async notifyAdminsOutOfStock(productId: string, productName: string, storeName?: string) {
+    // Verificar se alertas de estoque baixo estão habilitados (também se aplica a estoque zerado)
+    const lowStockAlertsEnabled = await this.getLowStockAlertsEnabled();
+    if (!lowStockAlertsEnabled) {
+      console.log('[NOTIFICATIONS] Alertas de estoque baixo desabilitados. Notificação de estoque zerado não será criada.');
+      return null;
+    }
+
     return this.notifyAllAdmins(
       NotificationType.ADMIN_OUT_OF_STOCK,
       'Produto Sem Estoque',
@@ -824,6 +845,46 @@ export class NotificationsService {
       }
     } catch (error) {
       console.error('Erro ao notificar usuários relevantes sobre novo usuário:', error);
+    }
+  }
+
+  /**
+   * Verifica se alertas de vendas estão habilitados
+   */
+  private async getSalesAlertsEnabled(): Promise<boolean> {
+    try {
+      const settings = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+      
+      if (settings && settings.value) {
+        const value = settings.value as any;
+        return value?.notifications?.salesAlerts ?? true; // Padrão: true
+      }
+      return true; // Padrão: habilitado
+    } catch (error) {
+      console.error('Erro ao verificar alertas de vendas:', error);
+      return true; // Em caso de erro, habilitar por padrão
+    }
+  }
+
+  /**
+   * Verifica se alertas de estoque baixo estão habilitados
+   */
+  private async getLowStockAlertsEnabled(): Promise<boolean> {
+    try {
+      const settings = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+      
+      if (settings && settings.value) {
+        const value = settings.value as any;
+        return value?.notifications?.lowStockAlerts ?? true; // Padrão: true
+      }
+      return true; // Padrão: habilitado
+    } catch (error) {
+      console.error('Erro ao verificar alertas de estoque baixo:', error);
+      return true; // Em caso de erro, habilitar por padrão
     }
   }
 }

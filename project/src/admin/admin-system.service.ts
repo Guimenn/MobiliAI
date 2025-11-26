@@ -46,6 +46,12 @@ export class AdminSystemService {
     userId?: string;
     metadata?: any;
   }) {
+    // Verificar se log de auditoria está habilitado
+    const auditLogEnabled = await this.isAuditLogEnabled();
+    if (!auditLogEnabled) {
+      return null; // Não criar log se estiver desabilitado
+    }
+
     return this.prisma.systemLog.create({
       data: {
         level: data.level,
@@ -55,6 +61,23 @@ export class AdminSystemService {
         metadata: data.metadata
       }
     });
+  }
+
+  private async isAuditLogEnabled(): Promise<boolean> {
+    try {
+      const settings = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+      
+      if (settings && settings.value) {
+        const value = settings.value as any;
+        return value?.security?.auditLog ?? true; // Padrão: true
+      }
+      return true; // Padrão: habilitado
+    } catch (error) {
+      console.error('Erro ao verificar log de auditoria:', error);
+      return true; // Em caso de erro, habilitar por padrão
+    }
   }
 
   // ==================== ESTATÍSTICAS DO SISTEMA ====================

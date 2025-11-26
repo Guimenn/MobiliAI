@@ -22,37 +22,66 @@ import { env } from '@/lib/env';
 const API_BASE_URL = env.API_URL;
 const SETTINGS_STORAGE_KEY = 'app_settings';
 
+// Valores padrão
+const defaultSettings = {
+  company: {
+    name: 'PintAI',
+    email: 'contato@pintai.com',
+    phone: '(11) 99999-9999',
+    address: 'Rua das Tintas, 123 - São Paulo, SP',
+    cnpj: '12.345.678/0001-90'
+  },
+  system: {
+    maintenanceMode: false,
+    sessionTimeout: 30,
+    maxLoginAttempts: 5
+  },
+  notifications: {
+    salesAlerts: true,
+    lowStockAlerts: true
+  },
+  security: {
+    passwordExpiration: 90,
+    ipWhitelist: '',
+    auditLog: true
+  }
+};
+
+// Função para carregar do localStorage primeiro (mais rápido)
+const loadSettingsFromStorage = () => {
+  if (typeof window === 'undefined') return defaultSettings;
+  
+  try {
+    const savedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings);
+      // Merge com valores padrão para garantir que todas as propriedades existam
+      return {
+        company: { ...defaultSettings.company, ...(parsed.company || {}) },
+        system: { ...defaultSettings.system, ...(parsed.system || {}) },
+        notifications: { ...defaultSettings.notifications, ...(parsed.notifications || {}) },
+        security: { ...defaultSettings.security, ...(parsed.security || {}) }
+      };
+    }
+  } catch (error) {
+    console.error('Erro ao carregar configurações do localStorage:', error);
+  }
+  
+  return defaultSettings;
+};
+
 export default function SettingsPage() {
   const { token } = useAppStore();
-  const [settings, setSettings] = useState({
-    company: {
-      name: 'PintAI',
-      email: 'contato@pintai.com',
-      phone: '(11) 99999-9999',
-      address: 'Rua das Tintas, 123 - São Paulo, SP',
-      cnpj: '12.345.678/0001-90'
-    },
-    system: {
-      maintenanceMode: false,
-      sessionTimeout: 30,
-      maxLoginAttempts: 5
-    },
-    notifications: {
-      salesAlerts: true,
-      lowStockAlerts: true
-    },
-    security: {
-      passwordExpiration: 90,
-      ipWhitelist: '',
-      auditLog: true
-    }
-  });
+  // Carregar do localStorage imediatamente para evitar flash
+  const [settings, setSettings] = useState(loadSettingsFromStorage);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('company');
 
   // Carregar configurações do backend ao montar o componente
   useEffect(() => {
     const loadSettings = async () => {
+      setIsInitialLoading(true);
       try {
         if (token) {
           // Tentar carregar do backend
@@ -70,31 +99,32 @@ export default function SettingsPage() {
             // Garantir que todas as propriedades estejam presentes
             const mergedSettings = {
               company: { 
-                name: backendSettings.company?.name || settings.company.name,
-                email: backendSettings.company?.email || settings.company.email,
-                phone: backendSettings.company?.phone || settings.company.phone,
-                address: backendSettings.company?.address || settings.company.address,
-                cnpj: backendSettings.company?.cnpj || settings.company.cnpj
+                name: backendSettings.company?.name || defaultSettings.company.name,
+                email: backendSettings.company?.email || defaultSettings.company.email,
+                phone: backendSettings.company?.phone || defaultSettings.company.phone,
+                address: backendSettings.company?.address || defaultSettings.company.address,
+                cnpj: backendSettings.company?.cnpj || defaultSettings.company.cnpj
               },
               system: { 
-                maintenanceMode: backendSettings.system?.maintenanceMode ?? settings.system.maintenanceMode,
-                sessionTimeout: backendSettings.system?.sessionTimeout ?? settings.system.sessionTimeout,
-                maxLoginAttempts: backendSettings.system?.maxLoginAttempts ?? settings.system.maxLoginAttempts
+                maintenanceMode: backendSettings.system?.maintenanceMode ?? defaultSettings.system.maintenanceMode,
+                sessionTimeout: backendSettings.system?.sessionTimeout ?? defaultSettings.system.sessionTimeout,
+                maxLoginAttempts: backendSettings.system?.maxLoginAttempts ?? defaultSettings.system.maxLoginAttempts
               },
               notifications: { 
-                salesAlerts: backendSettings.notifications?.salesAlerts ?? settings.notifications.salesAlerts,
-                lowStockAlerts: backendSettings.notifications?.lowStockAlerts ?? settings.notifications.lowStockAlerts
+                salesAlerts: backendSettings.notifications?.salesAlerts ?? defaultSettings.notifications.salesAlerts,
+                lowStockAlerts: backendSettings.notifications?.lowStockAlerts ?? defaultSettings.notifications.lowStockAlerts
               },
               security: { 
-                passwordExpiration: backendSettings.security?.passwordExpiration ?? settings.security.passwordExpiration,
-                ipWhitelist: backendSettings.security?.ipWhitelist ?? settings.security.ipWhitelist,
-                auditLog: backendSettings.security?.auditLog ?? settings.security.auditLog
+                passwordExpiration: backendSettings.security?.passwordExpiration ?? defaultSettings.security.passwordExpiration,
+                ipWhitelist: backendSettings.security?.ipWhitelist ?? defaultSettings.security.ipWhitelist,
+                auditLog: backendSettings.security?.auditLog ?? defaultSettings.security.auditLog
               }
             };
             
             setSettings(mergedSettings);
-            // Também salvar no localStorage como backup
+            // Atualizar localStorage com dados do backend
             localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(mergedSettings));
+            setIsInitialLoading(false);
             return;
           } else {
             const errorText = await response.text();
@@ -102,39 +132,12 @@ export default function SettingsPage() {
           }
         }
         
-        // Fallback: carregar do localStorage
-        const savedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-        if (savedSettings) {
-          try {
-            const parsed = JSON.parse(savedSettings);
-            console.log('Configurações carregadas do localStorage:', parsed);
-            setSettings(prev => ({
-              company: { ...prev.company, ...(parsed.company || {}) },
-              system: { ...prev.system, ...(parsed.system || {}) },
-              notifications: { ...prev.notifications, ...(parsed.notifications || {}) },
-              security: { ...prev.security, ...(parsed.security || {}) }
-            }));
-          } catch (error) {
-            console.error('Erro ao carregar configurações do localStorage:', error);
-          }
-        }
+        // Se não conseguiu carregar do backend, manter o que já está no estado (do localStorage)
+        setIsInitialLoading(false);
       } catch (error) {
         console.error('Erro ao carregar configurações do servidor:', error);
-        // Fallback: carregar do localStorage
-        const savedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-        if (savedSettings) {
-          try {
-            const parsed = JSON.parse(savedSettings);
-            setSettings(prev => ({
-              company: { ...prev.company, ...(parsed.company || {}) },
-              system: { ...prev.system, ...(parsed.system || {}) },
-              notifications: { ...prev.notifications, ...(parsed.notifications || {}) },
-              security: { ...prev.security, ...(parsed.security || {}) }
-            }));
-          } catch (err) {
-            console.error('Erro ao carregar configurações:', err);
-          }
-        }
+        // Manter o que já está no estado (do localStorage)
+        setIsInitialLoading(false);
       }
     };
 
@@ -259,6 +262,18 @@ export default function SettingsPage() {
       setIsLoading(false);
     }
   };
+
+  // Mostrar loading apenas na primeira carga
+  if (isInitialLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto"></div>
+          <p className="text-muted-foreground">Carregando configurações...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -426,10 +441,33 @@ export default function SettingsPage() {
                   min="5"
                   max="480"
                   value={settings.system.sessionTimeout}
-                  onChange={(e) => setSettings({
-                    ...settings,
-                    system: { ...settings.system, sessionTimeout: parseInt(e.target.value) || 30 }
-                  })}
+                  onChange={async (e) => {
+                    const newValue = parseInt(e.target.value) || 30;
+                    const clampedValue = Math.max(5, Math.min(480, newValue));
+                    const newSettings = {
+                      ...settings,
+                      system: { ...settings.system, sessionTimeout: clampedValue }
+                    };
+                    setSettings(newSettings);
+                    
+                    // Salvar automaticamente
+                    try {
+                      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+                      if (token) {
+                        await fetch(`${API_BASE_URL}/admin/system/settings`, {
+                          method: 'PUT',
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify(newSettings)
+                        });
+                      }
+                      toast.success(`Timeout de sessão atualizado para ${clampedValue} minutos`);
+                    } catch (error) {
+                      console.error('Erro ao salvar timeout:', error);
+                    }
+                  }}
                 />
                 <p className="text-sm text-muted-foreground">
                   Tempo de inatividade antes de desconectar o usuário (5-480 minutos)
@@ -444,10 +482,33 @@ export default function SettingsPage() {
                   min="3"
                   max="10"
                   value={settings.system.maxLoginAttempts}
-                  onChange={(e) => setSettings({
-                    ...settings,
-                    system: { ...settings.system, maxLoginAttempts: parseInt(e.target.value) || 5 }
-                  })}
+                  onChange={async (e) => {
+                    const newValue = parseInt(e.target.value) || 5;
+                    const clampedValue = Math.max(3, Math.min(10, newValue));
+                    const newSettings = {
+                      ...settings,
+                      system: { ...settings.system, maxLoginAttempts: clampedValue }
+                    };
+                    setSettings(newSettings);
+                    
+                    // Salvar automaticamente
+                    try {
+                      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+                      if (token) {
+                        await fetch(`${API_BASE_URL}/admin/system/settings`, {
+                          method: 'PUT',
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify(newSettings)
+                        });
+                      }
+                      toast.success(`Máximo de tentativas atualizado para ${clampedValue}`);
+                    } catch (error) {
+                      console.error('Erro ao salvar máximo de tentativas:', error);
+                    }
+                  }}
                 />
                 <p className="text-sm text-muted-foreground">
                   Número máximo de tentativas de login antes de bloquear (3-10)
@@ -480,10 +541,33 @@ export default function SettingsPage() {
                 <Switch
                   id="sales-alerts"
                   checked={settings.notifications.salesAlerts}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    notifications: { ...settings.notifications, salesAlerts: checked }
-                  })}
+                  onCheckedChange={async (checked) => {
+                    const newSettings = {
+                      ...settings,
+                      notifications: { ...settings.notifications, salesAlerts: checked }
+                    };
+                    setSettings(newSettings);
+                    
+                    // Salvar automaticamente
+                    try {
+                      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+                      if (token) {
+                        await fetch(`${API_BASE_URL}/admin/system/settings`, {
+                          method: 'PUT',
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify(newSettings)
+                        });
+                      }
+                      toast.success(checked ? '✅ Alertas de vendas ATIVADOS' : '✅ Alertas de vendas DESATIVADOS');
+                    } catch (error) {
+                      console.error('Erro ao salvar configuração:', error);
+                      toast.error('Erro ao salvar configuração');
+                    }
+                  }}
+                  disabled={isLoading}
                 />
               </div>
 
@@ -497,10 +581,33 @@ export default function SettingsPage() {
                 <Switch
                   id="low-stock-alerts"
                   checked={settings.notifications.lowStockAlerts}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    notifications: { ...settings.notifications, lowStockAlerts: checked }
-                  })}
+                  onCheckedChange={async (checked) => {
+                    const newSettings = {
+                      ...settings,
+                      notifications: { ...settings.notifications, lowStockAlerts: checked }
+                    };
+                    setSettings(newSettings);
+                    
+                    // Salvar automaticamente
+                    try {
+                      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+                      if (token) {
+                        await fetch(`${API_BASE_URL}/admin/system/settings`, {
+                          method: 'PUT',
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify(newSettings)
+                        });
+                      }
+                      toast.success(checked ? '✅ Alertas de estoque baixo ATIVADOS' : '✅ Alertas de estoque baixo DESATIVADOS');
+                    } catch (error) {
+                      console.error('Erro ao salvar configuração:', error);
+                      toast.error('Erro ao salvar configuração');
+                    }
+                  }}
+                  disabled={isLoading}
                 />
               </div>
             </CardContent>
@@ -528,10 +635,34 @@ export default function SettingsPage() {
                   min="30"
                   max="365"
                   value={settings.security.passwordExpiration}
-                  onChange={(e) => setSettings({
-                    ...settings,
-                    security: { ...settings.security, passwordExpiration: parseInt(e.target.value) || 90 }
-                  })}
+                  onChange={async (e) => {
+                    const newValue = parseInt(e.target.value) || 90;
+                    const clampedValue = Math.max(30, Math.min(365, newValue));
+                    const newSettings = {
+                      ...settings,
+                      security: { ...settings.security, passwordExpiration: clampedValue }
+                    };
+                    setSettings(newSettings);
+                    
+                    // Salvar automaticamente
+                    try {
+                      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+                      if (token) {
+                        await fetch(`${API_BASE_URL}/admin/system/settings`, {
+                          method: 'PUT',
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify(newSettings)
+                        });
+                      }
+                      toast.success(`Expiração de senha atualizada para ${clampedValue} dias`);
+                    } catch (error) {
+                      console.error('Erro ao salvar configuração:', error);
+                      toast.error('Erro ao salvar configuração');
+                    }
+                  }}
                 />
                 <p className="text-sm text-muted-foreground">
                   Número de dias antes de exigir alteração de senha (30-365 dias)
@@ -550,10 +681,33 @@ export default function SettingsPage() {
                 <Switch
                   id="audit-log"
                   checked={settings.security.auditLog}
-                  onCheckedChange={(checked) => setSettings({
-                    ...settings,
-                    security: { ...settings.security, auditLog: checked }
-                  })}
+                  onCheckedChange={async (checked) => {
+                    const newSettings = {
+                      ...settings,
+                      security: { ...settings.security, auditLog: checked }
+                    };
+                    setSettings(newSettings);
+                    
+                    // Salvar automaticamente
+                    try {
+                      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+                      if (token) {
+                        await fetch(`${API_BASE_URL}/admin/system/settings`, {
+                          method: 'PUT',
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify(newSettings)
+                        });
+                      }
+                      toast.success(checked ? '✅ Log de auditoria ATIVADO' : '✅ Log de auditoria DESATIVADO');
+                    } catch (error) {
+                      console.error('Erro ao salvar configuração:', error);
+                      toast.error('Erro ao salvar configuração');
+                    }
+                  }}
+                  disabled={isLoading}
                 />
               </div>
             </CardContent>

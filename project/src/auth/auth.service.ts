@@ -46,6 +46,7 @@ export class AuthService {
         zipCode: userData.zipCode,
         role: userData.role || UserRole.CUSTOMER,
         storeId: userData.storeId,
+        passwordChangedAt: new Date(), // Definir data inicial
       },
       include: {
         store: true,
@@ -100,11 +101,38 @@ export class AuthService {
       throw new UnauthorizedException('Usuário inativo');
     }
 
+    // Verificar expiração de senha
+    const passwordExpired = await this.checkPasswordExpiration(user);
+    if (passwordExpired) {
+      throw new UnauthorizedException(
+        'Sua senha expirou. Por favor, altere sua senha para continuar.'
+      );
+    }
+
+    // Verificar tentativas de login antes de verificar senha
+    const maxAttempts = await this.getMaxLoginAttempts();
+    const loginAttempts = await this.getLoginAttempts(email);
+    
+    if (loginAttempts >= maxAttempts) {
+      throw new UnauthorizedException(
+        `Muitas tentativas de login falhadas. Tente novamente em alguns minutos.`
+      );
+    }
+
     // Verificar senha
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Senha incorreta');
+      // Incrementar tentativas
+      await this.incrementLoginAttempts(email);
+      
+      const remainingAttempts = maxAttempts - loginAttempts - 1;
+      throw new UnauthorizedException(
+        `Senha incorreta. Tentativas restantes: ${remainingAttempts}`
+      );
     }
+
+    // Resetar tentativas em caso de sucesso
+    await this.resetLoginAttempts(email);
 
     // Gerar token
     const token = this.generateToken(user);
@@ -135,10 +163,13 @@ export class AuthService {
     // Hash da nova senha
     const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
-    // Atualizar senha
+    // Atualizar senha e data de alteração
     await this.prisma.user.update({
       where: { id: userId },
-      data: { password: hashedNewPassword },
+      data: { 
+        password: hashedNewPassword,
+        passwordChangedAt: new Date()
+      },
     });
   }
 
@@ -366,7 +397,10 @@ export class AuthService {
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: user.id },
-        data: { password: hashedNewPassword },
+        data: { 
+          password: hashedNewPassword,
+          passwordChangedAt: new Date()
+        },
       }),
       this.prisma.passwordReset.update({
         where: { id: passwordReset.id },
@@ -496,6 +530,113 @@ export class AuthService {
     } catch (error) {
       console.error('Erro ao verificar modo de manutenção:', error);
       return false;
+    }
+  }
+
+  private async getMaxLoginAttempts(): Promise<number> {
+    try {
+      const settings = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+      
+      if (settings && settings.value) {
+        const value = settings.value as any;
+        return value?.system?.maxLoginAttempts || 5;
+      }
+      return 5;
+    } catch (error) {
+      console.error('Erro ao buscar máximo de tentativas:', error);
+      return 5;
+    }
+  }
+
+  private async getLoginAttempts(email: string): Promise<number> {
+    try {
+      const attemptsKey = `login_attempts_${email.toLowerCase()}`;
+      const attemptsRecord = await this.prisma.systemSettings.findUnique({
+        where: { key: attemptsKey }
+      });
+      
+      if (attemptsRecord && attemptsRecord.value) {
+        const data = attemptsRecord.value as any;
+        const timestamp = data.timestamp || 0;
+        const now = Date.now();
+        // Resetar após 15 minutos
+        if (now - timestamp > 15 * 60 * 1000) {
+          await this.resetLoginAttempts(email);
+          return 0;
+        }
+        return data.attempts || 0;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Erro ao buscar tentativas de login:', error);
+      return 0;
+    }
+  }
+
+  private async incrementLoginAttempts(email: string): Promise<void> {
+    try {
+      const attemptsKey = `login_attempts_${email.toLowerCase()}`;
+      const currentAttempts = await this.getLoginAttempts(email);
+      
+      await this.prisma.systemSettings.upsert({
+        where: { key: attemptsKey },
+        update: {
+          value: {
+            attempts: currentAttempts + 1,
+            timestamp: Date.now()
+          }
+        },
+        create: {
+          key: attemptsKey,
+          value: {
+            attempts: 1,
+            timestamp: Date.now()
+          },
+          description: `Tentativas de login para ${email}`
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao incrementar tentativas de login:', error);
+    }
+  }
+
+  private async resetLoginAttempts(email: string): Promise<void> {
+    try {
+      const attemptsKey = `login_attempts_${email.toLowerCase()}`;
+      await this.prisma.systemSettings.deleteMany({
+        where: { key: attemptsKey }
+      });
+    } catch (error) {
+      console.error('Erro ao resetar tentativas de login:', error);
+    }
+  }
+
+  private async checkPasswordExpiration(user: User): Promise<boolean> {
+    try {
+      // Buscar configuração de expiração de senha
+      const settings = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+      
+      if (settings && settings.value) {
+        const value = settings.value as any;
+        const expirationDays = value?.security?.passwordExpiration || 90;
+        
+        // Se não tiver data de alteração, considerar como nunca alterada (criada na criação)
+        const passwordChangedAt = user.passwordChangedAt || user.createdAt;
+        const daysSinceChange = Math.floor(
+          (Date.now() - new Date(passwordChangedAt).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        
+        return daysSinceChange >= expirationDays;
+      }
+      
+      return false; // Se não houver configuração, não expira
+    } catch (error) {
+      console.error('Erro ao verificar expiração de senha:', error);
+      return false; // Em caso de erro, não bloquear
     }
   }
 

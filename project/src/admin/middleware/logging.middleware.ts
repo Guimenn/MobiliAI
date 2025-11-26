@@ -41,6 +41,12 @@ export class LoggingMiddleware implements NestMiddleware {
   }
 
   private async logAction(requestData: any, statusCode: number, duration: number) {
+    // Verificar se log de auditoria está habilitado
+    const auditLogEnabled = await this.isAuditLogEnabled();
+    if (!auditLogEnabled) {
+      return; // Não criar log se estiver desabilitado
+    }
+
     const level = this.getLogLevel(statusCode);
     const action = this.getActionFromUrl(requestData.url, requestData.method);
     const message = this.getLogMessage(requestData, statusCode, duration);
@@ -61,6 +67,23 @@ export class LoggingMiddleware implements NestMiddleware {
         }
       }
     });
+  }
+
+  private async isAuditLogEnabled(): Promise<boolean> {
+    try {
+      const settings = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+      
+      if (settings && settings.value) {
+        const value = settings.value as any;
+        return value?.security?.auditLog ?? true; // Padrão: true
+      }
+      return true; // Padrão: habilitado
+    } catch (error) {
+      console.error('Erro ao verificar log de auditoria:', error);
+      return true; // Em caso de erro, habilitar por padrão
+    }
   }
 
   private getLogLevel(statusCode: number): string {

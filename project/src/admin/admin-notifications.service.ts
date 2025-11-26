@@ -5,84 +5,124 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AdminNotificationsService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Busca configurações do sistema
+   */
+  private async getSystemSettings(): Promise<any> {
+    try {
+      const settingsRecord = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+
+      if (settingsRecord) {
+        return settingsRecord.value as any;
+      }
+
+      // Retornar valores padrão
+      return {
+        notifications: {
+          salesAlerts: true,
+          lowStockAlerts: true
+        }
+      };
+    } catch (error) {
+      console.error('Erro ao buscar configurações:', error);
+      return {
+        notifications: {
+          salesAlerts: true,
+          lowStockAlerts: true
+        }
+      };
+    }
+  }
+
   // ==================== NOTIFICAÇÕES DO SISTEMA ====================
 
   async getSystemNotifications() {
     const notifications = [];
 
+    // Carregar configurações do sistema
+    const settings = await this.getSystemSettings();
+    const lowStockAlertsEnabled = settings?.notifications?.lowStockAlerts ?? true;
+    const salesAlertsEnabled = settings?.notifications?.salesAlerts ?? true;
+
     // Verificar estoque baixo - produtos onde stock <= minStock E stock > 0
-    const lowStockProducts = await this.prisma.product.findMany({
-      where: {
-        AND: [
-          {
-            stock: {
-              lte: this.prisma.product.fields.minStock
+    if (lowStockAlertsEnabled) {
+      const lowStockProducts = await this.prisma.product.findMany({
+        where: {
+          AND: [
+            {
+              stock: {
+                lte: this.prisma.product.fields.minStock
+              }
+            },
+            {
+              stock: {
+                gt: 0
+              }
             }
-          },
-          {
-            stock: {
-              gt: 0
-            }
-          }
-        ]
-      },
-      include: {
-        store: { select: { name: true } }
-      },
-      take: 10
-    });
-
-    if (lowStockProducts.length > 0) {
-      notifications.push({
-        type: 'WARNING',
-        title: 'Estoque Baixo',
-        message: `${lowStockProducts.length} produto(s) com estoque baixo`,
-        data: lowStockProducts,
-        createdAt: new Date()
+          ]
+        },
+        include: {
+          store: { select: { name: true } }
+        },
+        take: 10
       });
-    }
 
-    // Verificar produtos sem estoque
-    const outOfStockProducts = await this.prisma.product.findMany({
-      where: { stock: 0 },
-      include: {
-        store: { select: { name: true } }
-      },
-      take: 10
-    });
+      if (lowStockProducts.length > 0) {
+        notifications.push({
+          type: 'WARNING',
+          title: 'Estoque Baixo',
+          message: `${lowStockProducts.length} produto(s) com estoque baixo`,
+          data: lowStockProducts,
+          createdAt: new Date()
+        });
+      }
 
-    if (outOfStockProducts.length > 0) {
-      notifications.push({
-        type: 'ERROR',
-        title: 'Produtos Sem Estoque',
-        message: `${outOfStockProducts.length} produtos sem estoque`,
-        data: outOfStockProducts,
-        createdAt: new Date()
+      // Verificar produtos sem estoque
+      const outOfStockProducts = await this.prisma.product.findMany({
+        where: { stock: 0 },
+        include: {
+          store: { select: { name: true } }
+        },
+        take: 10
       });
+
+      if (outOfStockProducts.length > 0) {
+        notifications.push({
+          type: 'ERROR',
+          title: 'Produtos Sem Estoque',
+          message: `${outOfStockProducts.length} produtos sem estoque`,
+          data: outOfStockProducts,
+          createdAt: new Date()
+        });
+      }
     }
 
     // Verificar vendas recentes
-    const recentSales = await this.prisma.sale.findMany({
-      where: {
-        createdAt: {
-          gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Últimas 24 horas
-        }
-      },
-      include: {
-        customer: { select: { name: true } },
-        store: { select: { name: true } }
-      },
-      take: 5
-    });
-
-    if (recentSales.length > 0) {
-      notifications.push({
-        type: 'INFO',
-        title: 'Vendas Recentes',
-        message: `${recentSales.length} vendas nas últimas 24 horas`,
-        data: recentSales,
-        createdAt: new Date()
+    if (salesAlertsEnabled) {
+      const recentSales = await this.prisma.sale.findMany({
+        where: {
+          createdAt: {
+            gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Últimas 24 horas
+          }
+        },
+        include: {
+          customer: { select: { name: true } },
+          store: { select: { name: true } }
+        },
+        take: 5
       });
+
+      if (recentSales.length > 0) {
+        notifications.push({
+          type: 'INFO',
+          title: 'Vendas Recentes',
+          message: `${recentSales.length} vendas nas últimas 24 horas`,
+          data: recentSales,
+          createdAt: new Date()
+        });
+      }
     }
 
     // Verificar usuários inativos

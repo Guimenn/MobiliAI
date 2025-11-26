@@ -27,6 +27,12 @@ export class LoggingInterceptor implements NestInterceptor {
 
   private async logSuccess(request: any, response: any, startTime: number, data: any) {
     try {
+      // Verificar se log de auditoria está habilitado
+      const auditLogEnabled = await this.isAuditLogEnabled();
+      if (!auditLogEnabled) {
+        return; // Não criar log se estiver desabilitado
+      }
+
       const duration = Date.now() - startTime;
       const action = this.getActionFromRequest(request);
       const message = `Ação ${action} executada com sucesso`;
@@ -53,6 +59,12 @@ export class LoggingInterceptor implements NestInterceptor {
 
   private async logError(request: any, response: any, startTime: number, error: any) {
     try {
+      // Verificar se log de auditoria está habilitado
+      const auditLogEnabled = await this.isAuditLogEnabled();
+      if (!auditLogEnabled) {
+        return; // Não criar log se estiver desabilitado
+      }
+
       const duration = Date.now() - startTime;
       const action = this.getActionFromRequest(request);
       const message = `Erro na ação ${action}: ${error.message}`;
@@ -78,6 +90,23 @@ export class LoggingInterceptor implements NestInterceptor {
       });
     } catch (logError) {
       console.error('Erro ao registrar log de erro:', logError);
+    }
+  }
+
+  private async isAuditLogEnabled(): Promise<boolean> {
+    try {
+      const settings = await this.prisma.systemSettings.findUnique({
+        where: { key: 'system_settings' }
+      });
+      
+      if (settings && settings.value) {
+        const value = settings.value as any;
+        return value?.security?.auditLog ?? true; // Padrão: true
+      }
+      return true; // Padrão: habilitado
+    } catch (error) {
+      console.error('Erro ao verificar log de auditoria:', error);
+      return true; // Em caso de erro, habilitar por padrão
     }
   }
 
