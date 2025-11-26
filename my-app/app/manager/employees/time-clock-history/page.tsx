@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,11 +26,9 @@ interface TimeClockRecord {
   createdAt: string;
 }
 
-export default function TimeClockHistoryPage() {
+export default function ManagerTimeClockHistoryPage() {
   const router = useRouter();
-  const params = useParams();
   const searchParams = useSearchParams();
-  const storeId = params.id as string;
   const employeeId = searchParams.get('employeeId') as string;
   const { token } = useAppStore();
   
@@ -45,7 +43,7 @@ export default function TimeClockHistoryPage() {
   useEffect(() => {
     if (!employeeId) {
       console.error('EmployeeId não fornecido');
-      router.push(`/admin/stores/${storeId}`);
+      router.push('/manager/employees');
       return;
     }
 
@@ -55,7 +53,7 @@ export default function TimeClockHistoryPage() {
     
     setEndDate(today.toISOString().split('T')[0]);
     setStartDate(thirtyDaysAgo.toISOString().split('T')[0]);
-  }, [employeeId, storeId, router]);
+  }, [employeeId, router]);
 
   useEffect(() => {
     if (employeeId && token) {
@@ -74,7 +72,7 @@ export default function TimeClockHistoryPage() {
     
     try {
       setEmployeeLoading(true);
-      const response = await fetch(`http://localhost:3001/api/admin/users/${employeeId}`, {
+      const response = await fetch(`http://localhost:3001/api/manager/users/${employeeId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -176,7 +174,7 @@ export default function TimeClockHistoryPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-3">
-        <Button variant="ghost" onClick={() => router.push(`/admin/stores/${storeId}`)}>
+        <Button variant="ghost" onClick={() => router.push('/manager/employees')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
@@ -330,3 +328,4 @@ export default function TimeClockHistoryPage() {
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { 
   ArrowLeft, 
   User, 
+  Calendar,
+  FileText,
   AlertTriangle,
   Save,
   X
@@ -24,11 +26,9 @@ interface Employee {
   hireDate?: string;
 }
 
-export default function TerminationPage() {
+export default function ManagerTerminationPage() {
   const router = useRouter();
-  const params = useParams();
   const searchParams = useSearchParams();
-  const storeId = params.id as string;
   const employeeId = searchParams.get('employeeId') as string;
   const { token } = useAppStore();
   
@@ -46,7 +46,7 @@ export default function TerminationPage() {
   useEffect(() => {
     if (!employeeId) {
       console.error('EmployeeId não fornecido');
-      router.push(`/admin/stores/${storeId}`);
+      router.push('/manager/employees');
       return;
     }
 
@@ -56,13 +56,13 @@ export default function TerminationPage() {
       ...prev,
       terminationDate: new Date().toISOString().split('T')[0]
     }));
-  }, [employeeId, storeId, token]);
+  }, [employeeId, token]);
 
   const fetchEmployee = async () => {
     if (!employeeId || !token) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/api/admin/users/${employeeId}`, {
+      const response = await fetch(`http://localhost:3001/api/manager/users/${employeeId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -107,7 +107,7 @@ export default function TerminationPage() {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       alert('Processo de demissão iniciado com sucesso!');
-      router.push(`/admin/stores/${storeId}`);
+      router.push('/manager/employees');
       
     } catch (error) {
       console.error('Erro ao processar demissão:', error);
@@ -119,9 +119,9 @@ export default function TerminationPage() {
 
   if (!employee) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
           <p className="text-gray-600">Carregando...</p>
         </div>
       </div>
@@ -132,7 +132,7 @@ export default function TerminationPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-3">
-        <Button variant="ghost" onClick={() => router.push(`/admin/stores/${storeId}`)}>
+        <Button variant="ghost" onClick={() => router.push('/manager/employees')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
@@ -278,7 +278,7 @@ export default function TerminationPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push(`/admin/stores/${storeId}`)}
+                onClick={() => router.push('/manager/employees')}
                 disabled={loading}
                 className="h-11 rounded-xl border-gray-300"
               >
@@ -300,3 +300,4 @@ export default function TerminationPage() {
     </div>
   );
 }
+

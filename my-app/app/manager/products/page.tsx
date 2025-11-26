@@ -34,7 +34,6 @@ import {
   Percent
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import FlashSalePanel from '@/components/FlashSalePanel';
 
 interface Product {
   id: string;
@@ -78,9 +77,6 @@ export default function ManagerProductsPage() {
   
   // Carrossel
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  
-  // Estado para o painel de oferta relâmpago
-  const [showFlashSalePanel, setShowFlashSalePanel] = useState(false);
   
   // Estado para controlar a aba ativa
   const [activeTab, setActiveTab] = useState<'all' | 'on-sale'>('all');
@@ -490,17 +486,6 @@ export default function ManagerProductsPage() {
     }).format(value);
   };
 
-  // Função para verificar se um produto está em oferta relâmpago ativa
-  const isFlashSaleActive = (product: Product): boolean => {
-    if (!product.isFlashSale || !product.flashSaleStartDate || !product.flashSaleEndDate) {
-      return false;
-    }
-    const now = new Date();
-    const start = new Date(product.flashSaleStartDate);
-    const end = new Date(product.flashSaleEndDate);
-    return now >= start && now <= end;
-  };
-
   // Função para verificar se um produto está em oferta normal ativa
   const isNormalSaleActive = (product: Product): boolean => {
     if (!product.isOnSale || !product.saleStartDate || !product.saleEndDate) {
@@ -528,7 +513,7 @@ export default function ManagerProductsPage() {
     // Filtro por oferta (se estiver na aba "em oferta")
     if (activeTab === 'on-sale') {
       filtered = filtered.filter(product => 
-        isFlashSaleActive(product) || isNormalSaleActive(product)
+        isNormalSaleActive(product)
       );
     }
     
@@ -548,7 +533,7 @@ export default function ManagerProductsPage() {
   // Função para renderizar seção de produtos
   const renderProductsSection = (showOnlyOnSale: boolean) => {
     const productsToShow = showOnlyOnSale 
-      ? filteredProducts.filter(p => isFlashSaleActive(p) || isNormalSaleActive(p))
+      ? filteredProducts.filter(p => isNormalSaleActive(p))
       : filteredProducts;
 
     return (
@@ -583,13 +568,12 @@ export default function ManagerProductsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {productsToShow.map((product) => {
-              const isFlashSale = isFlashSaleActive(product);
               const isNormalSale = isNormalSaleActive(product);
-              const salePrice = isFlashSale ? (product.flashSalePrice || product.price) : (isNormalSale ? (product.salePrice || product.price) : product.price);
+              const salePrice = isNormalSale ? (product.salePrice || product.price) : product.price;
               const originalPrice = product.price;
               
               return (
-                <Card key={product.id} className={`overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 rounded-2xl group ${isFlashSale ? 'ring-2 ring-yellow-400 ring-opacity-50' : isNormalSale ? 'ring-2 ring-blue-400 ring-opacity-50' : ''}`}>
+                <Card key={product.id} className={`overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 rounded-2xl group ${isNormalSale ? 'ring-2 ring-blue-400 ring-opacity-50' : ''}`}>
                   {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) ? (
                     <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
                       <img
@@ -597,13 +581,7 @@ export default function ManagerProductsPage() {
                         alt={product.name}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
-                      {isFlashSale && (
-                        <div className="absolute top-2 left-2 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
-                          <Zap className="h-3 w-3" />
-                          OFERTA RELÂMPAGO
-                        </div>
-                      )}
-                      {isNormalSale && !isFlashSale && (
+                      {isNormalSale && (
                         <div className="absolute top-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">
                           EM OFERTA
                         </div>
@@ -628,13 +606,7 @@ export default function ManagerProductsPage() {
                   ) : (
                     <div className="aspect-video w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
                       <Package className="h-16 w-16 text-gray-300" />
-                      {isFlashSale && (
-                        <div className="absolute top-2 left-2 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
-                          <Zap className="h-3 w-3" />
-                          OFERTA RELÂMPAGO
-                        </div>
-                      )}
-                      {isNormalSale && !isFlashSale && (
+                      {isNormalSale && (
                         <div className="absolute top-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">
                           EM OFERTA
                         </div>
@@ -661,25 +633,18 @@ export default function ManagerProductsPage() {
                         {product.description}
                       </CardDescription>
                     )}
-                    {(isFlashSale || isNormalSale) && (
+                    {isNormalSale && product.saleDiscountPercent && (
                       <div className="flex items-center gap-2 mt-2">
-                        {isFlashSale && product.flashSaleDiscountPercent && (
-                          <Badge className="bg-red-500 text-white border-0 shadow-md">
-                            -{product.flashSaleDiscountPercent}%
-                          </Badge>
-                        )}
-                        {isNormalSale && product.saleDiscountPercent && (
-                          <Badge className="bg-blue-500 text-white border-0 shadow-md">
-                            -{product.saleDiscountPercent}%
-                          </Badge>
-                        )}
+                        <Badge className="bg-blue-500 text-white border-0 shadow-md">
+                          -{product.saleDiscountPercent}%
+                        </Badge>
                       </div>
                     )}
                   </CardHeader>
                   <CardContent className="space-y-4 pt-0">
                     <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
                       <span className="text-sm font-medium text-gray-600">Preço</span>
-                      {isFlashSale || isNormalSale ? (
+                      {isNormalSale ? (
                         <div className="flex flex-col items-end">
                           <span className="font-bold text-xl text-green-600">{formatCurrency(salePrice)}</span>
                           <span className="text-sm text-gray-400 line-through">{formatCurrency(originalPrice)}</span>
@@ -749,71 +714,36 @@ export default function ManagerProductsPage() {
               className="pl-10 w-full sm:w-64"
             />
           </div>
-          {!showFlashSalePanel && (
-            <>
-              <Button 
-                variant="outline"
-                onClick={() => setShowFlashSalePanel(!showFlashSalePanel)}
-                className={`border-2 border-yellow-500 font-semibold shadow-lg ${
-                  showFlashSalePanel 
-                    ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
-                    : 'text-yellow-600 hover:bg-yellow-500 hover:text-white'
-                }`}
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                Oferta Relâmpago
-              </Button>
-              <Button 
-                onClick={handleCreateProduct}
-                className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white shadow-lg font-semibold"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Produto
-              </Button>
-            </>
-          )}
+          <Button 
+            onClick={handleCreateProduct}
+            className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white shadow-lg font-semibold"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Produto
+          </Button>
         </div>
       </div>
 
-      {/* Renderização condicional: Painel de Oferta Relâmpago ou conteúdo normal */}
-      {showFlashSalePanel ? (
-        <div className="px-6 pb-6">
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>ℹ️ Ofertas da sua loja:</strong> Você só pode configurar ofertas relâmpago para produtos da sua loja ({user?.store?.name || 'sua loja'}).
-            </p>
-          </div>
-          <FlashSalePanel
-            products={products}
-            onProductUpdated={onProductsChange}
-            onClose={() => setShowFlashSalePanel(false)}
-            token={token || ''}
-          />
-        </div>
-      ) : (
-        <>
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'all' | 'on-sale')} className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-              <TabsTrigger value="all" className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Todos os Produtos
-              </TabsTrigger>
-              <TabsTrigger value="on-sale" className="flex items-center gap-2">
-                <Zap className="h-4 w-4" />
-                Produtos em Oferta
-              </TabsTrigger>
-            </TabsList>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'all' | 'on-sale')} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Todos os Produtos
+          </TabsTrigger>
+          <TabsTrigger value="on-sale" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Produtos em Oferta
+          </TabsTrigger>
+        </TabsList>
 
-            <TabsContent value="all" className="mt-0">
-              {renderProductsSection(false)}
-            </TabsContent>
+        <TabsContent value="all" className="mt-0">
+          {renderProductsSection(false)}
+        </TabsContent>
 
-            <TabsContent value="on-sale" className="mt-0">
-              {renderProductsSection(true)}
-            </TabsContent>
-          </Tabs>
-        </>
-      )}
+        <TabsContent value="on-sale" className="mt-0">
+          {renderProductsSection(true)}
+        </TabsContent>
+      </Tabs>
 
       {/* Modal de Produto */}
       {isProductModalOpen && (

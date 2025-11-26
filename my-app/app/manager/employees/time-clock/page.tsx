@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,13 +24,11 @@ interface Employee {
   role: string;
 }
 
-export default function TimeClockPage() {
+export default function ManagerTimeClockPage() {
   const router = useRouter();
-  const params = useParams();
   const searchParams = useSearchParams();
-  const storeId = params.id as string;
   const employeeId = searchParams.get('employeeId') as string;
-  const { token } = useAppStore();
+  const { token, user } = useAppStore();
   
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,14 +43,14 @@ export default function TimeClockPage() {
   useEffect(() => {
     if (!employeeId) {
       console.error('EmployeeId não fornecido');
-      router.push(`/admin/stores/${storeId}`);
+      router.push('/manager/employees');
       return;
     }
 
     fetchEmployee();
     fetchLastEntry();
     getCurrentLocation();
-  }, [employeeId, storeId, token]);
+  }, [employeeId, token]);
 
   useEffect(() => {
     // Atualizar relógio a cada segundo
@@ -67,7 +65,7 @@ export default function TimeClockPage() {
     if (!employeeId || !token) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/api/admin/users/${employeeId}`, {
+      const response = await fetch(`http://localhost:3001/api/manager/users/${employeeId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -117,14 +115,11 @@ export default function TimeClockPage() {
     if (navigator.geolocation) {
       setGettingLocation(true);
       
-      // Opções para obter localização mais precisa
       const options = {
-        enableHighAccuracy: true, // Usar GPS em vez de localização de rede
-        timeout: 20000, // Timeout de 20 segundos para dar mais tempo
-        maximumAge: 0 // Não usar cache de localização
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0
       };
-
-      console.log('📍 Solicitando localização com opções:', options);
 
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -137,12 +132,10 @@ export default function TimeClockPage() {
             timestamp: new Date().toISOString()
           });
 
-          // Verificar se a precisão é aceitável (menos de 100 metros)
           if (accuracy > 100) {
             console.warn('⚠️ Localização com baixa precisão:', accuracy, 'metros');
           }
 
-          // Fazer reverse geocoding para obter endereço
           try {
             console.log('🔄 Iniciando reverse geocoding...');
             const address = await getAddressFromCoordinates(latitude, longitude);
@@ -153,12 +146,6 @@ export default function TimeClockPage() {
               latitude,
               longitude,
               address: address || `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`
-            });
-            
-            console.log('✅ Localização salva no estado:', {
-              latitude,
-              longitude,
-              address
             });
           } catch (error) {
             console.error('❌ Erro ao obter endereço:', error);
@@ -203,7 +190,6 @@ export default function TimeClockPage() {
     try {
       console.log('🔍 Convertendo coordenadas para endereço:', { lat, lng });
       
-      // Usar BigDataCloud para obter cidade, estado e país
       try {
         const response = await fetch(
           `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=pt`
@@ -213,7 +199,6 @@ export default function TimeClockPage() {
           const data = await response.json();
           console.log('📍 BigDataCloud response:', data);
           
-          // Construir endereço simples: cidade, estado, país
           const addressParts = [];
           
           if (data.locality) addressParts.push(data.locality);
@@ -228,7 +213,6 @@ export default function TimeClockPage() {
         console.log('BigDataCloud falhou, tentando OpenStreetMap...');
       }
       
-      // Fallback: OpenStreetMap
       try {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=pt-BR&addressdetails=1`
@@ -239,9 +223,8 @@ export default function TimeClockPage() {
           console.log('📍 OpenStreetMap response:', data);
           
           if (data.display_name) {
-            // Pegar apenas as primeiras partes (cidade, estado, país)
             const parts = data.display_name.split(', ');
-            const relevantParts = parts.slice(0, 3); // Cidade, Estado, País
+            const relevantParts = parts.slice(0, 3);
             return relevantParts.join(', ');
           }
         }
@@ -249,7 +232,6 @@ export default function TimeClockPage() {
         console.log('OpenStreetMap falhou:', error);
       }
       
-      // Último fallback: coordenadas
       return `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
       
     } catch (error) {
@@ -382,7 +364,6 @@ export default function TimeClockPage() {
     setPhoto(null);
   };
 
-
   const handleTimeClock = async () => {
     if (!employee) return;
 
@@ -412,10 +393,8 @@ export default function TimeClockPage() {
         const result = await response.json();
         console.log('Ponto registrado:', result);
         
-        // Recarregar dados
         await fetchLastEntry();
         
-        // Limpar formulário
         setPhoto(null);
         setNotes('');
       } else {
@@ -463,7 +442,7 @@ export default function TimeClockPage() {
     <div className="space-y-6">
       {/* Header com botão voltar */}
       <div className="flex items-center space-x-3">
-        <Button variant="ghost" onClick={() => router.push(`/admin/stores/${storeId}`)}>
+        <Button variant="ghost" onClick={() => router.push('/manager/employees')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
@@ -671,3 +650,4 @@ export default function TimeClockPage() {
     </div>
   );
 }
+

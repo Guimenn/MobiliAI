@@ -132,55 +132,13 @@ export default function EmployeeTimeClockPage() {
   };
 
   const capturePhoto = async () => {
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          } 
-        });
-        
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.play();
-        
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        video.addEventListener('loadedmetadata', () => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx?.drawImage(video, 0, 0);
-          const dataURL = canvas.toDataURL('image/jpeg', 0.8);
-          setPhoto(dataURL);
-          stream.getTracks().forEach(track => track.stop());
-        });
-      } else {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.capture = 'environment';
-        input.onchange = (e) => {
-          const file = (e.target as HTMLInputElement).files?.[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              const result = event.target?.result as string;
-              setPhoto(result);
-            };
-            reader.readAsDataURL(file);
-          }
-        };
-        input.click();
-      }
-    } catch (error) {
-      console.error('Erro ao acessar câmera:', error);
+    // Função auxiliar para criar input de arquivo
+    const createFileInput = () => {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
       input.capture = 'environment';
+      
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
@@ -192,7 +150,104 @@ export default function EmployeeTimeClockPage() {
           reader.readAsDataURL(file);
         }
       };
-      input.click();
+      
+      return input;
+    };
+
+    // Verificar se a API de mídia está disponível
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.log('API de mídia não disponível, usando input de arquivo');
+      createFileInput().click();
+      return;
+    }
+
+    // Tentar diferentes configurações de câmera em ordem de preferência
+    const cameraConfigs = [
+      { facingMode: 'environment' }, // Câmera traseira (preferida)
+      { facingMode: 'user' },        // Câmera frontal
+      {}                              // Qualquer câmera disponível
+    ];
+
+    for (const config of cameraConfigs) {
+      try {
+        console.log('Tentando acessar câmera com configuração:', config);
+        
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            ...config,
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
+        });
+        
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.playsInline = true;
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Aguardar o vídeo carregar
+        await new Promise<void>((resolve, reject) => {
+          video.addEventListener('loadedmetadata', () => {
+            try {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              
+              ctx?.drawImage(video, 0, 0);
+              
+              const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+              setPhoto(dataURL);
+              
+              // Parar a stream
+              stream.getTracks().forEach(track => track.stop());
+              
+              resolve();
+            } catch (error) {
+              stream.getTracks().forEach(track => track.stop());
+              reject(error);
+            }
+          });
+          
+          video.addEventListener('error', (error) => {
+            stream.getTracks().forEach(track => track.stop());
+            reject(error);
+          });
+          
+          // Timeout de segurança
+          setTimeout(() => {
+            stream.getTracks().forEach(track => track.stop());
+            reject(new Error('Timeout ao carregar vídeo'));
+          }, 5000);
+        });
+        
+        // Se chegou aqui, a foto foi capturada com sucesso
+        return;
+        
+      } catch (error: any) {
+        console.log(`Erro ao acessar câmera com configuração ${JSON.stringify(config)}:`, error);
+        
+        // Se não é o último, tenta a próxima configuração
+        if (config !== cameraConfigs[cameraConfigs.length - 1]) {
+          continue;
+        }
+        
+        // Se todas as tentativas falharam, usar input de arquivo
+        console.log('Todas as tentativas de câmera falharam, usando input de arquivo');
+        const errorMessage = error?.message || 'Erro desconhecido';
+        
+        if (errorMessage.includes('not found') || errorMessage.includes('device not found')) {
+          alert('Câmera não encontrada. Você pode fazer upload de uma foto.');
+        } else if (errorMessage.includes('permission') || errorMessage.includes('Permission denied')) {
+          alert('Permissão de câmera negada. Você pode fazer upload de uma foto.');
+        } else {
+          alert('Não foi possível acessar a câmera. Você pode fazer upload de uma foto.');
+        }
+        
+        createFileInput().click();
+        return;
+      }
     }
   };
 

@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import MedicalCertificateModal from '@/components/MedicalCertificateModal';
 import { useAppStore } from '@/lib/store';
@@ -25,11 +26,9 @@ type Certificate = {
   createdAt: string;
 };
 
-export default function EmployeeMedicalCertificatesPage() {
+export default function ManagerEmployeeMedicalCertificatesPage() {
   const router = useRouter();
-  const params = useParams();
   const searchParams = useSearchParams();
-  const storeId = params.id as string;
   const employeeId = searchParams.get('employeeId') || '';
   const { token, user } = useAppStore();
 
@@ -40,9 +39,8 @@ export default function EmployeeMedicalCertificatesPage() {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
 
   const apiBase = useMemo(() => {
-    const isAdmin = user?.role === 'ADMIN';
-    return isAdmin ? 'http://localhost:3001/api/admin' : 'http://localhost:3001/api/manager';
-  }, [user]);
+    return 'http://localhost:3001/api/manager';
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -148,9 +146,10 @@ export default function EmployeeMedicalCertificatesPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <Button variant="ghost" onClick={() => router.push(`/admin/stores/${storeId}`)}>
+          <Button variant="ghost" onClick={() => router.push('/manager/employees')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar
           </Button>
@@ -250,5 +249,4 @@ export default function EmployeeMedicalCertificatesPage() {
     </div>
   );
 }
-
 

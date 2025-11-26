@@ -1,6 +1,5 @@
 import { config } from 'dotenv';
 import { PrismaClient, ProductCategory } from '@prisma/client';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import ImageKit from 'imagekit';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -15,19 +14,6 @@ const prisma = new PrismaClient({
     },
   },
 });
-
-// Configurar Supabase
-function getSupabaseClient(): SupabaseClient | null {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.warn('⚠️ Supabase não configurado.');
-    return null;
-  }
-
-  return createClient(supabaseUrl, supabaseKey);
-}
 
 // Configurar ImageKit
 function getImageKitClient(): ImageKit | null {
@@ -207,56 +193,6 @@ function getRandomBrand(): string {
   return brands[Math.floor(Math.random() * brands.length)];
 }
 
-// Função para deletar imagens do Supabase
-async function deleteSupabaseImages(supabase: SupabaseClient): Promise<void> {
-  console.log('🗑️ Deletando imagens do Supabase...');
-  
-  try {
-    // Listar todos os arquivos no bucket
-    const { data: files, error: listError } = await supabase.storage
-      .from('product-images')
-      .list('products', {
-        limit: 1000,
-        sortBy: { column: 'name', order: 'asc' },
-      });
-
-    if (listError) {
-      // Se der erro de autenticação, apenas avisar mas continuar
-      const errorMessage = listError.message || '';
-      if (errorMessage.includes('signature') || errorMessage.includes('403') || errorMessage.includes('verification')) {
-        console.warn('⚠️ Erro de autenticação ao acessar Supabase. Continuando sem deletar imagens do Supabase...');
-        return;
-      }
-      console.error('❌ Erro ao listar arquivos:', listError);
-      return;
-    }
-
-    if (!files || files.length === 0) {
-      console.log('✅ Nenhuma imagem encontrada no Supabase para deletar');
-      return;
-    }
-
-    console.log(`📋 Encontradas ${files.length} imagens no Supabase`);
-
-    // Deletar todos os arquivos
-    const filePaths = files.map(file => `products/${file.name}`);
-    
-    const { error: deleteError } = await supabase.storage
-      .from('product-images')
-      .remove(filePaths);
-
-    if (deleteError) {
-      console.warn('⚠️ Erro ao deletar imagens do Supabase:', deleteError.message);
-      console.log('   Continuando mesmo assim...');
-    } else {
-      console.log(`✅ ${files.length} imagens deletadas do Supabase`);
-    }
-  } catch (error: any) {
-    console.warn('⚠️ Erro ao deletar imagens do Supabase:', error.message);
-    console.log('   Continuando mesmo assim...');
-  }
-}
-
 // Função para atualizar imagem no ImageKit com tags
 async function updateImageKitTags(
   imagekit: ImageKit,
@@ -283,7 +219,6 @@ export async function recreateProductsFromImageKit() {
   console.log('🔄 Recriando produtos baseado na numeração do ImageKit...\n');
 
   try {
-    const supabase = getSupabaseClient();
     const imagekit = getImageKitClient();
 
     if (!imagekit) {
@@ -291,15 +226,7 @@ export async function recreateProductsFromImageKit() {
       return;
     }
 
-    // 1. Deletar imagens do Supabase
-    if (supabase) {
-      await deleteSupabaseImages(supabase);
-      console.log('');
-    } else {
-      console.log('⚠️ Supabase não configurado, pulando deleção\n');
-    }
-
-    // 2. Buscar todas as imagens do ImageKit ordenadas por número
+    // 1. Buscar todas as imagens do ImageKit ordenadas por número
     console.log('📸 Buscando imagens do ImageKit...');
     const allFiles = await imagekit.listFiles({
       path: '/FotoMovel',

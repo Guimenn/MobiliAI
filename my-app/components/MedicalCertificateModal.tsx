@@ -124,60 +124,62 @@ export default function MedicalCertificateModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FileText className="h-5 w-5 text-blue-600" />
+        <div className="bg-gradient-to-r from-[#3e2626] to-[#4a2f2f] text-white p-6 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
+                <FileText className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">
+                  Atestado Médico
+                </h2>
+                <p className="text-sm text-white/80 mt-0.5">
+                  {employee?.name} - {employee?.email}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Atestado Médico
-              </h2>
-              <p className="text-sm text-gray-600">
-                {employee?.name} - {employee?.email}
-              </p>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="text-white hover:bg-white/20 h-8 w-8 p-0"
+            >
+              <X className="h-5 w-5" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 bg-gradient-to-br from-gray-50 to-white">
           {/* Período do Atestado */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-900">Período do Atestado</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="startDate">Data de Início *</Label>
+                <Label htmlFor="startDate" className="text-gray-700 font-semibold">Data de Início *</Label>
                 <Input
                   id="startDate"
                   type="date"
                   value={formData.startDate}
                   onChange={(e) => handleInputChange('startDate', e.target.value)}
-                  className={errors.startDate ? 'border-red-500' : ''}
+                  className={`h-11 border-gray-300 rounded-xl focus:border-[#8B4513] focus:ring-[#8B4513] ${errors.startDate ? 'border-red-500' : ''}`}
                 />
                 {errors.startDate && <p className="text-red-500 text-sm mt-1">{errors.startDate}</p>}
               </div>
 
               <div>
-                <Label htmlFor="endDate">Data de Fim *</Label>
+                <Label htmlFor="endDate" className="text-gray-700 font-semibold">Data de Fim *</Label>
                 <Input
                   id="endDate"
                   type="date"
                   value={formData.endDate}
                   onChange={(e) => handleInputChange('endDate', e.target.value)}
-                  className={errors.endDate ? 'border-red-500' : ''}
+                  className={`h-11 border-gray-300 rounded-xl focus:border-[#8B4513] focus:ring-[#8B4513] ${errors.endDate ? 'border-red-500' : ''}`}
                 />
                 {errors.endDate && <p className="text-red-500 text-sm mt-1">{errors.endDate}</p>}
               </div>
@@ -190,12 +192,12 @@ export default function MedicalCertificateModal({
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="type">Tipo de Atestado *</Label>
+                <Label htmlFor="type" className="text-gray-700 font-semibold">Tipo de Atestado *</Label>
                 <Select
                   value={formData.type}
                   onValueChange={(value) => handleInputChange('type', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11 border-gray-300 rounded-xl focus:border-[#8B4513] focus:ring-[#8B4513]">
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -208,12 +210,12 @@ export default function MedicalCertificateModal({
               </div>
 
               <div>
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status" className="text-gray-700 font-semibold">Status</Label>
                 <Select
                   value={formData.status}
                   onValueChange={(value) => handleInputChange('status', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11 border-gray-300 rounded-xl focus:border-[#8B4513] focus:ring-[#8B4513]">
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -226,14 +228,14 @@ export default function MedicalCertificateModal({
             </div>
 
             <div>
-              <Label htmlFor="reason">Motivo do Atestado *</Label>
+              <Label htmlFor="reason" className="text-gray-700 font-semibold">Motivo do Atestado *</Label>
               <Textarea
                 id="reason"
                 value={formData.reason}
                 onChange={(e) => handleInputChange('reason', e.target.value)}
                 placeholder="Descreva o motivo do atestado médico"
                 rows={3}
-                className={errors.reason ? 'border-red-500' : ''}
+                className={`border-gray-300 rounded-xl focus:border-[#8B4513] focus:ring-[#8B4513] ${errors.reason ? 'border-red-500' : ''}`}
               />
               {errors.reason && <p className="text-red-500 text-sm mt-1">{errors.reason}</p>}
             </div>
@@ -245,37 +247,37 @@ export default function MedicalCertificateModal({
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="doctorName">Nome do Médico *</Label>
+                <Label htmlFor="doctorName" className="text-gray-700 font-semibold">Nome do Médico *</Label>
                 <Input
                   id="doctorName"
                   value={formData.doctorName}
                   onChange={(e) => handleInputChange('doctorName', e.target.value)}
                   placeholder="Dr. João Silva"
-                  className={errors.doctorName ? 'border-red-500' : ''}
+                  className={`h-11 border-gray-300 rounded-xl focus:border-[#8B4513] focus:ring-[#8B4513] ${errors.doctorName ? 'border-red-500' : ''}`}
                 />
                 {errors.doctorName && <p className="text-red-500 text-sm mt-1">{errors.doctorName}</p>}
               </div>
 
               <div>
-                <Label htmlFor="doctorCrm">CRM *</Label>
+                <Label htmlFor="doctorCrm" className="text-gray-700 font-semibold">CRM *</Label>
                 <Input
                   id="doctorCrm"
                   value={formData.doctorCrm}
                   onChange={(e) => handleInputChange('doctorCrm', e.target.value)}
                   placeholder="123456"
-                  className={errors.doctorCrm ? 'border-red-500' : ''}
+                  className={`h-11 border-gray-300 rounded-xl focus:border-[#8B4513] focus:ring-[#8B4513] ${errors.doctorCrm ? 'border-red-500' : ''}`}
                 />
                 {errors.doctorCrm && <p className="text-red-500 text-sm mt-1">{errors.doctorCrm}</p>}
               </div>
 
               <div className="md:col-span-2">
-                <Label htmlFor="clinicName">Nome da Clínica/Hospital *</Label>
+                <Label htmlFor="clinicName" className="text-gray-700 font-semibold">Nome da Clínica/Hospital *</Label>
                 <Input
                   id="clinicName"
                   value={formData.clinicName}
                   onChange={(e) => handleInputChange('clinicName', e.target.value)}
                   placeholder="Hospital São Paulo"
-                  className={errors.clinicName ? 'border-red-500' : ''}
+                  className={`h-11 border-gray-300 rounded-xl focus:border-[#8B4513] focus:ring-[#8B4513] ${errors.clinicName ? 'border-red-500' : ''}`}
                 />
                 {errors.clinicName && <p className="text-red-500 text-sm mt-1">{errors.clinicName}</p>}
               </div>
@@ -285,30 +287,32 @@ export default function MedicalCertificateModal({
           {/* Observações */}
           <div className="space-y-4">
             <div>
-              <Label htmlFor="notes">Observações</Label>
+              <Label htmlFor="notes" className="text-gray-700 font-semibold">Observações</Label>
               <Textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => handleInputChange('notes', e.target.value)}
                 placeholder="Observações adicionais sobre o atestado"
                 rows={3}
+                className="border-gray-300 rounded-xl focus:border-[#8B4513] focus:ring-[#8B4513]"
               />
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-6 border-t">
+          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
+              className="h-11 rounded-xl border-gray-300"
             >
               Cancelar
             </Button>
             <Button
               type="submit"
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white h-11 rounded-xl shadow-lg"
               disabled={isLoading}
             >
               {isLoading ? (

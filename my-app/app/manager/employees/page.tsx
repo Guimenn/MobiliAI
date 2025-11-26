@@ -15,7 +15,11 @@ import {
   Users, 
   Plus,
   Eye,
-  Edit
+  Edit,
+  Clock,
+  Calendar,
+  FileText,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function ManagerEmployeesPage() {
@@ -143,11 +147,12 @@ export default function ManagerEmployeesPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-wrap gap-2">
                   <Button 
                     variant="outline" 
                     size="sm"
                     onClick={() => handleViewEmployee(employee)}
+                    title="Visualizar"
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -155,8 +160,45 @@ export default function ManagerEmployeesPage() {
                     variant="outline" 
                     size="sm"
                     onClick={() => handleEditEmployee(employee)}
+                    title="Editar"
                   >
                     <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => router.push(`/manager/employees/time-clock?employeeId=${employee.id}`)}
+                    title="Registrar ponto"
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    <Clock className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => router.push(`/manager/employees/time-clock-history?employeeId=${employee.id}`)}
+                    title="Ver histórico de pontos"
+                    className="text-purple-600 hover:text-purple-700"
+                  >
+                    <Calendar className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => router.push(`/manager/employees/medical-certificates?employeeId=${employee.id}`)}
+                    title="Atestado médico"
+                    className="text-green-600 hover:text-green-700"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => router.push(`/manager/employees/termination?employeeId=${employee.id}`)}
+                    title="Processar demissão"
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
