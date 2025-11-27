@@ -1115,7 +1115,7 @@ export default function TestIALandingPage() {
             <Button
               size="lg"
               variant="outline"
-                className="h-14 bg-transparent rounded-full border-white/60 px-10 text-base font-semibold text-white transition hover:bg-white/10 hover:text-white"
+                className="h-14 rounded-full border-white/60 px-10 text-base font-semibold text-white transition hover:bg-white/10"
               asChild
             >
               <Link href="/products">
