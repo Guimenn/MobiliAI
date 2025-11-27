@@ -117,6 +117,26 @@ export class CustomerCartService {
                 id: true,
                 name: true,
                 address: true,
+                zipCode: true,
+                city: true,
+                state: true,
+              },
+            },
+            storeInventory: {
+              select: {
+                storeId: true,
+                quantity: true,
+                store: {
+                  select: {
+                    id: true,
+                    name: true,
+                    address: true,
+                    zipCode: true,
+                    city: true,
+                    state: true,
+                    isActive: true,
+                  },
+                },
               },
             },
           }
@@ -127,6 +147,16 @@ export class CustomerCartService {
 
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const totalPrice = cartItems.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0);
+
+    // Log para debug - verificar se storeInventory está sendo retornado
+    cartItems.forEach((item) => {
+      console.log(`🛒 Produto ${item.product.id}: storeId=${item.product.storeId}, storeInventory.length=${item.product.storeInventory?.length || 0}`);
+      if (item.product.storeInventory && item.product.storeInventory.length > 0) {
+        item.product.storeInventory.forEach((inv: any) => {
+          console.log(`  └─ Loja ${inv.storeId}: estoque=${inv.quantity}, ativa=${inv.store?.isActive}`);
+        });
+      }
+    });
 
     return {
       items: cartItems,

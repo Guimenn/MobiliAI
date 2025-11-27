@@ -27,6 +27,7 @@ import { PublicModule } from './public/public.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentModule } from './payment/payment.module';
 import { CouponsModule } from './coupons/coupons.module';
+import { ShippingModule } from './shipping/shipping.module';
 
 
 @Module({
@@ -64,6 +65,7 @@ import { CouponsModule } from './coupons/coupons.module';
     NotificationsModule,
     PaymentModule,
     CouponsModule,
+    ShippingModule,
   ],
   controllers: [AppController],
   providers: [AppService, TimeClockService],

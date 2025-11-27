@@ -1512,6 +1512,37 @@ export const paymentAPI = {
   },
 };
 
+// Shipping API (frete / CEP via backend + Correios)
+export const shippingAPI = {
+  /**
+   * Proxy para consulta de CEP via backend (que usa Correios).
+   */
+  lookupCep: async (cep: string) => {
+    const cleanCep = (cep || '').replace(/\D/g, '');
+    const response = await api.get(`/shipping/cep/${cleanCep}`);
+    return response.data;
+  },
+
+  /**
+   * Calcula frete considerando múltiplas lojas e retorna
+   * opções de frete separado x combinado para o cliente escolher.
+   */
+  calculateQuote: async (data: {
+    destinationZipCode: string;
+    destinationCity?: string;
+    destinationState?: string;
+    mode?: 'combined' | 'separate' | 'both';
+    serviceType?: 'standard' | 'express';
+    items: {
+      productId: string;
+      quantity: number;
+    }[];
+  }) => {
+    const response = await api.post('/shipping/quote', data);
+    return response.data;
+  },
+};
+
 // Financial API
 export const financialAPI = {
   // Cash Flow
