@@ -28,16 +28,37 @@ export class ManagerService {
 
     const storeId = manager.store.id;
 
+    // Contar produtos de forma mais precisa
+    // Buscar IDs únicos de produtos que pertencem à loja
+    const [productsWithStoreId, productsWithInventory] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { storeId: storeId },
+        select: { id: true }
+      }),
+      this.prisma.product.findMany({
+        where: {
+          storeInventory: { some: { storeId: storeId } }
+        },
+        select: { id: true }
+      })
+    ]);
+
+    // Combinar e remover duplicatas
+    const allProductIds = new Set([
+      ...productsWithStoreId.map(p => p.id),
+      ...productsWithInventory.map(p => p.id)
+    ]);
+
+    const totalProducts = allProductIds.size;
+
     const [
       totalUsers,
-      totalProducts,
       totalSales,
       monthlyRevenue,
       lowStockProducts,
       recentSales
     ] = await Promise.all([
       this.prisma.user.count({ where: { storeId } }),
-      this.prisma.product.count({ where: { storeId } }),
       this.prisma.sale.count({ where: { storeId } }),
       this.getMonthlyRevenue(storeId),
       this.getLowStockProducts(storeId),
@@ -45,7 +66,13 @@ export class ManagerService {
     ]);
 
     const topProducts = await this.prisma.product.findMany({
-      where: { storeId },
+      where: {
+        OR: [
+          { storeId: storeId },
+          { storeInventory: { some: { storeId: storeId } } }
+        ],
+        isActive: true
+      },
       take: 5,
       orderBy: { rating: 'desc' },
       select: {
@@ -55,7 +82,11 @@ export class ManagerService {
         rating: true,
         reviewCount: true,
         stock: true,
-        category: true
+        category: true,
+        storeInventory: {
+          where: { storeId: storeId },
+          select: { quantity: true }
+        }
       }
     });
 
@@ -103,35 +134,77 @@ export class ManagerService {
   }
 
   private async getLowStockProducts(storeId: string) {
-    return this.prisma.product.findMany({
+    // Buscar produtos com storeId OU via StoreInventory
+    const products = await this.prisma.product.findMany({
       where: {
-        storeId,
-        stock: {
-          lte: this.prisma.product.fields.minStock
-        }
+        OR: [
+          { storeId: storeId },
+          { storeInventory: { some: { storeId: storeId } } }
+        ],
+        isActive: true
       },
       select: {
         id: true,
         name: true,
         stock: true,
         minStock: true,
-        category: true
+        category: true,
+        storeId: true,
+        storeInventory: {
+          where: { storeId: storeId },
+          select: { quantity: true, minStock: true }
+        }
       }
     });
+
+    // Filtrar produtos com estoque baixo considerando StoreInventory
+    return products.filter(product => {
+      const inventory = product.storeInventory?.[0];
+      const currentStock = inventory ? inventory.quantity : (product.stock || 0);
+      const minStock = inventory ? inventory.minStock : (product.minStock || 0);
+      return currentStock <= minStock && currentStock > 0;
+    }).map(product => ({
+      id: product.id,
+      name: product.name,
+      stock: product.storeInventory?.[0]?.quantity ?? product.stock ?? 0,
+      minStock: product.storeInventory?.[0]?.minStock ?? product.minStock ?? 0,
+      category: product.category
+    }));
   }
 
   private async getOutOfStockProducts(storeId: string) {
-    return this.prisma.product.findMany({
+    // Buscar produtos com storeId OU via StoreInventory
+    const products = await this.prisma.product.findMany({
       where: {
-        storeId,
-        stock: 0
+        OR: [
+          { storeId: storeId },
+          { storeInventory: { some: { storeId: storeId } } }
+        ],
+        isActive: true
       },
       select: {
         id: true,
         name: true,
-        category: true
+        category: true,
+        stock: true,
+        storeId: true,
+        storeInventory: {
+          where: { storeId: storeId },
+          select: { quantity: true }
+        }
       }
     });
+
+    // Filtrar produtos sem estoque considerando StoreInventory
+    return products.filter(product => {
+      const inventory = product.storeInventory?.[0];
+      const currentStock = inventory ? inventory.quantity : (product.stock || 0);
+      return currentStock === 0;
+    }).map(product => ({
+      id: product.id,
+      name: product.name,
+      category: product.category
+    }));
   }
 
   private async getRecentSales(storeId: string) {

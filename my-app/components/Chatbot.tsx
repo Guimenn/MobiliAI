@@ -55,10 +55,6 @@ export default function Chatbot() {
       
       const responses = [
         'Que ótimo! Posso te ajudar a encontrar móveis perfeitos para seu ambiente. Qual estilo você prefere?',
-        'Excelente escolha! Temos várias opções de móveis nesse estilo. Quer que eu mostre algumas sugestões?',
-        'Entendo! Para esse tipo de ambiente, recomendo móveis que combinem funcionalidade e estilo. Posso te ajudar a escolher?',
-        'Perfeito! Nossa IA Decoradora pode te mostrar como esses móveis ficam no seu espaço. Quer experimentar?',
-        'Ótima pergunta! Temos uma seleção especial para esse tipo de decoração. Vou te mostrar as melhores opções.',
       ];
 
       const randomResponse = responses[Math.floor(Math.random() * responses.length)];
