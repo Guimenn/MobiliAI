@@ -3,9 +3,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { MessageCircle, Send, X, HeadphonesIcon, Bot, User, Loader2, Sparkles, Minimize2 } from 'lucide-react';
+import { X, User } from 'lucide-react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { Message, MessageContent, MessageAvatar } from '@/components/ui/ai/message';
+import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ui/ai/conversation';
+import { Response } from '@/components/ui/ai/response';
+import { PromptInput, PromptInputTextarea, PromptInputSubmit, PromptInputToolbar } from '@/components/ui/ai/prompt-input';
+import { Loader } from '@/components/ui/ai/loader';
+import { Suggestions, Suggestion } from '@/components/ui/ai/suggestion';
 
 interface Message {
   id: string;
@@ -37,7 +43,6 @@ export default function SupportChatbot({ n8nWebhookUrl }: SupportChatbotProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const scrollToBottom = (smooth = true) => {
@@ -133,12 +138,6 @@ export default function SupportChatbot({ n8nWebhookUrl }: SupportChatbotProps) {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
 
   const quickActions = [
     'Prazo de entrega',
@@ -156,11 +155,17 @@ export default function SupportChatbot({ n8nWebhookUrl }: SupportChatbotProps) {
           <div className="relative">
             <Button
               onClick={() => setIsOpen(true)}
-              className="h-16 w-16 rounded-full bg-gradient-to-br from-[#3e2626] to-[#5e3a26] hover:from-[#5e3a26] hover:to-[#3e2626] shadow-2xl transition-all hover:scale-110 active:scale-95 border-2 border-white/20"
+              className="h-16 w-16 rounded-full bg-gradient-to-br from-[#3e2626] to-[#5e3a26] hover:from-[#5e3a26] hover:to-[#3e2626] shadow-2xl transition-all hover:scale-110 active:scale-95 border-2 border-white/20 p-0 overflow-hidden"
               size="lg"
               aria-label="Abrir chat de atendimento"
             >
-              <HeadphonesIcon className="h-7 w-7 text-white" />
+              <Image
+                src="/bot.jpeg"
+                alt="AI Bot"
+                width={64}
+                height={64}
+                className="w-full h-full object-cover"
+              />
             </Button>
             {/* Badge de notificação */}
             {unreadCount > 0 && (
@@ -193,8 +198,14 @@ export default function SupportChatbot({ n8nWebhookUrl }: SupportChatbotProps) {
               <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center space-x-3">
                   <div className="relative">
-                    <div className="h-10 w-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30">
-                      <HeadphonesIcon className="h-5 w-5 text-white" />
+                    <div className="h-10 w-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 overflow-hidden">
+                      <Image
+                        src="/bot.jpeg"
+                        alt="AI Bot"
+                        width={40}
+                        height={40}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     {/* Indicador online */}
                     <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-400 rounded-full border-2 border-[#3e2626] animate-pulse" />
@@ -208,15 +219,7 @@ export default function SupportChatbot({ n8nWebhookUrl }: SupportChatbotProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button
-                    onClick={() => setIsMinimized(!isMinimized)}
-                    variant="ghost"
-                    size="sm"
-                    className="text-white hover:bg-white/20 rounded-full h-8 w-8 p-0"
-                    aria-label={isMinimized ? "Expandir chat" : "Minimizar chat"}
-                  >
-                    <Minimize2 className="h-4 w-4" />
-                  </Button>
+              
                   <Button
                     onClick={() => {
                       setIsOpen(false);
@@ -236,58 +239,33 @@ export default function SupportChatbot({ n8nWebhookUrl }: SupportChatbotProps) {
             {!isMinimized && (
               <CardContent className="p-0 flex flex-col flex-1 overflow-hidden">
                 {/* Messages */}
-                <div 
-                  ref={messagesContainerRef}
-                  className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+                <Conversation
+                  className="scroll-smooth"
                   style={{
                     scrollbarWidth: 'thin',
                     scrollbarColor: '#C07A45 transparent',
                   }}
                 >
-                  {messages.map((message, index) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "flex animate-in fade-in slide-in-from-bottom-2 duration-300",
-                        message.role === 'user' ? 'justify-end' : 'justify-start',
-                        index === messages.length - 1 && "animate-in fade-in slide-in-from-bottom-4"
-                      )}
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      <div
+                  <ConversationContent className="space-y-4">
+                    {messages.map((message, index) => (
+                      <Message
+                        key={message.id}
+                        from={message.role}
                         className={cn(
-                          "flex items-start space-x-2 max-w-[85%]",
-                          message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''
+                          "animate-in fade-in slide-in-from-bottom-2 duration-300",
+                          index === messages.length - 1 && "animate-in fade-in slide-in-from-bottom-4"
                         )}
+                        style={{ animationDelay: `${index * 50}ms` }}
                       >
-                        {/* Avatar */}
-                        <div
-                          className={cn(
-                            "h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg transition-transform hover:scale-110",
-                            message.role === 'user'
-                              ? 'bg-gradient-to-br from-[#3e2626] to-[#5e3a26] text-white'
-                              : 'bg-gradient-to-br from-[#C07A45] to-[#D4A574] text-white'
-                          )}
-                        >
-                          {message.role === 'user' ? (
-                            <User className="h-4 w-4" />
-                          ) : (
-                            <Bot className="h-4 w-4" />
-                          )}
-                        </div>
                         
-                        {/* Message Bubble */}
-                        <div
+                        <MessageContent
                           className={cn(
-                            "rounded-2xl p-3.5 shadow-md transition-all hover:shadow-lg",
                             message.role === 'user'
                               ? 'bg-gradient-to-br from-[#3e2626] to-[#5e3a26] text-white rounded-br-sm'
                               : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-sm border border-gray-200 dark:border-gray-600'
                           )}
                         >
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                            {message.content}
-                          </p>
+                          <Response>{message.content}</Response>
                           <p
                             className={cn(
                               "text-xs mt-2 flex items-center gap-1",
@@ -303,34 +281,32 @@ export default function SupportChatbot({ n8nWebhookUrl }: SupportChatbotProps) {
                               })}
                             </span>
                           </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {/* Loading Indicator */}
-                  {isLoading && (
-                    <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
-                      <div className="flex items-start space-x-2">
-                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#C07A45] to-[#D4A574] text-white flex items-center justify-center shadow-lg">
-                          <Bot className="h-4 w-4" />
-                        </div>
-                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-2xl rounded-bl-sm p-4 border border-gray-200 dark:border-gray-600 shadow-md">
+                        </MessageContent>
+                      </Message>
+                    ))}
+                    
+                    {/* Loading Indicator */}
+                    {isLoading && (
+                      <Message
+                        from="assistant"
+                        className="animate-in fade-in slide-in-from-bottom-2"
+                      >
+                       
+                        <MessageContent className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-bl-sm border border-gray-200 dark:border-gray-600">
                           <div className="flex items-center space-x-2">
-                            <div className="flex space-x-1">
-                              <div className="h-2 w-2 bg-[#C07A45] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                              <div className="h-2 w-2 bg-[#C07A45] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                              <div className="h-2 w-2 bg-[#C07A45] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                            </div>
-                            <span className="text-sm text-gray-600 dark:text-gray-300 ml-2">Digitando...</span>
+                            <Loader size={16} className="text-[#C07A45]" />
+                            <span className="text-sm text-gray-600 dark:text-gray-300">
+                        
+                            </span>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div ref={messagesEndRef} />
-                </div>
+                        </MessageContent>
+                      </Message>
+                    )}
+                    
+                    <div ref={messagesEndRef} />
+                  </ConversationContent>
+                  <ConversationScrollButton />
+                </Conversation>
 
                 {/* Quick Actions */}
                 {messages.length === 1 && (
@@ -338,49 +314,45 @@ export default function SupportChatbot({ n8nWebhookUrl }: SupportChatbotProps) {
                     <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide">
                       Perguntas frequentes:
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <Suggestions>
                       {quickActions.map((action, index) => (
-                        <Button
+                        <Suggestion
                           key={index}
-                          variant="outline"
-                          size="sm"
-                          className="text-xs hover:bg-gradient-to-r hover:from-[#3e2626] hover:to-[#5e3a26] hover:text-white hover:border-transparent transition-all hover:scale-105 active:scale-95 shadow-sm"
-                          onClick={() => {
-                            setInputValue(action);
+                          suggestion={action}
+                          onClick={(suggestion) => {
+                            setInputValue(suggestion);
                             setTimeout(() => handleSendMessage(), 100);
                           }}
-                        >
-                          {action}
-                        </Button>
+                          className="text-xs hover:bg-gradient-to-r hover:from-[#3e2626] hover:to-[#5e3a26] hover:text-white hover:border-transparent transition-all hover:scale-105 active:scale-95 shadow-sm"
+                        />
                       ))}
-                    </div>
+                    </Suggestions>
                   </div>
                 )}
 
                 {/* Input */}
                 <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
-                  <div className="flex space-x-2">
-                    <Input
+                  <PromptInput
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }}
+                  >
+                    <PromptInputTextarea
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
-                      onKeyPress={handleKeyPress}
                       placeholder="Digite sua mensagem..."
-                      className="flex-1 border-2 focus:border-[#3e2626] dark:focus:border-[#C07A45] transition-colors"
                       disabled={isLoading}
                     />
-                    <Button
-                      onClick={handleSendMessage}
-                      disabled={!inputValue.trim() || isLoading}
-                      size="sm"
-                      className="bg-gradient-to-r from-[#3e2626] to-[#5e3a26] hover:from-[#5e3a26] hover:to-[#3e2626] text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
+                    <PromptInputToolbar>
+                      <div className="flex-1" />
+                      <PromptInputSubmit
+                        isLoading={isLoading}
+                        disabled={!inputValue.trim() || isLoading}
+                        className="bg-gradient-to-r from-[#3e2626] to-[#5e3a26] hover:from-[#5e3a26] hover:to-[#3e2626] text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                      />
+                    </PromptInputToolbar>
+                  </PromptInput>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                     Pressione Enter para enviar • Shift+Enter para nova linha
                   </p>
