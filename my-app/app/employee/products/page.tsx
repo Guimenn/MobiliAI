@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { productsAPI, employeeAPI } from '@/lib/api';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import ImageUpload from '@/components/ImageUpload';
 import { uploadMultipleProductImages } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -29,7 +30,13 @@ import {
   Building,
   ChevronLeft,
   ChevronRight,
-  Eye
+  ChevronsLeft,
+  ChevronsRight,
+  Eye,
+  Search,
+  CheckCircle,
+  Zap,
+  ArrowUpRight,
 } from 'lucide-react';
 
 interface Product {
@@ -48,11 +55,20 @@ export default function EmployeeProductsPage() {
   const { user, token } = useAppStore();
   const router = useRouter();
   const { searchTerm, setSearchTerm, viewMode, setViewMode, setOnCreateProduct } = useProductsHeader();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Produtos
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [pageLimit, setPageLimit] = useState(50);
+  
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'all' | 'on-sale'>('all');
   
   // Modal de Produto
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -89,8 +105,8 @@ export default function EmployeeProductsPage() {
   };
 
   useEffect(() => {
-    loadProducts();
-  }, []);
+    loadProductsData(currentPage, pageLimit);
+  }, [currentPage, pageLimit]);
 
   // Atualizar o handler quando handleCreateProduct mudar
   useEffect(() => {
@@ -98,22 +114,9 @@ export default function EmployeeProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    // Filtrar produtos válidos (não nulos) antes de aplicar filtros
-    const validProducts = products.filter(p => p != null && typeof p === 'object');
-    
-    if (searchTerm) {
-      const filtered = validProducts.filter(product =>
-        product && product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredProducts(filtered);
-    } else {
-      setFilteredProducts(validProducts);
-    }
-  }, [searchTerm, products]);
-
-  const loadProducts = async () => {
+  const loadProductsData = async (page: number = currentPage, limit: number = pageLimit) => {
     if (!user?.storeId) {
+      setIsLoading(false);
       return;
     }
     
@@ -121,12 +124,25 @@ export default function EmployeeProductsPage() {
       setIsLoading(true);
       // IMPORTANTE: Usar o endpoint do employee que filtra APENAS produtos da loja do funcionário
       // e considera StoreInventory (igual ao manager)
-      const response = await employeeAPI.getStoreProducts(1, 1000, '', undefined);
+      const response = await employeeAPI.getStoreProducts(page, limit, '', undefined);
       const productsData = response.products || [];
+      const pagination = response.pagination;
+      
       setProducts(productsData);
       setFilteredProducts(productsData);
+      
+      if (pagination) {
+        setTotalPages(pagination.pages || 1);
+        setTotalProducts(pagination.total || productsData.length);
+      } else {
+        setTotalPages(1);
+        setTotalProducts(productsData.length);
+      }
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
+      toast.error('Erro ao carregar produtos');
+      setProducts([]);
+      setFilteredProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -273,7 +289,7 @@ export default function EmployeeProductsPage() {
         toast.success('Produto atualizado com sucesso!');
       }
 
-      await loadProducts();
+      await loadProductsData(currentPage, pageLimit);
       handleCloseModal();
     } catch (error: any) {
       toast.error('Erro ao salvar produto', {
@@ -294,7 +310,7 @@ export default function EmployeeProductsPage() {
       setIsLoading(true);
       await productsAPI.delete(product.id);
       toast.success('Produto excluído com sucesso!');
-      await loadProducts();
+      await loadProductsData(currentPage, pageLimit);
     } catch (error) {
       toast.error('Erro ao excluir produto');
     } finally {
@@ -317,304 +333,122 @@ export default function EmployeeProductsPage() {
     }).format(value);
   };
 
-  // Filtrar produtos válidos (não nulos) e garantir que stock seja um número
-  const validProducts = products.filter(p => p != null && typeof p === 'object');
-  const totalProducts = validProducts.length;
-  const lowStockProducts = validProducts.filter(p => {
-    const stock = typeof p.stock === 'number' ? p.stock : 0;
-    return stock > 0 && stock <= 10;
-  }).length;
-  const outOfStockProducts = validProducts.filter(p => {
-    const stock = typeof p.stock === 'number' ? p.stock : 0;
-    return stock === 0;
-  }).length;
-  const inStockProducts = validProducts.filter(p => {
-    const stock = typeof p.stock === 'number' ? p.stock : 0;
-    return stock > 10;
-  }).length;
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/40">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-b-primary" />
+          <p className="text-sm text-muted-foreground">Carregando produtos...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total</CardTitle>
-            <ShoppingBag className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalProducts}</div>
-            <p className="text-xs text-gray-500">produtos cadastrados</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Em Estoque</CardTitle>
-            <Package className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{inStockProducts}</div>
-            <p className="text-xs text-gray-500">estoque adequado</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-orange-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Estoque Baixo</CardTitle>
-            <AlertCircle className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{lowStockProducts}</div>
-            <p className="text-xs text-gray-500">precisa reposição</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-red-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Sem Estoque</CardTitle>
-            <X className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{outOfStockProducts}</div>
-            <p className="text-xs text-gray-500">fora de estoque</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Botão Novo Produto */}
-      <div className="flex justify-start mb-6">
-        <Button 
-          onClick={handleCreateProduct}
-          className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white shadow-lg font-semibold px-6 py-2"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Produto
-        </Button>
-      </div>
-
-      {/* Products Grid */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#3e2626] mx-auto mb-4"></div>
-            <p className="text-gray-600">Carregando produtos...</p>
-          </div>
-        </div>
-      ) : filteredProducts.length === 0 ? (
-        <Card className="bg-white">
-          <CardContent className="text-center py-16">
-            <Package className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum produto encontrado</h3>
-            <p className="text-gray-600 mb-6">Comece adicionando seu primeiro produto</p>
-            <Button 
-              onClick={handleCreateProduct}
-              className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white"
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl space-y-4">
+            <Badge
+              variant="outline"
+              className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar Produto
-            </Button>
-          </CardContent>
-        </Card>
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredProducts.filter(product => product != null).map((product) => (
-            <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 rounded-2xl group">
-              {(product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product?.imageUrl) ? (
-                <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
-                  <img
-                    src={product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product?.imageUrl}
-                    alt={product?.name || 'Produto'}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  {product.imageUrls && product.imageUrls.length > 1 && (
-                    <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full font-medium shadow-lg">
-                      +{product.imageUrls.length - 1} mais
-                    </div>
-                  )}
-                  <div className="absolute top-3 right-3">
-                    <Badge className={
-                      (product?.stock ?? 0) > 10 
-                        ? 'bg-green-500 text-white border-0 shadow-md' 
-                        : (product?.stock ?? 0) > 0 
-                        ? 'bg-orange-500 text-white border-0 shadow-md' 
-                        : 'bg-red-500 text-white border-0 shadow-md'
-                    }>
-                      {(product?.stock ?? 0) > 10 ? 'OK' : (product?.stock ?? 0) > 0 ? 'BAIXO' : 'ZERO'}
-                    </Badge>
-                  </div>
-                </div>
-              ) : (
-                <div className="aspect-video w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
-                  <Package className="h-16 w-16 text-gray-300" />
-                  <div className="absolute top-3 right-3">
-                    <Badge className={
-                      (product?.stock ?? 0) > 10 
-                        ? 'bg-green-500 text-white border-0 shadow-md' 
-                        : (product?.stock ?? 0) > 0 
-                        ? 'bg-orange-500 text-white border-0 shadow-md' 
-                        : 'bg-red-500 text-white border-0 shadow-md'
-                    }>
-                      {(product?.stock ?? 0) > 10 ? 'OK' : (product?.stock ?? 0) > 0 ? 'BAIXO' : 'ZERO'}
-                    </Badge>
-                  </div>
-                </div>
-              )}
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-bold text-gray-900 line-clamp-2 mb-2 min-h-[3.5rem]">
-                  {product?.name || 'Produto sem nome'}
-                </CardTitle>
-                {product?.description && (
-                  <CardDescription className="line-clamp-2 text-sm text-gray-600 min-h-[2.5rem]">
-                    {product.description}
-                  </CardDescription>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-4 pt-0">
-                <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
-                  <span className="text-sm font-medium text-gray-600">Preço</span>
-                  <span className="font-bold text-xl text-[#3e2626]">{formatCurrency(product?.price ?? 0)}</span>
-                </div>
-                <div className="flex items-center justify-between py-2 px-4 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-600">Estoque</span>
-                  <span className="font-semibold text-gray-900">{product?.stock ?? 0} unidades</span>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleViewProduct(product)}
-                    className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 flex-1 transition-all"
-                    title="Visualizar"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleEditProduct(product)}
-                    className="flex-1 border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white transition-all font-medium"
-                  >
-                    <Edit className="h-4 w-4 mr-1.5" />
-                    Editar
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleDeleteProduct(product)}
-                    className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all"
-                    title="Excluir"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredProducts.filter(product => product != null).map((product) => (
-            <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-200 rounded-xl group">
-              <div className="flex flex-col sm:flex-row">
-                {/* Imagem */}
-                <div className="w-full sm:w-48 h-48 flex-shrink-0 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
-                  {(product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product?.imageUrl) ? (
-                    <>
-                      <img
-                        src={product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product?.imageUrl}
-                        alt={product?.name || 'Produto'}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                      {product.imageUrls && product.imageUrls.length > 1 && (
-                        <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full font-medium">
-                          +{product.imageUrls.length - 1} mais
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="h-12 w-12 text-gray-300" />
-                    </div>
-                  )}
-                  <div className="absolute top-2 right-2">
-                    <Badge className={
-                      (product?.stock ?? 0) > 10 
-                        ? 'bg-green-500 text-white border-0 shadow-md' 
-                        : (product?.stock ?? 0) > 0 
-                        ? 'bg-orange-500 text-white border-0 shadow-md' 
-                        : 'bg-red-500 text-white border-0 shadow-md'
-                    }>
-                      {(product?.stock ?? 0) > 10 ? 'OK' : (product?.stock ?? 0) > 0 ? 'BAIXO' : 'ZERO'}
-                    </Badge>
-                  </div>
-                </div>
+              Gestão de Produtos
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+                Gerenciar Produtos
+              </h1>
+              <p className="text-sm text-primary-foreground/80 lg:text-base">
+                Gerencie o catálogo de produtos da sua loja. Controle estoque, preços e disponibilidade.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                onClick={handleCreateProduct}
+                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Produto
+              </Button>
+            </div>
+          </div>
 
-                {/* Conteúdo */}
-                <div className="flex-1 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl font-bold text-gray-900 mb-2">
-                      {product?.name || 'Produto sem nome'}
-                    </CardTitle>
-                    {product?.description && (
-                      <CardDescription className="text-sm text-gray-600 mb-3 line-clamp-2">
-                        {product.description}
-                      </CardDescription>
-                    )}
-                    <div className="flex flex-wrap items-center gap-4 mt-3">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium text-gray-600">Preço:</span>
-                        <span className="font-bold text-lg text-[#3e2626]">{formatCurrency(product?.price ?? 0)}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium text-gray-600">Estoque:</span>
-                        <span className="font-semibold text-gray-900">{product?.stock ?? 0} unidades</span>
-                      </div>
-                      {product?.brand && (
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-gray-600">Marca:</span>
-                          <span className="text-sm text-gray-900">{product.brand}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Botões de ação */}
-                  <div className="flex gap-2 sm:flex-col">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleViewProduct(product)}
-                      className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all"
-                      title="Visualizar"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleEditProduct(product)}
-                      className="border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white transition-all font-medium"
-                    >
-                      <Edit className="h-4 w-4 mr-1.5" />
-                      Editar
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDeleteProduct(product)}
-                      className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all"
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))}
+          <ProductsStats products={products} totalProducts={totalProducts} />
         </div>
-      )}
+      </section>
+
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'all' | 'on-sale')} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Todos os Produtos
+          </TabsTrigger>
+          <TabsTrigger value="on-sale" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Produtos em Oferta
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-6">
+          <ProductsSection 
+            products={products}
+            isLoading={isLoading}
+            token={token}
+            onProductsChange={() => loadProductsData(currentPage, pageLimit)}
+            onDeleteProduct={(productId: string) => {
+              const product = products.find(p => p.id === productId);
+              if (product) handleDeleteProduct(product);
+            }}
+            onViewProduct={handleViewProduct}
+            onEditProduct={handleEditProduct}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalProducts={totalProducts}
+            pageLimit={pageLimit}
+            onPageChange={(page: number) => {
+              setCurrentPage(page);
+              loadProductsData(page, pageLimit);
+            }}
+            onLimitChange={(limit: number) => {
+              setPageLimit(limit);
+              setCurrentPage(1);
+              loadProductsData(1, limit);
+            }}
+            showOnlyOnSale={false}
+          />
+        </TabsContent>
+
+        <TabsContent value="on-sale" className="mt-6">
+          <ProductsSection 
+            products={products}
+            isLoading={isLoading}
+            token={token}
+            onProductsChange={() => loadProductsData(currentPage, pageLimit)}
+            onDeleteProduct={(productId: string) => {
+              const product = products.find(p => p.id === productId);
+              if (product) handleDeleteProduct(product);
+            }}
+            onViewProduct={handleViewProduct}
+            onEditProduct={handleEditProduct}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalProducts={totalProducts}
+            pageLimit={pageLimit}
+            onPageChange={(page: number) => {
+              setCurrentPage(page);
+              loadProductsData(page, pageLimit);
+            }}
+            onLimitChange={(limit: number) => {
+              setPageLimit(limit);
+              setCurrentPage(1);
+              loadProductsData(1, limit);
+            }}
+            showOnlyOnSale={true}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Modal de Produto */}
       {isProductModalOpen && (
@@ -1023,5 +857,433 @@ export default function EmployeeProductsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function ProductsStats({ products, totalProducts }: any) {
+  const stats = useMemo(() => {
+    const isFlashSaleActive = (product: any) => {
+      if (!product.isFlashSale || !product.flashSaleStartDate || !product.flashSaleEndDate) {
+        return false;
+      }
+      const now = new Date();
+      const start = new Date(product.flashSaleStartDate);
+      const end = new Date(product.flashSaleEndDate);
+      return now >= start && now <= end;
+    };
+
+    const productsOnSale = products.filter((p: any) => isFlashSaleActive(p));
+    const firstProductOnSale = productsOnSale.length > 0 ? productsOnSale[0] : null;
+
+    return {
+      total: totalProducts > 0 ? totalProducts : products.length,
+      active: products.filter((p: any) => p.isActive).length,
+      onSale: productsOnSale.length,
+      onSaleProduct: firstProductOnSale,
+      totalValue: products.reduce((sum: number, p: any) => sum + (p.price * (p.stock || 0)), 0),
+    };
+  }, [products, totalProducts]);
+
+  const formatPrice = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  return (
+    <div className="grid w-full max-w-md grid-cols-2 gap-4 sm:grid-cols-2 lg:max-w-xl">
+      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+          <Package className="h-5 w-5" />
+        </div>
+        <p className="text-2xl font-semibold leading-tight">{stats.total}</p>
+        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total</p>
+      </div>
+      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+          <CheckCircle className="h-5 w-5" />
+        </div>
+        <p className="text-2xl font-semibold leading-tight">{stats.active}</p>
+        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Ativos</p>
+      </div>
+      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+          <Zap className="h-5 w-5" />
+        </div>
+        <p className="text-base font-semibold leading-tight line-clamp-2 min-h-[2.5rem]">
+          {stats.onSaleProduct ? stats.onSaleProduct.name : 'Nenhum'}
+        </p>
+        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Em Oferta</p>
+      </div>
+      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+          <DollarSign className="h-5 w-5" />
+        </div>
+        <p className="text-2xl font-semibold leading-tight">{formatPrice(stats.totalValue)}</p>
+        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Valor Total</p>
+      </div>
+    </div>
+  );
+}
+
+function ProductsSection({ 
+  products, 
+  isLoading, 
+  token, 
+  onProductsChange, 
+  onDeleteProduct,
+  onViewProduct,
+  onEditProduct,
+  currentPage = 1,
+  totalPages = 1,
+  totalProducts = 0,
+  pageLimit = 50,
+  onPageChange,
+  onLimitChange,
+  showOnlyOnSale = false
+}: any) {
+  const [productFilters, setProductFilters] = useState({
+    category: 'all',
+    status: 'all',
+    search: ''
+  });
+
+  const handleEditProductById = (productId: string) => {
+    const product = products.find((p: any) => p.id === productId);
+    if (product && onEditProduct) {
+      onEditProduct(product);
+    }
+  };
+
+  const isFlashSaleActive = (product: any) => {
+    if (!product.isFlashSale || !product.flashSaleStartDate || !product.flashSaleEndDate) {
+      return false;
+    }
+    const now = new Date();
+    const start = new Date(product.flashSaleStartDate);
+    const end = new Date(product.flashSaleEndDate);
+    return now >= start && now <= end;
+  };
+
+  const getFilteredProducts = useMemo(() => {
+    if (!Array.isArray(products)) return [];
+    
+    return products
+      .filter((product: any) => {
+        if (showOnlyOnSale) {
+          if (!isFlashSaleActive(product)) {
+            return false;
+          }
+        }
+        
+        if (productFilters.category !== 'all' && product.category !== productFilters.category) {
+          return false;
+        }
+        
+        if (productFilters.status !== 'all') {
+          if (productFilters.status === 'active' && !product.isActive) return false;
+          if (productFilters.status === 'inactive' && product.isActive) return false;
+        }
+        
+        if (productFilters.search) {
+          const searchTerm = productFilters.search.toLowerCase();
+          return product.name?.toLowerCase().includes(searchTerm);
+        }
+        
+        return true;
+      })
+      .sort((a: any, b: any) => {
+        if (showOnlyOnSale) {
+          const discountA = a.flashSaleDiscountPercent || 0;
+          const discountB = b.flashSaleDiscountPercent || 0;
+          if (discountB !== discountA) {
+            return discountB - discountA;
+          }
+        }
+        return a.name.localeCompare(b.name);
+      });
+  }, [products, productFilters, showOnlyOnSale]);
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(price);
+  };
+
+  const getStockStatus = (stock: number) => {
+    if (stock === 0) return { label: 'Sem Estoque', color: 'border-border bg-muted/50 text-muted-foreground' };
+    if (stock < 10) return { label: 'Estoque Baixo', color: 'border-border bg-muted/50 text-muted-foreground' };
+    return { label: 'Em Estoque', color: 'border-border bg-muted/50 text-foreground' };
+  };
+
+  return (
+    <>
+      {/* Search and Filters */}
+      <Card className="border border-border shadow-sm">
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Buscar produtos por nome..."
+                  value={productFilters.search}
+                  onChange={(e) => setProductFilters({ ...productFilters, search: e.target.value })}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="md:w-48">
+              <select
+                value={productFilters.category}
+                onChange={(e) => setProductFilters({ ...productFilters, category: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="all">Todas as categorias</option>
+                <option value="SOFA">Sofá</option>
+                <option value="MESA">Mesa</option>
+                <option value="CADEIRA">Cadeira</option>
+                <option value="ARMARIO">Armário</option>
+                <option value="ESTANTE">Estante</option>
+                <option value="POLTRONA">Poltrona</option>
+                <option value="QUADRO">Quadro</option>
+                <option value="LUMINARIA">Luminária</option>
+                <option value="MESA_CENTRO">Mesa de centro</option>
+              </select>
+            </div>
+            <div className="md:w-48">
+              <select
+                value={productFilters.status}
+                onChange={(e) => setProductFilters({ ...productFilters, status: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="all">Todos os status</option>
+                <option value="active">Ativo</option>
+                <option value="inactive">Inativo</option>
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Products List */}
+      {getFilteredProducts.length === 0 ? (
+        <Card className="border border-border shadow-sm mt-2">
+          <CardContent className="py-12 text-center mt-2">
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">Nenhum produto encontrado</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {productFilters.search || productFilters.category !== 'all' || productFilters.status !== 'all'
+                ? 'Tente ajustar os filtros para encontrar produtos.'
+                : 'Comece criando seu primeiro produto.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-8">
+            {getFilteredProducts.map((product: any) => {
+              const stockStatus = getStockStatus(product.stock);
+              const isOnSale = isFlashSaleActive(product);
+              const salePrice = product.flashSalePrice || product.price;
+              const originalPrice = product.price;
+              const imageUrl = (product.imageUrls && product.imageUrls.length > 0) 
+                ? product.imageUrls[0] 
+                : product.imageUrl;
+              
+              return (
+                <Card key={product.id} className="border border-border shadow-sm transition hover:shadow-md overflow-hidden">
+                  {imageUrl && (
+                    <div className="aspect-video w-full overflow-hidden bg-muted relative">
+                      <img
+                        src={imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {isOnSale && (
+                        <div className="absolute top-2 left-2">
+                          <Badge className="bg-primary text-primary-foreground">
+                            <Zap className="h-3 w-3 mr-1" />
+                            OFERTA
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground mb-1">{product.name}</h3>
+                        <p className="text-sm text-muted-foreground">{product.category}</p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="border-border bg-muted/50 text-muted-foreground">
+                          {product.category}
+                        </Badge>
+                        <Badge 
+                          variant="outline" 
+                          className={
+                            product.isActive 
+                              ? 'border-border bg-muted/50 text-foreground' 
+                              : 'border-border bg-muted/50 text-muted-foreground'
+                          }
+                        >
+                          {product.isActive ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                        {isOnSale && product.flashSaleDiscountPercent && (
+                          <Badge variant="outline" className="border-border bg-muted/50 text-foreground">
+                            -{product.flashSaleDiscountPercent}%
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          {isOnSale ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl font-semibold text-foreground">
+                                {formatPrice(salePrice)}
+                              </span>
+                              <span className="text-sm text-muted-foreground line-through">
+                                {formatPrice(originalPrice)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xl font-semibold text-foreground">
+                              {formatPrice(originalPrice)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Package className="h-4 w-4" />
+                          <span>Estoque: {product.stock || 0} unidades</span>
+                        </div>
+                        {product.sku && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Tag className="h-4 w-4" />
+                            <span>SKU: {product.sku}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-3 border-t border-border">
+                        <Badge variant="outline" className={stockStatus.color}>
+                          {stockStatus.label}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-border">
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => onViewProduct && onViewProduct(product)}
+                            title="Visualizar produto"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleEditProductById(product.id)}
+                            title="Editar produto"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            onClick={() => onDeleteProduct(product.id)}
+                            title="Deletar produto"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Card className="border border-border shadow-sm">
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <Label htmlFor="page-limit" className="text-sm">
+                      Itens por página:
+                    </Label>
+                    <select
+                      id="page-limit"
+                      value={pageLimit}
+                      onChange={(e) => onLimitChange && onLimitChange(Number(e.target.value))}
+                      className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span className="text-sm text-muted-foreground">
+                      Mostrando {((currentPage - 1) * pageLimit) + 1} - {Math.min(currentPage * pageLimit, totalProducts)} de {totalProducts} produtos
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPageChange && onPageChange(1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPageChange && onPageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <span className="text-sm text-foreground px-4">
+                      Página {currentPage} de {totalPages}
+                    </span>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPageChange && onPageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPageChange && onPageChange(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </>
   );
 }
