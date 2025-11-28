@@ -83,7 +83,7 @@ export default function ProductsPage() {
   // Estado inicial via URL
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   // Ler tanto 'category' quanto 'cat' para compatibilidade
-  const categoryParam = searchParams.get('category') || searchParams.get('cat') || 'all';
+  const categoryParam = (searchParams.get('category') || searchParams.get('cat') || 'all').toUpperCase();
   const [selectedCategory, setSelectedCategory] = useState<string>(categoryParam);
   const [selectedColor, setSelectedColor] = useState<string>(searchParams.get('color') || '');
   const [minPrice, setMinPrice] = useState<string>(searchParams.get('min') || '');
@@ -112,7 +112,7 @@ export default function ProductsPage() {
     if (categoryFromUrl !== selectedCategory) {
       setSelectedCategory(categoryFromUrl);
     }
-  }, [searchParams, selectedCategory]);
+  }, [searchParams]);
 
   // Debounce de busca
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
@@ -131,7 +131,7 @@ export default function ProductsPage() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (debouncedTerm) params.set('q', debouncedTerm);
-    if (selectedCategory && selectedCategory !== 'all') params.set('cat', selectedCategory);
+    if (selectedCategory && selectedCategory.toUpperCase() !== 'ALL') params.set('cat', selectedCategory);
     if (selectedColor) params.set('color', selectedColor);
     if (minPrice) params.set('min', minPrice);
     if (maxPrice) params.set('max', maxPrice);
@@ -139,7 +139,16 @@ export default function ProductsPage() {
     if (sortBy && sortBy !== 'name') params.set('sort', sortBy);
     if (page && page > 1) params.set('page', String(page));
     const qs = params.toString();
-    router.replace(`/products${qs ? `?${qs}` : ''}`);
+    const newUrl = `/products${qs ? `?${qs}` : ''}`;
+    
+    // Só atualiza se a URL for diferente da atual
+    if (window.location.pathname + window.location.search !== newUrl) {
+      router.replace(newUrl, { scroll: false });
+      // Scroll para o topo quando categoria mudar
+      if (selectedCategory) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
   }, [debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount, sortBy, page, router]);
 
   const categories = useMemo(() => {
@@ -302,7 +311,7 @@ export default function ProductsPage() {
         const matchesSearch = !term ||
           product.name.toLowerCase().includes(term) ||
           (product.brand?.toLowerCase().includes(term) ?? false);
-        const matchesCategory = selectedCategory === 'all' || 
+        const matchesCategory = !selectedCategory || selectedCategory.toUpperCase() === 'ALL' || 
           product.category?.toString().toUpperCase() === selectedCategory.toUpperCase();
         const matchesColor = !selectedColor || product.color === selectedColor;
         const currentPrice = getCurrentPrice(product);
@@ -580,105 +589,7 @@ export default function ProductsPage() {
       <Header />
 
       <main className="container mx-auto px-4 py-6">
-        {/* Seção de Localização e Categorias */}
-        <div className=" flex flex-col lg:flex-row gap-4 mt-6">
-          {/* Localização do Usuário */}
-          <div className="flex-shrink-0 lg:w-80 mt-6">
-            <div className="bg-white border border-gray-200 rounded-xl p-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-brand-700 rounded-full p-1.5">
-                  <MapPin className="h-4 w-4 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  {isAuthenticated && user ? (
-                    <>
-                      <p className="text-xs text-gray-500">Enviar para</p>
-                      <p className="text-sm font-bold text-gray-900 truncate">{getUserLocation()}</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-xs text-gray-500">Entrar para melhor experiência</p>
-                      <p className="text-sm font-bold text-gray-900">Cadastre sua localização</p>
-                    </>
-                  )}
-                </div>
-                {!isAuthenticated && (
-                  <Button
-                    onClick={() => router.push('/login')}
-                    className="bg-brand-700 hover:bg-brand-700/90 text-white"
-                    size="sm"
-                  >
-                    Criar
-                  </Button>
-                )}
-                {isAuthenticated && (
-                  <Button
-                    onClick={() => router.push('/profile')}
-                    variant="outline"
-                    size="sm"
-                    className="border-gray-300"
-                  >
-                    Editar
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Carrossel de Categorias */}
-          <div className="flex-1 ">
-            <div
-              ref={categoriesScrollRef}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
-              className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-3 py-4"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              {categories.map((cat) => {
-                const Icon = categoryIcons[cat] || Package;
-                const count = products.filter(p => 
-                  p.category?.toString().toUpperCase() === cat.toUpperCase()
-                ).length;
-                const isSelected = selectedCategory?.toUpperCase() === cat.toUpperCase();
-                
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className="flex flex-col items-center justify-center gap-4 whitespace-nowrap flex-1 min-w-0 px-2"
-                  >
-                    <div className={`relative w-20 h-20 rounded-full bg-white border-2 flex items-center justify-center transition-all duration-200 ${
-                      isSelected
-                        ? 'border-brand-600 shadow-lg scale-110'
-                        : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                    }`}>
-                      <Icon className={`h-8 w-8 transition-colors duration-200 ${
-                        isSelected ? 'text-brand-700' : 'text-brand-700'
-                      }`} />
-                      {isSelected && (
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-brand-600 rounded-full" />
-                      )}
-                    </div>
-                    <span className={`text-xs font-medium transition-colors duration-200 ${
-                      isSelected ? 'text-brand-700 font-semibold' : 'text-brand-700'
-                    }`}>
-                      {categoryNames[cat] || cat}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        
-
-        {/* Título, Banner e Ordenação */}
-        <div className="mb-4 space-y-4 ">
-          
-          {/* Breadcrumbs */}
+        {/* Breadcrumbs */}
         <Breadcrumb className="mb-4 mt-8">
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -693,19 +604,17 @@ export default function ProductsPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
+        {/* Título */}
+        <div className="mb-4">
+          <h1 className="text-2xl font-semibold text-brand-700 mb-1">
+            {searchTerm ? `Resultados para "${searchTerm}"` : 'Nossos Produtos'}
+          </h1>
+          <p className="text-sm text-gray-600">
+            {filteredProducts.length} {filteredProducts.length === 1 ? 'produto encontrado' : 'produtos encontrados'}
+          </p>
+        </div>
 
-          <div>
-            <div>
-              <h1 className="text-2xl font-semibold text-brand-700 mb-1">
-                {searchTerm ? `Resultados para "${searchTerm}"` : 'Nossos Produtos'}
-              </h1>
-              <p className="text-sm text-gray-600">
-                {filteredProducts.length} {filteredProducts.length === 1 ? 'produto encontrado' : 'produtos encontrados'}
-              </p>
-            </div>
-          </div>
-
-          {/* Seção Principal: Oferta Relâmpago e Produtos Recentes */}
+        {/* Seção Principal: Banner e Oferta Relâmpago */}
           {!searchTerm && (() => {
             // Verificar se há oferta relâmpago REALMENTE ativa (já começou)
             const hasActiveFlashSale = specialOfferProduct && isFlashSaleActuallyActive(specialOfferProduct) && specialOfferProduct.isFlashSale;
@@ -944,18 +853,109 @@ export default function ProductsPage() {
             );
           })()}
 
-          {/* Ordenação */}
-          <div className="flex items-center justify-end mt-4 mb-4">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
-                className="border-2 border-brand-200 rounded-lg px-4 py-2 text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
-              >
-                <option value="name">Ordenar por: Mais relevantes</option>
-                <option value="price">Menor preço</option>
-                <option value="stock">Maior estoque</option>
-              </select>
+        {/* Ordenação */}
+        <div className="flex items-center justify-end mt-4 mb-4">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
+            className="border-2 border-brand-200 rounded-lg px-4 py-2 text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
+          >
+            <option value="name">Ordenar por: Mais relevantes</option>
+            <option value="price">Menor preço</option>
+            <option value="stock">Maior estoque</option>
+          </select>
+        </div>
+
+        {/* Seção de Localização e Categorias */}
+        <div className="flex flex-col lg:flex-row gap-4 mt-6 mb-6">
+          {/* Localização do Usuário */}
+          <div className="flex-shrink-0 lg:w-80">
+            <div className="bg-white border border-gray-200 rounded-xl p-3">
+              <div className="flex items-center gap-3">
+                <div className="bg-brand-700 rounded-full p-1.5">
+                  <MapPin className="h-4 w-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  {isAuthenticated && user ? (
+                    <>
+                      <p className="text-xs text-gray-500">Enviar para</p>
+                      <p className="text-sm font-bold text-gray-900 truncate">{getUserLocation()}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-gray-500">Entrar para melhor experiência</p>
+                      <p className="text-sm font-bold text-gray-900">Cadastre sua localização</p>
+                    </>
+                  )}
+                </div>
+                {!isAuthenticated && (
+                  <Button
+                    onClick={() => router.push('/login')}
+                    className="bg-brand-700 hover:bg-brand-700/90 text-white"
+                    size="sm"
+                  >
+                    Criar
+                  </Button>
+                )}
+                {isAuthenticated && (
+                  <Button
+                    onClick={() => router.push('/profile')}
+                    variant="outline"
+                    size="sm"
+                    className="border-gray-300"
+                  >
+                    Editar
+                  </Button>
+                )}
+              </div>
             </div>
+          </div>
+
+          {/* Carrossel de Categorias */}
+          <div className="flex-1">
+            <div
+              ref={categoriesScrollRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
+              className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-3 py-4"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {categories.map((cat) => {
+                const Icon = categoryIcons[cat] || Package;
+                const count = products.filter(p => 
+                  p.category?.toString().toUpperCase() === cat.toUpperCase()
+                ).length;
+                const isSelected = selectedCategory?.toUpperCase() === cat.toUpperCase();
+                
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className="flex flex-col items-center justify-center gap-3 whitespace-nowrap flex-1 min-w-0 px-2 py-2 rounded-xl transition-all duration-200"
+                  >
+                    <div className={`relative w-20 h-20 rounded-full border-[3px] flex items-center justify-center transition-all duration-200 ${
+                      isSelected
+                        ? 'border-[#3e2626] bg-[#3e2626] shadow-xl shadow-[#3e2626]/30 scale-110 ring-4 ring-[#3e2626]/20'
+                        : 'bg-white border-gray-300 hover:border-brand-400 hover:shadow-lg hover:bg-brand-50/50'
+                    }`}>
+                      <Icon className={`h-8 w-8 transition-colors duration-200 ${
+                        isSelected ? 'text-white' : 'text-gray-600'
+                      }`} />
+                    </div>
+                    <span className={`text-xs font-medium transition-all duration-200 px-2 py-1 rounded-md ${
+                      isSelected 
+                        ? 'text-brand-700 font-bold bg-brand-100' 
+                        : 'text-gray-700 hover:text-brand-700'
+                    }`}>
+                      {categoryNames[cat] || cat}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -986,8 +986,10 @@ export default function ProductsPage() {
                       type="radio"
                       name="category"
                       value="all"
-                      checked={selectedCategory === 'all'}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
+                      checked={selectedCategory?.toUpperCase() === 'ALL'}
+                      onChange={(e) => {
+                        setSelectedCategory(e.target.value);
+                      }}
                       className="w-3.5 h-3.5 border-gray-300 text-brand-600 focus:ring-brand-500"
                     />
                     <span className="text-xs text-gray-700">Todas as categorias</span>
@@ -998,8 +1000,10 @@ export default function ProductsPage() {
                         type="radio"
                         name="category"
                         value={cat}
-                        checked={selectedCategory === cat}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        checked={selectedCategory?.toUpperCase() === cat.toUpperCase()}
+                        onChange={(e) => {
+                          setSelectedCategory(e.target.value);
+                        }}
                         className="w-3.5 h-3.5 border-gray-300 text-brand-600 focus:ring-brand-500"
                       />
                       <span className="text-xs text-gray-700">

@@ -815,7 +815,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-gray-900">MobiliAI Assistant</h3>
+              <h3 className="text-xl font-semibold text-gray-900">MobiliAI Assistente</h3>
               <p className="text-base text-gray-600">Assistente de Login</p>
             </div>
           </div>
