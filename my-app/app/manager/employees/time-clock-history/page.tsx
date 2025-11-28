@@ -171,16 +171,16 @@ export default function ManagerTimeClockHistoryPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
       {/* Header */}
-      <div className="flex items-center space-x-3">
-        <Button variant="ghost" onClick={() => router.push('/manager/employees')}>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:space-x-3">
+        <Button variant="ghost" onClick={() => router.push('/manager/employees')} className="w-fit">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Histórico de Pontos</h1>
-          <p className="text-sm text-gray-600">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900">Histórico de Pontos</h1>
+          <p className="text-xs sm:text-sm text-gray-600 truncate">
             {employee ? `${employee.name} - ${employee.email}` : 'Carregando...'}
           </p>
         </div>
@@ -234,10 +234,10 @@ export default function ManagerTimeClockHistoryPage() {
 
       {/* Resumo */}
       <Card className="bg-[#3e2626] text-white border-0 shadow-lg rounded-2xl">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h4 className="font-bold text-lg mb-1">Resumo do Período</h4>
+              <h4 className="font-bold text-base sm:text-lg mb-1">Resumo do Período</h4>
               <p className="text-white text-sm">
                 {totalRecords} registros encontrados
               </p>
@@ -245,7 +245,7 @@ export default function ManagerTimeClockHistoryPage() {
             <Button
               variant="outline"
               size="sm"
-              className="bg-white/20 text-white border-white/30 hover:bg-white/30"
+              className="bg-white/20 text-white border-white/30 hover:bg-white/30 w-full sm:w-auto"
             >
               <Download className="h-4 w-4 mr-2" />
               Exportar
@@ -278,42 +278,42 @@ export default function ManagerTimeClockHistoryPage() {
               {records.map((record) => (
                 <div
                   key={record.id}
-                  className="bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all duration-300"
+                  className="bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl p-4 sm:p-5 hover:shadow-lg transition-all duration-300"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-6">
-                      <div className="text-center bg-white rounded-lg p-3 shadow-sm min-w-[100px]">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 sm:space-x-4">
+                      <div className="text-center bg-white rounded-lg p-2 sm:p-3 shadow-sm min-w-[80px] sm:min-w-[100px]">
                         <div className="text-xs text-gray-500 font-medium mb-1">Data</div>
-                        <div className="font-bold text-gray-900">{formatDate(record.date)}</div>
+                        <div className="font-bold text-gray-900 text-sm sm:text-base">{formatDate(record.date)}</div>
                       </div>
-                      <div className="text-center bg-green-50 rounded-lg p-3 shadow-sm min-w-[100px]">
+                      <div className="text-center bg-green-50 rounded-lg p-2 sm:p-3 shadow-sm min-w-[80px] sm:min-w-[100px]">
                         <div className="text-xs text-green-600 font-medium mb-1">Entrada</div>
-                        <div className="font-bold text-green-700">{formatTime(record.clockIn)}</div>
+                        <div className="font-bold text-green-700 text-sm sm:text-base">{formatTime(record.clockIn)}</div>
                       </div>
                       {record.clockOut && (
-                        <div className="text-center bg-red-50 rounded-lg p-3 shadow-sm min-w-[100px]">
+                        <div className="text-center bg-red-50 rounded-lg p-2 sm:p-3 shadow-sm min-w-[80px] sm:min-w-[100px]">
                           <div className="text-xs text-red-600 font-medium mb-1">Saída</div>
-                          <div className="font-bold text-red-700">{formatTime(record.clockOut)}</div>
+                          <div className="font-bold text-red-700 text-sm sm:text-base">{formatTime(record.clockOut)}</div>
                         </div>
                       )}
                       {record.totalHours && (
-                        <div className="text-center bg-blue-50 rounded-lg p-3 shadow-sm min-w-[100px]">
+                        <div className="text-center bg-blue-50 rounded-lg p-2 sm:p-3 shadow-sm min-w-[80px] sm:min-w-[100px]">
                           <div className="text-xs text-blue-600 font-medium mb-1">Horas</div>
-                          <div className="font-bold text-blue-700">{record.totalHours}h</div>
+                          <div className="font-bold text-blue-700 text-sm sm:text-base">{record.totalHours}h</div>
                         </div>
                       )}
                       {record.minutesLate && record.minutesLate > 0 && (
-                        <div className="text-center bg-orange-50 rounded-lg p-3 shadow-sm min-w-[100px]">
+                        <div className="text-center bg-orange-50 rounded-lg p-2 sm:p-3 shadow-sm min-w-[80px] sm:min-w-[100px]">
                           <div className="text-xs text-orange-600 font-medium mb-1">Atraso</div>
-                          <div className="font-bold text-orange-700">
+                          <div className="font-bold text-orange-700 text-sm sm:text-base">
                             {formatLateTime(record.minutesLate)}
                           </div>
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center justify-center sm:justify-end">
                       <span
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusColor(record.status)}`}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusColor(record.status)} whitespace-nowrap`}
                       >
                         {getStatusText(record.status)}
                       </span>
