@@ -90,29 +90,6 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Iluminação: <Lamp className="h-5 w-5" />,
 };
 
-// Limite de tentativas gratuitas antes de exigir login
-const FREE_TRIAL_LIMIT = 3;
-
-// Função para gerenciar contador de tentativas
-const getUsageCount = (): number => {
-  if (typeof window === 'undefined') return 0;
-  const count = localStorage.getItem('ia-demo-usage-count');
-  return count ? parseInt(count, 10) : 0;
-};
-
-const incrementUsageCount = (): number => {
-  if (typeof window === 'undefined') return 0;
-  const current = getUsageCount();
-  const newCount = current + 1;
-  localStorage.setItem('ia-demo-usage-count', newCount.toString());
-  return newCount;
-};
-
-const resetUsageCount = () => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('ia-demo-usage-count');
-};
-
 export default function TestAIPage() {
   const { isAuthenticated, setLoading } = useAppStore();
   
@@ -127,8 +104,6 @@ export default function TestAIPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
-  const [usageCount, setUsageCount] = useState(0);
-  const [showLoginWarning, setShowLoginWarning] = useState(false);
   
   // Estado para seleção de posição
   const [pendingFurniture, setPendingFurniture] = useState<FurnitureItem | null>(null);
@@ -142,17 +117,6 @@ export default function TestAIPage() {
   // Histórico para Undo/Redo
   const [history, setHistory] = useState<HistoryState[]>([{ furniture: [] }]);
   const [historyIndex, setHistoryIndex] = useState(0);
-
-  // Carregar contador de uso ao montar o componente
-  useEffect(() => {
-    const count = getUsageCount();
-    setUsageCount(count);
-    // Se o usuário está autenticado, resetar o contador
-    if (isAuthenticated) {
-      resetUsageCount();
-      setUsageCount(0);
-    }
-  }, [isAuthenticated]);
 
   // Refs
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -220,18 +184,8 @@ export default function TestAIPage() {
 
   // Iniciar seleção de posição
   const handleStartAddFurniture = (furniture: FurnitureItem) => {
-    if (!uploadedImageFile) {
-      setError('Você precisa carregar uma imagem primeiro.');
-      return;
-    }
-
-    // Verificar se precisa de login (após algumas tentativas)
-    const currentCount = getUsageCount();
-    const needsLogin = !isAuthenticated && currentCount >= FREE_TRIAL_LIMIT;
-    
-    if (needsLogin) {
-      setShowLoginWarning(true);
-      setError(`Você já usou ${FREE_TRIAL_LIMIT} tentativas gratuitas. Faça login para continuar gerando imagens.`);
+    if (!uploadedImageFile || !isAuthenticated) {
+      setError('Você precisa estar logado e ter um arquivo carregado.');
       return;
     }
     
@@ -239,7 +193,6 @@ export default function TestAIPage() {
     setIsSelectingPosition(true);
     setSelectedPosition(null);
     setError(null);
-    setShowLoginWarning(false);
     setSuccessMessage('Clique na imagem para escolher onde colocar o móvel');
   };
 
@@ -253,20 +206,8 @@ export default function TestAIPage() {
 
   // Adicionar móvel ao ambiente - COM IA do nano-banana
   const handleAddFurniture = async (furniture: FurnitureItem, position?: { x: number; y: number }) => {
-    if (!uploadedImageFile) {
-      setError('Você precisa carregar uma imagem primeiro.');
-      return;
-    }
-
-    // Verificar se precisa de login (após algumas tentativas)
-    const currentCount = getUsageCount();
-    const needsLogin = !isAuthenticated && currentCount >= FREE_TRIAL_LIMIT;
-    
-    if (needsLogin) {
-      setShowLoginWarning(true);
-      setError(`Você já usou ${FREE_TRIAL_LIMIT} tentativas gratuitas. Faça login para continuar gerando imagens.`);
-      setIsSelectingPosition(false);
-      setPendingFurniture(null);
+    if (!uploadedImageFile || !isAuthenticated) {
+      setError('Você precisa estar logado e ter um arquivo carregado.');
       return;
     }
 
@@ -441,21 +382,6 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
       });
 
       if (result.success && result.imageUrl) {
-        // Incrementar contador de uso apenas se não estiver autenticado
-        if (!isAuthenticated) {
-          const newCount = incrementUsageCount();
-          setUsageCount(newCount);
-          
-          // Avisar quando estiver próximo do limite
-          if (newCount >= FREE_TRIAL_LIMIT - 1) {
-            setSuccessMessage(`${furniture.name} adicionado! Você tem ${FREE_TRIAL_LIMIT - newCount} tentativa(s) restante(s). Faça login para continuar.`);
-          } else {
-            setSuccessMessage(`${furniture.name} adicionado com IA!`);
-          }
-        } else {
-          setSuccessMessage(`${furniture.name} adicionado com IA!`);
-        }
-        
         // Atualizar imagem processada
         setProcessedImageUrl(result.imageUrl);
         setUploadedImage(result.imageUrl);
@@ -495,7 +421,8 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
         setSelectedFurniture(null);
         setPendingFurniture(null);
         setSelectedPosition(null);
-        setTimeout(() => setSuccessMessage(null), 5000);
+        setSuccessMessage(`${furniture.name} adicionado com IA!`);
+        setTimeout(() => setSuccessMessage(null), 3000);
       } else {
         throw new Error(result.error || 'Erro ao processar imagem com IA');
       }
@@ -698,18 +625,8 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
 
   // Auto posicionar IA - usando nano-banana para otimizar posições
   const handleAutoPosition = async () => {
-    if (!uploadedImageFile || placedFurniture.length === 0) {
-      setError('Você precisa ter um arquivo carregado e móveis adicionados.');
-      return;
-    }
-
-    // Verificar se precisa de login (após algumas tentativas)
-    const currentCount = getUsageCount();
-    const needsLogin = !isAuthenticated && currentCount >= FREE_TRIAL_LIMIT;
-    
-    if (needsLogin) {
-      setShowLoginWarning(true);
-      setError(`Você já usou ${FREE_TRIAL_LIMIT} tentativas gratuitas. Faça login para continuar gerando imagens.`);
+    if (!uploadedImageFile || placedFurniture.length === 0 || !isAuthenticated) {
+      setError('Você precisa estar logado, ter um arquivo carregado e móveis adicionados.');
       return;
     }
 
@@ -763,21 +680,6 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
       });
 
       if (result.success && result.imageUrl) {
-        // Incrementar contador de uso apenas se não estiver autenticado
-        if (!isAuthenticated) {
-          const newCount = incrementUsageCount();
-          setUsageCount(newCount);
-          
-          // Avisar quando estiver próximo do limite
-          if (newCount >= FREE_TRIAL_LIMIT - 1) {
-            setSuccessMessage(`Móveis reposicionados! Você tem ${FREE_TRIAL_LIMIT - newCount} tentativa(s) restante(s). Faça login para continuar.`);
-          } else {
-            setSuccessMessage('Móveis reposicionados pela IA do nano-banana!');
-          }
-        } else {
-          setSuccessMessage('Móveis reposicionados pela IA do nano-banana!');
-        }
-        
         // Atualizar imagem processada pela IA
         setProcessedImageUrl(result.imageUrl);
         if (result.imageUrl.startsWith('http')) {
@@ -785,7 +687,9 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
         }
         
         addToHistory();
-        setTimeout(() => setSuccessMessage(null), 5000);
+        // A imagem já foi reprocessada pela IA com móveis reposicionados
+        setSuccessMessage('Móveis reposicionados pela IA do nano-banana!');
+        setTimeout(() => setSuccessMessage(null), 3000);
       } else {
         throw new Error(result.error || 'Erro ao processar imagem com IA');
       }
@@ -904,6 +808,32 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
     setPlacedFurniture(placedFurniture.map((f) => ({ ...f, isSelected: false })));
   };
 
+  // Verificar autenticação
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Header />
+        <div className="min-h-screen flex items-center justify-center bg-white" style={{ paddingTop: '180px' }}>
+          <Card className="max-w-md w-full mx-4 border-[#3e2626]/20 bg-white shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-2xl text-center text-[#3e2626]">Acesso Necessário</CardTitle>
+              <CardDescription className="text-center text-[#4f3a2f]/75">
+                Você precisa estar logado para usar o Visualizador de Móveis com IA
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button className="w-full bg-[#3e2626] hover:bg-[#4f3223] text-white" asChild>
+                <Link href="/login">Fazer Login</Link>
+              </Button>
+              <Button variant="outline" className="w-full border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10" asChild>
+                <Link href="/teste-ia-landing">Ver Demonstração</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -988,19 +918,8 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
           <div className="container mx-auto px-4">
             <div className="mt-2 flex items-center gap-2 border-l-4 border-red-500 bg-red-50 px-4 py-3 rounded-r-lg">
               <AlertCircle className="h-5 w-5 text-red-500" />
-              <p className="text-sm text-red-700 flex-1">{error}</p>
-              {showLoginWarning && (
-                <Button 
-                  className="bg-[#3e2626] hover:bg-[#4f3223] text-white text-sm px-4 py-1.5" 
-                  asChild
-                >
-                  <Link href="/login">Fazer Login</Link>
-                </Button>
-              )}
-              <Button variant="ghost" size="icon" onClick={() => {
-                setError(null);
-                setShowLoginWarning(false);
-              }} className="h-6 w-6 hover:bg-red-100">
+              <p className="text-sm text-red-700">{error}</p>
+              <Button variant="ghost" size="icon" onClick={() => setError(null)} className="ml-auto h-6 w-6 hover:bg-red-100">
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -1248,22 +1167,6 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
               </div>
 
               <div className="flex-1 space-y-4 overflow-y-auto p-4">
-                {/* Aviso sobre tentativas gratuitas */}
-                {!isAuthenticated && usageCount < FREE_TRIAL_LIMIT && (
-                  <div className="mb-4 rounded-lg border border-[#C07A45]/30 bg-[#F7C194]/10 p-3 text-xs text-[#3e2626]">
-                    <div className="flex items-start gap-2">
-                      <Sparkles className="h-4 w-4 text-[#C07A45] mt-0.5" />
-                      <div>
-                        <p className="font-semibold">Modo de demonstração</p>
-                        <p className="text-[#4f3a2f]/70">
-                          Você tem {FREE_TRIAL_LIMIT - usageCount} tentativa(s) restante(s). 
-                          {usageCount > 0 && ' Faça login para continuar gerando imagens.'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
                 {filteredProducts.length === 0 ? (
                   <div className="py-8 text-center text-[#4f3a2f]/60 animate-in fade-in duration-500">
                     <p>Nenhum produto encontrado</p>
@@ -1307,7 +1210,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                               size="sm"
                               className="w-full bg-[#3e2626] hover:bg-[#4f3223] text-white"
                               onClick={() => handleStartAddFurniture(product)}
-                              disabled={!uploadedImage || isProcessingAI || isSelectingPosition}
+                              disabled={!uploadedImage || isProcessingAI || isSelectingPosition || !isAuthenticated}
                             >
                               {isProcessingAI ? (
                                 <>
@@ -1340,4 +1243,3 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
     </>
   );
 }
-

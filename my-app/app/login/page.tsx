@@ -732,8 +732,8 @@ export default function LoginPage() {
 
   return (
     <div className="h-screen flex relative overflow-hidden">
-         {/* Background Image - Covering entire page */}
-         <div className="absolute inset-0 z-0">
+         {/* Background Image - Covering entire page - Hidden on small screens */}
+         <div className="absolute inset-0 z-0 hidden md:block">
            <Image
              src="/fundo-login.png"
              alt="Background"
@@ -745,21 +745,21 @@ export default function LoginPage() {
            />
          </div>
 
-         {/* Left Side - Background Image with MobiliAI Text */}
-         <div className="w-full relative z-10">
+         {/* Botão Voltar para Home - Visible only on large screens */}
+         <div className="absolute top-8 left-8 z-20 hidden md:block">
+           <Link href="/">
+             <Button
+               variant="ghost"
+               className="bg-white/90 hover:bg-white text-[#3e2626] backdrop-blur-sm shadow-lg"
+             >
+               <ArrowLeft className="h-4 w-4 mr-2" />
+               Voltar
+             </Button>
+           </Link>
+         </div>
 
-           {/* Botão Voltar para Home */}
-           <div className="absolute top-8 left-8 z-10">
-             <Link href="/">
-               <Button
-                 variant="ghost"
-                 className="bg-white/90 hover:bg-white text-[#3e2626] backdrop-blur-sm shadow-lg"
-               >
-                 <ArrowLeft className="h-4 w-4 mr-2" />
-                 Voltar
-               </Button>
-             </Link>
-           </div>
+         {/* Left Side - Background Image with MobiliAI Text - Hidden on small screens */}
+         <div className="w-full relative z-10 hidden md:block">
              
             {/* MobiliAI Text Overlay - Centralizado e Proporcional */}
             <div className="absolute inset-0 flex items-center justify-center pr-50">
@@ -789,9 +789,22 @@ export default function LoginPage() {
          </div>
 
         {/* Right Side - Chat Interface */}
-        <div className="w-2/3 flex flex-col translate-x-[-50px] relative z-10 ">
+        <div className="w-full md:w-2/3 flex flex-col md:translate-x-[-50px] relative z-10 bg-white md:bg-transparent">
+          {/* Botão Voltar para Home - Inside chat area - Only on small screens */}
+          <div className="pt-4 px-4 block md:hidden">
+            <Link href="/">
+              <Button
+                variant="ghost"
+                className="bg-white/90 hover:bg-white text-[#3e2626] backdrop-blur-sm shadow-lg"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </Button>
+            </Link>
+          </div>
+
           {/* Chat Header */}
-          <div className="p-8 flex items-center space-x-4">
+          <div className="px-4 pb-4 pt-2 md:p-8 flex items-center space-x-4">
             <div className="w-16 h-16 rounded-lg overflow-hidden flex items-center justify-center bg-gray-50">
               <Image
                 src="/bot.jpeg"
@@ -808,7 +821,7 @@ export default function LoginPage() {
           </div>
 
           {/* Chat Messages */}
-          <div className="flex-1 p-8 overflow-y-auto">
+          <div className="flex-1 px-4 py-2 md:p-8 overflow-y-auto">
             <div className="space-y-6">
               {messages.map((message) => (
                 <div key={message.id}>
@@ -872,7 +885,7 @@ export default function LoginPage() {
           </div>
 
           {/* Chat Input */}
-          <div className="p-8">
+          <div className="px-4 pb-4 md:p-8">
             <form onSubmit={handleSubmit} className="flex space-x-3">
               <div className="flex-1 relative">
                 {loginStep === 'password' || loginStep === 'resetPassword' ? (

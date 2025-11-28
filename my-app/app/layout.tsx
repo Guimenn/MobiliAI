@@ -5,7 +5,7 @@ import "ol/ol.css";
 import { Toaster } from "@/components/ui/sonner";
 import ClientProviders from "@/components/ClientProviders";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider";
-import SupportChatbot from "@/components/SupportChatbot";
+import ConditionalSupportChatbot from "@/components/ConditionalSupportChatbot";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -38,7 +38,7 @@ export default function RootLayout({
         </ClientProviders>
         <Toaster />
         <ConfirmDialogProvider />
-        <SupportChatbot />
+        <ConditionalSupportChatbot />
       </body>
     </html>
   );
