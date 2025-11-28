@@ -200,9 +200,9 @@ export default function SalesPage() {
   return (
     <div className="space-y-8">
       {/* Hero Section */}
-      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-xl space-y-4">
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-6 sm:gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl space-y-4 w-full min-w-0">
             <Badge
               variant="outline"
               className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
@@ -210,7 +210,7 @@ export default function SalesPage() {
               Gestão de Vendas
             </Badge>
             <div className="space-y-3">
-              <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-tight">
                 Vendas e Transações
               </h1>
               <p className="text-sm text-primary-foreground/80 lg:text-base">
@@ -225,9 +225,9 @@ export default function SalesPage() {
 
       {/* Filters */}
       <Card className="border border-border shadow-sm">
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end">
-            <div className="flex-1">
+        <CardContent className="pt-4 sm:pt-6">
+          <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-end">
+            <div className="flex-1 w-full">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -238,8 +238,8 @@ export default function SalesPage() {
                 />
               </div>
             </div>
-            <div className="md:w-48">
-              <Label htmlFor="status-filter" className="text-sm mb-2 block">Status</Label>
+            <div className="w-full sm:w-48">
+              <Label htmlFor="status-filter" className="text-xs sm:text-sm mb-2 block">Status</Label>
               <select
                 id="status-filter"
                 value={statusFilter}
@@ -254,8 +254,8 @@ export default function SalesPage() {
                 <option value="REFUNDED">Reembolsada</option>
               </select>
             </div>
-            <div className="md:w-48">
-              <Label htmlFor="date-filter" className="text-sm mb-2 block">Período</Label>
+            <div className="w-full sm:w-48">
+              <Label htmlFor="date-filter" className="text-xs sm:text-sm mb-2 block">Período</Label>
               <select
                 id="date-filter"
                 value={dateFilter}
@@ -294,40 +294,40 @@ export default function SalesPage() {
               className="border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => handleViewSale(sale.id)}
             >
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-foreground flex-shrink-0">
-                      <Receipt className="h-6 w-6" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                  <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                    <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg sm:rounded-xl bg-muted text-foreground flex-shrink-0">
+                      <Receipt className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-foreground">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
                           Venda #{sale.saleNumber || sale.id}
                         </h3>
                         {getStatusBadge(sale.status)}
                       </div>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <User className="h-4 w-4" />
-                          <span>{sale.customer?.name || sale.customerName || 'Cliente'}</span>
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">{sale.customer?.name || sale.customerName || 'Cliente'}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <Calendar className="h-4 w-4" />
-                          <span>{formatDate(sale.createdAt)}</span>
+                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">{formatDate(sale.createdAt)}</span>
                         </div>
                         {sale.paymentMethod && (
                           <div className="flex items-center gap-1.5">
-                            <CreditCard className="h-4 w-4" />
-                            <span className="capitalize">{sale.paymentMethod}</span>
+                            <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="capitalize truncate">{sale.paymentMethod}</span>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <div className="text-right">
-                      <p className="text-xl font-semibold text-foreground">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-shrink-0">
+                    <div className="text-left sm:text-right">
+                      <p className="text-lg sm:text-xl font-semibold text-foreground">
                         {formatPrice(typeof sale.totalAmount === 'string' ? parseFloat(sale.totalAmount) : (sale.totalAmount || 0))}
                       </p>
                       {sale.items && sale.items.length > 0 && (
@@ -343,7 +343,7 @@ export default function SalesPage() {
                         e.stopPropagation();
                         handleViewSale(sale.id);
                       }}
-                      className="h-10 w-10"
+                      className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -367,34 +367,34 @@ function SalesStats({ stats }: any) {
   };
 
   return (
-    <div className="grid w-full max-w-md grid-cols-2 gap-4 sm:grid-cols-2 lg:max-w-xl">
-      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
-          <ShoppingCart className="h-5 w-5" />
+    <div className="grid w-full max-w-full sm:max-w-md grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:max-w-xl">
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <p className="text-2xl font-semibold leading-tight">{stats.totalSales}</p>
-        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total de Vendas</p>
+        <p className="text-xl sm:text-2xl font-semibold leading-tight">{stats.totalSales}</p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total de Vendas</p>
       </div>
-      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
-          <DollarSign className="h-5 w-5" />
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <p className="text-2xl font-semibold leading-tight">{formatPrice(stats.totalRevenue)}</p>
-        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Receita Total</p>
+        <p className="text-lg sm:text-2xl font-semibold leading-tight truncate">{formatPrice(stats.totalRevenue)}</p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Receita Total</p>
       </div>
-      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
-          <TrendingUp className="h-5 w-5" />
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <p className="text-2xl font-semibold leading-tight">{formatPrice(stats.averageOrderValue)}</p>
-        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Ticket Médio</p>
+        <p className="text-lg sm:text-2xl font-semibold leading-tight truncate">{formatPrice(stats.averageOrderValue)}</p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Ticket Médio</p>
       </div>
-      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
-          <BarChart3 className="h-5 w-5" />
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <p className="text-2xl font-semibold leading-tight">{stats.conversionRate.toFixed(1)}%</p>
-        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Taxa de Conversão</p>
+        <p className="text-xl sm:text-2xl font-semibold leading-tight">{stats.conversionRate.toFixed(1)}%</p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Taxa de Conversão</p>
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api';
+import SaleDetailsModal from '@/components/SaleDetailsModal';
 
 interface Sale {
   id: string;
@@ -63,6 +64,8 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
     averageTicket: 0,
     growthRate: 0
   });
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   useEffect(() => {
     loadSales();
@@ -191,80 +194,80 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
   return (
     <div className="space-y-6">
       {/* Actions */}
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm">
+      <div className="flex items-center justify-end gap-2 flex-wrap">
+        <Button variant="outline" size="sm" className="w-full sm:w-auto">
           <Download className="h-4 w-4 mr-2" />
           Exportar
         </Button>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" className="w-full sm:w-auto">
           <BarChart3 className="h-4 w-4 mr-2" />
           Relatório
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
                 <DollarSign className="h-4 w-4 text-green-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="min-w-0">
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">
                   R$ {salesStats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
-                <p className="text-sm text-gray-500">Receita Total</p>
+                <p className="text-xs sm:text-sm text-gray-500">Receita Total</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
                 <Package className="h-4 w-4 text-blue-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{salesStats.totalSales}</p>
-                <p className="text-sm text-gray-500">Total de Vendas</p>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{salesStats.totalSales}</p>
+                <p className="text-xs sm:text-sm text-gray-500">Total de Vendas</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
                 <TrendingUp className="h-4 w-4 text-purple-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="min-w-0">
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">
                   R$ {salesStats.averageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
-                <p className="text-sm text-gray-500">Ticket Médio</p>
+                <p className="text-xs sm:text-sm text-gray-500">Ticket Médio</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+              <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
                 {salesStats.growthRate >= 0 ? (
                   <TrendingUp className="h-4 w-4 text-green-600" />
                 ) : (
                   <TrendingDown className="h-4 w-4 text-red-600" />
                 )}
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="min-w-0">
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
                   {salesStats.growthRate >= 0 ? '+' : ''}{salesStats.growthRate.toFixed(1)}%
                 </p>
-                <p className="text-sm text-gray-500">Crescimento</p>
+                <p className="text-xs sm:text-sm text-gray-500">Crescimento</p>
               </div>
             </div>
           </CardContent>
@@ -284,9 +287,9 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
             />
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -297,7 +300,7 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
             </SelectContent>
           </Select>
           <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
@@ -314,13 +317,13 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
       <div className="space-y-4">
         {filteredSales.map((sale) => (
           <Card key={sale.id} className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-4 mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">#{sale.saleNumber || 'N/A'}</h3>
-                      <p className="text-sm text-gray-600">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">#{sale.saleNumber || 'N/A'}</h3>
+                      <p className="text-xs sm:text-sm text-gray-600">
                         {sale.createdAt ? (() => {
                           try {
                             return new Date(sale.createdAt).toLocaleDateString('pt-BR', {
@@ -336,25 +339,25 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
                         })() : 'Data não disponível'}
                       </p>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2">
                       {getStatusBadge(sale.status)}
                       {getPaymentMethodBadge(sale.paymentMethod)}
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-sm">
                     <div>
-                      <p className="text-gray-500">Cliente</p>
-                      <p className="font-medium">{sale.customer?.name ?? 'Cliente não identificado'}</p>
-                      <p className="text-gray-600">{sale.customer?.email ?? '-'}</p>
+                      <p className="text-gray-500 text-xs sm:text-sm">Cliente</p>
+                      <p className="font-medium truncate">{sale.customer?.name ?? 'Cliente não identificado'}</p>
+                      <p className="text-gray-600 text-xs truncate">{sale.customer?.email ?? '-'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Funcionário</p>
-                      <p className="font-medium">{sale.employee?.name ?? 'Funcionário não identificado'}</p>
+                      <p className="text-gray-500 text-xs sm:text-sm">Funcionário</p>
+                      <p className="font-medium truncate">{sale.employee?.name ?? 'Funcionário não identificado'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Valor Total</p>
-                      <p className="font-bold text-lg text-green-600">
+                      <p className="text-gray-500 text-xs sm:text-sm">Valor Total</p>
+                      <p className="font-bold text-base sm:text-lg text-green-600">
                         R$ {Number(sale.totalAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
@@ -362,11 +365,11 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
 
                   {sale.items && sale.items.length > 0 && (
                     <div className="mt-3">
-                      <p className="text-sm text-gray-500 mb-2">Produtos:</p>
+                      <p className="text-xs sm:text-sm text-gray-500 mb-2">Produtos:</p>
                       <div className="flex flex-wrap gap-2">
                         {sale.items.map((item, index) => (
                           <Badge key={item.product?.id || index} variant="outline" className="text-xs">
-                            {item.product?.name || 'Produto não identificado'} x{item.quantity || 0}
+                            <span className="truncate max-w-[150px] sm:max-w-none">{item.product?.name || 'Produto não identificado'}</span> x{item.quantity || 0}
                           </Badge>
                         ))}
                       </div>
@@ -374,10 +377,19 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
                   )}
                 </div>
                 
-                <div className="ml-4">
-                  <Button variant="outline" size="sm">
+                <div className="sm:ml-4 flex-shrink-0">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full sm:w-auto"
+                    onClick={() => {
+                      setSelectedSaleId(sale.id);
+                      setIsDetailsModalOpen(true);
+                    }}
+                  >
                     <Eye className="h-4 w-4 mr-2" />
-                    Ver Detalhes
+                    <span className="hidden sm:inline">Ver Detalhes</span>
+                    <span className="sm:hidden">Detalhes</span>
                   </Button>
                 </div>
               </div>
@@ -393,6 +405,16 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
           <p className="text-gray-500">Ajuste os filtros ou aguarde novas vendas.</p>
         </div>
       )}
+
+      {/* Modal de Detalhes */}
+      <SaleDetailsModal
+        saleId={selectedSaleId}
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedSaleId(null);
+        }}
+      />
     </div>
   );
 }

@@ -128,7 +128,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-4">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="h-5 w-5" />
@@ -161,7 +161,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
             </Card>
 
             {/* Informações da Venda */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               {/* Cliente */}
               <Card>
                 <CardHeader>
@@ -238,9 +238,9 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
               <CardContent>
                 <div className="space-y-4">
                   {sale.items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium">{item.product.name}</p>
+                    <div key={item.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-4 border rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.product.name}</p>
                         {item.product.sku && (
                           <p className="text-sm text-gray-500">SKU: {item.product.sku}</p>
                         )}
@@ -248,10 +248,10 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                           {item.quantity}x {formatCurrency(item.unitPrice)}
                         </p>
                         {item.notes && (
-                          <p className="text-sm text-gray-500 italic">{item.notes}</p>
+                          <p className="text-sm text-gray-500 italic break-words">{item.notes}</p>
                         )}
                       </div>
-                      <div className="text-right">
+                      <div className="text-left sm:text-right flex-shrink-0">
                         <p className="font-medium">{formatCurrency(item.totalPrice)}</p>
                       </div>
                     </div>

@@ -827,72 +827,80 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden animate-in zoom-in-95 duration-300">
         {/* Header */}
-        <div className="bg-[#3e2626] text-white p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
-                <Package className="h-6 w-6" />
+        <div className="bg-[#3e2626] text-white p-4 sm:p-6">
+          <div className="flex items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30 flex-shrink-0">
+                <Package className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold truncate">
                   {mode === 'create' ? 'Novo Produto' : isEditing ? 'Editar Produto' : 'Visualizar Produto'}
                 </h2>
-                <p className="text-sm text-white/90 mt-0.5">
+                <p className="text-xs sm:text-sm text-white/90 mt-0.5 hidden sm:block">
                   {mode === 'view' && !isEditing ? 'Visualização dos detalhes do produto' : 'Preencha as informações do produto'}
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              {!isEditing && mode !== 'create' && (
-                <Button 
-                  variant="outline"
-                  onClick={() => setIsEditing(true)}
-                  className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
-                </Button>
-              )}
-              {isEditing && (
-                <>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleCancel} 
-                    disabled={isLoading}
-                    className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button 
-                    onClick={handleSave} 
-                    disabled={isLoading}
-                    className="bg-white text-[#3e2626] hover:bg-white/90 border border-white/30 shadow-lg font-semibold"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {isLoading ? 'Salvando...' : 'Salvar'}
-                  </Button>
-                </>
-              )}
-              {!isEditing && mode !== 'create' && (
-                <Button 
-                  variant="outline" 
-                  onClick={handleDelete} 
-                  disabled={isLoading}
-                  className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {isLoading ? 'Excluindo...' : 'Excluir'}
-                </Button>
-              )}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={onClose}
-                className="text-white hover:bg-white/20 rounded-lg"
+                className="text-white hover:bg-white/20 rounded-lg h-9 w-9 sm:h-10 sm:w-10 p-0 flex-shrink-0"
+                title="Fechar"
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0 sm:justify-end">
+            {!isEditing && mode !== 'create' && (
+              <Button 
+                variant="outline"
+                onClick={() => setIsEditing(true)}
+                className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-xs sm:text-sm"
+                size="sm"
+              >
+                <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Editar
+              </Button>
+            )}
+            {isEditing && (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCancel} 
+                  disabled={isLoading}
+                  className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-xs sm:text-sm"
+                  size="sm"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleSave} 
+                  disabled={isLoading}
+                  className="bg-white text-[#3e2626] hover:bg-white/90 border border-white/30 shadow-lg font-semibold text-xs sm:text-sm"
+                  size="sm"
+                >
+                  <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  {isLoading ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </>
+            )}
+            {!isEditing && mode !== 'create' && (
+              <Button 
+                variant="outline" 
+                onClick={handleDelete} 
+                disabled={isLoading}
+                className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-xs sm:text-sm"
+                size="sm"
+              >
+                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">{isLoading ? 'Excluindo...' : 'Excluir'}</span>
+                <span className="sm:hidden">{isLoading ? '...' : 'Excluir'}</span>
+              </Button>
+            )}
           </div>
         </div>
 

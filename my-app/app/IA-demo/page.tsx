@@ -4,10 +4,11 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import Header from '@/components/Header';
-import { aiAPI } from '@/lib/api';
+import { env } from '@/lib/env';
 import { useAppStore } from '@/lib/store';
+import Link from 'next/link';
 import { useProducts } from '@/lib/hooks/useProducts';
 import {
   Upload,
@@ -25,13 +26,11 @@ import {
   BookOpen,
   Lamp,
   X,
-  GripVertical,
   Loader2,
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react';
 import Image from 'next/image';
-import Link from 'next/link';
 
 // Tipos e interfaces
 interface FurnitureItem {
@@ -60,6 +59,8 @@ interface PlacedFurniture {
 
 interface HistoryState {
   furniture: PlacedFurniture[];
+  processedImageUrl: string | null;
+  uploadedImage: string | null;
 }
 
 // Mock data do catálogo
@@ -90,8 +91,38 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Iluminação: <Lamp className="h-5 w-5" />,
 };
 
+const MAX_FREE_REQUESTS = 3;
+const STORAGE_KEY = 'ia_demo_request_count';
+
 export default function TestAIPage() {
-  const { isAuthenticated, setLoading } = useAppStore();
+  const { setLoading, isAuthenticated } = useAppStore();
+  
+  // Contador de requisições (apenas para usuários não autenticados)
+  const [requestCount, setRequestCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? parseInt(stored, 10) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  // Verificar se atingiu o limite
+  const hasReachedLimit = !isAuthenticated && requestCount >= MAX_FREE_REQUESTS;
+
+  // Função para incrementar contador
+  const incrementRequestCount = () => {
+    if (!isAuthenticated) {
+      const newCount = requestCount + 1;
+      setRequestCount(newCount);
+      try {
+        localStorage.setItem(STORAGE_KEY, newCount.toString());
+      } catch {
+        // Ignorar erros de localStorage
+      }
+    }
+  };
   
   // Estados principais
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -115,7 +146,11 @@ export default function TestAIPage() {
   const { products: allProducts } = useProducts();
 
   // Histórico para Undo/Redo
-  const [history, setHistory] = useState<HistoryState[]>([{ furniture: [] }]);
+  const [history, setHistory] = useState<HistoryState[]>([{ 
+    furniture: [], 
+    processedImageUrl: null, 
+    uploadedImage: uploadedImage 
+  }]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
   // Refs
@@ -152,7 +187,7 @@ export default function TestAIPage() {
       setSuccessMessage('Arquivo carregado! Processando com IA...');
       
       // Se não for imagem, tentar processar diretamente com a IA
-      // A IA do nano-banana pode processar diferentes tipos de arquivo
+      // Nossa IA pode processar diferentes tipos de arquivo
       setUploadedImage(`data:${file.type};base64,${btoa(String.fromCharCode(...new Uint8Array(0)))}`);
       setTimeout(() => setSuccessMessage(null), 3000);
     }
@@ -184,8 +219,13 @@ export default function TestAIPage() {
 
   // Iniciar seleção de posição
   const handleStartAddFurniture = (furniture: FurnitureItem) => {
-    if (!uploadedImageFile || !isAuthenticated) {
-      setError('Você precisa estar logado e ter um arquivo carregado.');
+    if (!uploadedImageFile) {
+      setError('Você precisa ter um arquivo carregado.');
+      return;
+    }
+
+    if (hasReachedLimit) {
+      setError('Você atingiu o limite de 3 requisições gratuitas. Faça login para continuar usando.');
       return;
     }
     
@@ -204,10 +244,15 @@ export default function TestAIPage() {
     setSuccessMessage(null);
   };
 
-  // Adicionar móvel ao ambiente - COM IA do nano-banana
+  // Adicionar móvel ao ambiente - COM Nossa IA
   const handleAddFurniture = async (furniture: FurnitureItem, position?: { x: number; y: number }) => {
-    if (!uploadedImageFile || !isAuthenticated) {
-      setError('Você precisa estar logado e ter um arquivo carregado.');
+    if (!uploadedImageFile) {
+      setError('Você precisa ter um arquivo carregado.');
+      return;
+    }
+
+    if (hasReachedLimit) {
+      setError('Você atingiu o limite de 3 requisições gratuitas. Faça login para continuar usando.');
       return;
     }
 
@@ -373,22 +418,44 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
       console.log('  - Produto:', productFiles[0].name, productFiles[0].size, 'bytes');
       console.log('  - Prompt:', prompt.substring(0, 100) + '...');
 
-      // Chamar IA do nano-banana - processa qualquer arquivo
-      const result = await aiAPI.processImageWithUpload({
-        file: environmentFile,
-        productFiles: productFiles, // SEMPRE enviar a imagem do produto
-        prompt,
-        outputFormat: 'jpg',
+      // Chamar nossa IA - usar endpoint público para demo
+      const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+      const formData = new FormData();
+      formData.append('images', environmentFile);
+      productFiles.forEach((productFile) => {
+        formData.append('images', productFile);
+      });
+      formData.append('prompt', prompt);
+      formData.append('outputFormat', 'jpg');
+
+      // Usar endpoint público que não exige autenticação
+      const response = await fetch(`${apiBaseUrl}/public/ai/process-upload`, {
+        method: 'POST',
+        body: formData,
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Erro ao processar imagem' }));
+        throw new Error(errorData.message || `Erro ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
       if (result.success && result.imageUrl) {
+        // Incrementar contador de requisições (apenas para não autenticados)
+        incrementRequestCount();
+        
         // Atualizar imagem processada
         setProcessedImageUrl(result.imageUrl);
         setUploadedImage(result.imageUrl);
         
         // Adicionar móvel à lista
         setPlacedFurniture((prev) => {
-          const currentState = { furniture: [...prev] };
+          const currentState = { 
+            furniture: [...prev],
+            processedImageUrl: processedImageUrl,
+            uploadedImage: uploadedImage
+          };
           
           const newFurniture: PlacedFurniture = {
             id: `furniture-${Date.now()}-${Math.random()}`,
@@ -405,12 +472,17 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
           };
 
           const updated = [...prev, newFurniture];
+          const newImageUrl = result.imageUrl;
           
           // Atualizar histórico
           setHistory((prevHistory) => {
             const newHistory = prevHistory.slice(0, historyIndex + 1);
             newHistory.push(currentState);
-            newHistory.push({ furniture: updated });
+            newHistory.push({ 
+              furniture: updated,
+              processedImageUrl: newImageUrl,
+              uploadedImage: newImageUrl
+            });
             setHistoryIndex(newHistory.length - 1);
             return newHistory;
           });
@@ -428,10 +500,24 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
       }
     } catch (error: unknown) {
       console.error('Erro ao adicionar móvel com IA:', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : (error as { response?: { data?: { message?: string } } })?.response?.data?.message 
-        || 'Erro ao processar imagem com IA. Tente novamente.';
+      
+      // Verificar se é erro de autenticação (mas não redirecionar)
+      const errorResponse = error as { response?: { status?: number; data?: { message?: string } } };
+      const isAuthError = errorResponse?.response?.status === 401;
+      
+      let errorMessage = 'Erro ao processar imagem com IA. Tente novamente.';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (errorResponse?.response?.data?.message) {
+        errorMessage = errorResponse.response.data.message;
+      }
+      
+      // Se for erro de autenticação, mostrar mensagem específica mas não bloquear
+      if (isAuthError) {
+        errorMessage = 'Erro ao processar. A requisição pode ter falhado. Tente novamente.';
+      }
+      
       setError(errorMessage);
       setPendingFurniture(null);
       setIsSelectingPosition(false);
@@ -483,27 +569,45 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
 
   // Gerenciamento de histórico
   const addToHistory = useCallback(() => {
-    const currentState = { furniture: [...placedFurniture] };
+    const currentState = { 
+      furniture: [...placedFurniture],
+      processedImageUrl: processedImageUrl,
+      uploadedImage: uploadedImage
+    };
     setHistory((prevHistory) => {
       const newHistory = prevHistory.slice(0, historyIndex + 1);
       newHistory.push(currentState);
       setHistoryIndex(newHistory.length - 1);
       return newHistory;
     });
-  }, [historyIndex, placedFurniture]);
+  }, [historyIndex, placedFurniture, processedImageUrl, uploadedImage]);
 
   const handleUndo = () => {
-    if (historyIndex > 0) {
+    if (historyIndex > 0 && history.length > 0) {
+      const prevState = history[historyIndex - 1];
       setHistoryIndex(historyIndex - 1);
-      setPlacedFurniture(history[historyIndex - 1].furniture);
+      setPlacedFurniture(prevState.furniture);
+      if (prevState.processedImageUrl !== null) {
+        setProcessedImageUrl(prevState.processedImageUrl);
+      }
+      if (prevState.uploadedImage !== null) {
+        setUploadedImage(prevState.uploadedImage);
+      }
       setSelectedFurniture(null);
     }
   };
 
   const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
+    if (historyIndex < history.length - 1 && history.length > 0) {
+      const nextState = history[historyIndex + 1];
       setHistoryIndex(historyIndex + 1);
-      setPlacedFurniture(history[historyIndex + 1].furniture);
+      setPlacedFurniture(nextState.furniture);
+      if (nextState.processedImageUrl !== null) {
+        setProcessedImageUrl(nextState.processedImageUrl);
+      }
+      if (nextState.uploadedImage !== null) {
+        setUploadedImage(nextState.uploadedImage);
+      }
       setSelectedFurniture(null);
     }
   };
@@ -623,10 +727,15 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
     );
   };
 
-  // Auto posicionar IA - usando nano-banana para otimizar posições
+  // Auto posicionar IA - usando nossa IA para otimizar posições
   const handleAutoPosition = async () => {
-    if (!uploadedImageFile || placedFurniture.length === 0 || !isAuthenticated) {
-      setError('Você precisa estar logado, ter um arquivo carregado e móveis adicionados.');
+    if (!uploadedImageFile || placedFurniture.length === 0) {
+      setError('Você precisa ter um arquivo carregado e móveis adicionados.');
+      return;
+    }
+
+    if (hasReachedLimit) {
+      setError('Você atingiu o limite de 3 requisições gratuitas. Faça login para continuar usando.');
       return;
     }
 
@@ -672,14 +781,30 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
         }
       }
 
-      // Chamar IA do nano-banana para auto-posicionar
-      const result = await aiAPI.processImageWithUpload({
-        file: environmentFile,
-        prompt,
-        outputFormat: 'jpg',
+      // Chamar nossa IA para auto-posicionar - usar endpoint público
+      const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+      const formData = new FormData();
+      formData.append('images', environmentFile);
+      formData.append('prompt', prompt);
+      formData.append('outputFormat', 'jpg');
+
+      // Usar endpoint público que não exige autenticação
+      const response = await fetch(`${apiBaseUrl}/public/ai/process-upload`, {
+        method: 'POST',
+        body: formData,
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Erro ao processar imagem' }));
+        throw new Error(errorData.message || `Erro ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
       if (result.success && result.imageUrl) {
+        // Incrementar contador de requisições (apenas para não autenticados)
+        incrementRequestCount();
+        
         // Atualizar imagem processada pela IA
         setProcessedImageUrl(result.imageUrl);
         if (result.imageUrl.startsWith('http')) {
@@ -688,17 +813,31 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
         
         addToHistory();
         // A imagem já foi reprocessada pela IA com móveis reposicionados
-        setSuccessMessage('Móveis reposicionados pela IA do nano-banana!');
+        setSuccessMessage('Móveis reposicionados pela nossa IA!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
         throw new Error(result.error || 'Erro ao processar imagem com IA');
       }
     } catch (error: unknown) {
       console.error('Erro ao reposicionar móveis com IA:', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : (error as { response?: { data?: { message?: string } } })?.response?.data?.message 
-        || 'Erro ao processar imagem com IA. Tente novamente.';
+      
+      // Verificar se é erro de autenticação (mas não redirecionar)
+      const errorResponse = error as { response?: { status?: number; data?: { message?: string } } };
+      const isAuthError = errorResponse?.response?.status === 401;
+      
+      let errorMessage = 'Erro ao processar imagem com IA. Tente novamente.';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (errorResponse?.response?.data?.message) {
+        errorMessage = errorResponse.response.data.message;
+      }
+      
+      // Se for erro de autenticação, mostrar mensagem específica mas não bloquear
+      if (isAuthError) {
+        errorMessage = 'Erro ao processar. A requisição pode ter falhado. Tente novamente.';
+      }
+      
       setError(errorMessage);
     } finally {
       setIsProcessingAI(false);
@@ -706,68 +845,48 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
     }
   };
 
-  // Salvar imagem - usa a imagem já processada pela IA
-  const handleSaveImage = () => {
+  // Salvar imagem - faz download direto da imagem
+  const handleSaveImage = async () => {
     // Usar a imagem processada pela IA se disponível, senão a original
     const imageToSave = processedImageUrl || uploadedImage;
     if (!imageToSave) return;
 
-    // Se já temos uma imagem processada pela IA, apenas fazer download
-    if (processedImageUrl) {
+    try {
+      let blob: Blob;
+      
+      // Se for data URL, converter diretamente para blob
+      if (imageToSave.startsWith('data:')) {
+        const response = await fetch(imageToSave);
+        blob = await response.blob();
+      } else {
+        // Se for URL externa, buscar e converter para blob
+        const response = await fetch(imageToSave);
+        if (!response.ok) {
+          throw new Error('Erro ao buscar imagem');
+        }
+        blob = await response.blob();
+      }
+      
+      // Criar URL temporária do blob
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Criar link de download
       const a = document.createElement('a');
-      a.href = processedImageUrl;
+      a.href = blobUrl;
       a.download = `ambiente-decorado-${Date.now()}.jpg`;
+      document.body.appendChild(a);
       a.click();
+      
+      // Limpar
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+      
       setSuccessMessage('Imagem salva com sucesso!');
       setTimeout(() => setSuccessMessage(null), 3000);
-      return;
+    } catch (error) {
+      console.error('Erro ao salvar imagem:', error);
+      setError('Erro ao salvar imagem. Tente novamente.');
     }
-
-    // Se não temos imagem processada, criar canvas com aviso
-    if (!imageRef.current || !canvasRef.current) return;
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-
-      // Adicionar aviso discreto
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(10, canvas.height - 40, 380, 30);
-      ctx.fillStyle = 'white';
-      ctx.font = '14px Arial';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText('Adicione móveis com IA para renderização completa', 15, canvas.height - 15);
-
-      // Gerar download
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `ambiente-${Date.now()}.png`;
-            a.click();
-            URL.revokeObjectURL(url);
-            setSuccessMessage('Imagem salva com sucesso!');
-            setTimeout(() => setSuccessMessage(null), 3000);
-          }
-        },
-        'image/png',
-        0.95
-      );
-    };
-    img.onerror = () => {
-      setError('Erro ao processar a imagem. Tente novamente.');
-    };
-    img.src = imageToSave;
   };
 
   // Remover móvel
@@ -808,46 +927,72 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
     setPlacedFurniture(placedFurniture.map((f) => ({ ...f, isSelected: false })));
   };
 
-  // Verificar autenticação
-  if (!isAuthenticated) {
-    return (
-      <>
-        <Header />
-        <div className="min-h-screen flex items-center justify-center bg-white" style={{ paddingTop: '180px' }}>
-          <Card className="max-w-md w-full mx-4 border-[#3e2626]/20 bg-white shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-2xl text-center text-[#3e2626]">Acesso Necessário</CardTitle>
-              <CardDescription className="text-center text-[#4f3a2f]/75">
-                Você precisa estar logado para usar o Visualizador de Móveis com IA
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button className="w-full bg-[#3e2626] hover:bg-[#4f3223] text-white" asChild>
-                <Link href="/login">Fazer Login</Link>
-              </Button>
-              <Button variant="outline" className="w-full border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10" asChild>
-                <Link href="/teste-ia-landing">Ver Demonstração</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       {/* Navbar */}
       <Header />
       
       <div className="flex flex-col bg-white" style={{ minHeight: '100vh', paddingTop: '180px' }}>
+        {/* Banner de limite atingido */}
+        {hasReachedLimit && (
+          <div className="sticky top-[180px] z-40 bg-yellow-50 border-b-2 border-yellow-400 shadow-md">
+            <div className="container mx-auto px-4 py-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-6 w-6 text-yellow-600 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-yellow-900">
+                      Limite de requisições gratuitas atingido
+                    </p>
+                    <p className="text-sm text-yellow-700">
+                      Você usou {MAX_FREE_REQUESTS} requisições gratuitas. Faça login para continuar usando o Visualizador de Móveis com IA.
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  className="bg-[#3e2626] hover:bg-[#4f3223] text-white shrink-0"
+                  asChild
+                >
+                  <Link href="/login">Fazer Login</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header com ferramentas */}
-        <div className="sticky top-[180px] z-30 bg-white shadow-sm border-b border-[#3e2626]/10">
+        <div className="sticky top-[180px] z-30 bg-white shadow-sm border-b border-[#3e2626]/10" style={{ top: hasReachedLimit ? '240px' : '180px' }}>
+          {/* Mensagem de seleção de posição */}
+          {isSelectingPosition && pendingFurniture && (
+            <div className="bg-[#C07A45]/10 border-b border-[#C07A45]/30 px-4 py-2">
+              <div className="container mx-auto flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-[#C07A45] animate-pulse" />
+                  <p className="text-sm font-medium text-[#3e2626]">
+                    <span className="font-semibold">Clique na imagem</span> para escolher onde colocar: <span className="text-[#C07A45]">{pendingFurniture.name}</span>
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelPositionSelection}
+                  className="text-[#3e2626] hover:bg-[#C07A45]/20 h-7 px-2"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-3">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-6 w-6 text-[#C07A45]" />
                 <h1 className="text-xl font-black text-[#3e2626]">Visualizador de Móveis com IA</h1>
+                {!isAuthenticated && (
+                  <div className="ml-4 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs font-medium text-blue-700">
+                    {MAX_FREE_REQUESTS - requestCount} requisições restantes
+                  </div>
+                )}
               </div>
               {uploadedImage && (
                 <div className="flex items-center gap-2">
@@ -886,24 +1031,6 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
 
             {uploadedImage && (
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleAutoPosition}
-                  disabled={isProcessingAI || placedFurniture.length === 0}
-                  className="border-[#C07A45]/50 text-[#3e2626] hover:bg-[#C07A45]/10 hover:border-[#C07A45]"
-                >
-                  {isProcessingAI ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin text-[#C07A45]" />
-                      Processando imagem com IA...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4 text-[#C07A45]" />
-                      Auto posicionar móveis
-                    </>
-                  )}
-                </Button>
                 <Button onClick={handleSaveImage} className="bg-[#3e2626] hover:bg-[#4f3223] text-white">
                   <Download className="mr-2 h-4 w-4" />
                   Salvar imagem
@@ -959,7 +1086,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                           {isDragActive ? 'Solte a imagem aqui' : 'Arraste sua foto aqui ou clique para enviar'}
                         </p>
                         <p className="mb-6 text-sm text-[#4f3a2f]/70">
-                          Aceita qualquer tipo de arquivo - imagens serão processadas com IA do nano-banana
+                          Aceita qualquer tipo de arquivo - imagens serão processadas com nossa IA
                         </p>
                         <div className="flex justify-center gap-4">
                           <Button
@@ -1055,26 +1182,9 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                       ) : null}
 
                       {/* Overlay de seleção de posição */}
+                      {/* Overlay sutil para indicar modo de seleção - não bloqueia a interação */}
                       {isSelectingPosition && !isProcessingAI && (
-                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/20 backdrop-blur-[2px] pointer-events-none">
-                          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white/95 backdrop-blur-sm p-6 shadow-2xl border-2 border-[#C07A45] pointer-events-auto">
-                            <Sparkles className="h-8 w-8 text-[#C07A45] animate-pulse" />
-                            <p className="text-lg font-semibold text-[#3e2626] text-center">
-                              Clique na imagem para escolher onde colocar
-                            </p>
-                            <p className="text-sm text-[#4f3a2f]/70 text-center">
-                              {pendingFurniture?.name}
-                            </p>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleCancelPositionSelection}
-                              className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10"
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
-                        </div>
+                        <div className="absolute inset-0 rounded-lg border-2 border-dashed border-[#C07A45]/50 bg-[#C07A45]/5 pointer-events-none z-10" />
                       )}
 
                       {/* Indicador de hover (posição do mouse) */}
@@ -1120,9 +1230,9 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                         <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm">
                           <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-[#3e2626]/20">
                             <Loader2 className="h-12 w-12 animate-spin text-[#C07A45]" />
-                            <p className="text-lg font-semibold text-[#3e2626]">Processando com nano-banana AI...</p>
+                            <p className="text-lg font-semibold text-[#3e2626]">Processando com nossa IA...</p>
                             <p className="text-sm text-[#4f3a2f]/70">Aguarde alguns segundos</p>
-                            <p className="text-xs text-[#4f3a2f]/50">Powered by Replicate</p>
+                           
                           </div>
                         </div>
                       )}
@@ -1210,7 +1320,8 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                               size="sm"
                               className="w-full bg-[#3e2626] hover:bg-[#4f3223] text-white"
                               onClick={() => handleStartAddFurniture(product)}
-                              disabled={!uploadedImage || isProcessingAI || isSelectingPosition || !isAuthenticated}
+                              disabled={!uploadedImage || isProcessingAI || isSelectingPosition || hasReachedLimit}
+                              title={hasReachedLimit ? 'Faça login para continuar usando' : ''}
                             >
                               {isProcessingAI ? (
                                 <>

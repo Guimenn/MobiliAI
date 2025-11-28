@@ -283,7 +283,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Estoque da Loja</h3>
           <p className="text-sm text-gray-600">
@@ -291,8 +291,8 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
             Para vender, distribua produtos ao estoque da loja.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 sm:max-w-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
@@ -302,80 +302,85 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
               className="pl-10"
             />
           </div>
-          <Button
-            onClick={handleOpenAddDialog}
-            className="bg-[#3e2626] hover:bg-[#2d1c1c] text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar ao Estoque
-          </Button>
-          <Button
-            variant="outline"
-            onClick={async () => {
-              setIsAddCatalogOpen(true);
-              await loadGlobalProducts();
-            }}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar ao Catálogo
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              onClick={handleOpenAddDialog}
+              className="bg-[#3e2626] hover:bg-[#2d1c1c] text-white w-full sm:w-auto"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Adicionar ao Estoque</span>
+              <span className="sm:hidden">Adicionar Estoque</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                setIsAddCatalogOpen(true);
+                await loadGlobalProducts();
+              }}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Adicionar ao Catálogo</span>
+              <span className="sm:hidden">Adicionar Catálogo</span>
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total de Produtos (Catálogo)</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Total (Catálogo)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{totalProducts}</div>
+            <div className="text-xl sm:text-2xl font-bold text-gray-900">{totalProducts}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Produtos no Estoque (SKUs)</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">No Estoque (SKUs)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{inventory.length}</div>
+            <div className="text-xl sm:text-2xl font-bold text-gray-900">{inventory.length}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Unidades em Estoque</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Unidades</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-xl sm:text-2xl font-bold text-gray-900">
               {inventory.reduce((sum, item) => sum + (item.quantity || 0), 0)}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Em Estoque</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Em Estoque</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-xl sm:text-2xl font-bold text-green-600">
               {inventory.filter(item => item.quantity > 0 && item.quantity > item.minStock).length}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Estoque Baixo</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Estoque Baixo</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
+            <div className="text-xl sm:text-2xl font-bold text-yellow-600">
               {inventory.filter(item => item.quantity > 0 && item.quantity <= item.minStock).length}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Sem Estoque</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">Sem Estoque</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-xl sm:text-2xl font-bold text-red-600">
               {inventory.filter(item => item.quantity === 0).length}
             </div>
           </CardContent>
@@ -400,15 +405,15 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <Table className="min-w-[800px] sm:min-w-0">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>SKU / Código</TableHead>
-                    <TableHead className="text-center">Quantidade</TableHead>
-                    <TableHead className="text-center">Mínimo</TableHead>
-                    <TableHead>Localização</TableHead>
+                    <TableHead className="min-w-[200px]">Produto</TableHead>
+                    <TableHead className="hidden sm:table-cell">SKU / Código</TableHead>
+                    <TableHead className="text-center">Qtd</TableHead>
+                    <TableHead className="text-center hidden md:table-cell">Mínimo</TableHead>
+                    <TableHead className="hidden lg:table-cell">Localização</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -453,7 +458,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           <div className="text-sm">
                             {item.product.sku && (
                               <div className="text-gray-900">SKU: {item.product.sku}</div>
@@ -465,15 +470,16 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="font-semibold text-gray-900">{item.quantity}</div>
+                          <div className="text-xs text-gray-500 sm:hidden">Mín: {item.minStock}</div>
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center hidden md:table-cell">
                           <div className="text-sm text-gray-600">{item.minStock}</div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden lg:table-cell">
                           {item.location ? (
                             <div className="flex items-center gap-1 text-sm text-gray-600">
                               <MapPin className="h-3 w-3" />
-                              {item.location}
+                              <span className="truncate max-w-[150px]">{item.location}</span>
                             </div>
                           ) : (
                             <span className="text-sm text-gray-400">Não informado</span>
@@ -483,14 +489,15 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
                           <Badge className={status.color}>{status.label}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1 sm:gap-2">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleEdit(item)}
+                              className="px-2 sm:px-3"
                             >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Editar
+                              <Edit className="h-4 w-4 sm:mr-1" />
+                              <span className="hidden sm:inline">Editar</span>
                             </Button>
                             <Button
                               variant="outline"
@@ -499,7 +506,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
                                 setItemToRemove(item);
                                 setIsRemoveDialogOpen(true);
                               }}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 px-2 sm:px-3"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -517,7 +524,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
           <DialogHeader>
             <DialogTitle>Editar Estoque</DialogTitle>
             <DialogDescription>
@@ -549,7 +556,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantity">Quantidade Atual</Label>
                 <Input
@@ -629,7 +636,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
 
       {/* Add Product Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto mx-4">
           <DialogHeader>
             <DialogTitle>Adicionar Produto ao Estoque</DialogTitle>
             <DialogDescription>
@@ -736,7 +743,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="addQuantity">Quantidade Inicial</Label>
                     <Input
@@ -793,7 +800,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
 
       {/* Add to Catalog Dialog */}
       <Dialog open={isAddCatalogOpen} onOpenChange={setIsAddCatalogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto mx-4">
           <DialogHeader>
             <DialogTitle>Adicionar Produto ao Catálogo</DialogTitle>
             <DialogDescription>

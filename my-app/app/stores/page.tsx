@@ -142,17 +142,28 @@ export default function StoresPage() {
         const data = await storesResponse.json();
         storesData = data.stores || data || [];
       } else {
-        // Fallback: tentar endpoint autenticado se disponível
-        try {
-          storesData = await storesAPI.getAll();
-        } catch (error) {
-          console.error('Erro ao buscar lojas:', error);
-        }
+        console.error('Erro ao buscar lojas do endpoint público');
       }
       
-      const [productsData] = await Promise.all([
-        productsAPI.getAll()
-      ]);
+      // Buscar produtos do endpoint público (não exige autenticação)
+      let productsData: any = [];
+      try {
+        const productsResponse = await fetch(`${apiBaseUrl}/public/products?limit=1000`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        
+        if (productsResponse.ok) {
+          const data = await productsResponse.json();
+          productsData = data.products || data || [];
+        } else {
+          console.log('Endpoint público de produtos retornou erro, continuando sem filtro de produtos');
+        }
+      } catch (error) {
+        // Se não houver endpoint público de produtos, continuar sem produtos
+        console.log('Erro ao buscar produtos públicos, continuando sem filtro de produtos:', error);
+        productsData = [];
+      }
 
       // Processar lojas
       let storesArray: Store[] = [];

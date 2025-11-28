@@ -687,48 +687,48 @@ export default function StoreDetailsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Hero Header */}
-      <div className="bg-[#3e2626] text-white py-12 px-6">
+      <div className="bg-[#3e2626] text-white py-6 sm:py-8 lg:py-12 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full min-w-0">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push('/admin/stores')}
-                className="flex items-center text-white hover:bg-white/20 rounded-xl"
+                className="flex items-center text-white hover:bg-white/20 rounded-xl flex-shrink-0"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar
+                <span className="hidden sm:inline">Voltar</span>
               </Button>
-              <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Store className="h-8 w-8 text-white" />
+              <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                  <Store className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                 </div>
-                <div>
-                  <h1 className="text-3xl font-bold">{store.name}</h1>
-                  <p className="text-white/80 text-lg">{store.city}, {store.state}</p>
-                  <div className="flex items-center space-x-4 mt-2">
-                    <div className="flex items-center text-white/80 text-sm">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      {store.address}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold truncate">{store.name}</h1>
+                  <p className="text-white/80 text-sm sm:text-base lg:text-lg truncate">{store.city}, {store.state}</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2">
+                    <div className="flex items-center text-white/80 text-xs sm:text-sm min-w-0">
+                      <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                      <span className="truncate">{store.address}</span>
                     </div>
-                    <div className="flex items-center text-white/80 text-sm">
-                      <Phone className="h-4 w-4 mr-1" />
-                      {store.phone}
+                    <div className="flex items-center text-white/80 text-xs sm:text-sm">
+                      <Phone className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
+                      <span className="truncate">{store.phone}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <div className="flex items-center space-x-2 mb-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-shrink-0">
+              <div className="text-left sm:text-right">
+                <div className="flex items-center space-x-2 mb-1 sm:mb-2">
                   <div className={`w-3 h-3 rounded-full ${store.isActive ? 'bg-green-400' : 'bg-red-400'}`}></div>
-                  <span className="text-white/90 font-medium">
+                  <span className="text-white/90 font-medium text-sm sm:text-base">
                     {store.isActive ? 'Loja Ativa' : 'Loja Inativa'}
                   </span>
                 </div>
-                <p className="text-white/70 text-sm">
+                <p className="text-white/70 text-xs sm:text-sm">
                   {store.isActive ? 'Em operação' : 'Fora de operação'}
                 </p>
               </div>
@@ -736,10 +736,11 @@ export default function StoreDetailsPage() {
                 variant="outline" 
                 size="sm"
                 onClick={handleOpenEditModal}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-xl"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-xl w-full sm:w-auto"
               >
                 <Edit className="h-4 w-4 mr-2" />
-                Editar Loja
+                <span className="hidden sm:inline">Editar Loja</span>
+                <span className="sm:hidden">Editar</span>
               </Button>
             </div>
           </div>
@@ -747,9 +748,38 @@ export default function StoreDetailsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-1">
+      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto">
+          {/* Mobile: Scroll horizontal suave com indicadores */}
+          <div className="relative sm:hidden">
+            <div className="overflow-x-auto scrollbar-hide scroll-smooth">
+              <nav className="flex space-x-2 px-4 py-2 min-w-max">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`py-3 px-4 border-b-2 font-semibold text-xs flex flex-col items-center justify-center space-y-1 rounded-t-lg transition-all duration-200 whitespace-nowrap flex-shrink-0 min-w-[70px] ${
+                        activeTab === tab.id
+                          ? 'border-[#3e2626] text-[#3e2626] bg-[#3e2626]/10'
+                          : 'border-transparent text-gray-500 active:text-[#3e2626] active:bg-gray-50'
+                      }`}
+                    >
+                      <Icon className={`h-5 w-5 flex-shrink-0 ${activeTab === tab.id ? 'text-[#3e2626]' : 'text-gray-400'}`} />
+                      <span className="text-[10px] leading-tight text-center">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+            {/* Gradientes laterais para indicar scroll */}
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
+          </div>
+          
+          {/* Desktop: Layout normal */}
+          <nav className="hidden sm:flex space-x-1 px-4 sm:px-6 lg:px-8">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -772,11 +802,11 @@ export default function StoreDetailsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6 overflow-x-hidden">
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               <Card className="bg-gradient-to-br from-[#3e2626]/5 to-[#3e2626]/10 border-2 border-[#3e2626]/20 shadow-lg hover:shadow-xl hover:border-[#3e2626]/30 transition-all duration-300">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-semibold text-[#3e2626] uppercase tracking-wide">Vendas da Loja</CardTitle>
@@ -839,7 +869,7 @@ export default function StoreDetailsPage() {
             </div>
 
             {/* Charts Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Sales Chart */}
               <Card>
                 <CardHeader>
@@ -955,12 +985,12 @@ export default function StoreDetailsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-3">
                     <div className="flex items-center text-sm text-gray-600">
                       <MapPin className="h-4 w-4 mr-2" />
                       <span className="font-medium">Endereço:</span>
-                      <span className="ml-2">{store.address}</span>
+                      <span className="ml-2 truncate">{store.address}</span>
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <MapPin className="h-4 w-4 mr-2" />
@@ -1101,7 +1131,7 @@ export default function StoreDetailsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {Object.entries(store.settings).map(([key, value]: [string, any]) => (
                       <div key={key} className="flex items-center justify-between py-2">
                         <span className="text-sm font-medium text-gray-700">
@@ -1127,25 +1157,27 @@ export default function StoreDetailsPage() {
         {activeTab === 'employees' && (
           <div className="space-y-6">
             {/* Header da seção de funcionários */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h3 className="text-lg font-medium text-gray-900">Funcionários da Loja</h3>
                 <p className="text-sm text-gray-600">Gerencie os funcionários desta filial</p>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-2">
                 <Button 
                   onClick={() => router.push(`/admin/stores/${storeId}/employees`)}
                   variant="outline"
+                  className="w-full sm:w-auto"
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Ver Todos
                 </Button>
               <Button 
                   onClick={() => router.push(`/admin/stores/${storeId}/employee/new`)}
-                className="bg-[#3e2626] hover:bg-[#8B4513]"
+                className="bg-[#3e2626] hover:bg-[#8B4513] w-full sm:w-auto"
               >
                 <Users className="h-4 w-4 mr-2" />
-                Adicionar Funcionário
+                <span className="hidden sm:inline">Adicionar Funcionário</span>
+                <span className="sm:hidden">Adicionar</span>
               </Button>
               </div>
             </div>
@@ -1172,9 +1204,9 @@ export default function StoreDetailsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="p-6">
-                  <div className="overflow-x-auto">
-                    <Table>
+                <div className="p-3 sm:p-6">
+                  <div className="overflow-x-auto -mx-3 sm:mx-0">
+                    <Table className="min-w-[800px] sm:min-w-0">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Funcionário</TableHead>
@@ -1243,7 +1275,7 @@ export default function StoreDetailsPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex items-center justify-end space-x-1">
+                              <div className="flex items-center justify-end flex-wrap gap-1 sm:space-x-1">
                             <Button 
                               variant="outline" 
                               size="sm"
@@ -1308,15 +1340,15 @@ export default function StoreDetailsPage() {
         {activeTab === 'products' && <StoreInventory storeId={storeId} />}
 
         {activeTab === 'sales' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Vendas da Loja</h2>
-                <p className="text-gray-600">Gerencie as vendas desta loja</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Vendas da Loja</h2>
+                <p className="text-sm sm:text-base text-gray-600">Gerencie as vendas desta loja</p>
               </div>
               <Button 
                 onClick={() => router.push(`/admin/sales/create?storeId=${storeId}`)}
-                className="bg-[#3e2626] hover:bg-[#4a2f2f] text-white"
+                className="bg-[#3e2626] hover:bg-[#4a2f2f] text-white w-full sm:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Venda
@@ -1342,7 +1374,7 @@ export default function StoreDetailsPage() {
                 {/* Informações Básicas */}
                 <div className="space-y-4">
                   <h4 className="font-medium text-gray-900">Informações Básicas</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Nome da Loja</Label>
                       <div className="p-3 bg-gray-50 rounded-md">
@@ -1475,7 +1507,7 @@ export default function StoreDetailsPage() {
                   <div className="p-4 border rounded-lg bg-gray-50">
                     <div className="space-y-2">
                       <Label className="text-base font-medium">Informações do Sistema</Label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-600">ID da Loja:</span>
                           <code className="ml-2 text-gray-900">{store?.id}</code>
@@ -1590,32 +1622,37 @@ export default function StoreDetailsPage() {
           <div className="fixed z-50 bg-white overflow-y-auto lg:left-64 lg:top-20 lg:right-0 lg:bottom-0 top-0 left-0 right-0 bottom-0">
           {/* Header Fixo */}
           <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
-            <div className="max-w-7xl mx-auto px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-[#3e2626] rounded-lg flex items-center justify-center">
-                    <Store className="h-6 w-6 text-white" />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#3e2626] rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Store className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Editar Loja</h2>
-                    <p className="text-sm text-gray-600">Atualize as informações da loja</p>
+                  <div className="min-w-0">
+                    <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">Editar Loja</h2>
+                    <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">Atualize as informações da loja</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-2 sm:space-x-3">
                   <Button
                     variant="outline"
                     onClick={handleCloseEditModal}
                     disabled={isSaving}
+                    size="sm"
+                    className="flex-1 sm:flex-initial"
                   >
-                    Cancelar
+                    <span className="hidden sm:inline">Cancelar</span>
+                    <X className="h-4 w-4 sm:hidden" />
                   </Button>
                   <Button
                     onClick={handleSaveStore}
                     disabled={isSaving}
-                    className="bg-[#3e2626] hover:bg-[#2a1a1a] text-white"
+                    className="bg-[#3e2626] hover:bg-[#2a1a1a] text-white flex-1 sm:flex-initial"
+                    size="sm"
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                    <span className="hidden sm:inline">{isSaving ? 'Salvando...' : 'Salvar Alterações'}</span>
+                    <span className="sm:hidden">{isSaving ? 'Salvando...' : 'Salvar'}</span>
                   </Button>
                 </div>
               </div>
@@ -1623,7 +1660,7 @@ export default function StoreDetailsPage() {
           </div>
 
           {/* Conteúdo do Formulário */}
-          <div className="max-w-4xl mx-auto px-6 py-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6 lg:py-8">
             <form onSubmit={(e) => { e.preventDefault(); handleSaveStore(); }} className="space-y-6">
               {/* Informações Básicas */}
               <Card>
@@ -1637,7 +1674,7 @@ export default function StoreDetailsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="edit-name">Nome da Loja *</Label>
                       <Input
@@ -1749,31 +1786,31 @@ export default function StoreDetailsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {daysOfWeek.map((day) => (
-                    <div key={day.key} className="flex items-center space-x-4 p-4 border rounded-lg">
-                      <div className="w-32">
-                        <Label>{day.label}</Label>
+                    <div key={day.key} className="flex flex-col sm:flex-row sm:items-center gap-3 sm:space-x-4 p-4 border rounded-lg">
+                      <div className="w-full sm:w-32 flex-shrink-0">
+                        <Label className="text-sm sm:text-base">{day.label}</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Switch
                           checked={editFormData.workingHours[day.key].isOpen}
                           onCheckedChange={(checked) => handleEditWorkingHoursChange(day.key, 'isOpen', checked)}
                         />
-                        <Label>Aberto</Label>
+                        <Label className="text-sm sm:text-base">Aberto</Label>
                       </div>
                       {editFormData.workingHours[day.key].isOpen && (
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 flex-1 sm:flex-initial">
                           <Input
                             type="time"
                             value={editFormData.workingHours[day.key].open}
                             onChange={(e) => handleEditWorkingHoursChange(day.key, 'open', e.target.value)}
-                            className="w-32"
+                            className="w-full sm:w-32"
                           />
-                          <span>até</span>
+                          <span className="text-sm">até</span>
                           <Input
                             type="time"
                             value={editFormData.workingHours[day.key].close}
                             onChange={(e) => handleEditWorkingHoursChange(day.key, 'close', e.target.value)}
-                            className="w-32"
+                            className="w-full sm:w-32"
                           />
                         </div>
                       )}
@@ -1794,7 +1831,7 @@ export default function StoreDetailsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>

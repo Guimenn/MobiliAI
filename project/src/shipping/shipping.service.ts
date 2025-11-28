@@ -4,7 +4,7 @@ import axios, { AxiosInstance } from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { CalculateShippingDto, ShippingMode, ShippingServiceType } from './dto/calculate-shipping.dto';
 
-interface CorreiosCepResponse {
+export interface CorreiosCepResponse {
   cep: string;
   logradouro?: string;
   complemento?: string;

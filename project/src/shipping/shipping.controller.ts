@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { ShippingService } from './shipping.service';
+import { ShippingService, CorreiosCepResponse } from './shipping.service';
 import { CalculateShippingDto, ShippingMode } from './dto/calculate-shipping.dto';
 
 @Controller('shipping')
@@ -11,7 +11,7 @@ export class ShippingController {
    * Permite buscar endereço a partir do CEP.
    */
   @Get('cep/:cep')
-  async lookupCep(@Param('cep') cep: string) {
+  async lookupCep(@Param('cep') cep: string): Promise<CorreiosCepResponse> {
     return this.shippingService.lookupCep(cep);
   }
 

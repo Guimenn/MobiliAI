@@ -204,9 +204,9 @@ export default function ProductsPage() {
       ) : (
         <>
           {/* Hero Section */}
-          <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
-            <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-xl space-y-4">
+          <section className="rounded-3xl border border-border bg-[#3e2626] px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 text-primary-foreground shadow-sm">
+            <div className="flex flex-col gap-6 sm:gap-8 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-xl space-y-4 w-full min-w-0">
                 <Badge
                   variant="outline"
                   className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
@@ -214,48 +214,51 @@ export default function ProductsPage() {
                   Gestão de Produtos
                 </Badge>
                 <div className="space-y-3">
-                  <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-tight">
                     Gerenciar Produtos
                   </h1>
                   <p className="text-sm text-primary-foreground/80 lg:text-base">
                     Gerencie o catálogo de produtos da empresa. Controle estoque, preços, ofertas e modelos 3D.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
                   <Button 
                     onClick={() => {
                       setSelectedProduct(null);
                       setModalMode('create');
                       setIsModalOpen(true);
                     }}
-                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 w-full sm:w-auto"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Novo Produto
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                    className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 w-full sm:w-auto"
                     onClick={() => setShowFlashSalePanel(true)}
                   >
                     <Zap className="h-4 w-4 mr-2" />
-                    Oferta Relâmpago
+                    <span className="hidden sm:inline">Oferta Relâmpago</span>
+                    <span className="sm:hidden">Oferta</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                    className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 w-full sm:w-auto"
                     onClick={() => setIsPhotoTo3DOpen(true)}
                   >
                     <Camera className="h-4 w-4 mr-2" />
-                    Foto para 3D
+                    <span className="hidden sm:inline">Foto para 3D</span>
+                    <span className="sm:hidden">Foto 3D</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                    className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 w-full sm:w-auto"
                     onClick={() => setIsDirect3DUploadOpen(true)}
                   >
                     <Upload className="h-4 w-4 mr-2" />
-                    Upload 3D
+                    <span className="hidden sm:inline">Upload 3D</span>
+                    <span className="sm:hidden">Upload</span>
                   </Button>
                 </div>
               </div>
@@ -265,14 +268,16 @@ export default function ProductsPage() {
           </section>
 
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'all' | 'on-sale')} className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="all" className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Todos os Produtos
+            <TabsList className="grid w-full max-w-full sm:max-w-md grid-cols-2">
+              <TabsTrigger value="all" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <Package className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Todos os Produtos</span>
+                <span className="sm:hidden">Todos</span>
               </TabsTrigger>
-              <TabsTrigger value="on-sale" className="flex items-center gap-2">
-                <Zap className="h-4 w-4" />
-                Produtos em Oferta
+              <TabsTrigger value="on-sale" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Produtos em Oferta</span>
+                <span className="sm:hidden">Ofertas</span>
               </TabsTrigger>
             </TabsList>
 
@@ -428,36 +433,36 @@ function ProductsStats({ products, totalProducts }: any) {
   };
 
   return (
-    <div className="grid w-full max-w-md grid-cols-2 gap-4 sm:grid-cols-2 lg:max-w-xl">
-      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
-          <Package className="h-5 w-5" />
+    <div className="grid w-full max-w-full sm:max-w-md grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:max-w-xl">
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <Package className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <p className="text-2xl font-semibold leading-tight">{stats.total}</p>
-        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total</p>
+        <p className="text-xl sm:text-2xl font-semibold leading-tight">{stats.total}</p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total</p>
       </div>
-      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
-          <CheckCircle className="h-5 w-5" />
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <p className="text-2xl font-semibold leading-tight">{stats.active}</p>
-        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Ativos</p>
+        <p className="text-xl sm:text-2xl font-semibold leading-tight">{stats.active}</p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Ativos</p>
       </div>
-      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
-          <Zap className="h-5 w-5" />
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <Zap className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <p className="text-base font-semibold leading-tight line-clamp-2 min-h-[2.5rem]">
+        <p className="text-sm sm:text-base font-semibold leading-tight line-clamp-2 min-h-[2rem] sm:min-h-[2.5rem]">
           {stats.onSaleProduct ? stats.onSaleProduct.name : 'Nenhum'}
         </p>
-        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Em Oferta</p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Em Oferta</p>
       </div>
-      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
-          <DollarSign className="h-5 w-5" />
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
-        <p className="text-2xl font-semibold leading-tight">{formatPrice(stats.totalValue)}</p>
-        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Valor Total</p>
+        <p className="text-lg sm:text-2xl font-semibold leading-tight truncate">{formatPrice(stats.totalValue)}</p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Valor Total</p>
       </div>
     </div>
   );
@@ -614,9 +619,9 @@ function ProductsSection({
     <>
       {/* Search and Filters */}
       <Card className="border border-border shadow-sm">
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end">
-            <div className="flex-1">
+        <CardContent className="pt-4 sm:pt-6">
+          <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-end">
+            <div className="flex-1 w-full">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -627,7 +632,7 @@ function ProductsSection({
                 />
               </div>
             </div>
-            <div className="md:w-48">
+            <div className="w-full sm:w-48">
               <select
                 value={productFilters.category}
                 onChange={(e) => setProductFilters({ ...productFilters, category: e.target.value })}
@@ -645,7 +650,7 @@ function ProductsSection({
                 <option value="MESA_CENTRO">Mesa de centro</option>
               </select>
             </div>
-            <div className="md:w-48">
+            <div className="w-full sm:w-48">
               <select
                 value={productFilters.status}
                 onChange={(e) => setProductFilters({ ...productFilters, status: e.target.value })}
@@ -675,7 +680,7 @@ function ProductsSection({
         </Card>
       ) : (
         <>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-8">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4 sm:mt-8">
             {getFilteredProducts.map((product: any) => {
               const stockStatus = getStockStatus(product.stock);
               const isOnSale = isFlashSaleActive(product);
@@ -704,11 +709,11 @@ function ProductsSection({
                       )}
                     </div>
                   )}
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="space-y-3 sm:space-y-4">
                       <div>
-                        <h3 className="text-lg font-semibold text-foreground mb-1">{product.name}</h3>
-                        <p className="text-sm text-muted-foreground">{product.category}</p>
+                        <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 truncate">{product.name}</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground">{product.category}</p>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
@@ -734,30 +739,30 @@ function ProductsSection({
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           {isOnSale ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl font-semibold text-foreground">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-lg sm:text-xl font-semibold text-foreground">
                                 {formatPrice(salePrice)}
                               </span>
-                              <span className="text-sm text-muted-foreground line-through">
+                              <span className="text-xs sm:text-sm text-muted-foreground line-through">
                                 {formatPrice(originalPrice)}
                               </span>
                             </div>
                           ) : (
-                            <span className="text-xl font-semibold text-foreground">
+                            <span className="text-lg sm:text-xl font-semibold text-foreground">
                               {formatPrice(originalPrice)}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Package className="h-4 w-4" />
-                          <span>Estoque: {product.stock || 0} unidades</span>
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                          <Package className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">Estoque: {product.stock || 0} unidades</span>
                         </div>
                         {product.sku && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Tag className="h-4 w-4" />
-                            <span>SKU: {product.sku}</span>
+                          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                            <Tag className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">SKU: {product.sku}</span>
                           </div>
                         )}
                       </div>
@@ -768,12 +773,12 @@ function ProductsSection({
                         </Badge>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3 border-t border-border">
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 pt-3 border-t border-border">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-8 w-8 p-0"
+                            className="h-9 w-9 sm:h-8 sm:w-8 p-0 flex-shrink-0"
                             onClick={() => onViewProduct && onViewProduct(product)}
                             title="Visualizar produto"
                           >
@@ -782,7 +787,7 @@ function ProductsSection({
                           <Button 
                             variant="outline" 
                             size="sm"
-                            className="h-8 w-8 p-0"
+                            className="h-9 w-9 sm:h-8 sm:w-8 p-0 flex-shrink-0"
                             onClick={() => handleEditProductById(product.id)}
                             title="Editar produto"
                           >
@@ -792,7 +797,7 @@ function ProductsSection({
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              className="h-8 w-8 p-0"
+                              className="h-9 w-9 sm:h-8 sm:w-8 p-0 flex-shrink-0"
                               onClick={() => handleView3D(product)}
                               title="Visualizar 3D"
                             >
@@ -802,7 +807,7 @@ function ProductsSection({
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              className="h-8 w-8 p-0"
+                              className="h-9 w-9 sm:h-8 sm:w-8 p-0 flex-shrink-0"
                               onClick={() => handleGenerate3D(product)}
                               title="Gerar Modelo 3D"
                             >
@@ -812,7 +817,7 @@ function ProductsSection({
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            className="h-9 w-9 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
                             onClick={() => onDeleteProduct(product.id)}
                             title="Deletar produto"
                           >
@@ -830,47 +835,51 @@ function ProductsSection({
           {/* Pagination */}
           {totalPages > 1 && (
             <Card className="border border-border shadow-sm">
-              <CardContent className="pt-6">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <Label htmlFor="page-limit" className="text-sm">
-                      Itens por página:
-                    </Label>
-                    <select
-                      id="page-limit"
-                      value={pageLimit}
-                      onChange={(e) => onLimitChange && onLimitChange(Number(e.target.value))}
-                      className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value={10}>10</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                    <span className="text-sm text-muted-foreground">
+              <CardContent className="pt-4 sm:pt-6">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                      <Label htmlFor="page-limit" className="text-xs sm:text-sm whitespace-nowrap">
+                        Itens por página:
+                      </Label>
+                      <select
+                        id="page-limit"
+                        value={pageLimit}
+                        onChange={(e) => onLimitChange && onLimitChange(Number(e.target.value))}
+                        className="h-10 rounded-md border border-input bg-background px-2 sm:px-3 py-2 text-sm flex-1 sm:flex-initial"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
+                    <span className="text-xs sm:text-sm text-muted-foreground">
                       Mostrando {((currentPage - 1) * pageLimit) + 1} - {Math.min(currentPage * pageLimit, totalProducts)} de {totalProducts} produtos
                     </span>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center sm:justify-end gap-1 sm:gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onPageChange && onPageChange(1)}
                       disabled={currentPage === 1}
+                      className="h-8 w-8 sm:h-10 sm:w-10 p-0"
                     >
-                      <ChevronsLeft className="h-4 w-4" />
+                      <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onPageChange && onPageChange(currentPage - 1)}
                       disabled={currentPage === 1}
+                      className="h-8 w-8 sm:h-10 sm:w-10 p-0"
                     >
-                      <ChevronLeft className="h-4 w-4" />
+                      <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                     
-                    <span className="text-sm text-foreground px-4">
+                    <span className="text-xs sm:text-sm text-foreground px-2 sm:px-4 min-w-[80px] sm:min-w-[120px] text-center">
                       Página {currentPage} de {totalPages}
                     </span>
                     
@@ -879,16 +888,18 @@ function ProductsSection({
                       size="sm"
                       onClick={() => onPageChange && onPageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
+                      className="h-8 w-8 sm:h-10 sm:w-10 p-0"
                     >
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onPageChange && onPageChange(totalPages)}
                       disabled={currentPage === totalPages}
+                      className="h-8 w-8 sm:h-10 sm:w-10 p-0"
                     >
-                      <ChevronsRight className="h-4 w-4" />
+                      <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                   </div>
                 </div>

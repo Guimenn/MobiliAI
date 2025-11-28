@@ -66,12 +66,19 @@ api.interceptors.response.use(
       });
     }
     
-    // Não fazer logout automático em rotas de auth
+    // Não fazer logout automático em rotas de auth ou IA (IA pode ser usada sem login)
+    const isAIRoute = error.config?.url?.includes('/ai/');
+    const isAuthRoute = error.config?.url?.includes('/auth/');
+    const isPublicRoute = error.config?.url?.includes('/public/');
+    
     if (error.response?.status === 401 && 
-        !error.config?.url?.includes('/auth/')) {
-      // Só fazer logout se não estiver em uma rota de autenticação
+        !isAuthRoute && 
+        !isAIRoute && 
+        !isPublicRoute) {
+      // Só fazer logout se não estiver em uma rota de autenticação, IA ou pública
       if (!window.location.pathname.includes('/login') && 
-          !window.location.pathname.includes('/register')) {
+          !window.location.pathname.includes('/register') &&
+          !window.location.pathname.includes('/IA-demo')) {
         useAppStore.getState().logout();
         window.location.href = '/login';
       }

@@ -691,7 +691,7 @@ export default function AdminLayout({
           </div>
         </header>
 
-        <main className="p-6">{children}</main>
+        <main className="p-6 overflow-x-hidden max-w-full">{children}</main>
       </div>
 
       {sidebarOpen && (

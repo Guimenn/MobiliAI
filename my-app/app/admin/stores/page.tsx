@@ -129,11 +129,11 @@ export default function StoresPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 overflow-x-hidden max-w-full">
       {/* Hero Section */}
-      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-xl space-y-4">
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-4 sm:px-6 lg:px-8 py-10 text-primary-foreground shadow-sm w-full">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between w-full">
+          <div className="max-w-xl space-y-4 w-full min-w-0">
             <Badge
               variant="outline"
               className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
@@ -167,7 +167,7 @@ export default function StoresPage() {
             </div>
           </div>
 
-          <div className="grid w-full max-w-md grid-cols-2 gap-4 sm:grid-cols-2 lg:max-w-xl">
+          <div className="grid w-full max-w-full sm:max-w-md grid-cols-2 gap-4 sm:grid-cols-2 lg:max-w-xl min-w-0 flex-shrink-0">
             <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
                 <Store className="h-5 w-5" />
@@ -201,9 +201,9 @@ export default function StoresPage() {
       </section>
 
       {/* Search and Filters */}
-      <Card className="border border-border shadow-sm">
+      <Card className="border border-border shadow-sm w-full">
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end w-full">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -250,19 +250,19 @@ export default function StoresPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 w-full max-w-full">
           {filteredStores.map((store) => (
-            <Card key={store.id} className="border border-border shadow-sm transition hover:shadow-md">
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-muted/60 flex items-center justify-center">
+            <Card key={store.id} className="border border-border shadow-sm transition hover:shadow-md w-full min-w-0 max-w-full overflow-hidden">
+              <CardContent className="p-6 w-full min-w-0">
+                <div className="space-y-4 w-full min-w-0">
+                  <div className="flex items-start justify-between gap-2 w-full min-w-0">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-12 h-12 rounded-xl bg-muted/60 flex items-center justify-center flex-shrink-0">
                         <Store className="h-6 w-6 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-semibold text-foreground truncate">{store.name}</h3>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground truncate">
                           {store.city}{store.state && `, ${store.state}`}
                         </p>
                       </div>
@@ -270,34 +270,36 @@ export default function StoresPage() {
                     <Badge 
                       variant="outline" 
                       className={
-                        store.isActive 
-                          ? 'border-border bg-muted/50 text-foreground' 
-                          : 'border-border bg-muted/50 text-muted-foreground'
+                        `flex-shrink-0 ${
+                          store.isActive 
+                            ? 'border-border bg-muted/50 text-foreground' 
+                            : 'border-border bg-muted/50 text-muted-foreground'
+                        }`
                       }
                     >
                       {store.isActive ? 'Ativa' : 'Inativa'}
                     </Badge>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 w-full min-w-0">
                     {store.address && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground w-full min-w-0">
                         <MapPin className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{store.address}</span>
+                        <span className="truncate min-w-0">{store.address}</span>
                       </div>
                     )}
                     
                     {store.phone && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground w-full min-w-0">
                         <Phone className="h-4 w-4 flex-shrink-0" />
-                        <span>{store.phone}</span>
+                        <span className="truncate min-w-0">{store.phone}</span>
                       </div>
                     )}
                     
                     {store.email && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground w-full min-w-0">
                         <Mail className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{store.email}</span>
+                        <span className="truncate min-w-0">{store.email}</span>
                       </div>
                     )}
                   </div>
