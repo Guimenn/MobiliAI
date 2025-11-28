@@ -15,12 +15,19 @@ export class FinancialService {
       throw new ForbiddenException('Acesso negado');
     }
 
+    const data: any = {
+      ...createCashFlowDto,
+      storeId: userStoreId,
+      userId,
+    };
+
+    // Converter date string para Date se fornecido
+    if (createCashFlowDto.date) {
+      data.date = new Date(createCashFlowDto.date);
+    }
+
     return this.prisma.cashFlow.create({
-      data: {
-        ...createCashFlowDto,
-        storeId: userStoreId,
-        userId,
-      },
+      data,
     });
   }
 
