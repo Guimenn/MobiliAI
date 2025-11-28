@@ -6,7 +6,6 @@ import { useAppStore, Product } from '@/lib/store';
 import { useProducts } from '@/lib/hooks/useProducts';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import FavoriteTooltip from '@/components/FavoriteTooltip';
 import ProductCard from '@/components/ProductCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +44,7 @@ import {
   Store,
   Clock,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Image from 'next/image';
 import { env } from '@/lib/env';
 import { customerAPI } from '@/lib/api';
@@ -151,13 +151,14 @@ export default function ProductDetailPage() {
             
             // Buscar produtos relacionados
             if (data.category) {
+              // Buscar mais produtos para garantir 4 após filtrar o atual
               const relatedResponse = await fetch(
-                `${apiBaseUrl}/public/products?category=${data.category}&limit=4`,
+                `${apiBaseUrl}/public/products?category=${data.category}&limit=10`,
                 { headers: { 'Content-Type': 'application/json' } }
               );
               if (relatedResponse.ok) {
                 const relatedData = await relatedResponse.json();
-                const related = (relatedData.products || relatedData.data || [])
+                let related = (relatedData.products || relatedData.data || [])
                   .filter((p: any) => p.id !== productId)
                   .slice(0, 4)
                   .map((p: any) => ({
@@ -182,6 +183,43 @@ export default function ProductDetailPage() {
                     storeName: p.store?.name,
                     storeAddress: p.store?.address,
                   }));
+
+                // Se não encontrou 4 produtos da mesma categoria, buscar de outras categorias
+                if (related.length < 4) {
+                  const allProductsResponse = await fetch(
+                    `${apiBaseUrl}/public/products?limit=20`,
+                    { headers: { 'Content-Type': 'application/json' } }
+                  );
+                  if (allProductsResponse.ok) {
+                    const allData = await allProductsResponse.json();
+                    const allProducts = (allData.products || allData.data || [])
+                      .filter((p: any) => p.id !== productId && !related.some((r: { id: string }) => r.id === p.id))
+                      .slice(0, 4 - related.length)
+                      .map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        description: p.description,
+                        category: (p.category?.toLowerCase() || 'mesa_centro') as any,
+                        price: Number(p.price),
+                        stock: Number(p.stock) || 0,
+                        color: p.colorHex || p.colorName,
+                        material: p.material,
+                        brand: p.brand,
+                        dimensions: p.width && p.height && p.depth 
+                          ? `${p.width}x${p.height}x${p.depth}cm` 
+                          : p.dimensions,
+                        weight: p.weight,
+                        style: p.style,
+                        imageUrl: Array.isArray(p.imageUrls) && p.imageUrls.length > 0 
+                          ? p.imageUrls[0] 
+                          : p.imageUrl,
+                        storeId: p.store?.id || p.storeId || '',
+                        storeName: p.store?.name,
+                        storeAddress: p.store?.address,
+                      }));
+                    related = [...related, ...allProducts].slice(0, 4);
+                  }
+                }
                 setRelatedProducts(related);
               }
             }
@@ -199,9 +237,18 @@ export default function ProductDetailPage() {
             setProductImages([foundProduct.imageUrl]);
           }
           // Produtos relacionados da mesma categoria
-          const related = products
+          let related = products
             .filter(p => p.id !== productId && p.category === foundProduct.category)
             .slice(0, 4);
+          
+          // Se não encontrou 4 produtos da mesma categoria, buscar de outras categorias
+          if (related.length < 4) {
+            const otherProducts = products
+              .filter(p => p.id !== productId && p.category !== foundProduct.category && !related.some((r: Product) => r.id === p.id))
+              .slice(0, 4 - related.length);
+            related = [...related, ...otherProducts].slice(0, 4);
+          }
+          
           setRelatedProducts(related);
         } else {
           setError('Produto não encontrado');
@@ -468,7 +515,67 @@ export default function ProductDetailPage() {
   }
   
   // Sempre mostrar desconto se houver oferta relâmpago configurada
-  const hasDiscount = product?.isFlashSale && flashDiscountPercent > 0 && currentPrice < originalPrice;
+const hasDiscount = product?.isFlashSale && flashDiscountPercent > 0 && currentPrice < originalPrice;
+const isInStock = (product?.stock || 0) > 0;
+const shortDescription = product?.description
+  ? product.description.length > 220
+    ? `${product.description.slice(0, 220)}...`
+    : product.description
+  : 'Explore combinações exclusivas de cores, texturas e acabamentos pensados para ambientes contemporâneos.';
+const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const formattedCurrentPrice = currencyFormatter.format(currentPrice);
+const formattedOriginalPrice = currencyFormatter.format(originalPrice);
+const installmentValue = currencyFormatter.format(currentPrice / 18 || 0);
+const serviceHighlights: Array<{ icon: LucideIcon; title: string; subtitle: string }> = [
+  {
+    icon: Truck,
+    title: 'Entrega ágil',
+    subtitle: 'Até 4 dias úteis',
+  },
+  {
+    icon: Shield,
+    title: 'Garantia estendida',
+    subtitle: '2 anos de cobertura',
+  },
+  {
+    icon: Package,
+    title: isInStock ? 'Estoque imediato' : 'Sob encomenda',
+    subtitle: isInStock ? `${product?.stock || 0} unidades disponíveis` : 'Avise-me quando chegar',
+  },
+];
+const experienceHighlights: Array<{
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  accent: string;
+  href: string;
+  cta: string;
+}> = [
+  {
+    title: 'Visualize com IA',
+    description: 'Envie uma foto do seu ambiente e teste cores instantaneamente.',
+    icon: Eye,
+    accent: 'from-[#fcefe7] to-white',
+    href: '/color-visualizer',
+    cta: 'Simular agora',
+  },
+  {
+    title: 'Consultoria inteligente',
+    description: 'Receba recomendações de tintas e móveis com base no seu estilo.',
+    icon: Sparkles,
+    accent: 'from-[#fdf3f0] to-white',
+    href: '/IA',
+    cta: 'Falar com o assistente',
+  },
+  {
+    title: 'Experimente nas lojas',
+    description: 'Localize a loja com estoque e agende uma visita guiada.',
+    icon: Store,
+    accent: 'from-[#efe9ff] to-white',
+    href: '/stores',
+    cta: 'Ver lojas',
+  },
+];
 
   const handleReviewAdded = () => {
     setReviewKey(prev => prev + 1);
@@ -532,10 +639,10 @@ export default function ProductDetailPage() {
     <div className="min-h-screen bg-gray-50 page-with-fixed-header">
       <Header />
 
-      <main className="container mx-auto px-4 py-6">
-        {/* Breadcrumbs */}
-        <Breadcrumb className="mb-6">
-          <BreadcrumbList>
+      <main className="container mx-auto px-4 py-6 pb-32 space-y-10">
+        {/* Breadcrumb */}
+        <Breadcrumb className="mb-6 mt-8">
+          <BreadcrumbList className="flex items-center gap-2 text-sm">
             <BreadcrumbItem>
               <BreadcrumbLink href="/" className="text-[#3e2626] hover:text-[#2d1a1a]">
                 Início
@@ -553,7 +660,9 @@ export default function ProductDetailPage() {
               <ChevronRight className="h-4 w-4 text-[#3e2626]" />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <span className="font-medium text-[#3e2626]">{product.name}</span>
+              <span className="font-medium text-[#3e2626] line-clamp-1 max-w-md">
+                {product.name}
+              </span>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -656,166 +765,132 @@ export default function ProductDetailPage() {
             )}
 
             {/* Descrição e Avaliações (lado esquerdo) */}
-            <div className="space-y-5 pt-4 border-t border-[#3e2626]/20">
+            <div className="space-y-6 pt-6">
               {product.description && (
-            <div className="bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl p-6 border border-[#3e2626]/10">
-                  <h2 className="text-xl font-bold text-[#3e2626] mb-4 flex items-center gap-2">
+                <div className="space-y-6 rounded-2xl border border-[#3e2626]/10 bg-white/90 p-6 shadow-sm shadow-[#3e2626]/5">
+                  <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-[#3e2626]" />
-                    Descrição do Produto
-                  </h2>
-                <p className="text-gray-700 leading-relaxed mb-4">{product.description}</p>
-                
-                {/* Informações adicionais expandidas */}
-                <div className="mt-4 space-y-3 pt-4 border-t border-[#3e2626]/10">
-                  <h3 className="text-lg font-semibold text-[#3e2626] mb-3">Detalhes Adicionais</h3>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {product.material && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#3e2626] mt-2 flex-shrink-0"></div>
-                        <div>
-                          <span className="text-sm font-medium text-[#3e2626]">Material:</span>
-                          <p className="text-sm text-gray-700">{product.material}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {product.color && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#3e2626] mt-2 flex-shrink-0"></div>
-                        <div>
-                          <span className="text-sm font-medium text-[#3e2626]">Cor:</span>
-                          <p className="text-sm text-gray-700">{product.color}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {product.style && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#3e2626] mt-2 flex-shrink-0"></div>
-                        <div>
-                          <span className="text-sm font-medium text-[#3e2626]">Estilo:</span>
-                          <p className="text-sm text-gray-700">{product.style}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {product.brand && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#3e2626] mt-2 flex-shrink-0"></div>
-                        <div>
-                          <span className="text-sm font-medium text-[#3e2626]">Marca:</span>
-                          <p className="text-sm text-gray-700">{product.brand}</p>
-                        </div>
-                      </div>
-                    )}
+                    <h2 className="text-2xl md:text-3xl font-bold text-[#3e2626]">Descrição do Produto</h2>
                   </div>
-                  
-                  {/* Texto descritivo adicional */}
-                  <div className="mt-4 pt-4 border-t border-[#3e2626]/10">
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      Este produto foi cuidadosamente selecionado para oferecer qualidade e durabilidade. 
-                      {product.material && ` Fabricado em ${product.material.toLowerCase()}, `}
-                      {product.style && `com estilo ${product.style.toLowerCase()}, `}
-                      este item combina funcionalidade e design para atender às suas necessidades.
-                    </p>
-                  </div>
-                  
-                  {/* Garantias e cuidados */}
-                  <div className="mt-4 pt-4 border-t border-[#3e2626]/10">
-                    <h4 className="text-sm font-semibold text-[#3e2626] mb-2">Garantias e Cuidados</h4>
-                    <ul className="space-y-1.5 text-sm text-gray-600">
-                      <li className="flex items-start gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-[#3e2626] mt-0.5 flex-shrink-0" />
-                        <span>Produto com garantia de qualidade</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-[#3e2626] mt-0.5 flex-shrink-0" />
-                        <span>Entrega rápida e segura</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-[#3e2626] mt-0.5 flex-shrink-0" />
-                        <span>Suporte pós-venda especializado</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
+                  <p className="text-gray-700 leading-relaxed">{product.description}</p>
 
-
-
-              <section className="mb-12">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                  <div className="lg:col-span-7">
-                    <div>
-                      <h3 className="text-xl font-semibold text-[#3e2626] mb-3 flex items-center gap-2">
-                        <Package className="h-5 w-5 text-[#3e2626]" />
-                        Características
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {product.dimensions && (
-                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
-                            <div className="bg-[#3e2626]/10 rounded-lg p-2"><Ruler className="h-5 w-5 text-[#3e2626]" /></div>
-                  <div>
-                    <p className="text-xs text-[#3e2626] font-medium">Dimensões</p>
-                    <p className="text-sm font-semibold text-[#3e2626]">{product.dimensions}</p>
-                  </div>
-                </div>
-              )}
-              {product.weight && (
-                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
-                            <div className="bg-[#3e2626]/10 rounded-lg p-2"><Weight className="h-5 w-5 text-[#3e2626]" /></div>
-                  <div>
-                    <p className="text-xs text-[#3e2626] font-medium">Peso</p>
-                    <p className="text-sm font-semibold text-[#3e2626]">{product.weight}</p>
-                  </div>
-                </div>
-              )}
-              {product.material && (
-                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
-                            <div className="bg-[#3e2626]/10 rounded-lg p-2"><Package className="h-5 w-5 text-[#3e2626]" /></div>
-                  <div>
-                    <p className="text-xs text-[#3e2626] font-medium">Material</p>
-                    <p className="text-sm font-semibold text-[#3e2626]">{product.material}</p>
-                  </div>
-                </div>
-              )}
-              {product.color && (
-                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
-                            <div className="bg-[#3e2626]/10 rounded-lg p-2"><Palette className="h-5 w-5 text-[#3e2626]" /></div>
-                  <div>
-                    <p className="text-xs text-[#3e2626] font-medium">Cor</p>
-                    <p className="text-sm font-semibold text-[#3e2626]">{product.color}</p>
-                  </div>
-                </div>
-              )}
-              {product.storeName && (
-                <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20 hover:border-[#3e2626]/30 transition-colors">
-                  <div className="bg-[#3e2626]/10 rounded-lg p-2"><Store className="h-5 w-5 text-[#3e2626]" /></div>
-                  <div>
-                    <p className="text-xs text-[#3e2626] font-medium">Loja/Filial</p>
-                    <p className="text-sm font-semibold text-[#3e2626]">{product.storeName}</p>
-                    {product.storeAddress && (
-                      <p className="text-xs text-[#3e2626]/70 mt-1">{product.storeAddress}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+                  <div className="space-y-3 border-t border-[#3e2626]/10 pt-4">
+                    <h3 className="text-xl font-semibold text-[#3e2626]">Detalhes adicionais</h3>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {product.material && (
+                        <div className="rounded-xl border border-[#3e2626]/15 bg-[#fdf6f2] p-4">
+                          <p className="text-xs uppercase text-[#3e2626]/70">Material</p>
+                          <p className="text-sm font-semibold text-[#3e2626]">{product.material}</p>
+                        </div>
+                      )}
+                      {product.color && (
+                        <div className="rounded-xl border border-[#3e2626]/15 bg-[#fdf6f2] p-4">
+                          <p className="text-xs uppercase text-[#3e2626]/70">Cor</p>
+                          <p className="text-sm font-semibold text-[#3e2626]">{product.color}</p>
+                        </div>
+                      )}
+                      {product.style && (
+                        <div className="rounded-xl border border-[#3e2626]/15 bg-[#fdf6f2] p-4">
+                          <p className="text-xs uppercase text-[#3e2626]/70">Estilo</p>
+                          <p className="text-sm font-semibold text-[#3e2626]">{product.style}</p>
+                        </div>
+                      )}
+                      {product.brand && (
+                        <div className="rounded-xl border border-[#3e2626]/15 bg-[#fdf6f2] p-4">
+                          <p className="text-xs uppercase text-[#3e2626]/70">Marca</p>
+                          <p className="text-sm font-semibold text-[#3e2626]">{product.brand}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  <div className="rounded-xl border border-dashed border-[#3e2626]/20 bg-[#fff9f5] p-4 text-sm text-gray-600 leading-relaxed">
+                    Este produto foi cuidadosamente selecionado para oferecer qualidade e durabilidade.
+                    {product.material && ` Fabricado em ${product.material.toLowerCase()},`}
+                    {product.style && ` com estilo ${product.style.toLowerCase()},`} este item combina funcionalidade e
+                    design para atender às suas necessidades.
+                  </div>
+
+                </div>
+              )}
+
+
+
+              <section className="space-y-6 rounded-2xl border border-[#3e2626]/10 bg-white/90 p-6 shadow-sm shadow-[#3e2626]/5">
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-[#3e2626]" />
+                  <h3 className="text-2xl font-semibold text-[#3e2626]">Características essenciais</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {product.dimensions && (
+                    <div className="flex items-center gap-3 rounded-xl border border-[#3e2626]/20 bg-gradient-to-br from-white to-[#3e2626]/5 p-4">
+                      <div className="rounded-lg bg-[#3e2626]/10 p-2">
+                        <Ruler className="h-5 w-5 text-[#3e2626]" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase text-[#3e2626]/70">Dimensões</p>
+                        <p className="text-sm font-semibold text-[#3e2626]">{product.dimensions}</p>
+                      </div>
+                    </div>
+                  )}
+                  {product.weight && (
+                    <div className="flex items-center gap-3 rounded-xl border border-[#3e2626]/20 bg-gradient-to-br from-white to-[#3e2626]/5 p-4">
+                      <div className="rounded-lg bg-[#3e2626]/10 p-2">
+                        <Weight className="h-5 w-5 text-[#3e2626]" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase text-[#3e2626]/70">Peso</p>
+                        <p className="text-sm font-semibold text-[#3e2626]">{product.weight}</p>
+                      </div>
+                    </div>
+                  )}
+                  {product.material && (
+                    <div className="flex items-center gap-3 rounded-xl border border-[#3e2626]/20 bg-gradient-to-br from-white to-[#3e2626]/5 p-4">
+                      <div className="rounded-lg bg-[#3e2626]/10 p-2">
+                        <Package className="h-5 w-5 text-[#3e2626]" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase text-[#3e2626]/70">Material</p>
+                        <p className="text-sm font-semibold text-[#3e2626]">{product.material}</p>
+                      </div>
+                    </div>
+                  )}
+                  {product.color && (
+                    <div className="flex items-center gap-3 rounded-xl border border-[#3e2626]/20 bg-gradient-to-br from-white to-[#3e2626]/5 p-4">
+                      <div className="rounded-lg bg-[#3e2626]/10 p-2">
+                        <Palette className="h-5 w-5 text-[#3e2626]" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase text-[#3e2626]/70">Cor</p>
+                        <p className="text-sm font-semibold text-[#3e2626]">{product.color}</p>
+                      </div>
+                    </div>
+                  )}
+                  {product.storeName && (
+                    <div className="flex items-center gap-3 rounded-xl border border-[#3e2626]/20 bg-gradient-to-br from-white to-[#3e2626]/5 p-4 sm:col-span-2">
+                      <div className="rounded-lg bg-[#3e2626]/10 p-2">
+                        <Store className="h-5 w-5 text-[#3e2626]" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase text-[#3e2626]/70">Loja/Filial</p>
+                        <p className="text-sm font-semibold text-[#3e2626]">{product.storeName}</p>
+                        {product.storeAddress && (
+                          <p className="text-xs text-[#3e2626]/70 mt-1">{product.storeAddress}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
 
               {/* Seção de Avaliações */}
-              <div className="mt-8 space-y-6">
+              <div className="space-y-6 rounded-2xl border border-[#3e2626]/10 bg-white/90 p-6 shadow-sm shadow-[#3e2626]/5">
                 <div>
-                  <h3 className="text-xl font-semibold text-[#3e2626]">Avaliações e Comentários</h3>
+                  <h3 className="text-2xl md:text-3xl font-semibold text-[#3e2626]">Avaliações e Comentários</h3>
+                  <p className="text-sm text-[#3e2626]/70 mt-1">Compartilhe sua experiência com a comunidade</p>
                 </div>
 
-                {/* Resumo de Avaliações */}
-                <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-white to-[#3e2626]/5 rounded-xl border border-[#3e2626]/20">
+                <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-[#3e2626]/20 bg-white p-4">
                   <div className="flex items-center gap-2">
                     <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
                     <span className="text-2xl font-bold text-[#3e2626]">
@@ -827,7 +902,6 @@ export default function ProductDetailPage() {
                   </span>
                 </div>
 
-                {/* Formulário de Avaliação */}
                 {showReviewForm && (
                   <ReviewForm
                     productId={productId}
@@ -836,7 +910,6 @@ export default function ProductDetailPage() {
                   />
                 )}
 
-                {/* Lista de Avaliações */}
                 <ProductReviews key={reviewKey} productId={productId} onReviewAdded={handleReviewAdded} />
               </div>
               </div>
@@ -856,7 +929,7 @@ export default function ProductDetailPage() {
                   <Badge variant="outline" className="border-[#3e2626]/30 text-[#3e2626] bg-[#3e2626]/5">{product.brand}</Badge>
                 )}
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-[#3e2626] leading-tight">{product.name}</h1>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#3e2626] leading-tight">{product.name}</h1>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1">
                   <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
@@ -879,59 +952,37 @@ export default function ProductDetailPage() {
             </div>
 
             <div className="lg:top-24">
-              <Card className="border-2 border-[#3e2626]/20 shadow-sm bg-gradient-to-br from-white to-[#3e2626]/5">
-                <CardContent className="p-6 space-y-6">
+              <Card className="border border-[#3e2626]/10 shadow-sm bg-white/90">
+                <CardContent className="p-5 space-y-5">
                   {/* Preço */}
-                  <div className={`bg-gradient-to-br ${isFlashSaleActive ? 'from-yellow-50 to-yellow-100 border-yellow-300' : 'from-[#3e2626]/5 to-[#3e2626]/10 border-[#3e2626]/30'} rounded-2xl p-5 border-2`}>
-                    <div className="flex items-baseline gap-3 flex-wrap">
-                      <span className="text-sm font-medium text-[#3e2626]">Por apenas</span>
-                      <span className="text-4xl font-black text-[#3e2626]">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice)}
-                      </span>
-                    </div>
-                    {/* Mostrar desconto se houver oferta relâmpago configurada */}
+                  <div className="space-y-3 pb-4 border-b border-[#3e2626]/10">
                     {hasDiscount && (
-                      <>
-                        <div className="flex items-center gap-2 mt-3 flex-wrap">
-                          <span className="text-sm text-gray-500 line-through">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalPrice)}
-                          </span>
-                          <Badge className="bg-red-600 text-white text-xs font-bold shadow-sm">
-                            -{flashDiscountPercent}% OFF
-                          </Badge>
-                        </div>
-
-                        {product?.isFlashSale && (
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            {/* Badge Oferta Relâmpago (similar ao da home) */}
-                            <div className="relative overflow-hidden bg-gradient-to-r from-[#3e2626] to-[#2a1f1f] text-white rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(62,38,38,0.55)]">
-                              <Zap className="h-3.5 w-3.5 fill-white animate-pulse" />
-                              <span className="text-[11px] font-semibold tracking-wide uppercase">
-                                Oferta Relâmpago
-                              </span>
-                            </div>
-
-                            {/* Timer da oferta, baseado na data de término do produto */}
-                            {flashSecondsLeft !== null && flashSecondsLeft > 0 && (
-                              <div className="relative flex items-center gap-1 rounded-full bg-[#3e2626] text-white px-3 py-1.5 text-[11px] font-semibold shadow-[0_4px_12px_rgba(0,0,0,0.25)]">
-                                <Clock className="h-3 w-3" />
-                                <span className="tabular-nums">
-                                  {formatFlashTime(flashSecondsLeft)}
-                                </span>
-                              </div>
-                            )}
-
-                            <span className="text-[11px] font-medium text-[#3e2626]/80">
-                              Oferta exclusiva por tempo limitado neste produto.
-                            </span>
-                          </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className={`${isFlashSaleActive ? 'bg-yellow-500' : 'bg-red-600'} text-white text-xs font-semibold`}>
+                          {isFlashSaleActive && <Zap className="h-3 w-3 mr-1" />}
+                          -{flashDiscountPercent}% OFF
+                        </Badge>
+                        {isFlashSaleActive && (
+                          <span className="text-xs text-[#3e2626]/70 font-medium">Oferta Relâmpago</span>
                         )}
-                      </>
+                      </div>
                     )}
-                    <p className="text-sm text-green-600 font-semibold mt-2 flex items-center gap-1">
-                      <Sparkles className="h-4 w-4" />
-                      Parcelamento em até 18x {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice / 18)} sem juros
-                    </p>
+                    <div className="space-y-1">
+                      {hasDiscount && (
+                        <p className="text-sm text-gray-500 line-through">
+                          {formattedOriginalPrice}
+                        </p>
+                      )}
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-bold text-[#3e2626]">
+                          {formattedCurrentPrice}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#3e2626]/70 flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        Em até 18x de {installmentValue} sem juros
+                      </p>
+                    </div>
                   </div>
 
                   {/* Quantidade */}
@@ -950,11 +1001,11 @@ export default function ProductDetailPage() {
 
                   {/* Ações */}
               <div className="flex flex-col sm:flex-row gap-3">
-                    <Button id="add-to-cart-btn" onClick={handleAddToCart} className="flex-1 bg-[#3e2626] hover:bg-[#2d1a1a] text-white cursor-pointer h-12 text-base font-semibold shadow-md">
+                    <Button id="add-to-cart-btn" onClick={handleAddToCart} disabled={!isInStock} className="flex-1 bg-[#3e2626] hover:bg-[#2d1a1a] text-white cursor-pointer h-12 text-base font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-60">
                   <ShoppingCart className="h-5 w-5 mr-2" />
                   Adicionar ao Carrinho
                 </Button>
-                    <Button onClick={handleBuyNow} variant="outline" className="h-12 px-6 border-2 border-[#3e2626]/40 hover:border-[#3e2626] hover:bg-[#3e2626]/5 text-[#3e2626]">Comprar agora</Button>
+                    <Button onClick={handleBuyNow} variant="outline" disabled={!isInStock} className="h-12 px-6 border-2 border-[#3e2626]/40 hover:border-[#3e2626] hover:bg-[#3e2626]/5 text-[#3e2626] disabled:cursor-not-allowed disabled:opacity-60">Comprar agora</Button>
                     <Button variant="outline" onClick={handleToggleFavorite} className="h-12 px-4 border-2 border-[#3e2626]/30 hover:border-[#3e2626]/40 hover:bg-[#3e2626]/5">
                       <Heart className={`${isFavorite ? 'fill-red-500 text-red-500' : 'text-[#3e2626]'} h-5 w-5`} />
                 </Button>
@@ -978,156 +1029,297 @@ export default function ProductDetailPage() {
             </div>
 
                   {/* Disponibilidade */}
-                  <div className="flex items-center justify-between p-3 rounded-xl border-2 border-[#3e2626]/20 bg-gradient-to-br from-white to-[#3e2626]/5">
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-[#3e2626]/10 bg-[#3e2626]/5">
                     <div>
-                      <p className="text-sm text-[#3e2626] font-medium">Estoque disponível</p>
-                      <p className={`${(product.stock || 0) > 0 ? 'text-green-600' : 'text-red-600'} text-base font-bold`}>
+                      <p className="text-xs text-[#3e2626]/70 font-medium">Estoque</p>
+                      <p className={`${(product.stock || 0) > 0 ? 'text-green-600' : 'text-red-600'} text-sm font-semibold`}>
                         {(product.stock || 0) > 0 ? `${product.stock} unidades` : 'Esgotado'}
                       </p>
               </div>
-                    {(product.stock || 0) > 0 && <CheckCircle2 className="h-6 w-6 text-green-600" />}
+                    {(product.stock || 0) > 0 && <CheckCircle2 className="h-5 w-5 text-green-600" />}
               </div>
 
                   {/* Pagamentos e Garantias */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[#3e2626]/20">
-                    <div className="flex items-center gap-2 text-sm text-[#3e2626] bg-[#3e2626]/5 p-2 rounded-lg"><CreditCard className="h-4 w-4 text-[#3e2626]" /><span>Cartão em até 18x</span></div>
-                    <div className="flex items-center gap-2 text-sm text-[#3e2626] bg-[#3e2626]/5 p-2 rounded-lg"><Zap className="h-4 w-4 text-[#3e2626]" /><span>Pix com desconto</span></div>
-                    <div className="flex items-center gap-2 text-sm text-[#3e2626] bg-[#3e2626]/5 p-2 rounded-lg"><Shield className="h-4 w-4 text-[#3e2626]" /><span>Compra garantida</span></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3 border-t border-[#3e2626]/10">
+                    <div className="flex items-center gap-1.5 text-xs text-[#3e2626] bg-[#3e2626]/5 p-2 rounded-md"><CreditCard className="h-3.5 w-3.5 text-[#3e2626]" /><span className="truncate">18x sem juros</span></div>
+                    <div className="flex items-center gap-1.5 text-xs text-[#3e2626] bg-[#3e2626]/5 p-2 rounded-md"><Zap className="h-3.5 w-3.5 text-[#3e2626]" /><span className="truncate">Pix com desconto</span></div>
+                    <div className="flex items-center gap-1.5 text-xs text-[#3e2626] bg-[#3e2626]/5 p-2 rounded-md"><Shield className="h-3.5 w-3.5 text-[#3e2626]" /><span className="truncate">Garantia</span></div>
               </div>
                 </CardContent>
               </Card>
         </div>
 
-            {/* Produtos Relacionados (coluna direita em lista) */}
-        {relatedProducts.length > 0 && (
-              <div className="space-y-4 mt-6">
-                <h3 className="text-xl font-semibold text-gray-900">Produtos Relacionados</h3>
-                <div className="flex flex-col gap-4">
-                  {relatedProducts.map((relatedProduct) => (
-                    <ProductCard
-                      key={relatedProduct.id}
-                      product={relatedProduct}
-                      variant="compact"
-                      showFavorite={true}
-                      showAddToCart={false}
-                    />
-                  ))}
-                </div>
-            </div>
-        )}
-
-            {/* Meios de Pagamento */}
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Meios de pagamento</h3>
-              
-              {/* Botão de destaque */}
-              <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 mb-4 rounded-lg flex items-center justify-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Pague em até 21x sem juros!
-              </Button>
-
-              <div className="space-y-4">
-                {/* Linha de Crédito */}
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Linha de Crédito</h4>
-                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <CreditCard className="h-5 w-5 text-blue-600" />
+            {/* Informações adicionais e suporte */}
+            <div className="space-y-4">
+              <div className="rounded-xl border border-[#3e2626]/10 bg-white/90 p-5 shadow-sm shadow-[#3e2626]/5">
+                <h3 className="text-lg md:text-xl font-semibold text-[#3e2626] mb-4">Informações importantes</h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Shield className="h-5 w-5 text-[#3e2626] mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-[#3e2626]">Garantia de 12 meses</p>
+                      <p className="text-xs text-gray-600 mt-0.5">Contra defeitos de fabricação</p>
                     </div>
-                    <span className="text-sm text-gray-700">Crédito disponível</span>
                   </div>
-                </div>
-
-                {/* Cartões de crédito */}
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Cartões de crédito</h4>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="h-8 w-auto flex items-center justify-center">
-                      <img 
-                        src="https://down-br.img.susercontent.com/file/a65c5d1c5e556c6197f8fbd607482372" 
-                        alt="Visa" 
-                        className="h-6 w-auto object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
+                  <div className="flex items-start gap-3">
+                    <Truck className="h-5 w-5 text-[#3e2626] mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-[#3e2626]">Frete grátis acima de R$ 299</p>
+                      <p className="text-xs text-gray-600 mt-0.5">Para todo o Brasil</p>
                     </div>
-                    <div className="h-8 w-auto flex items-center justify-center">
-                      <img 
-                        src="https://down-br.img.susercontent.com/file/95d849253f75d5e6e6b867af4f7c65aa" 
-                        alt="Mastercard" 
-                        className="h-6 w-auto object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
-                    <div className="h-8 w-auto flex items-center justify-center">
-                      <img 
-                        src="https://down-br.img.susercontent.com/file/br-11134258-7r98o-lxsovyseln7jc5" 
-                        alt="Elo" 
-                        className="h-6 w-auto object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
-                    <div className="h-8 w-auto flex items-center justify-center">
-                      <img 
-                        src="https://down-br.img.susercontent.com/file/285e5ab6207eb562a9e893a42ff7ee46 " 
-                        alt="American Express" 
-                        className="h-6 w-auto object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Package className="h-5 w-5 text-[#3e2626] mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-[#3e2626]">Troca em até 7 dias</p>
+                      <p className="text-xs text-gray-600 mt-0.5">Se não estiver satisfeito</p>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Pix */}
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Pix</h4>
-                  <div className="flex items-center gap-2">
-                    <div className="h-10 w-10 flex items-center justify-center">
-                      <img 
-                        src="https://down-br.img.susercontent.com/file/2a2cfeb34b00ef7b3be23ea516dcd1c5" 
-                        alt="PIX" 
-                        className="h-8 w-auto object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
+              <div className="rounded-xl border border-[#3e2626]/10 bg-white/90 p-5 shadow-sm shadow-[#3e2626]/5">
+                <h3 className="text-lg md:text-xl font-semibold text-[#3e2626] mb-4">Precisa de ajuda?</h3>
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5"
+                    onClick={() => router.push('/faq')}
+                  >
+                    <span className="text-sm">Perguntas frequentes</span>
+                    <ChevronRight className="ml-auto h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5"
+                    onClick={() => router.push('/contact')}
+                  >
+                    <span className="text-sm">Falar com atendimento</span>
+                    <ChevronRight className="ml-auto h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5"
+                    onClick={() => router.push('/warranty')}
+                  >
+                    <span className="text-sm">Informações de garantia</span>
+                    <ChevronRight className="ml-auto h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#3e2626]/10 bg-white/90 p-5 shadow-sm shadow-[#3e2626]/5">
+                <h3 className="text-lg md:text-xl font-semibold text-[#3e2626] mb-4">Ferramentas exclusivas</h3>
+                <div className="space-y-3">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5"
+                    onClick={() => router.push('/color-visualizer')}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    <span className="text-sm">Visualizar com IA</span>
+                    <ChevronRight className="ml-auto h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5"
+                    onClick={() => router.push('/IA')}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    <span className="text-sm">Consultoria IA</span>
+                    <ChevronRight className="ml-auto h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5"
+                    onClick={() => router.push('/stores')}
+                  >
+                    <Store className="mr-2 h-4 w-4" />
+                    <span className="text-sm">Encontrar lojas</span>
+                    <ChevronRight className="ml-auto h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#3e2626]/10 bg-gradient-to-br from-[#3e2626] to-[#2c1b1a] p-5 text-white shadow-sm shadow-[#3e2626]/5">
+                <div className="flex items-start gap-3 mb-3">
+                  <Truck className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-lg md:text-xl font-semibold text-white">Entregas rápidas</h3>
+                    <p className="text-xs text-white/80 mt-1">
+                      Receba em até 4 dias úteis na maioria das cidades
+                    </p>
                   </div>
                 </div>
-
-                {/* Boleto bancário */}
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Boleto bancário</h4>
-                  <div className="flex items-center gap-2">
-                    <div className="h-10 w-10 flex items-center justify-center">
-                      <img 
-                        src="https://down-br.img.susercontent.com/file/44734b7fc343eb46237c2d90c6c9ca60" 
-                        alt="Boleto" 
-                        className="h-8 w-auto object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  </div>
+                <div className="pt-3 border-t border-white/20">
+                  <p className="text-xs text-white/70 mb-2">Também oferecemos:</p>
+                  <ul className="space-y-1.5 text-xs text-white/80">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                      <span>Montagem profissional disponível</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                      <span>Rastreamento em tempo real</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                      <span>Atendimento especializado</span>
+                    </li>
+                  </ul>
                 </div>
-
-          
               </div>
             </div>
+
+            <Card className="border-2 border-[#3e2626]/10 bg-white/90 shadow-sm shadow-[#3e2626]/5">
+              <CardContent className="space-y-5 p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs uppercase font-semibold text-[#3e2626]/70">Pagamentos</p>
+                    <h3 className="text-xl md:text-2xl font-semibold text-[#3e2626]">Meios de pagamento</h3>
+                  </div>
+                  <Button className="w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto">
+                    <CreditCard className="mr-2 h-5 w-5" />
+                    Pague em até 21x sem juros!
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Linha de crédito</h4>
+                    <div className="flex items-center gap-2 rounded-lg bg-gray-50 p-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                        <CreditCard className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <span className="text-sm text-gray-700">Crédito disponível imediato</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Cartões de crédito</h4>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {[
+                        { src: 'https://down-br.img.susercontent.com/file/a65c5d1c5e556c6197f8fbd607482372', alt: 'Visa' },
+                        { src: 'https://down-br.img.susercontent.com/file/95d849253f75d5e6e6b867af4f7c65aa', alt: 'Mastercard' },
+                        { src: 'https://down-br.img.susercontent.com/file/br-11134258-7r98o-lxsovyseln7jc5', alt: 'Elo' },
+                        { src: 'https://down-br.img.susercontent.com/file/285e5ab6207eb562a9e893a42ff7ee46', alt: 'American Express' },
+                      ].map((card) => (
+                        <div key={card.alt} className="flex h-8 items-center">
+                          <img
+                            src={card.src}
+                            alt={card.alt}
+                            className="h-6 w-auto object-contain"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Pix</h4>
+                      <div className="flex items-center gap-2 rounded-lg bg-gray-50 p-3">
+                        <img
+                          src="https://down-br.img.susercontent.com/file/2a2cfeb34b00ef7b3be23ea516dcd1c5"
+                          alt="Pix"
+                          className="h-8 w-auto object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                        <span className="text-sm text-gray-700">Aprovação instantânea</span>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Boleto bancário</h4>
+                      <div className="flex items-center gap-2 rounded-lg bg-gray-50 p-3">
+                        <img
+                          src="https://down-br.img.susercontent.com/file/44734b7fc343eb46237c2d90c6c9ca60"
+                          alt="Boleto"
+                          className="h-8 w-auto object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                        <span className="text-sm text-gray-700">Compensação em até 1 dia útil</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        {/* Características */}
+        {/* Produtos Relacionados */}
+        {relatedProducts.length > 0 && (
+          <section className="space-y-6 rounded-2xl border border-[#3e2626]/10 bg-white/90 p-6 md:p-8 shadow-lg shadow-[#3e2626]/5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-3xl md:text-4xl font-bold text-[#3e2626]">Produtos relacionados</h3>
+                <p className="text-sm text-gray-600 mt-1">Você também pode gostar destes produtos</p>
+              </div>
+              {product.category && (
+                <Button
+                  variant="outline"
+                  className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5"
+                  onClick={() => router.push(`/products?category=${product.category}`)}
+                >
+                  Ver todos
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {relatedProducts.slice(0, 4).map((relatedProduct) => (
+                <ProductCard
+                  key={relatedProduct.id}
+                  product={relatedProduct}
+                  variant="default"
+                  showFavorite={true}
+                  showAddToCart={true}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
       </main>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 lg:hidden">
+        <div className="mx-auto max-w-3xl space-y-3 rounded-2xl border border-[#3e2626]/10 bg-white p-4 shadow-2xl shadow-[#3e2626]/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase text-[#3e2626]/60">Total</p>
+              <p className="text-2xl font-bold text-[#3e2626]">{formattedCurrentPrice}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-[#3e2626]/60">em até 18x de</p>
+              <p className="text-sm font-semibold text-[#3e2626]">{installmentValue}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleToggleFavorite}
+              className={`flex h-12 w-12 items-center justify-center rounded-xl border ${
+                isFavorite ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#3e2626]/20 text-[#3e2626]'
+              }`}
+            >
+              <Heart className={`${isFavorite ? 'fill-red-500 text-red-500' : ''} h-5 w-5`} />
+            </button>
+            <Button
+              onClick={handleAddToCart}
+              disabled={!isInStock}
+              className="flex-1 h-12 bg-[#3e2626] text-white hover:bg-[#2d1a1a] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Adicionar ao carrinho
+            </Button>
+          </div>
+        </div>
+      </div>
 
       <Footer />
     </div>
