@@ -42,14 +42,61 @@ export class PublicSupportService {
           closingTime: true,
           workingDays: true,
           isActive: true,
+          inventory: {
+            select: {
+              id: true,
+              productId: true,
+              quantity: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  isActive: true,
+                },
+              },
+            },
+            where: {
+              product: {
+                isActive: true,
+              },
+            },
+          },
         },
       });
 
-      console.log(`📦 [PublicSupportService] Encontradas ${stores.length} lojas ativas`);
+      // Processar estoque para cada loja
+      const storesWithInventory = stores.map((store) => {
+        const storeInventory = store.inventory
+          .filter((inv) => inv.product?.isActive)
+          .map((inv) => ({
+            productId: inv.productId,
+            productName: inv.product?.name || 'Produto desconhecido',
+            quantity: inv.quantity || 0,
+          }));
+
+        return {
+          id: store.id,
+          name: store.name,
+          address: store.address,
+          city: store.city,
+          state: store.state,
+          zipCode: store.zipCode,
+          phone: store.phone,
+          email: store.email,
+          workingHours: store.workingHours,
+          openingTime: store.openingTime,
+          closingTime: store.closingTime,
+          workingDays: store.workingDays,
+          isActive: store.isActive,
+          storeInventory,
+        };
+      });
+
+      console.log(`📦 [PublicSupportService] Encontradas ${storesWithInventory.length} lojas ativas`);
 
       return {
         success: true,
-        stores,
+        stores: storesWithInventory,
       };
     } catch (error: any) {
       console.error('❌ [PublicSupportService] Erro ao buscar lojas:', error);

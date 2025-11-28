@@ -253,10 +253,42 @@ export default function CartPage() {
     const grouped: { [storeId: string]: { storeName: string; storeAddress?: string; items: typeof cart } } = {};
     
     cart.forEach(item => {
-      const storeId = item.product.storeId || 'unknown';
-      // Usar informações do produto, cache ou fallback
-      // Se não tiver storeName, tenta usar o cache ou gera um nome baseado no ID
-      let storeName = item.product.storeName;
+      // Determinar qual loja usar para este produto
+      // Prioridade: 1) storeId direto, 2) primeira loja do storeInventory com estoque, 3) primeira loja do storeInventory
+      let storeId: string = 'unknown';
+      let storeName: string | undefined;
+      let storeAddress: string | undefined;
+
+      // Tentar usar storeId direto
+      if (item.product.storeId) {
+        storeId = item.product.storeId;
+        storeName = item.product.store?.name;
+        storeAddress = item.product.store?.address;
+      } 
+      // Se não tiver storeId direto, usar storeInventory
+      else if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
+        // Buscar loja com estoque (ou maior estoque)
+        const availableStores = item.product.storeInventory
+          .filter((inv: any) => inv.store?.isActive && inv.quantity > 0)
+          .sort((a: any, b: any) => b.quantity - a.quantity);
+
+        if (availableStores.length > 0) {
+          const selectedInventory = availableStores[0];
+          storeId = selectedInventory.storeId;
+          storeName = selectedInventory.store?.name;
+          storeAddress = selectedInventory.store?.address;
+        } else {
+          // Se nenhuma tem estoque, usar a primeira loja ativa
+          const firstActive = item.product.storeInventory.find((inv: any) => inv.store?.isActive);
+          if (firstActive) {
+            storeId = firstActive.storeId;
+            storeName = firstActive.store?.name;
+            storeAddress = firstActive.store?.address;
+          }
+        }
+      }
+
+      // Fallback: usar cache ou gerar nome
       if (!storeName) {
         storeName = storeInfoCache[storeId]?.name;
         if (!storeName && storeId !== 'unknown') {
@@ -265,7 +297,9 @@ export default function CartPage() {
           storeName = 'Loja não identificada';
         }
       }
-      const storeAddress = item.product.storeAddress || storeInfoCache[storeId]?.address;
+      if (!storeAddress) {
+        storeAddress = storeInfoCache[storeId]?.address;
+      }
       
       if (!grouped[storeId]) {
         grouped[storeId] = {
@@ -293,10 +327,11 @@ export default function CartPage() {
     }, 0);
   }, [selectedCartItems]);
 
-  // Função para calcular frete baseado no total selecionado
+  // Função para calcular frete estimado (valor fixo básico)
+  // O valor real será calculado no checkout usando a API dos Correios,
+  // aqui é apenas uma estimativa simples para o resumo do carrinho.
   const calculateShipping = () => {
-    if (selectedTotal >= 500) return 0; // Frete grátis acima de R$ 500
-    return 29.90; // Frete padrão
+    return 29.90; // Frete padrão estimado
   };
 
   // Função para calcular total final dos selecionados

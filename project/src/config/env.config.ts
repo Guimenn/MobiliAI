@@ -44,4 +44,15 @@ export const envConfig = {
   IMAGEKIT_URL_ENDPOINT: process.env.IMAGEKIT_URL_ENDPOINT || '',
   IMAGEKIT_PUBLIC_KEY: process.env.IMAGEKIT_PUBLIC_KEY || '',
   IMAGEKIT_PRIVATE_KEY: process.env.IMAGEKIT_PRIVATE_KEY || '',
+
+  // Correios (frete / CEP / prazo)
+  // Para usar a API oficial dos Correios é necessário configurar um token válido
+  // e, opcionalmente, URL base e código de serviço (SEDEX, PAC, etc.).
+  CORREIOS_API_BASE_URL: process.env.CORREIOS_API_BASE_URL || 'https://api.correios.com.br',
+  CORREIOS_API_TOKEN: process.env.CORREIOS_API_TOKEN || '',
+  // Códigos de produto/serviço dos Correios
+  CORREIOS_PAC_CODE: process.env.CORREIOS_PAC_CODE || '04669', // PAC varejo (padrão - mais barato, mais lento)
+  CORREIOS_SEDEX_CODE: process.env.CORREIOS_SEDEX_CODE || '03220', // SEDEX varejo (expresso - mais caro, mais rápido)
+  // Mantido para compatibilidade (usa SEDEX como padrão)
+  CORREIOS_PRODUCT_CODE: process.env.CORREIOS_PRODUCT_CODE || '03220',
 };

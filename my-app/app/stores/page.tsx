@@ -25,7 +25,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { storesAPI, productsAPI, adminAPI } from '@/lib/api';
+import { storesAPI, productsAPI } from '@/lib/api';
+import { env } from '@/lib/env';
 import { toast } from 'sonner';
 
 interface Store {
@@ -128,8 +129,28 @@ export default function StoresPage() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [storesData, productsData] = await Promise.all([
-        storesAPI.getAll(),
+      
+      // Usar endpoint público que não exige autenticação
+      const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+      const storesResponse = await fetch(`${apiBaseUrl}/public/support/stores`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      let storesData: any = [];
+      if (storesResponse.ok) {
+        const data = await storesResponse.json();
+        storesData = data.stores || data || [];
+      } else {
+        // Fallback: tentar endpoint autenticado se disponível
+        try {
+          storesData = await storesAPI.getAll();
+        } catch (error) {
+          console.error('Erro ao buscar lojas:', error);
+        }
+      }
+      
+      const [productsData] = await Promise.all([
         productsAPI.getAll()
       ]);
 
@@ -156,11 +177,10 @@ export default function StoresPage() {
         productsArray = productsData.data;
       }
 
+      // O endpoint público já retorna as lojas com storeInventory incluído
+      // Não precisa mais fazer chamadas separadas para buscar estoque
       setStores(storesArray);
       setProducts(productsArray);
-
-      // Carregar estoque para cada loja
-      await loadStoreInventories(storesArray);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar lojas e produtos');
@@ -169,51 +189,6 @@ export default function StoresPage() {
     }
   };
 
-  // Carregar estoque real de cada loja
-  const loadStoreInventories = async (storesArray: Store[]) => {
-    try {
-      const storesWithInventory = await Promise.all(
-        storesArray.map(async (store) => {
-          try {
-            // Tentar buscar estoque via API
-            const inventoryData = await adminAPI.getStoreInventory(store.id);
-            
-            let inventoryArray: any[] = [];
-            if (Array.isArray(inventoryData)) {
-              inventoryArray = inventoryData;
-            } else if (inventoryData?.inventory) {
-              inventoryArray = inventoryData.inventory;
-            } else if (inventoryData?.data) {
-              inventoryArray = inventoryData.data;
-            }
-
-            // Mapear estoque para o formato esperado
-            const storeInventory = inventoryArray.map((inv: any) => ({
-              productId: inv.productId || inv.product?.id,
-              productName: inv.product?.name,
-              quantity: inv.quantity || 0,
-            }));
-
-            return {
-              ...store,
-              storeInventory,
-            };
-          } catch (error) {
-            // Se não conseguir buscar estoque (pode ser cliente sem permissão), retornar loja sem estoque
-            console.warn(`Não foi possível carregar estoque da loja ${store.name}:`, error);
-            return {
-              ...store,
-              storeInventory: [],
-            };
-          }
-        })
-      );
-      setStores(storesWithInventory);
-    } catch (error) {
-      console.error('Erro ao carregar estoques:', error);
-      setStores(storesArray);
-    }
-  };
 
   // Calcular distância usando fórmula de Haversine
   const calculateDistance = (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { productsAPI, managerAPI } from '@/lib/api';
@@ -28,10 +28,14 @@ import {
   Building,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Eye,
   Search,
   Zap,
-  Percent
+  Percent,
+  CheckCircle,
+  Box
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -60,12 +64,18 @@ interface Product {
 export default function ManagerProductsPage() {
   const { user, token } = useAppStore();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Produtos
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [pageLimit, setPageLimit] = useState(50);
   
   // Modal de Produto
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -111,16 +121,17 @@ export default function ManagerProductsPage() {
   };
 
   useEffect(() => {
-    loadProducts();
-  }, []);
+    loadProductsData(currentPage, pageLimit);
+  }, [currentPage, pageLimit]);
 
   useEffect(() => {
     setFilteredProducts(getFilteredProducts());
   }, [searchTerm, products, activeTab]);
 
-  const loadProducts = async (forceReload = false) => {
+  const loadProductsData = async (page: number = currentPage, limit: number = pageLimit) => {
     if (!user?.storeId) {
       console.warn('⚠️ Usuário não tem storeId associado:', user);
+      setIsLoading(false);
       return;
     }
     
@@ -128,37 +139,37 @@ export default function ManagerProductsPage() {
       setIsLoading(true);
       console.log('🔄 [Manager] Carregando produtos da loja...', { 
         storeId: user.storeId,
-        forceReload,
+        page,
+        limit,
         timestamp: new Date().toISOString()
       });
       
       // IMPORTANTE: Usar o endpoint do manager que filtra APENAS produtos da loja do manager
-      // Não usar productsAPI.getAll() que pode retornar produtos de outras lojas
-      const response = await managerAPI.getStoreProducts(1, 1000, '', undefined);
+      const response = await managerAPI.getStoreProducts(page, limit, '', undefined);
       const productsData = response.products || [];
+      const pagination = response.pagination || {};
       
       console.log('📦 [Manager] Produtos carregados da loja:', {
         count: productsData?.length,
         storeId: user.storeId,
-        products: productsData?.slice(0, 5).map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          stock: p.stock,
-          storeId: p.storeId,
-          originalStoreId: p.originalStoreId,
-          availableViaStoreInventory: p.availableViaStoreInventory
-        }))
+        pagination
       });
       
-      // IMPORTANTE: Produtos podem ter storeId diferente se estiverem via StoreInventory
-      // Isso é normal - o produto pode ter storeId de outra loja mas estar disponível
-      // na loja do manager através do StoreInventory
-      // Não é um erro, é o comportamento esperado para produtos em múltiplas lojas
       setProducts(productsData);
       setFilteredProducts(productsData);
+      
+      if (pagination) {
+        setTotalPages(pagination.pages || 1);
+        setTotalProducts(pagination.total || productsData.length);
+      } else {
+        setTotalPages(1);
+        setTotalProducts(productsData.length);
+      }
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast.error('Erro ao carregar produtos');
+      setProducts([]);
+      setFilteredProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -438,7 +449,7 @@ export default function ManagerProductsPage() {
         // Isso evita sobrescrever o estado com dados antigos
       } else {
         // Para criação de produto, recarregar normalmente
-        await loadProducts();
+        await loadProductsData(currentPage, pageLimit);
       }
 
       handleCloseModal();
@@ -462,7 +473,7 @@ export default function ManagerProductsPage() {
       setIsLoading(true);
       await managerAPI.deleteStoreProduct(product.id);
       toast.success('Produto excluído com sucesso!');
-      await loadProducts();
+      await loadProductsData(currentPage, pageLimit);
     } catch (error) {
       console.error('Erro ao excluir produto:', error);
       toast.error('Erro ao excluir produto');
@@ -520,212 +531,59 @@ export default function ManagerProductsPage() {
     return filtered;
   };
 
-  const totalProducts = products.length;
-  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= 10).length;
-  const outOfStockProducts = products.filter(p => p.stock === 0).length;
-  const inStockProducts = products.filter(p => p.stock > 10).length;
-
   // Função para recarregar produtos após atualização
   const onProductsChange = () => {
-    loadProducts();
+    loadProductsData(currentPage, pageLimit);
   };
 
-  // Função para renderizar seção de produtos
-  const renderProductsSection = (showOnlyOnSale: boolean) => {
-    const productsToShow = showOnlyOnSale 
-      ? filteredProducts.filter(p => isNormalSaleActive(p))
-      : filteredProducts;
-
+  if (isLoading && products.length === 0) {
     return (
-      <>
-        {/* Products Grid */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#3e2626] mx-auto mb-4"></div>
-              <p className="text-gray-600">Carregando produtos...</p>
-            </div>
-          </div>
-        ) : productsToShow.length === 0 ? (
-          <Card className="bg-white">
-            <CardContent className="text-center py-16">
-              <Package className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum produto encontrado</h3>
-              <p className="text-gray-600 mb-6">
-                {searchTerm ? 'Tente buscar com outro termo' : showOnlyOnSale ? 'Nenhum produto em oferta no momento' : 'Comece adicionando seu primeiro produto'}
-              </p>
-              {!searchTerm && !showOnlyOnSale && (
-                <Button 
-                  onClick={handleCreateProduct}
-                  className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] hover:from-[#2a1f1f] hover:to-[#6B3410] text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Produto
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {productsToShow.map((product) => {
-              const isNormalSale = isNormalSaleActive(product);
-              const salePrice = isNormalSale ? (product.salePrice || product.price) : product.price;
-              const originalPrice = product.price;
-              
-              return (
-                <Card key={product.id} className={`overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 rounded-2xl group ${isNormalSale ? 'ring-2 ring-blue-400 ring-opacity-50' : ''}`}>
-                  {(product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl) ? (
-                    <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 relative">
-                      <img
-                        src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : product.imageUrl}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                      {isNormalSale && (
-                        <div className="absolute top-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-                          EM OFERTA
-                        </div>
-                      )}
-                      {product.imageUrls && product.imageUrls.length > 1 && (
-                        <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full font-medium shadow-lg">
-                          +{product.imageUrls.length - 1} mais
-                        </div>
-                      )}
-                      <div className="absolute top-3 right-3">
-                        <Badge className={
-                          product.stock > 10 
-                            ? 'bg-green-500 text-white border-0 shadow-md' 
-                            : product.stock > 0 
-                            ? 'bg-orange-500 text-white border-0 shadow-md' 
-                            : 'bg-red-500 text-white border-0 shadow-md'
-                        }>
-                          {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
-                        </Badge>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="aspect-video w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
-                      <Package className="h-16 w-16 text-gray-300" />
-                      {isNormalSale && (
-                        <div className="absolute top-2 left-2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-                          EM OFERTA
-                        </div>
-                      )}
-                      <div className="absolute top-3 right-3">
-                        <Badge className={
-                          product.stock > 10 
-                            ? 'bg-green-500 text-white border-0 shadow-md' 
-                            : product.stock > 0 
-                            ? 'bg-orange-500 text-white border-0 shadow-md' 
-                            : 'bg-red-500 text-white border-0 shadow-md'
-                        }>
-                          {product.stock > 10 ? 'OK' : product.stock > 0 ? 'BAIXO' : 'ZERO'}
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-bold text-gray-900 line-clamp-2 mb-2 min-h-[3.5rem]">
-                      {product.name}
-                    </CardTitle>
-                    {product.description && (
-                      <CardDescription className="line-clamp-2 text-sm text-gray-600 min-h-[2.5rem]">
-                        {product.description}
-                      </CardDescription>
-                    )}
-                    {isNormalSale && product.saleDiscountPercent && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge className="bg-blue-500 text-white border-0 shadow-md">
-                          -{product.saleDiscountPercent}%
-                        </Badge>
-                      </div>
-                    )}
-                  </CardHeader>
-                  <CardContent className="space-y-4 pt-0">
-                    <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
-                      <span className="text-sm font-medium text-gray-600">Preço</span>
-                      {isNormalSale ? (
-                        <div className="flex flex-col items-end">
-                          <span className="font-bold text-xl text-green-600">{formatCurrency(salePrice)}</span>
-                          <span className="text-sm text-gray-400 line-through">{formatCurrency(originalPrice)}</span>
-                        </div>
-                      ) : (
-                        <span className="font-bold text-xl text-[#3e2626]">{formatCurrency(originalPrice)}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between py-2 px-4 bg-gray-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-600">Estoque</span>
-                      <span className="font-semibold text-gray-900">{product.stock} unidades</span>
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleViewProduct(product)}
-                        className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 flex-1 transition-all"
-                        title="Visualizar"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleEditProduct(product)}
-                        className="flex-1 border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white transition-all font-medium"
-                      >
-                        <Edit className="h-4 w-4 mr-1.5" />
-                        Editar
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleDeleteProduct(product)}
-                        className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </>
-    );
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Header com busca e botão */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-[#3e2626]">Gestão de Estoque</h2>
-          <p className="text-gray-600 mt-1">Gerencie os produtos e estoque da sua loja</p>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-          <div className="relative flex-1 sm:flex-initial">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Buscar produtos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-full sm:w-64"
-            />
-          </div>
-          <Button 
-            onClick={handleCreateProduct}
-            className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white shadow-lg font-semibold"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Produto
-          </Button>
+      <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/40">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-b-primary" />
+          <p className="text-sm text-muted-foreground">Carregando produtos...</p>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl space-y-4">
+            <Badge
+              variant="outline"
+              className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+            >
+              Gestão de Produtos
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+                Gerenciar Produtos
+              </h1>
+              <p className="text-sm text-primary-foreground/80 lg:text-base">
+                Gerencie o catálogo de produtos da sua loja. Controle estoque, preços e ofertas.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                onClick={handleCreateProduct}
+                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Produto
+              </Button>
+            </div>
+          </div>
+
+          <ProductsStats products={products} totalProducts={totalProducts} />
+        </div>
+      </section>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'all' | 'on-sale')} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="all" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Todos os Produtos
@@ -736,12 +594,66 @@ export default function ManagerProductsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="mt-0">
-          {renderProductsSection(false)}
+        <TabsContent value="all" className="mt-6">
+          <ProductsSection 
+            products={products}
+            isLoading={isLoading}
+            token={token}
+            onProductsChange={onProductsChange}
+            onDeleteProduct={(productId: string) => {
+              const product = products.find(p => p.id === productId);
+              if (product) handleDeleteProduct(product);
+            }}
+            onViewProduct={handleViewProduct}
+            onEditProduct={handleEditProduct}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalProducts={totalProducts}
+            pageLimit={pageLimit}
+            onPageChange={(page: number) => {
+              setCurrentPage(page);
+              loadProductsData(page, pageLimit);
+            }}
+            onLimitChange={(limit: number) => {
+              setPageLimit(limit);
+              setCurrentPage(1);
+              loadProductsData(1, limit);
+            }}
+            showOnlyOnSale={false}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+          />
         </TabsContent>
 
-        <TabsContent value="on-sale" className="mt-0">
-          {renderProductsSection(true)}
+        <TabsContent value="on-sale" className="mt-6">
+          <ProductsSection 
+            products={products}
+            isLoading={isLoading}
+            token={token}
+            onProductsChange={onProductsChange}
+            onDeleteProduct={(productId: string) => {
+              const product = products.find(p => p.id === productId);
+              if (product) handleDeleteProduct(product);
+            }}
+            onViewProduct={handleViewProduct}
+            onEditProduct={handleEditProduct}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalProducts={totalProducts}
+            pageLimit={pageLimit}
+            onPageChange={(page: number) => {
+              setCurrentPage(page);
+              loadProductsData(page, pageLimit);
+            }}
+            onLimitChange={(limit: number) => {
+              setPageLimit(limit);
+              setCurrentPage(1);
+              loadProductsData(1, limit);
+            }}
+            showOnlyOnSale={true}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+          />
         </TabsContent>
       </Tabs>
 
@@ -1300,6 +1212,440 @@ export default function ManagerProductsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function ProductsStats({ products, totalProducts }: any) {
+  const stats = useMemo(() => {
+    const isNormalSaleActive = (product: any) => {
+      if (!product.isOnSale || !product.saleStartDate || !product.saleEndDate) {
+        return false;
+      }
+      const now = new Date();
+      const start = new Date(product.saleStartDate);
+      const end = new Date(product.saleEndDate);
+      return now >= start && now <= end;
+    };
+
+    return {
+      total: totalProducts > 0 ? totalProducts : products.length,
+      active: products.filter((p: any) => p.isActive !== false).length,
+      onSale: products.filter((p: any) => isNormalSaleActive(p)).length,
+      totalValue: products.reduce((sum: number, p: any) => sum + (p.price * (p.stock || 0)), 0),
+    };
+  }, [products, totalProducts]);
+
+  const formatPrice = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  return (
+    <div className="grid w-full max-w-md grid-cols-2 gap-4 sm:grid-cols-2 lg:max-w-xl">
+      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+          <Package className="h-5 w-5" />
+        </div>
+        <p className="text-2xl font-semibold leading-tight">{stats.total}</p>
+        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Total</p>
+      </div>
+      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+          <CheckCircle className="h-5 w-5" />
+        </div>
+        <p className="text-2xl font-semibold leading-tight">{stats.active}</p>
+        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Ativos</p>
+      </div>
+      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+          <Zap className="h-5 w-5" />
+        </div>
+        <p className="text-2xl font-semibold leading-tight">{stats.onSale}</p>
+        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Em Oferta</p>
+      </div>
+      <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+          <DollarSign className="h-5 w-5" />
+        </div>
+        <p className="text-2xl font-semibold leading-tight">{formatPrice(stats.totalValue)}</p>
+        <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Valor Total</p>
+      </div>
+    </div>
+  );
+}
+
+function ProductsSection({ 
+  products, 
+  isLoading, 
+  token, 
+  onProductsChange, 
+  onDeleteProduct,
+  onViewProduct,
+  onEditProduct,
+  currentPage = 1,
+  totalPages = 1,
+  totalProducts = 0,
+  pageLimit = 50,
+  onPageChange,
+  onLimitChange,
+  showOnlyOnSale = false,
+  searchTerm = '',
+  onSearchChange
+}: any) {
+  const [productFilters, setProductFilters] = useState({
+    category: 'all',
+    status: 'all',
+    search: searchTerm
+  });
+
+  useEffect(() => {
+    setProductFilters(prev => ({ ...prev, search: searchTerm }));
+  }, [searchTerm]);
+
+  const handleEditProductById = (productId: string) => {
+    const product = products.find((p: any) => p.id === productId);
+    if (product && onEditProduct) {
+      onEditProduct(product);
+    }
+  };
+
+  const isNormalSaleActive = (product: any) => {
+    if (!product.isOnSale || !product.saleStartDate || !product.saleEndDate) {
+      return false;
+    }
+    const now = new Date();
+    const start = new Date(product.saleStartDate);
+    const end = new Date(product.saleEndDate);
+    return now >= start && now <= end;
+  };
+
+  const getFilteredProducts = useMemo(() => {
+    if (!Array.isArray(products)) return [];
+    
+    return products
+      .filter((product: any) => {
+        if (showOnlyOnSale) {
+          if (!isNormalSaleActive(product)) {
+            return false;
+          }
+        }
+        
+        if (productFilters.category !== 'all' && product.category !== productFilters.category) {
+          return false;
+        }
+        
+        if (productFilters.status !== 'all') {
+          if (productFilters.status === 'active' && product.isActive === false) return false;
+          if (productFilters.status === 'inactive' && product.isActive !== false) return false;
+        }
+        
+        if (productFilters.search) {
+          const searchTerm = productFilters.search.toLowerCase();
+          return product.name?.toLowerCase().includes(searchTerm) ||
+                 product.brand?.toLowerCase().includes(searchTerm) ||
+                 product.category?.toLowerCase().includes(searchTerm);
+        }
+        
+        return true;
+      })
+      .sort((a: any, b: any) => {
+        if (showOnlyOnSale) {
+          const discountA = a.saleDiscountPercent || 0;
+          const discountB = b.saleDiscountPercent || 0;
+          if (discountB !== discountA) {
+            return discountB - discountA;
+          }
+        }
+        return a.name.localeCompare(b.name);
+      });
+  }, [products, productFilters, showOnlyOnSale]);
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(price);
+  };
+
+  const getStockStatus = (stock: number) => {
+    if (stock === 0) return { label: 'Sem Estoque', color: 'border-border bg-muted/50 text-muted-foreground' };
+    if (stock < 10) return { label: 'Estoque Baixo', color: 'border-border bg-muted/50 text-muted-foreground' };
+    return { label: 'Em Estoque', color: 'border-border bg-muted/50 text-foreground' };
+  };
+
+  return (
+    <>
+      {/* Search and Filters */}
+      <Card className="border border-border shadow-sm">
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Buscar produtos por nome..."
+                  value={productFilters.search}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    setProductFilters({ ...productFilters, search: newValue });
+                    if (onSearchChange) onSearchChange(newValue);
+                  }}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="md:w-48">
+              <select
+                value={productFilters.category}
+                onChange={(e) => setProductFilters({ ...productFilters, category: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="all">Todas as categorias</option>
+                <option value="SOFA">Sofá</option>
+                <option value="MESA">Mesa</option>
+                <option value="CADEIRA">Cadeira</option>
+                <option value="ARMARIO">Armário</option>
+                <option value="ESTANTE">Estante</option>
+                <option value="POLTRONA">Poltrona</option>
+                <option value="QUADRO">Quadro</option>
+                <option value="LUMINARIA">Luminária</option>
+                <option value="MESA_CENTRO">Mesa de centro</option>
+              </select>
+            </div>
+            <div className="md:w-48">
+              <select
+                value={productFilters.status}
+                onChange={(e) => setProductFilters({ ...productFilters, status: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="all">Todos os status</option>
+                <option value="active">Ativo</option>
+                <option value="inactive">Inativo</option>
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Products List */}
+      {getFilteredProducts.length === 0 ? (
+        <Card className="border border-border shadow-sm mt-2">
+          <CardContent className="py-12 text-center mt-2">
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">Nenhum produto encontrado</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {productFilters.search || productFilters.category !== 'all' || productFilters.status !== 'all'
+                ? 'Tente ajustar os filtros para encontrar produtos.'
+                : 'Comece criando seu primeiro produto.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-8">
+            {getFilteredProducts.map((product: any) => {
+              const stockStatus = getStockStatus(product.stock);
+              const isOnSale = isNormalSaleActive(product);
+              const salePrice = product.salePrice || product.price;
+              const originalPrice = product.price;
+              const imageUrl = (product.imageUrls && product.imageUrls.length > 0) 
+                ? product.imageUrls[0] 
+                : product.imageUrl;
+              
+              return (
+                <Card key={product.id} className="border border-border shadow-sm transition hover:shadow-md overflow-hidden">
+                  {imageUrl && (
+                    <div className="aspect-video w-full overflow-hidden bg-muted relative">
+                      <img
+                        src={imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {isOnSale && (
+                        <div className="absolute top-2 left-2">
+                          <Badge className="bg-primary text-primary-foreground">
+                            <Zap className="h-3 w-3 mr-1" />
+                            OFERTA
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground mb-1">{product.name}</h3>
+                        <p className="text-sm text-muted-foreground">{product.category}</p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="border-border bg-muted/50 text-muted-foreground">
+                          {product.category}
+                        </Badge>
+                        <Badge 
+                          variant="outline" 
+                          className={
+                            product.isActive !== false
+                              ? 'border-border bg-muted/50 text-foreground' 
+                              : 'border-border bg-muted/50 text-muted-foreground'
+                          }
+                        >
+                          {product.isActive !== false ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                        {isOnSale && product.saleDiscountPercent && (
+                          <Badge variant="outline" className="border-border bg-muted/50 text-foreground">
+                            -{product.saleDiscountPercent}%
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          {isOnSale ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl font-semibold text-foreground">
+                                {formatPrice(salePrice)}
+                              </span>
+                              <span className="text-sm text-muted-foreground line-through">
+                                {formatPrice(originalPrice)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xl font-semibold text-foreground">
+                              {formatPrice(originalPrice)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Package className="h-4 w-4" />
+                          <span>Estoque: {product.stock || 0} unidades</span>
+                        </div>
+                        {product.sku && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Tag className="h-4 w-4" />
+                            <span>SKU: {product.sku}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-3 border-t border-border">
+                        <Badge variant="outline" className={stockStatus.color}>
+                          {stockStatus.label}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-border">
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => onViewProduct && onViewProduct(product)}
+                            title="Visualizar produto"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleEditProductById(product.id)}
+                            title="Editar produto"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            onClick={() => onDeleteProduct(product.id)}
+                            title="Deletar produto"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Card className="border border-border shadow-sm">
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <Label htmlFor="page-limit" className="text-sm">
+                      Itens por página:
+                    </Label>
+                    <select
+                      id="page-limit"
+                      value={pageLimit}
+                      onChange={(e) => onLimitChange && onLimitChange(Number(e.target.value))}
+                      className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span className="text-sm text-muted-foreground">
+                      Mostrando {((currentPage - 1) * pageLimit) + 1} - {Math.min(currentPage * pageLimit, totalProducts)} de {totalProducts} produtos
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPageChange && onPageChange(1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPageChange && onPageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <span className="text-sm text-foreground px-4">
+                      Página {currentPage} de {totalPages}
+                    </span>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPageChange && onPageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPageChange && onPageChange(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </>
   );
 }
 

@@ -38,7 +38,7 @@ import {
   Headphones,
   Store
 } from 'lucide-react';
-import { customerAPI, authAPI, storesAPI } from '@/lib/api';
+import { customerAPI, authAPI, storesAPI, shippingAPI } from '@/lib/api';
 import { env } from '@/lib/env';
 import { showAlert, showConfirm } from '@/lib/alerts';
 import {
@@ -299,6 +299,12 @@ export default function CheckoutPage() {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [storesWithDistance, setStoresWithDistance] = useState<any[]>([]);
 
+  // Cálculo de frete via Correios (backend)
+  const [shippingMode, setShippingMode] = useState<'combined' | 'separate'>('separate');
+  const [shippingQuoteStandard, setShippingQuoteStandard] = useState<any | null>(null);
+  const [shippingQuoteExpress, setShippingQuoteExpress] = useState<any | null>(null);
+  const [isLoadingShippingQuote, setIsLoadingShippingQuote] = useState(false);
+
   // Produtos recomendados
   const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
   const [isLoadingRecommended, setIsLoadingRecommended] = useState(false);
@@ -421,9 +427,23 @@ export default function CheckoutPage() {
   const shippingCost = useMemo(() => {
     // Retirada na loja é sempre grátis
     if (selectedShipping === 'pickup') return 0;
-    if (subtotal >= 500) return 0;
+    
+    // Escolher a cotação baseada no tipo de serviço selecionado
+    const quote = selectedShipping === 'express' ? shippingQuoteExpress : shippingQuoteStandard;
+    
+    // Se houver cotação de frete via Correios, usar valor conforme modo escolhido
+    if (quote) {
+      if (shippingMode === 'combined' && quote.combined?.finalPrice) {
+        return quote.combined.finalPrice;
+      }
+      if (shippingMode === 'separate' && quote.separate?.totalPrice) {
+        return quote.separate.totalPrice;
+      }
+    }
+
+    // Fallback antigo caso backend de frete não esteja configurado
     return selectedShipping === 'express' ? 49.90 : 29.90;
-  }, [subtotal, selectedShipping]);
+  }, [subtotal, selectedShipping, shippingQuoteStandard, shippingQuoteExpress, shippingMode]);
 
   const insuranceCost = shippingInsurance ? 5.00 : 0;
   const tax = subtotal * 0.1; // 10% de impostos estimados
@@ -435,6 +455,149 @@ export default function CheckoutPage() {
   const finalShippingCost = Math.max(0, shippingCost - shippingDiscount);
   
   const total = subtotal + finalShippingCost + insuranceCost + tax - productDiscount;
+
+  // Prazo estimado de entrega baseado na cotação dos Correios
+  const shippingDeadlineDays = useMemo(() => {
+    if (selectedShipping === 'pickup') return null;
+    
+    // Escolher a cotação baseada no tipo de serviço selecionado
+    const quote = selectedShipping === 'express' ? shippingQuoteExpress : shippingQuoteStandard;
+    if (!quote) return null;
+
+    if (shippingMode === 'combined' && quote.combined?.deadlineDays) {
+      return quote.combined.deadlineDays as number;
+    }
+
+    if (quote.separate?.maxDeadlineDays) {
+      return quote.separate.maxDeadlineDays as number;
+    }
+
+    return null;
+  }, [shippingQuoteStandard, shippingQuoteExpress, shippingMode, selectedShipping]);
+
+  // Buscar cotação de frete via backend (Correios) quando endereço e itens estiverem prontos
+  useEffect(() => {
+    const hasDestination =
+      shippingAddress.zipCode &&
+      shippingAddress.zipCode.replace(/\D/g, '').length === 8;
+
+    if (!hasDestination || checkoutItems.length === 0) {
+      setShippingQuoteStandard(null);
+      setShippingQuoteExpress(null);
+      return;
+    }
+
+    // Identificar lojas distintas considerando storeId direto e storeInventory
+    const distinctStores = new Set<string>();
+    checkoutItems.forEach((item) => {
+      // Se tiver storeId direto, usar ele
+      if (item.product.storeId) {
+        distinctStores.add(item.product.storeId);
+        console.log(`📦 Produto ${item.product.id}: usando storeId direto ${item.product.storeId}`);
+      }
+      // Se não tiver, usar a primeira loja do storeInventory com estoque
+      else if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
+        console.log(`📦 Produto ${item.product.id}: tem ${item.product.storeInventory.length} lojas no storeInventory`);
+        const availableStore = item.product.storeInventory
+          .find((inv: any) => inv.store?.isActive && inv.quantity >= item.quantity);
+        if (availableStore) {
+          distinctStores.add(availableStore.storeId);
+          console.log(`📦 Produto ${item.product.id}: usando loja ${availableStore.storeId} (${availableStore.store?.name}) do storeInventory com estoque`);
+        } else {
+          // Se nenhuma tem estoque suficiente, usar a primeira loja ativa
+          const firstActive = item.product.storeInventory.find((inv: any) => inv.store?.isActive);
+          if (firstActive) {
+            distinctStores.add(firstActive.storeId);
+            console.log(`📦 Produto ${item.product.id}: usando primeira loja ativa ${firstActive.storeId} (${firstActive.store?.name}) do storeInventory`);
+          } else {
+            console.warn(`⚠️ Produto ${item.product.id}: nenhuma loja ativa encontrada no storeInventory`);
+          }
+        }
+      } else {
+        console.warn(`⚠️ Produto ${item.product.id}: sem storeId e sem storeInventory`);
+      }
+    });
+    
+    console.log(`🏪 Lojas distintas identificadas: ${Array.from(distinctStores).join(', ')}`);
+
+    const mode: 'combined' | 'separate' | 'both' =
+      distinctStores.length > 1 ? 'both' : 'separate';
+
+    const itemsPayload = checkoutItems.map((item) => ({
+      productId: item.product.id,
+      quantity: item.quantity,
+    }));
+
+    const fetchQuotes = async () => {
+      setIsLoadingShippingQuote(true);
+      try {
+        console.log('📦 Calculando cotações de frete:', {
+          cep: shippingAddress.zipCode,
+          cidade: shippingAddress.city,
+          estado: shippingAddress.state,
+          mode,
+          itemsCount: itemsPayload.length,
+          items: itemsPayload,
+        });
+
+        // Calcular ambos os tipos de serviço em paralelo
+        const [quoteStandard, quoteExpress] = await Promise.all([
+          shippingAPI.calculateQuote({
+            destinationZipCode: shippingAddress.zipCode,
+            destinationCity: shippingAddress.city,
+            destinationState: shippingAddress.state,
+            mode,
+            serviceType: 'standard',
+            items: itemsPayload,
+          }),
+          shippingAPI.calculateQuote({
+            destinationZipCode: shippingAddress.zipCode,
+            destinationCity: shippingAddress.city,
+            destinationState: shippingAddress.state,
+            mode,
+            serviceType: 'express',
+            items: itemsPayload,
+          }),
+        ]);
+
+        console.log('📦 Cotações recebidas:', {
+          standard: {
+            hasSeparate: !!quoteStandard.separate,
+            separateGroups: quoteStandard.separate?.groups?.length || 0,
+            separateTotal: quoteStandard.separate?.totalPrice,
+            hasCombined: !!quoteStandard.combined,
+            combinedPrice: quoteStandard.combined?.finalPrice,
+          },
+          express: {
+            hasSeparate: !!quoteExpress.separate,
+            separateGroups: quoteExpress.separate?.groups?.length || 0,
+            separateTotal: quoteExpress.separate?.totalPrice,
+            hasCombined: !!quoteExpress.combined,
+            combinedPrice: quoteExpress.combined?.finalPrice,
+          },
+        });
+
+        setShippingQuoteStandard(quoteStandard);
+        setShippingQuoteExpress(quoteExpress);
+
+        // Ajustar modo padrão dependendo se existe opção combinada
+        if (mode === 'both' && quoteStandard.combined) {
+          setShippingMode('separate'); // começa em separado, cliente pode mudar
+        } else {
+          setShippingMode('separate');
+        }
+      } catch (error) {
+        console.error('Erro ao calcular frete via Correios:', error);
+        // Não bloquear o checkout: manter fallback fixo
+        setShippingQuoteStandard(null);
+        setShippingQuoteExpress(null);
+      } finally {
+        setIsLoadingShippingQuote(false);
+      }
+    };
+
+    fetchQuotes();
+  }, [shippingAddress.zipCode, shippingAddress.city, shippingAddress.state, checkoutItems]);
 
 
   // Função para parsear endereço completo em partes
@@ -1984,7 +2147,21 @@ export default function CheckoutPage() {
         const selectedStoreData = stores.find((s: any) => s.id === selectedStore);
         notes += `Retirada na loja: ${selectedStoreData?.name || 'Loja selecionada'}. `;
       } else {
-        notes += `Frete: ${selectedShipping === 'express' ? 'Expresso' : 'Padrão'}. `;
+        notes += `Frete: ${selectedShipping === 'express' ? 'Expresso (SEDEX)' : 'Padrão (PAC)'}. `;
+        const quote = selectedShipping === 'express' ? shippingQuoteExpress : shippingQuoteStandard;
+        if (quote) {
+          if (shippingMode === 'combined' && quote.combined) {
+            notes += ` | Modo frete COMBINADO (todas as lojas juntas). Valor base somado: R$ ${Number(
+              quote.combined.basePriceSum || 0,
+            ).toFixed(2)}, desconto: ${quote.combined.discountPercent || 0}%, prazo estimado: ${
+              quote.combined.deadlineDays
+            } dia(s). `;
+          } else if (shippingMode === 'separate' && quote.separate) {
+            notes += ` | Modo frete SEPARADO por loja. Valor total: R$ ${Number(
+              quote.separate.totalPrice || 0,
+            ).toFixed(2)}, maior prazo entre lojas: ${quote.separate.maxDeadlineDays} dia(s). `;
+          }
+        }
         notes += shippingInsurance ? 'Com seguro de envio. ' : 'Sem seguro. ';
       }
       if (appliedCoupon) {
@@ -2512,13 +2689,33 @@ export default function CheckoutPage() {
                             <div>
                               <div className="font-semibold text-[#3e2626]">Entrega Padrão</div>
                               <div className="text-sm text-gray-600">
-                                {shippingCost === 0 ? (
-                                  <span className="text-green-600 font-semibold">Grátis</span>
-                                ) : (
-                                  `R$ ${shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                                )}
+                                {isLoadingShippingQuote ? (
+                                  <span className="text-gray-400">Calculando...</span>
+                                ) : (() => {
+                                  const quote = shippingQuoteStandard;
+                                  let price = 29.90; // fallback
+                                  if (quote) {
+                                    if (shippingMode === 'combined' && quote.combined?.finalPrice) {
+                                      price = quote.combined.finalPrice;
+                                    } else if (shippingMode === 'separate' && quote.separate?.totalPrice) {
+                                      price = quote.separate.totalPrice;
+                                    }
+                                  }
+                                  return `R$ ${price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                                })()}
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">Entrega em 7-10 dias úteis</div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {isLoadingShippingQuote ? (
+                                  'Calculando prazo...'
+                                ) : (() => {
+                                  const quote = shippingQuoteStandard;
+                                  if (!quote) return 'Entrega em 7-10 dias úteis';
+                                  const days = shippingMode === 'combined' && quote.combined?.deadlineDays
+                                    ? quote.combined.deadlineDays
+                                    : quote.separate?.maxDeadlineDays || 10;
+                                  return `Entrega em até ${days} dia${days > 1 ? 's' : ''} útil${days > 1 ? 'eis' : ''}`;
+                                })()}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -2542,9 +2739,33 @@ export default function CheckoutPage() {
                             <div>
                               <div className="font-semibold text-[#3e2626]">Entrega Expressa</div>
                               <div className="text-sm text-gray-600">
-                                R$ {shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                {isLoadingShippingQuote ? (
+                                  <span className="text-gray-400">Calculando...</span>
+                                ) : (() => {
+                                  const quote = shippingQuoteExpress;
+                                  let price = 49.90; // fallback
+                                  if (quote) {
+                                    if (shippingMode === 'combined' && quote.combined?.finalPrice) {
+                                      price = quote.combined.finalPrice;
+                                    } else if (shippingMode === 'separate' && quote.separate?.totalPrice) {
+                                      price = quote.separate.totalPrice;
+                                    }
+                                  }
+                                  return `R$ ${price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                                })()}
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">Entrega em 2-3 dias úteis</div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {isLoadingShippingQuote ? (
+                                  'Calculando prazo...'
+                                ) : (() => {
+                                  const quote = shippingQuoteExpress;
+                                  if (!quote) return 'Entrega em 2-3 dias úteis';
+                                  const days = shippingMode === 'combined' && quote.combined?.deadlineDays
+                                    ? quote.combined.deadlineDays
+                                    : quote.separate?.maxDeadlineDays || 3;
+                                  return `Entrega em até ${days} dia${days > 1 ? 's' : ''} útil${days > 1 ? 'eis' : ''}`;
+                                })()}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -2883,9 +3104,16 @@ export default function CheckoutPage() {
                     <span className="font-semibold">R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
 
-                  <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-sm">
                     <span className="text-gray-600">
-                      {selectedShipping === 'pickup' ? 'Retirada na Loja' : 'Frete'}
+                      {selectedShipping === 'pickup'
+                        ? 'Retirada na Loja'
+                        : (() => {
+                            const quote = selectedShipping === 'express' ? shippingQuoteExpress : shippingQuoteStandard;
+                            return quote && (quote.combined || quote.separate)
+                              ? `Frete (${shippingMode === 'combined' && quote.combined ? 'tudo junto' : 'por loja'})`
+                              : 'Frete';
+                          })()}
                     </span>
                     <span className="font-semibold">
                       {finalShippingCost === 0 ? (
@@ -2911,6 +3139,13 @@ export default function CheckoutPage() {
                       )}
                     </span>
                   </div>
+
+                  {shippingDeadlineDays && selectedShipping !== 'pickup' && (
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Prazo estimado</span>
+                      <span>até {shippingDeadlineDays} dia{shippingDeadlineDays > 1 ? 's' : ''} úteis</span>
+                    </div>
+                  )}
 
                   {insuranceCost > 0 && (
                     <div className="flex justify-between text-sm">

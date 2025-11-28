@@ -89,12 +89,8 @@ export default function PDVPage() {
         // Se tem produtos para retirar, mostrar informações e aguardar confirmação
         showAlert('info', `Cliente encontrado: ${customer.name}. Há ${pickupOrders.length} pedido(s) para retirada.`);
       } else {
-        // Se não tem produtos para retirar, entrar automaticamente no PDV
-        showAlert('success', `Cliente encontrado: ${customer.name}. Iniciando PDV...`);
-        // Pequeno delay para mostrar a mensagem
-        setTimeout(() => {
-          setShowPDV(true);
-        }, 500);
+        // Se não tem produtos para retirar, apenas mostrar mensagem de sucesso
+        showAlert('success', `Cliente encontrado: ${customer.name}.`);
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || 'Cliente não encontrado';
@@ -354,7 +350,7 @@ export default function PDVPage() {
                           </div>
 
                           {/* Pedidos para Retirada */}
-                          {hasPickupOrders && (
+                          {hasPickupOrders ? (
                             <div className="mt-4 pt-4 border-t border-yellow-200 bg-yellow-50 rounded-lg p-4">
                               <div className="flex items-start gap-3">
                                 <div className="p-2 bg-yellow-500 rounded-lg">
@@ -406,6 +402,19 @@ export default function PDVPage() {
                                   </div>
                                 </div>
                               )}
+                            </div>
+                          ) : (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                <div className="p-2 bg-gray-100 rounded-lg">
+                                  <Package className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-600">
+                                    Nenhum produto pendente para retirada
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           )}
 

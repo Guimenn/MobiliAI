@@ -1,24 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAppStore } from '@/lib/store';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { salesAPI, timeClockAPI } from '@/lib/api';
-import { 
-  Clock, 
-  ShoppingCart, 
-  DollarSign, 
-  TrendingUp, 
-  CheckCircle, 
-  XCircle,
+import { Progress } from '@/components/ui/progress';
+import { salesAPI, timeClockAPI, notificationsAPI } from '@/lib/api';
+import { useAppStore } from '@/lib/store';
+import {
+  Clock,
+  ShoppingCart,
+  DollarSign,
+  ArrowUpRight,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
+  User,
+  Package,
   Receipt,
   Target,
-  ArrowRight,
-  Loader2,
-  User,
-  AlertTriangle,
   Truck,
 } from 'lucide-react';
 
@@ -40,16 +42,47 @@ interface SaleEntry {
   employeeId?: string;
 }
 
+const formatNumber = (value?: number | string | null) => {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) {
+    return '--';
+  }
+  return new Intl.NumberFormat('pt-BR').format(Number(value));
+};
+
+const formatCurrency = (value?: number | string | null) => {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) {
+    return '--';
+  }
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(Number(value));
+};
+
+const formatPercent = (value?: number | null) => {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return '--';
+  }
+  return `${value.toFixed(1)}%`;
+};
+
+const clampPercentage = (value?: number | null) => {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return 0;
+  }
+  return Math.min(100, Math.max(0, value));
+};
+
 export default function EmployeeDashboard() {
   const { user, isAuthenticated, token } = useAppStore();
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Time Clock Data
   const [lastTimeClock, setLastTimeClock] = useState<TimeClockEntry | null>(null);
   const [hoursWorkedToday, setHoursWorkedToday] = useState({ hours: 0, minutes: 0 });
-  const [hasOpenEntry, setHasOpenEntry] = useState(false);
   const [workStatus, setWorkStatus] = useState<'Trabalhando' | 'Fora de Serviço'>('Fora de Serviço');
   const [nextAction, setNextAction] = useState<'Entrada' | 'Saída'>('Entrada');
   const [timeClockHistory, setTimeClockHistory] = useState<TimeClockEntry[]>([]);
@@ -63,6 +96,7 @@ export default function EmployeeDashboard() {
     progressoMeta: 0,
   });
   const [salesHistory, setSalesHistory] = useState<SaleEntry[]>([]);
+  const [realNotifications, setRealNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -79,97 +113,123 @@ export default function EmployeeDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (user?.id && token) {
-      fetchDashboardData();
-      // Atualizar dados a cada 30 segundos
-      const interval = setInterval(fetchDashboardData, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [user?.id, token]);
+  const fetchData = useCallback(
+    async (controller?: { cancelled: boolean }) => {
+      const signal = controller ?? { cancelled: false };
+      if (!user?.id || !token) return;
+      
+      setIsLoading(true);
+      setError(null);
 
-  const fetchDashboardData = async () => {
-    if (!user?.id || !token) return;
+      try {
+        const [salesData, timeClockData, notificationsResponse] = await Promise.all([
+          fetchSalesData(),
+          fetchTimeClockData(),
+          notificationsAPI.getAll(1, 50).catch(err => {
+            console.warn('Erro ao buscar notificações:', err);
+            return { notifications: [], total: 0 };
+          }),
+        ]);
 
-    try {
-      setLoading(true);
+        if (signal.cancelled) return;
 
-      // Buscar dados de vendas e ponto em paralelo
-      const [salesData, timeClockData] = await Promise.all([
-        fetchSalesData(),
-        fetchTimeClockData()
-      ]);
+        // Processar dados de ponto
+        if (timeClockData.records && timeClockData.records.length > 0) {
+          const today = new Date().toISOString().split('T')[0];
+          const todayEntry = timeClockData.records.find((entry: TimeClockEntry) => entry.date === today);
+          
+          if (todayEntry) {
+            setLastTimeClock(todayEntry);
+            setWorkStatus(todayEntry.clockOut ? 'Fora de Serviço' : 'Trabalhando');
+            setNextAction(todayEntry.clockOut ? 'Entrada' : 'Saída');
 
-      // Processar dados de ponto
-      if (timeClockData.records && timeClockData.records.length > 0) {
-        const today = new Date().toISOString().split('T')[0];
-        const todayEntry = timeClockData.records.find((entry: TimeClockEntry) => entry.date === today);
-        
-        if (todayEntry) {
-          setLastTimeClock(todayEntry);
-          setHasOpenEntry(!todayEntry.clockOut);
-          setWorkStatus(todayEntry.clockOut ? 'Fora de Serviço' : 'Trabalhando');
-          setNextAction(todayEntry.clockOut ? 'Entrada' : 'Saída');
-
-          // Calcular horas trabalhadas hoje
-          if (todayEntry.clockIn && todayEntry.clockOut) {
-            const hours = todayEntry.totalHours || 0;
-            setHoursWorkedToday({
-              hours: Math.floor(hours),
-              minutes: Math.round((hours - Math.floor(hours)) * 60)
-            });
-          } else if (todayEntry.clockIn) {
-            // Calcular horas parciais se ainda está trabalhando
-            const now = new Date();
-            const clockInTime = new Date(`${todayEntry.date}T${todayEntry.clockIn}`);
-            const diffMs = now.getTime() - clockInTime.getTime();
-            const diffHours = diffMs / (1000 * 60 * 60);
-            setHoursWorkedToday({
-              hours: Math.floor(diffHours),
-              minutes: Math.round((diffHours - Math.floor(diffHours)) * 60)
-            });
+            // Calcular horas trabalhadas hoje
+            if (todayEntry.clockIn && todayEntry.clockOut) {
+              const hours = todayEntry.totalHours || 0;
+              setHoursWorkedToday({
+                hours: Math.floor(hours),
+                minutes: Math.round((hours - Math.floor(hours)) * 60)
+              });
+            } else if (todayEntry.clockIn) {
+              // Calcular horas parciais se ainda está trabalhando
+              const now = new Date();
+              const clockInTime = new Date(`${todayEntry.date}T${todayEntry.clockIn}`);
+              const diffMs = now.getTime() - clockInTime.getTime();
+              const diffHours = diffMs / (1000 * 60 * 60);
+              setHoursWorkedToday({
+                hours: Math.floor(diffHours),
+                minutes: Math.round((diffHours - Math.floor(diffHours)) * 60)
+              });
+            }
           }
+
+          // Histórico de pontos (últimos 3 registros)
+          setTimeClockHistory(
+            timeClockData.records
+              .slice(0, 3)
+              .map((entry: TimeClockEntry) => ({
+                ...entry,
+                status: entry.clockOut ? 'Registrado' : 'Pendente'
+              }))
+          );
         }
 
-        // Histórico de pontos (últimos 3 registros)
-        setTimeClockHistory(
-          timeClockData.records
-            .slice(0, 3)
-            .map((entry: TimeClockEntry) => ({
-              ...entry,
-              status: entry.clockOut ? 'Registrado' : 'Pendente'
-            }))
-        );
-      }
+        // Processar dados de vendas
+        if (salesData.sales) {
+          const total = salesData.sales.reduce((sum: number, sale: SaleEntry) => 
+            sum + Number(sale.totalAmount), 0);
+          const count = salesData.sales.length;
+          const avg = count > 0 ? total / count : 0;
+          const metaDia = 5000;
+          const progressoMeta = metaDia > 0 ? (total / metaDia) * 100 : 0;
+          
+          setSalesStats({
+            totalVendas: total,
+            numeroVendas: count,
+            ticketMedio: avg,
+            metaDia: metaDia,
+            progressoMeta: Math.min(progressoMeta, 100),
+          });
 
-      // Processar dados de vendas
-      if (salesData.sales) {
-        const total = salesData.sales.reduce((sum: number, sale: SaleEntry) => 
-          sum + Number(sale.totalAmount), 0);
-        const count = salesData.sales.length;
-        const avg = count > 0 ? total / count : 0;
-        const metaDia = 5000;
-        const progressoMeta = metaDia > 0 ? (total / metaDia) * 100 : 0;
-        
-        setSalesStats({
-          totalVendas: total,
-          numeroVendas: count,
-          ticketMedio: avg,
-          metaDia: metaDia,
-          progressoMeta: Math.min(progressoMeta, 100),
-        });
+          // Histórico de vendas (últimas 3)
+          setSalesHistory(
+            salesData.sales.slice(0, 3).map((sale: SaleEntry) => sale)
+          );
+        }
 
-        // Histórico de vendas (últimas 3)
-        setSalesHistory(
-          salesData.sales.slice(0, 3).map((sale: SaleEntry) => sale)
-        );
+        // Processar notificações
+        const notifications = notificationsResponse?.notifications || [];
+        setRealNotifications(notifications);
+      } catch (err) {
+        console.error('Erro ao carregar dashboard:', err);
+        if (!signal.cancelled) {
+          setError('Não foi possível carregar os dados do dashboard. Tente novamente em instantes.');
+        }
+      } finally {
+        if (!signal.cancelled) {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Erro ao buscar dados do dashboard:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [user?.id, token]
+  );
+
+  useEffect(() => {
+    const state = { cancelled: false };
+    void fetchData(state);
+    
+    // Atualizar dados a cada 30 segundos
+    const interval = setInterval(() => {
+      if (!state.cancelled) {
+        void fetchData(state);
+      }
+    }, 30000);
+    
+    return () => {
+      state.cancelled = true;
+      clearInterval(interval);
+    };
+  }, [fetchData]);
 
   const fetchSalesData = async () => {
     if (!user?.id) return { sales: [] };
@@ -222,10 +282,6 @@ export default function EmployeeDashboard() {
     router.push('/employee/timeclock');
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
-
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('pt-BR', { 
       hour: '2-digit', 
@@ -245,307 +301,391 @@ export default function EmployeeDashboard() {
     return new Date(dateString).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
   };
 
-  if (loading) {
+  const dateTimeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat('pt-BR', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      }),
+    []
+  );
+
+  const overviewCards = useMemo(() => [
+    {
+      title: 'Total vendido hoje',
+      value: formatCurrency(salesStats.totalVendas),
+      helper: `${formatNumber(salesStats.numeroVendas)} venda(s) realizada(s)`,
+      icon: DollarSign,
+    },
+    {
+      title: 'Horas trabalhadas',
+      value: `${hoursWorkedToday.hours}h ${hoursWorkedToday.minutes}m`,
+      helper: 'Meta: 8h diárias',
+      icon: Clock,
+    },
+    {
+      title: 'Ticket médio',
+      value: formatCurrency(salesStats.ticketMedio),
+      helper: 'Valor médio por venda',
+      icon: Receipt,
+    },
+    {
+      title: 'Status do ponto',
+      value: workStatus,
+      helper: `Próximo: ${nextAction}`,
+      icon: User,
+    },
+  ], [salesStats, hoursWorkedToday, workStatus, nextAction]);
+
+  const heroHighlights = useMemo(() => [
+    {
+      label: 'Meta do dia',
+      value: formatCurrency(salesStats.metaDia),
+      description: `${formatPercent(salesStats.progressoMeta)} da meta alcançada`,
+      icon: Target,
+    },
+    {
+      label: 'Vendas realizadas',
+      value: formatNumber(salesStats.numeroVendas),
+      description: realNotifications.filter(n => !n.isRead).length > 0
+        ? `${formatNumber(realNotifications.filter(n => !n.isRead).length)} notificações não lidas`
+        : 'Tudo atualizado',
+      icon: ShoppingCart,
+    },
+    {
+      label: 'Último ponto',
+      value: lastTimeClock?.clockIn || lastTimeClock?.clockOut || '--:--',
+      description: lastTimeClock?.clockOut ? 'Saída registrada' : lastTimeClock?.clockIn ? 'Entrada registrada' : 'Nenhum registro',
+      icon: Clock,
+    },
+  ], [salesStats, realNotifications, lastTimeClock]);
+
+  const quickActions = useMemo(() => [
+    {
+      name: 'Bater ponto',
+      description: 'Registre sua entrada ou saída do trabalho.',
+      href: '/employee/timeclock',
+      indicator: workStatus === 'Trabalhando' ? 'Em serviço' : 'Fora de serviço',
+      icon: Clock,
+    },
+    {
+      name: 'Nova venda',
+      description: 'Registre uma nova venda no PDV.',
+      href: '/employee/pdv',
+      indicator: `${formatNumber(salesStats.numeroVendas)} vendas hoje`,
+      icon: ShoppingCart,
+    },
+    {
+      name: 'Pedidos online',
+      description: 'Gerencie pedidos para retirada na loja.',
+      href: '/employee/orders-online',
+      indicator: 'Acompanhar entregas',
+      icon: Truck,
+    },
+    {
+      name: 'Histórico de vendas',
+      description: 'Visualize todas as suas vendas realizadas.',
+      href: '/employee/sales',
+      indicator: `${formatNumber(salesStats.numeroVendas)} registros`,
+      icon: Receipt,
+    },
+  ], [salesStats, workStatus]);
+
+  const operationalMetrics = useMemo(() => [
+    {
+      title: 'Progresso da meta diária',
+      value: formatPercent(salesStats.progressoMeta),
+      helper: `${formatCurrency(salesStats.totalVendas)} de ${formatCurrency(salesStats.metaDia)}`,
+      progress: clampPercentage(salesStats.progressoMeta),
+      tone: 'success' as const,
+    },
+    {
+      title: 'Horas trabalhadas hoje',
+      value: `${hoursWorkedToday.hours}h ${hoursWorkedToday.minutes}m`,
+      helper: 'Meta: 8h diárias',
+      progress: clampPercentage((hoursWorkedToday.hours * 60 + hoursWorkedToday.minutes) / 8 / 60 * 100),
+      tone: 'default' as const,
+    },
+    {
+      title: 'Taxa de conversão',
+      value: salesStats.numeroVendas > 0 ? '100%' : '0%',
+      helper: `${formatNumber(salesStats.numeroVendas)} venda(s) concluída(s)`,
+      progress: salesStats.numeroVendas > 0 ? 100 : 0,
+      tone: 'default' as const,
+    },
+  ], [salesStats, hoursWorkedToday]);
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/40">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 text-[#3e2626] animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Carregando dados...</p>
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-b-primary" />
+          <p className="text-sm text-muted-foreground">Carregando informações do painel...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-3xl border border-destructive/40 bg-destructive/5 p-10 text-center">
+        <div className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-destructive/40 bg-destructive/10 text-destructive">
+          <AlertTriangle className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground">Erro ao carregar o dashboard</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+        <Button className="mt-6" onClick={() => fetchData()}>
+          Tentar novamente
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      {/* Seção de Ponto */}
-      <div className="space-y-6">
-        {/* Cards Superiores - Ponto */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Último Ponto */}
-          <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 font-medium mb-2">Último Ponto</p>
-                  <p className="text-3xl font-bold text-gray-900 mb-2">
-                    {lastTimeClock?.clockIn || lastTimeClock?.clockOut || '--:--'}
-                  </p>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm text-gray-600">
-                      {lastTimeClock?.clockOut ? 'Saída registrada' : lastTimeClock?.clockIn ? 'Entrada registrada' : 'Nenhum registro'}
-                    </span>
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl space-y-4">
+            <Badge
+              variant="outline"
+              className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+            >
+              Painel do funcionário
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+                Bem-vindo ao seu painel de trabalho
+              </h1>
+              <p className="text-sm text-primary-foreground/80 lg:text-base">
+                Acompanhe suas vendas, registre seu ponto e gerencie pedidos online em tempo real.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+                <Link href="/employee/pdv">
+                  Nova venda
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                onClick={handleBaterPonto}
+              >
+                Bater ponto
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid w-full max-w-md grid-cols-1 gap-4 sm:grid-cols-3 lg:max-w-2xl">
+            {heroHighlights.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.label}
+                  className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-4 overflow-hidden min-w-0 flex flex-col"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground flex-shrink-0 mb-4">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <p className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold leading-tight" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{item.value}</p>
+                    <p className="text-xs uppercase tracking-wide text-primary-foreground/70 mt-2 break-words">{item.label}</p>
+                    <p className="mt-1 text-xs text-primary-foreground/70 break-words line-clamp-2">{item.description}</p>
                   </div>
                 </div>
-                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
-                  <Clock className="h-7 w-7 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Horas Trabalhadas */}
-          <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 font-medium mb-2">Horas Trabalhadas</p>
-                  <p className="text-3xl font-bold text-gray-900 mb-2">
-                    {hoursWorkedToday.hours}h {hoursWorkedToday.minutes}m
-                  </p>
-                  <p className="text-sm text-gray-600">Meta: 8h</p>
-                </div>
-                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
-                  <TrendingUp className="h-7 w-7 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Status */}
-          <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 font-medium mb-2">Status</p>
-                  <p className="text-3xl font-bold text-gray-900 mb-2">{workStatus}</p>
-                  <div className="flex items-center space-x-2">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm text-gray-600">Próximo: {nextAction}</span>
-                  </div>
-                </div>
-                <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center">
-                  <User className="h-7 w-7 text-orange-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              );
+            })}
+          </div>
         </div>
+      </section>
 
-        {/* Relógio e Botão Bater Ponto */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Relógio Grande */}
-          <Card className="lg:col-span-2 bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
-            <CardContent className="p-8">
-              <div className="text-center">
-                <div className="text-7xl font-bold text-[#3e2626] mb-4">
-                  {formatTime(currentTime)}
-                </div>
-                <p className="text-lg text-gray-600 font-medium">Horário atual</p>
-                <div className="mt-8">
-                  <Button
-                    onClick={handleBaterPonto}
-                    className="bg-[#3e2626] hover:bg-[#2a1f1f] text-white px-12 py-6 text-xl font-bold rounded-2xl shadow-xl flex items-center space-x-3 mx-auto transform hover:scale-105 transition-all duration-300"
-                    size="lg"
-                  >
-                    <Clock className="h-6 w-6" />
-                    <span>Bater Ponto</span>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Histórico de Pontos */}
-          <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-bold text-gray-900">Histórico de Pontos</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {timeClockHistory.length > 0 ? (
-                timeClockHistory.map((entry, index) => (
-                  <div key={index} className="space-y-2 pb-4 border-b border-gray-100 last:border-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-900">
-                        {entry.clockIn ? 'Entrada' : entry.clockOut ? 'Saída' : '--'}
-                      </span>
-                      <span className="text-xs text-gray-500">{getTimeLabel(entry.date)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-base font-medium text-gray-700">
-                        {entry.clockIn || entry.clockOut || '--:--'}
-                      </span>
-                      <div className="flex items-center space-x-1">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-xs text-green-600 font-medium">Registrado</span>
-                      </div>
-                    </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {overviewCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <Card key={card.title} className="border border-border shadow-sm">
+              <CardContent className="flex flex-col gap-4 p-6">
+                <div className="flex items-center justify-between">
+                  <div className="rounded-xl bg-muted/60 p-3">
+                    <Icon className="h-5 w-5 text-primary" />
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-4">
-                  <Clock className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Nenhum registro</p>
+                  <Badge variant="outline" className="border-transparent text-xs text-muted-foreground">
+                    Indicador-chave
+                  </Badge>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                <div className="space-y-1">
+                  <p className="text-3xl font-semibold text-foreground">{card.value}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
+                  <p className="text-xs text-muted-foreground/80">{card.helper}</p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Seção de Vendas */}
-      <div className="space-y-6">
-        <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl overflow-hidden">
-          <CardHeader className="bg-[#3e2626] text-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                  <ShoppingCart className="h-6 w-6" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl text-white">Vendas do Dia</CardTitle>
-                  <p className="text-sm text-white/80 mt-1">Acompanhe seu desempenho</p>
-                </div>
-              </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <Card className="xl:col-span-2 border border-border shadow-sm">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg font-semibold text-foreground">Ações rápidas</CardTitle>
+              <CardDescription>
+                Atalhos diretos para as áreas mais acessadas do seu painel.
+              </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="p-6 space-y-6">
-            {/* Cards de Métricas de Vendas */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Total Vendido */}
-              <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <DollarSign className="h-8 w-8 text-blue-200" />
-                    <span className="text-xs font-semibold text-blue-100 bg-white/20 px-2 py-1 rounded-full">
-                      {salesStats.progressoMeta.toFixed(0)}%
-                    </span>
-                  </div>
-                  <p className="text-2xl font-bold mb-1">{formatCurrency(salesStats.totalVendas)}</p>
-                  <p className="text-xs text-blue-100 font-medium">Total Vendido</p>
-                </CardContent>
-              </Card>
-
-              {/* Nº de Vendas */}
-              <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0 shadow-lg">
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <ShoppingCart className="h-8 w-8 text-green-200" />
-                    <span className="text-xs font-semibold text-green-100 bg-white/20 px-2 py-1 rounded-full">
-                      +{salesStats.numeroVendas}
-                    </span>
-                  </div>
-                  <p className="text-2xl font-bold mb-1">{salesStats.numeroVendas}</p>
-                  <p className="text-xs text-green-100 font-medium">Nº de Vendas</p>
-                </CardContent>
-              </Card>
-
-              {/* Ticket Médio */}
-              <Card className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white border-0 shadow-lg">
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <Receipt className="h-8 w-8 text-purple-200" />
-                    <span className="text-xs font-semibold text-purple-100 bg-white/20 px-2 py-1 rounded-full">
-                      Média
-                    </span>
-                  </div>
-                  <p className="text-2xl font-bold mb-1">{formatCurrency(salesStats.ticketMedio)}</p>
-                  <p className="text-xs text-purple-100 font-medium">Ticket Médio</p>
-                </CardContent>
-              </Card>
-
-              {/* Meta do Dia */}
-              <Card className="bg-gradient-to-br from-orange-500 to-amber-600 text-white border-0 shadow-lg">
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <Target className="h-8 w-8 text-orange-200" />
-                    <span className="text-xs font-semibold text-orange-100 bg-white/20 px-2 py-1 rounded-full">
-                      {salesStats.progressoMeta.toFixed(0)}%
-                    </span>
-                  </div>
-                  <p className="text-2xl font-bold mb-1">{formatCurrency(salesStats.metaDia)}</p>
-                  <p className="text-xs text-orange-100 font-medium">Meta do Dia</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Grid com Histórico de Vendas e Ações Rápidas */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Histórico de Vendas */}
-              <Card className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-bold text-gray-900">Histórico de Vendas</CardTitle>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => router.push('/employee/sales')}
-                      className="text-[#3e2626] hover:bg-[#3e2626]/10"
-                    >
-                      Ver todas <ArrowRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {salesHistory.length > 0 ? (
-                    salesHistory.map((sale, index) => (
-                      <div key={index} className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl hover:shadow-md transition-all">
-                        <div className="flex items-center space-x-3 flex-1">
-                          <div className="w-10 h-10 bg-[#3e2626] rounded-lg flex items-center justify-center">
-                            <ShoppingCart className="h-5 w-5 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-bold text-gray-900">
-                              {sale.customer?.name || 'Cliente Avulso'}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(sale.createdAt).toLocaleTimeString('pt-BR', { 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-base font-bold text-[#3e2626]">{formatCurrency(Number(sale.totalAmount))}</p>
-                          <div className="flex items-center space-x-1 mt-1">
-                            <CheckCircle className="h-3 w-3 text-green-500" />
-                            <span className="text-xs text-green-600 font-medium">Concluída</span>
-                          </div>
-                        </div>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {quickActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Link
+                    key={action.name}
+                    href={action.href}
+                    className="group flex h-full flex-col justify-between rounded-2xl border border-border bg-card p-5 transition hover:border-primary/40 hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-xl bg-primary/10 p-2 text-primary">
+                        <Icon className="h-5 w-5" />
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-sm text-gray-500">Nenhuma venda hoje</p>
+                      <div className="flex-1">
+                        <p className="text-base font-semibold text-foreground">{action.name}</p>
+                        <p className="text-sm text-muted-foreground">{action.description}</p>
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                    <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
+                      <span>{action.indicator ?? 'Acesse a área correspondente'}</span>
+                      <ArrowUpRight className="h-4 w-4 text-primary" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
-              {/* Ação Rápida - Nova Venda */}
-              <Card className="bg-[#3e2626] text-white border-0 shadow-xl">
-                <CardContent className="p-6">
-                  <div className="text-center space-y-4">
-                    <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto">
-                      <ShoppingCart className="h-8 w-8" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold mb-2">Nova Venda</h3>
-                      <p className="text-sm text-white/90 mb-4">
-                        Registre uma nova venda rapidamente
-                      </p>
-                      <Button
-                        onClick={() => router.push('/employee/pdv')}
-                        className="bg-white text-[#3e2626] hover:bg-white/90 w-full font-semibold mb-2"
-                      >
-                        Criar Venda
-                      </Button>
-                      <Button
-                        onClick={() => router.push('/employee/orders-online')}
-                        variant="outline"
-                        className="bg-white/10 text-white border-white/30 hover:bg-white/20 w-full font-semibold"
-                      >
-                        <Truck className="h-4 w-4 mr-2" />
-                        Pedidos Online
-                      </Button>
+        <Card className="border border-border shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-foreground">Indicadores operacionais</CardTitle>
+            <CardDescription>Metas e desempenho acompanhados em tempo real.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {operationalMetrics.map((metric) => (
+              <div key={metric.title} className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{metric.title}</p>
+                    <p className="text-xs text-muted-foreground">{metric.helper}</p>
+                  </div>
+                  <span
+                    className={`text-sm font-semibold ${
+                      metric.tone === 'destructive'
+                        ? 'text-destructive'
+                        : metric.tone === 'success'
+                        ? 'text-emerald-600'
+                        : 'text-foreground'
+                    }`}
+                  >
+                    {metric.value}
+                  </span>
+                </div>
+                <Progress
+                  value={metric.progress}
+                  className={`h-2 ${
+                    metric.tone === 'destructive'
+                      ? '[&>div]:bg-destructive'
+                      : metric.tone === 'success'
+                      ? '[&>div]:bg-emerald-500'
+                      : ''
+                  }`}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <Card className="xl:col-span-2 border border-border shadow-sm">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg font-semibold text-foreground">Vendas recentes</CardTitle>
+              <CardDescription>Últimas vendas realizadas hoje com destaque para valores e clientes.</CardDescription>
+            </div>
+            <Button variant="ghost" className="text-sm text-primary hover:bg-primary/10" asChild>
+              <Link href="/employee/sales">
+                Ver todas
+                <ArrowUpRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {salesHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma venda registrada hoje.</p>
+            ) : (
+              salesHistory.map((sale) => (
+                <div
+                  key={sale.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-border bg-card/80 p-4 transition hover:border-primary/40 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {sale.customer?.name || 'Cliente não identificado'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(sale.createdAt).toLocaleTimeString('pt-BR', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-start text-sm sm:items-end">
+                    <span className="font-semibold text-foreground">{formatCurrency(sale.totalAmount)}</span>
+                    <div className="flex items-center gap-1 mt-1">
+                      <CheckCircle className="h-3 w-3 text-emerald-600" />
+                      <span className="text-xs text-muted-foreground">Concluída</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-foreground">Histórico de pontos</CardTitle>
+            <CardDescription>Últimos registros de entrada e saída.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {timeClockHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum registro de ponto disponível.</p>
+            ) : (
+              timeClockHistory.map((entry, index) => (
+                <div key={index} className="flex flex-col gap-2 rounded-2xl border border-border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {entry.clockIn ? 'Entrada' : entry.clockOut ? 'Saída' : '--'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {getTimeLabel(entry.date)}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="border-transparent text-xs text-primary">
+                      {entry.clockIn || entry.clockOut || '--:--'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 text-emerald-600">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Registrado
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,8 @@ import {
   TrendingUp,
   Sparkles,
   Package,
-  AlertCircle
+  AlertCircle,
+  ArrowUpRight
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Image from 'next/image';
@@ -32,17 +33,6 @@ export default function ManagerPDVPage() {
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [foundCustomer, setFoundCustomer] = useState<any>(null);
   const [showPDV, setShowPDV] = useState(false);
-
-  // Desabilitar scroll na página
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    
-    return () => {
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-    };
-  }, []);
 
   // Função auxiliar para verificar pedidos de retirada
   const getPickupOrdersFromCustomer = (customer: any) => {
@@ -89,12 +79,8 @@ export default function ManagerPDVPage() {
         // Se tem produtos para retirar, mostrar informações e aguardar confirmação
         showAlert('info', `Cliente encontrado: ${customer.name}. Há ${pickupOrders.length} pedido(s) para retirada.`);
       } else {
-        // Se não tem produtos para retirar, entrar automaticamente no PDV
-        showAlert('success', `Cliente encontrado: ${customer.name}. Iniciando PDV...`);
-        // Pequeno delay para mostrar a mensagem
-        setTimeout(() => {
-          setShowPDV(true);
-        }, 500);
+        // Se não tem produtos para retirar, apenas mostrar mensagem de sucesso
+        showAlert('success', `Cliente encontrado: ${customer.name}.`);
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || 'Cliente não encontrado';
@@ -177,29 +163,51 @@ export default function ManagerPDVPage() {
     );
   }
 
-  // Tela inicial de busca de CPF - Design moderno
+  // Tela inicial de busca de CPF - Design padronizado
   return (
-    <div className="fixed inset-0 bg-white flex items-center justify-center p-4" style={{ height: '100vh', width: '100vw', overflow: 'hidden', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="w-full max-w-4xl mx-auto">
-        {/* Header com título */}
-        <div className="text-center mb-4">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#3e2626] rounded-2xl shadow-lg mb-2">
-            <ShoppingCart className="h-8 w-8 text-white" />
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-8 py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl space-y-4">
+            <Badge
+              variant="outline"
+              className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+            >
+              Ponto de Venda
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold leading-tight lg:text-4xl">
+                Ponto de Venda
+              </h1>
+              <p className="text-sm text-primary-foreground/80 lg:text-base">
+                Identifique o cliente pelo CPF antes de iniciar a venda ou continue sem cadastro.
+              </p>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Ponto de Venda</h1>
-          <p className="text-base text-gray-600">Identifique o cliente antes de iniciar a venda</p>
+
+          <div className="flex items-center justify-center lg:justify-end">
+            <div className="rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-6">
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary-foreground/10 text-primary-foreground mb-3">
+                <ShoppingCart className="h-8 w-8" />
+              </div>
+            </div>
+          </div>
         </div>
+      </section>
+
+      <div className="w-full max-w-4xl mx-auto">
 
         {/* Card principal */}
-        <Card className="shadow-2xl border-0 overflow-hidden">
+        <Card className="border border-border shadow-sm">
           <CardHeader className="bg-[#3e2626] text-white p-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <User className="h-7 w-7" />
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
+                <User className="h-6 w-6" />
               </div>
               <div>
                 <CardTitle className="text-2xl font-bold mb-1">Buscar Cliente</CardTitle>
-                <p className="text-white/90 text-base">Digite o CPF para identificar o cliente no sistema</p>
+                <p className="text-white/90 text-sm">Digite o CPF para identificar o cliente no sistema</p>
               </div>
             </div>
           </CardHeader>
@@ -227,7 +235,7 @@ export default function ManagerPDVPage() {
                           handleSearchCustomer();
                         }
                       }}
-                      className="pl-14 pr-20 h-16 text-xl font-semibold border-2 focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 transition-all"
+                      className="pl-14 pr-20 h-14 text-lg font-semibold border-border focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 transition-all"
                     />
                     <div className="absolute left-5 top-1/2 transform -translate-y-1/2 pointer-events-none">
                       <CreditCard className="h-6 w-6 text-gray-400" />
@@ -243,8 +251,7 @@ export default function ManagerPDVPage() {
                   <Button
                     onClick={handleSearchCustomer}
                     disabled={searchingCustomer || customerSearchCpf.length !== 11}
-                    size="lg"
-                    className="h-16 px-10 bg-[#3e2626] hover:bg-[#5a3a3a] shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                    className="h-14 px-8 bg-[#3e2626] hover:bg-[#5a3a3a] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-white"
                   >
                     {searchingCustomer ? (
                       <>
@@ -266,7 +273,7 @@ export default function ManagerPDVPage() {
                   </p>
                 )}
                 {customerSearchCpf.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     CPF formatado: {customerSearchCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}
                   </p>
                 )}
@@ -274,8 +281,8 @@ export default function ManagerPDVPage() {
 
               {/* Resultado da busca - Cliente encontrado */}
               {foundCustomer && (
-                <div className="mt-6 animate-in slide-in-from-top-4 duration-500">
-                  <Card className="border-2 border-[#3e2626]/20 bg-white shadow-xl">
+                <div className="mt-6">
+                  <Card className="border border-border shadow-sm">
                     <CardContent className="p-6">
                       <div className="flex items-start gap-6">
                         {/* Avatar do cliente */}
@@ -301,13 +308,13 @@ export default function ManagerPDVPage() {
                         <div className="flex-1 space-y-4">
                           <div>
                             <div className="flex items-center gap-3 mb-2">
-                              <h3 className="text-2xl font-bold text-gray-900">{foundCustomer.name}</h3>
+                              <h3 className="text-2xl font-bold text-foreground">{foundCustomer.name}</h3>
                               <Badge className="bg-[#3e2626] text-white font-semibold">
                                 Cliente Cadastrado
                               </Badge>
                             </div>
                             {foundCustomer._count && foundCustomer._count.purchases > 0 && (
-                              <div className="flex items-center gap-2 text-[#8B4513]">
+                              <div className="flex items-center gap-2 text-primary">
                                 <TrendingUp className="h-4 w-4" />
                                 <span className="text-sm font-medium">
                                   {foundCustomer._count.purchases} compra(s) realizada(s)
@@ -319,42 +326,42 @@ export default function ManagerPDVPage() {
                           {/* Dados do cliente */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {foundCustomer.cpf && (
-                              <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-[#3e2626]/10 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="p-2 bg-[#3e2626]/10 rounded-lg">
-                                  <CreditCard className="h-5 w-5 text-[#3e2626]" />
+                              <div className="flex items-center gap-3 p-3 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+                                <div className="p-2 bg-muted rounded-lg">
+                                  <CreditCard className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
-                                  <p className="text-xs text-gray-500 font-medium">CPF</p>
-                                  <p className="text-sm font-semibold text-gray-900">{formatCPF(foundCustomer.cpf)}</p>
+                                  <p className="text-xs text-muted-foreground font-medium">CPF</p>
+                                  <p className="text-sm font-semibold text-foreground">{formatCPF(foundCustomer.cpf)}</p>
                                 </div>
                               </div>
                             )}
                             {foundCustomer.email && (
-                              <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-[#3e2626]/10 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="p-2 bg-[#3e2626]/10 rounded-lg">
-                                  <Mail className="h-5 w-5 text-[#3e2626]" />
+                              <div className="flex items-center gap-3 p-3 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+                                <div className="p-2 bg-muted rounded-lg">
+                                  <Mail className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
-                                  <p className="text-xs text-gray-500 font-medium">Email</p>
-                                  <p className="text-sm font-semibold text-gray-900 truncate">{foundCustomer.email}</p>
+                                  <p className="text-xs text-muted-foreground font-medium">Email</p>
+                                  <p className="text-sm font-semibold text-foreground truncate">{foundCustomer.email}</p>
                                 </div>
                               </div>
                             )}
                             {foundCustomer.phone && (
-                              <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-[#3e2626]/10 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="p-2 bg-[#3e2626]/10 rounded-lg">
-                                  <Phone className="h-5 w-5 text-[#3e2626]" />
+                              <div className="flex items-center gap-3 p-3 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+                                <div className="p-2 bg-muted rounded-lg">
+                                  <Phone className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
-                                  <p className="text-xs text-gray-500 font-medium">Telefone</p>
-                                  <p className="text-sm font-semibold text-gray-900">{foundCustomer.phone}</p>
+                                  <p className="text-xs text-muted-foreground font-medium">Telefone</p>
+                                  <p className="text-sm font-semibold text-foreground">{foundCustomer.phone}</p>
                                 </div>
                               </div>
                             )}
                           </div>
 
                           {/* Pedidos para Retirada */}
-                          {hasPickupOrders && (
+                          {hasPickupOrders ? (
                             <div className="mt-4 pt-4 border-t border-yellow-200 bg-yellow-50 rounded-lg p-4">
                               <div className="flex items-start gap-3">
                                 <div className="p-2 bg-yellow-500 rounded-lg">
@@ -407,6 +414,19 @@ export default function ManagerPDVPage() {
                                 </div>
                               )}
                             </div>
+                          ) : (
+                            <div className="mt-4 pt-4 border-t border-border">
+                              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                                <div className="p-2 bg-muted rounded-lg">
+                                  <Package className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-muted-foreground">
+                                    Nenhum produto pendente para retirada
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
                           )}
 
                           {/* Botões de ação */}
@@ -414,16 +434,16 @@ export default function ManagerPDVPage() {
                             {canStartSale() ? (
                               <Button
                                 onClick={handleStartPDV}
-                                className="flex-1 bg-[#3e2626] hover:bg-[#5a3a3a] h-12 text-lg font-semibold shadow-lg text-white"
+                                className="flex-1 bg-[#3e2626] hover:bg-[#5a3a3a] h-12 text-base font-semibold text-white"
                               >
                                 <ShoppingCart className="mr-2 h-5 w-5" />
                                 {hasPickupOrders ? 'Iniciar Venda (Retirada)' : 'Iniciar Venda'}
-                                <ArrowRight className="ml-2 h-5 w-5" />
+                                <ArrowUpRight className="ml-2 h-5 w-5" />
                               </Button>
                             ) : (
                               <Button
                                 disabled
-                                className="flex-1 bg-gray-400 cursor-not-allowed h-12 text-lg font-semibold text-white"
+                                className="flex-1 bg-muted cursor-not-allowed h-12 text-base font-semibold text-muted-foreground"
                               >
                                 <AlertCircle className="mr-2 h-5 w-5" />
                                 Complete os dados para iniciar
@@ -432,7 +452,7 @@ export default function ManagerPDVPage() {
                             <Button
                               onClick={handleClearCustomer}
                               variant="outline"
-                              className="h-12 px-6 border-2 border-[#3e2626]/20 hover:bg-[#3e2626]/5 hover:border-[#3e2626]/30"
+                              className="h-12 px-6 border-border hover:bg-muted"
                             >
                               <X className="mr-2 h-5 w-5" />
                               Trocar
@@ -447,22 +467,22 @@ export default function ManagerPDVPage() {
 
               {/* Opção de continuar sem cliente - apenas se não tiver produtos para retirar */}
               {!foundCustomer && (
-                <div className="mt-8 pt-6 border-t border-gray-200">
+                <div className="mt-8 pt-6 border-t border-border">
                   <div className="text-center space-y-4">
-                    <p className="text-gray-600 text-lg">
+                    <p className="text-foreground text-base">
                       Cliente não encontrado ou deseja vender sem cadastro?
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       Para retirar produtos na loja, é necessário buscar o cliente pelo CPF.
                     </p>
                     <Button
                       onClick={handleStartPDV}
                       variant="outline"
-                      className="w-full max-w-md h-14 text-lg font-semibold border-2 border-gray-300 hover:bg-gray-50 hover:border-[#3e2626] transition-all"
+                      className="w-full max-w-md h-12 text-base font-semibold border-border hover:bg-muted"
                     >
                       <ShoppingCart className="mr-2 h-5 w-5" />
                       Continuar sem cliente cadastrado
-                      <ArrowRight className="ml-2 h-5 w-5" />
+                      <ArrowUpRight className="ml-2 h-5 w-5" />
                     </Button>
                   </div>
                 </div>
@@ -473,7 +493,7 @@ export default function ManagerPDVPage() {
 
         {/* Dica rápida */}
         <div className="mt-4 text-center">
-          <p className="text-xs text-gray-500 flex items-center justify-center gap-2">
+          <p className="text-xs text-muted-foreground flex items-center justify-center gap-2">
             <Sparkles className="h-3 w-3" />
             Dica: Digite o CPF apenas com números ou use o formato com pontos e traço
           </p>

@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAppStore } from '@/lib/store';
-import { useProductsHeader } from '@/components/products-header-context';
 import { ProductsHeaderProvider } from '@/components/products-header-context';
 import { 
   Package, 
@@ -18,9 +17,6 @@ import {
   User,
   Home,
   Sparkles,
-  Search,
-  Grid3x3,
-  List,
   Receipt,
   Monitor,
   ArrowRight,
@@ -39,133 +35,50 @@ function ProductsHeaderComponent({
   user: any; 
   router: any;
 }) {
-  const isProductsPage = pathname.startsWith('/employee/products');
-  const { searchTerm, setSearchTerm, viewMode, setViewMode } = useProductsHeader();
-
-  if (!isProductsPage) {
-    return (
-      <header className="border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label="Abrir menu lateral"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Painel funcionário
-              </p>
-              <h1 className="text-xl font-semibold text-foreground">
-                {pathname.startsWith('/employee/pdv') ? 'Ponto de Venda' : 
-                 pathname === '/employee/sales' ? 'Vendas' : 
-                 pathname === '/employee/timeclock' ? 'Ponto' : 
-                 'Dashboard'}
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push('/employee/profile')}
-              className="hidden items-center gap-3 rounded-2xl border border-border bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50 sm:flex"
-            >
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
-                  {user?.name?.charAt(0)?.toUpperCase() || 'F'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 text-left">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {user?.name || 'Funcionário'}
-                </p>
-                <p className="text-xs text-muted-foreground">Funcionário</p>
-              </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            </button>
-          </div>
-        </div>
-      </header>
-    );
-  }
-
   return (
-    <header className="bg-gradient-to-r from-[#3e2626] to-[#8B4513] border-b border-[#3e2626]/20 sticky top-0 z-30 shadow-lg">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-6 py-4">
-        <div className="flex items-center">
+    <header className="border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+      <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
-            size="sm"
-            className="lg:hidden mr-3 text-white hover:bg-white/20"
+            size="icon"
+            className="lg:hidden"
             onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Abrir menu lateral"
           >
             <Menu className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-white mb-1">Produtos</h1>
-            <p className="text-sm text-white/90">Gerencie o catálogo de produtos da loja</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Painel funcionário
+            </p>
+            <h1 className="text-xl font-semibold text-foreground">
+              {pathname.startsWith('/employee/pdv') ? 'Ponto de Venda' : 
+               pathname.startsWith('/employee/products') ? 'Produtos' :
+               pathname === '/employee/sales' ? 'Vendas' : 
+               pathname === '/employee/timeclock' ? 'Ponto' : 
+               'Dashboard'}
+            </h1>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 flex-1 md:justify-end">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Buscar produtos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-64 pl-10 bg-white border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513]"
-            />
-          </div>
-          <div className="flex items-center bg-white/20 backdrop-blur-sm rounded-lg border border-white/30 p-1">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-md transition-all ${
-                viewMode === 'grid'
-                  ? 'bg-white text-[#3e2626] shadow-md'
-                  : 'text-white hover:bg-white/20'
-              }`}
-              title="Visualização em Grid"
-            >
-              <Grid3x3 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-md transition-all ${
-                viewMode === 'list'
-                  ? 'bg-white text-[#3e2626] shadow-md'
-                  : 'text-white hover:bg-white/20'
-              }`}
-              title="Visualização em Lista"
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => router.push('/employee/profile')}
-            className="hidden md:flex items-center space-x-3 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30 hover:bg-white/30 transition-all duration-300 cursor-pointer ml-4"
+            className="hidden items-center gap-3 rounded-2xl border border-border bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50 sm:flex"
           >
-            <Avatar className="h-10 w-10 ring-2 ring-white/30 flex-shrink-0">
-              <AvatarImage 
-                src={user?.avatarUrl || ''} 
-                alt={user?.name || 'Usuário'}
-                className="object-cover"
-              />
-              <AvatarFallback className="bg-white/30 text-white font-bold">
-                {user?.name?.charAt(0).toUpperCase() || 'F'}
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
+                {user?.name?.charAt(0)?.toUpperCase() || 'F'}
               </AvatarFallback>
             </Avatar>
-            <div className="text-right">
-              <p className="text-sm font-semibold text-white">{user?.name}</p>
-              <p className="text-xs text-white/80">Funcionário</p>
+            <div className="min-w-0 text-left">
+              <p className="truncate text-sm font-medium text-foreground">
+                {user?.name || 'Funcionário'}
+              </p>
+              <p className="text-xs text-muted-foreground">Funcionário</p>
             </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           </button>
         </div>
       </div>
