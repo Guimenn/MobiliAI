@@ -19,7 +19,8 @@ import {
   CreditCard,
   Clock,
   Trophy,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
@@ -371,11 +372,8 @@ export default function ReportsPage() {
         {isLoading && !currentReport ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
-              <div className="relative">
-                <div className="w-16 h-16 border-4 border-amber-100 rounded-full"></div>
-                <div className="w-16 h-16 border-4 border-[#3e2626] border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
-              </div>
-              <p className="mt-4 text-gray-600 font-medium">Gerando relatório completo...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-[#3e2626] mx-auto mb-4" />
+              <p className="text-gray-600 font-medium">Gerando relatório completo...</p>
               <p className="text-sm text-gray-500 mt-1">Aguarde enquanto os dados são processados</p>
             </div>
           </div>
