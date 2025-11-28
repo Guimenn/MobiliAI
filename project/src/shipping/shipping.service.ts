@@ -1,10 +1,10 @@
-import { Injectable, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { CalculateShippingDto, ShippingMode, ShippingServiceType } from './dto/calculate-shipping.dto';
 
-export interface CorreiosCepResponse {
+export interface CepResponse {
   cep: string;
   logradouro?: string;
   complemento?: string;
@@ -13,72 +13,41 @@ export interface CorreiosCepResponse {
   uf?: string;
 }
 
-interface CorreiosPriceResponse {
+interface ShippingPriceResponse {
   valor: number;
   prazo: number;
-  raw?: any;
 }
 
 @Injectable()
 export class ShippingService {
   private readonly logger = new Logger(ShippingService.name);
-  private readonly correiosBaseUrl: string;
-  private readonly correiosPacCode: string; // PAC (padrão)
-  private readonly correiosSedexCode: string; // SEDEX (expresso)
-  private readonly http: AxiosInstance;
+  private readonly viaCepBaseUrl = 'https://viacep.com.br';
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {
-    // URL base da API dos Correios (REST oficial)
-    this.correiosBaseUrl =
-      this.configService.get<string>('CORREIOS_API_BASE_URL') ||
-      'https://api.correios.com.br';
-
-    // Códigos dos serviços dos Correios
-    // PAC (padrão - mais barato, mais lento): 03140 (contrato) ou 04669 (varejo)
-    this.correiosPacCode =
-      this.configService.get<string>('CORREIOS_PAC_CODE') || '04669';
-    
-    // SEDEX (expresso - mais caro, mais rápido): 03220 (varejo) ou 03298 (contrato)
-    this.correiosSedexCode =
-      this.configService.get<string>('CORREIOS_SEDEX_CODE') || '03220';
-
-    this.http = axios.create({
-      baseURL: this.correiosBaseUrl.replace(/\/+$/, ''),
-      timeout: 10000,
-    });
-  }
+  ) {}
 
   /**
-   * Consulta CEP usando API oficial dos Correios.
-   * Mantém tipagem simples para ser usada tanto no checkout quanto em outros fluxos.
+   * Consulta CEP usando ViaCEP (API pública e gratuita).
+   * Referência: https://viacep.com.br/
    */
-  async lookupCep(cep: string): Promise<CorreiosCepResponse> {
+  async lookupCep(cep: string): Promise<CepResponse> {
     const cleanCep = (cep || '').replace(/\D/g, '');
     if (cleanCep.length !== 8) {
       throw new BadRequestException('CEP inválido. Deve conter 8 dígitos numéricos.');
     }
 
-    const token = this.configService.get<string>('CORREIOS_API_TOKEN');
-    if (!token) {
-      // Não bloquear completamente o fluxo se o token não estiver configurado
-      // Isso facilita desenvolvimento local.
-      this.logger.warn('CORREIOS_API_TOKEN não configurado. lookupCep não será chamado.');
-      throw new InternalServerErrorException(
-        'Integração com Correios não configurada. Configure CORREIOS_API_TOKEN para usar este recurso.',
-      );
-    }
-
     try {
-      const response = await this.http.get(`/cep/v1/enderecos/${cleanCep}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await axios.get(`${this.viaCepBaseUrl}/ws/${cleanCep}/json/`, {
+        timeout: 10000,
       });
 
       const data = response.data;
+
+      if (data.erro) {
+        throw new BadRequestException('CEP não encontrado.');
+      }
 
       return {
         cep: data.cep || cleanCep,
@@ -89,19 +58,75 @@ export class ShippingService {
         uf: data.uf,
       };
     } catch (error: any) {
-      this.logger.error('Erro ao consultar CEP nos Correios', error?.response?.data || error.message);
-      throw new InternalServerErrorException(
-        error?.response?.data?.mensagem ||
-          'Erro ao consultar CEP nos Correios. Tente novamente mais tarde.',
+      this.logger.error('Erro ao consultar CEP no ViaCEP', error?.response?.data || error.message);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        'Erro ao consultar CEP. Tente novamente mais tarde.',
       );
     }
   }
 
   /**
-   * Chamada simplificada para cálculo de preço e prazo nos Correios.
-   * A API oficial possui muitos campos, aqui usamos o básico e mantemos extensível.
+   * Calcula distância aproximada entre dois CEPs usando uma fórmula simples.
+   * Baseado na diferença numérica dos CEPs (aproximação).
+   * Para cálculo mais preciso, seria necessário usar API de geolocalização.
    */
-  private async calculateCorreiosPriceAndDeadline(params: {
+  private calculateDistance(cepOrigem: string, cepDestino: string): number {
+    const origem = parseInt(cepOrigem.replace(/\D/g, ''), 10);
+    const destino = parseInt(cepDestino.replace(/\D/g, ''), 10);
+    
+    // Diferença absoluta entre CEPs
+    const diff = Math.abs(origem - destino);
+    
+    // Converter diferença em distância aproximada (km)
+    // Fórmula mais conservadora: usar logaritmo para suavizar diferenças grandes
+    // Base: distância mínima de 10km, máxima de 3000km
+    // Para CEPs próximos (diferença < 10000): ~10-50km
+    // Para CEPs médios (diferença 10000-100000): ~50-500km
+    // Para CEPs distantes (diferença > 100000): ~500-3000km
+    
+    let distanceKm: number;
+    if (diff < 1000) {
+      // CEPs muito próximos (mesma cidade/região)
+      distanceKm = 10 + (diff / 100);
+    } else if (diff < 10000) {
+      // CEPs na mesma região metropolitana
+      distanceKm = 20 + (diff / 500);
+    } else if (diff < 100000) {
+      // CEPs em estados diferentes mas região próxima
+      distanceKm = 100 + (diff / 200);
+    } else {
+      // CEPs muito distantes (regiões diferentes do país)
+      distanceKm = 500 + (diff / 500);
+    }
+    
+    // Limitar distância entre 10km e 3000km (Brasil tem ~4000km de extensão)
+    return Math.max(10, Math.min(3000, distanceKm));
+  }
+
+  /**
+   * Calcula peso cúbico (volume weight) para transporte.
+   * Usado quando o volume ocupa mais espaço que o peso real.
+   */
+  private calculateCubicWeight(
+    widthCm: number,
+    heightCm: number,
+    depthCm: number,
+  ): number {
+    // Fórmula: (largura × altura × profundidade) / fator de cubagem
+    // Fator de cubagem padrão: 6000 (usado pelos Correios)
+    const volumeCm3 = widthCm * heightCm * depthCm;
+    const cubicWeightKg = volumeCm3 / 6000;
+    return cubicWeightKg;
+  }
+
+  /**
+   * Calcula frete manualmente baseado em distância, peso e tipo de serviço.
+   * Não usa API dos Correios, apenas cálculos estimados.
+   */
+  private calculateShippingPriceAndDeadline(params: {
     cepOrigem: string;
     cepDestino: string;
     pesoKg: number;
@@ -109,75 +134,128 @@ export class ShippingService {
     larguraCm: number;
     alturaCm: number;
     serviceType: 'standard' | 'express';
-  }): Promise<CorreiosPriceResponse> {
-    const token = this.configService.get<string>('CORREIOS_API_TOKEN');
-    if (!token) {
-      throw new InternalServerErrorException(
-        'Integração com Correios não configurada. Configure CORREIOS_API_TOKEN para cálculo de frete.',
-      );
+  }): ShippingPriceResponse {
+    const { cepOrigem, cepDestino, pesoKg, comprimentoCm, larguraCm, alturaCm, serviceType } = params;
+
+    // Calcular distância aproximada
+    const distanceKm = this.calculateDistance(cepOrigem, cepDestino);
+
+    // Calcular peso cúbico
+    const cubicWeightKg = this.calculateCubicWeight(larguraCm, alturaCm, comprimentoCm);
+    
+    // Usar o maior entre peso real e peso cúbico
+    const effectiveWeightKg = Math.max(pesoKg, cubicWeightKg);
+    
+    // Peso mínimo de 0.3kg
+    const finalWeightKg = Math.max(0.3, effectiveWeightKg);
+
+    // Calcular preço baseado em distância e peso
+    // Fórmula ajustada para valores mais realistas de frete no Brasil
+    
+    // Preços base (em R$)
+    const basePriceStandard = 12.00; // PAC - valor base mínimo
+    const basePriceExpress = 25.00; // SEDEX - valor base mínimo
+    
+    // Taxas por km (reduzidas para valores mais realistas)
+    const ratePerKmStandard = 0.05; // R$ 0,05 por km (PAC) - mais conservador
+    const ratePerKmExpress = 0.10; // R$ 0,10 por km (SEDEX) - mais conservador
+    
+    // Taxas por kg (reduzidas)
+    const ratePerKgStandard = 1.50; // R$ 1,50 por kg (PAC)
+    const ratePerKgExpress = 3.00; // R$ 3,00 por kg (SEDEX)
+
+    // Calcular preço base
+    let price: number;
+    if (serviceType === 'express') {
+      price = basePriceExpress + (distanceKm * ratePerKmExpress) + (finalWeightKg * ratePerKgExpress);
+    } else {
+      price = basePriceStandard + (distanceKm * ratePerKmStandard) + (finalWeightKg * ratePerKgStandard);
     }
 
-    // Escolher código do serviço baseado no tipo
-    const productCode = params.serviceType === 'express' 
-      ? this.correiosSedexCode 
-      : this.correiosPacCode;
-
-    const payload = {
-      coProduto: productCode,
-      cepOrigem: params.cepOrigem.replace(/\D/g, ''),
-      cepDestino: params.cepDestino.replace(/\D/g, ''),
-      peso: Math.max(0.3, Number(params.pesoKg.toFixed(3))), // mínimo técnico de 300g
-      comprimento: Math.max(16, Math.round(params.comprimentoCm)), // mínimos sugeridos pelos Correios
-      largura: Math.max(11, Math.round(params.larguraCm)),
-      altura: Math.max(2, Math.round(params.alturaCm)),
-    };
-
-    try {
-      const response = await this.http.post('/preco/v1/nacional', payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = Array.isArray(response.data) ? response.data[0] : response.data;
-      const valor = Number(data?.pcFinal || data?.valor || 0);
-      const prazo = Number(data?.prazoEntrega || data?.prazo || 0);
-
-      if (!valor || !prazo) {
-        this.logger.warn('Resposta inesperada da API de preço/prazo dos Correios', data);
+    // Aplicar faixas de preço mais realistas baseadas em distância
+    // Para evitar valores muito altos ou muito baixos
+    if (serviceType === 'express') {
+      // SEDEX: R$ 25-150 (dependendo da distância e peso)
+      if (distanceKm < 100) {
+        price = Math.max(25, Math.min(price, 60)); // Curta distância
+      } else if (distanceKm < 500) {
+        price = Math.max(30, Math.min(price, 100)); // Média distância
+      } else {
+        price = Math.max(50, Math.min(price, 150)); // Longa distância
       }
-
-      return {
-        valor,
-        prazo,
-        raw: data,
-      };
-    } catch (error: any) {
-      this.logger.error(
-        'Erro ao calcular preço/prazo nos Correios',
-        error?.response?.data || error.message,
-      );
-      throw new InternalServerErrorException(
-        error?.response?.data?.mensagem ||
-          'Erro ao calcular frete nos Correios. Tente novamente mais tarde.',
-      );
+    } else {
+      // PAC: R$ 12-80 (dependendo da distância e peso)
+      if (distanceKm < 100) {
+        price = Math.max(12, Math.min(price, 35)); // Curta distância
+      } else if (distanceKm < 500) {
+        price = Math.max(18, Math.min(price, 50)); // Média distância
+      } else {
+        price = Math.max(30, Math.min(price, 80)); // Longa distância
+      }
     }
+
+    // Arredondar para 2 casas decimais
+    price = Math.round(price * 100) / 100;
+
+    // Calcular prazo baseado em distância
+    // Fórmula ajustada para prazos mais realistas no Brasil
+    const baseDeadlineStandard = 5; // 5 dias úteis base (PAC) - aumentado
+    const baseDeadlineExpress = 2; // 2 dias úteis base (SEDEX) - aumentado
+    
+    // Velocidade média de entrega (km por dia útil)
+    // Valores mais conservadores para prazos mais realistas
+    const avgSpeedKmPerDayStandard = 250; // PAC: ~250km por dia útil
+    const avgSpeedKmPerDayExpress = 500; // SEDEX: ~500km por dia útil
+    
+    let deadline: number;
+    if (serviceType === 'express') {
+      // SEDEX: prazo base + dias de transporte + margem de segurança
+      const transportDays = Math.ceil(distanceKm / avgSpeedKmPerDayExpress);
+      deadline = baseDeadlineExpress + transportDays + 1; // +1 dia de margem
+    } else {
+      // PAC: prazo base + dias de transporte + margem de segurança
+      const transportDays = Math.ceil(distanceKm / avgSpeedKmPerDayStandard);
+      deadline = baseDeadlineStandard + transportDays + 2; // +2 dias de margem
+    }
+
+    // Limitar prazo mínimo e máximo com valores mais realistas
+    if (serviceType === 'express') {
+      // SEDEX: mínimo 2 dias, máximo 10 dias úteis
+      deadline = Math.max(2, Math.min(deadline, 10));
+    } else {
+      // PAC: mínimo 5 dias, máximo 20 dias úteis
+      deadline = Math.max(5, Math.min(deadline, 20));
+    }
+
+    this.logger.debug(`Cálculo de frete: distância=${distanceKm.toFixed(2)}km, peso=${finalWeightKg.toFixed(2)}kg, tipo=${serviceType}, preço=R$${price.toFixed(2)}, prazo=${deadline} dias`);
+
+    return {
+      valor: price,
+      prazo: deadline,
+    };
   }
 
   /**
    * Calcula frete por loja e também opção combinada (quando aplicável).
    * Usa dados reais de produtos/lojas do banco (peso, dimensões, CEP).
+   * Calcula frete manualmente sem usar API dos Correios.
    */
   async calculateShipping(dto: CalculateShippingDto) {
-    if (!dto.items || dto.items.length === 0) {
-      throw new BadRequestException('Nenhum item informado para cálculo de frete.');
-    }
+    try {
+      if (!dto.items || dto.items.length === 0) {
+        throw new BadRequestException('Nenhum item informado para cálculo de frete.');
+      }
 
-    const cleanDestinationCep = dto.destinationZipCode.replace(/\D/g, '');
-    if (cleanDestinationCep.length !== 8) {
-      throw new BadRequestException('CEP de destino inválido. Deve conter 8 dígitos numéricos.');
-    }
+      if (!dto.destinationZipCode) {
+        throw new BadRequestException('CEP de destino não informado.');
+      }
+
+      const cleanDestinationCep = dto.destinationZipCode.replace(/\D/g, '');
+      if (cleanDestinationCep.length !== 8) {
+        throw new BadRequestException('CEP de destino inválido. Deve conter 8 dígitos numéricos.');
+      }
+
+      this.logger.debug(`Calculando frete: CEP destino=${cleanDestinationCep}, items=${dto.items.length}, serviceType=${dto.serviceType || 'standard'}`);
 
     // Buscar produtos com informações de loja e dimensões
     // Incluir StoreInventory para produtos que estão em múltiplas lojas
@@ -362,7 +440,7 @@ export class ShippingService {
       this.logger.debug(`Calculando frete para loja ${group.storeId} (${group.storeName}): CEP origem=${group.originZipCode}, CEP destino=${cleanDestinationCep}, peso=${group.totalWeightKg}kg`);
 
       const serviceType = dto.serviceType || ShippingServiceType.STANDARD;
-      const correiosResult = await this.calculateCorreiosPriceAndDeadline({
+      const shippingResult = this.calculateShippingPriceAndDeadline({
         cepOrigem: group.originZipCode,
         cepDestino: cleanDestinationCep,
         pesoKg: group.totalWeightKg,
@@ -372,8 +450,8 @@ export class ShippingService {
         serviceType: serviceType === ShippingServiceType.EXPRESS ? 'express' : 'standard',
       });
 
-      sumSeparatePrice += correiosResult.valor;
-      maxSeparateDeadline = Math.max(maxSeparateDeadline, correiosResult.prazo || 0);
+      sumSeparatePrice += shippingResult.valor;
+      maxSeparateDeadline = Math.max(maxSeparateDeadline, shippingResult.prazo || 0);
 
       perStoreResults.push({
         storeId: group.storeId,
@@ -382,10 +460,9 @@ export class ShippingService {
         originCity: group.city,
         originState: group.state,
         destinationZipCode: cleanDestinationCep,
-        serviceCode: serviceType === ShippingServiceType.EXPRESS ? this.correiosSedexCode : this.correiosPacCode,
         serviceType: serviceType,
-        price: correiosResult.valor,
-        deadlineDays: correiosResult.prazo,
+        price: shippingResult.valor,
+        deadlineDays: shippingResult.prazo,
         totalWeightKg: group.totalWeightKg,
         items: group.items,
       });
@@ -421,24 +498,43 @@ export class ShippingService {
       };
     }
 
-    return {
-      destination: {
-        zipCode: cleanDestinationCep,
-        city: dto.destinationCity,
-        state: dto.destinationState,
-      },
-      modeRequested: dto.mode,
-      separate: dto.mode === ShippingMode.COMBINED ? null : {
-        mode: 'separate',
-        totalPrice: sumSeparatePrice,
-        maxDeadlineDays: maxSeparateDeadline,
-        groups: perStoreResults,
-        description:
-          'Cada loja envia seus produtos separadamente. Prazos menores por loja, custo total maior.',
-      },
-      combined: dto.mode === ShippingMode.SEPARATE ? null : combinedOption,
-    };
+      return {
+        destination: {
+          zipCode: cleanDestinationCep,
+          city: dto.destinationCity,
+          state: dto.destinationState,
+        },
+        modeRequested: dto.mode,
+        separate: dto.mode === ShippingMode.COMBINED ? null : {
+          mode: 'separate',
+          totalPrice: sumSeparatePrice,
+          maxDeadlineDays: maxSeparateDeadline,
+          groups: perStoreResults,
+          description:
+            'Cada loja envia seus produtos separadamente. Prazos menores por loja, custo total maior.',
+        },
+        combined: dto.mode === ShippingMode.SEPARATE ? null : combinedOption,
+      };
+    } catch (error: any) {
+      this.logger.error('Erro ao calcular frete:', {
+        error: error.message,
+        stack: error.stack,
+        dto: {
+          destinationZipCode: dto.destinationZipCode,
+          itemsCount: dto.items?.length || 0,
+          serviceType: dto.serviceType,
+        },
+      });
+
+      // Se já for uma BadRequestException, relançar
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      // Para outros erros, lançar como erro genérico com mensagem clara
+      throw new BadRequestException(
+        `Erro ao calcular frete: ${error.message || 'Erro desconhecido. Verifique se todos os produtos têm loja e CEP configurados.'}`,
+      );
+    }
   }
 }
-
-

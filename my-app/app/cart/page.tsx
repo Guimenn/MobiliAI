@@ -175,9 +175,29 @@ export default function CartPage() {
   React.useEffect(() => {
     const missingInfo: Array<{ productId: string; storeId: string }> = [];
     cart.forEach(item => {
-      const storeId = item.product.storeId;
-      if (storeId && storeId !== 'unknown' && storeId !== '' && !item.product.storeName && !storeInfoCache[storeId]) {
-        missingInfo.push({ productId: item.product.id, storeId });
+      // Verificar se precisa buscar informações da loja
+      let needsFetch = false;
+      let storeIdToFetch: string | null = null;
+
+      // Prioridade 1: Verificar storeId direto
+      if (item.product.storeId && item.product.storeId !== 'unknown' && item.product.storeId !== '') {
+        if (!item.product.store?.name && !storeInfoCache[item.product.storeId]) {
+          needsFetch = true;
+          storeIdToFetch = item.product.storeId;
+        }
+      }
+      // Prioridade 2: Verificar storeInventory se não encontrou storeId direto
+      else if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
+        // Buscar primeira loja com informações ou estoque
+        const firstStore = item.product.storeInventory.find((inv: any) => inv.storeId && inv.storeId !== 'unknown' && inv.storeId !== '');
+        if (firstStore && !firstStore.store?.name && !storeInfoCache[firstStore.storeId]) {
+          needsFetch = true;
+          storeIdToFetch = firstStore.storeId;
+        }
+      }
+
+      if (needsFetch && storeIdToFetch) {
+        missingInfo.push({ productId: item.product.id, storeId: storeIdToFetch });
       }
     });
 
@@ -254,22 +274,22 @@ export default function CartPage() {
     
     cart.forEach(item => {
       // Determinar qual loja usar para este produto
-      // Prioridade: 1) storeId direto, 2) primeira loja do storeInventory com estoque, 3) primeira loja do storeInventory
+      // Prioridade: 1) storeId direto com informações completas, 2) storeInventory com estoque, 3) primeira loja do storeInventory
       let storeId: string = 'unknown';
       let storeName: string | undefined;
       let storeAddress: string | undefined;
 
-      // Tentar usar storeId direto
-      if (item.product.storeId) {
+      // Tentar usar storeId direto se tiver informações completas
+      if (item.product.storeId && item.product.store?.name) {
         storeId = item.product.storeId;
-        storeName = item.product.store?.name;
-        storeAddress = item.product.store?.address;
+        storeName = item.product.store.name;
+        storeAddress = item.product.store.address;
       } 
-      // Se não tiver storeId direto, usar storeInventory
+      // Se storeId direto não tiver informações completas, tentar storeInventory
       else if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
-        // Buscar loja com estoque (ou maior estoque)
+        // Buscar loja com estoque (ou maior estoque) que tenha informações completas
         const availableStores = item.product.storeInventory
-          .filter((inv: any) => inv.store?.isActive && inv.quantity > 0)
+          .filter((inv: any) => inv.store?.isActive && inv.quantity > 0 && inv.store?.name)
           .sort((a: any, b: any) => b.quantity - a.quantity);
 
         if (availableStores.length > 0) {
@@ -278,26 +298,88 @@ export default function CartPage() {
           storeName = selectedInventory.store?.name;
           storeAddress = selectedInventory.store?.address;
         } else {
-          // Se nenhuma tem estoque, usar a primeira loja ativa
-          const firstActive = item.product.storeInventory.find((inv: any) => inv.store?.isActive);
+          // Se nenhuma tem estoque, usar a primeira loja ativa com informações
+          const firstActive = item.product.storeInventory.find((inv: any) => inv.store?.isActive && inv.store?.name);
           if (firstActive) {
             storeId = firstActive.storeId;
             storeName = firstActive.store?.name;
             storeAddress = firstActive.store?.address;
+          } else {
+            // Último recurso: qualquer loja do storeInventory
+            const anyStore = item.product.storeInventory.find((inv: any) => inv.store?.name);
+            if (anyStore) {
+              storeId = anyStore.storeId;
+              storeName = anyStore.store?.name;
+              storeAddress = anyStore.store?.address;
+            }
           }
         }
       }
+      // Se ainda não encontrou, tentar usar storeId direto mesmo sem informações completas
+      else if (item.product.storeId && item.product.storeId !== 'unknown' && item.product.storeId !== '') {
+        storeId = item.product.storeId;
+        storeName = item.product.store?.name;
+        storeAddress = item.product.store?.address;
+      }
+      // Último recurso: tentar buscar qualquer loja ativa do sistema
+      else {
+        // Se chegou aqui, não encontrou loja específica, mas vamos tentar buscar uma loja padrão
+        // Isso será tratado no fallback abaixo
+      }
 
-      // Fallback: usar cache ou gerar nome
-      if (!storeName) {
-        storeName = storeInfoCache[storeId]?.name;
-        if (!storeName && storeId !== 'unknown') {
+      // Fallback: usar cache ou buscar informações
+      if (!storeName || storeId === 'unknown') {
+        // Tentar cache primeiro
+        if (storeId !== 'unknown' && storeId !== '') {
+          storeName = storeInfoCache[storeId]?.name;
+        }
+        
+        // Se não tem no cache e tem storeId válido, tentar buscar
+        if (!storeName && storeId !== 'unknown' && storeId !== '') {
+          // Tentar buscar informações da loja de forma assíncrona
+          fetchStoreInfoFromProduct(item.product.id, storeId).catch(() => {
+            // Se falhar, usar nome genérico
+          });
+          // Enquanto busca, usar nome temporário
           storeName = `Loja ${storeId.substring(0, 8)}`;
-        } else if (!storeName) {
-          storeName = 'Loja não identificada';
+        } else if (!storeName || storeId === 'unknown') {
+          // Se não tem storeId válido, tentar buscar primeira loja do storeInventory
+          if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
+            // Tentar encontrar loja com informações completas primeiro
+            const storeWithInfo = item.product.storeInventory.find((inv: any) => 
+              inv.storeId && inv.storeId !== 'unknown' && inv.storeId !== '' && inv.store?.name
+            );
+            
+            if (storeWithInfo && storeWithInfo.store) {
+              storeId = storeWithInfo.storeId;
+              storeName = storeWithInfo.store.name;
+              storeAddress = storeWithInfo.store.address;
+            } else {
+              // Se não encontrou com informações, pegar primeira loja válida e buscar
+              const firstInventory = item.product.storeInventory.find((inv: any) => 
+                inv.storeId && inv.storeId !== 'unknown' && inv.storeId !== ''
+              );
+              
+              if (firstInventory) {
+                storeId = firstInventory.storeId;
+                storeName = firstInventory.store?.name || storeInfoCache[firstInventory.storeId]?.name;
+                storeAddress = firstInventory.store?.address || storeInfoCache[firstInventory.storeId]?.address;
+                
+                if (!storeName) {
+                  // Buscar informações da loja de forma assíncrona
+                  fetchStoreInfoFromProduct(item.product.id, firstInventory.storeId).catch(() => {});
+                  storeName = `Loja ${firstInventory.storeId.substring(0, 8)}`;
+                }
+              } else {
+                storeName = 'Loja não identificada';
+              }
+            }
+          } else {
+            storeName = 'Loja não identificada';
+          }
         }
       }
-      if (!storeAddress) {
+      if (!storeAddress && storeId !== 'unknown' && storeId !== '') {
         storeAddress = storeInfoCache[storeId]?.address;
       }
       
@@ -327,11 +409,28 @@ export default function CartPage() {
     }, 0);
   }, [selectedCartItems]);
 
-  // Função para calcular frete estimado (valor fixo básico)
-  // O valor real será calculado no checkout usando a API dos Correios,
+  // Função para calcular frete estimado baseado no peso dos produtos
+  // O valor real será calculado no checkout usando cálculo manual de frete,
   // aqui é apenas uma estimativa simples para o resumo do carrinho.
-  const calculateShipping = () => {
-    return 29.90; // Frete padrão estimado
+  const calculateShipping = (): number => {
+    // Calcular estimativa básica baseada no peso total dos produtos selecionados
+    const totalWeight = selectedCartItems.reduce((total, item) => {
+      // Assumir 0.5kg por produto se não tiver peso definido
+      // O peso pode vir como string ou number, então convertemos para number
+      let itemWeight = 0.5;
+      if (item.product.weight) {
+        if (typeof item.product.weight === 'string') {
+          itemWeight = parseFloat(item.product.weight) || 0.5;
+        } else {
+          itemWeight = Number(item.product.weight) || 0.5;
+        }
+      }
+      return total + (itemWeight * item.quantity);
+    }, 0);
+    
+    // Estimativa: R$ 10 base + R$ 2,50 por kg
+    const estimatedShipping = 10.00 + (totalWeight * 2.50);
+    return Math.round(estimatedShipping * 100) / 100;
   };
 
   // Função para calcular total final dos selecionados
@@ -517,7 +616,7 @@ export default function CartPage() {
         <Header />
         
         {/* Empty Cart State */}
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-44 pb-20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 mt-50 pb-20">
           <div className="text-center">
             {/* Empty Cart Icon */}
             <div className="mx-auto w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-8 shadow-lg">
@@ -590,7 +689,7 @@ export default function CartPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
       <Header />
       
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 mt-42 pb-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 mt-50 pb-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
           <div className="flex items-center space-x-4">
@@ -888,34 +987,13 @@ export default function CartPage() {
                       R$ {selectedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  
-                  <div className="flex justify-between text-sm py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Frete</span>
-                    <span className="font-semibold">
-                      {calculateShipping() === 0 ? (
-                        <span className="text-green-600 flex items-center space-x-1">
-                          <CheckCircle className="h-4 w-4" />
-                          <span>Grátis</span>
-                        </span>
-                      ) : (
-                        `R$ ${calculateShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                      )}
-                    </span>
-                  </div>
-                  
-                  {calculateShipping() > 0 && (
-                    <div className="text-xs text-gray-700 bg-white p-3 rounded-lg border border-blue-200 shadow-sm">
-                      <div className="flex items-center space-x-2">
-                        <Truck className="h-4 w-4 text-black-600" />
-                        <span>Frete grátis para compras acima de R$ 500,00</span>
-                      </div>
-                    </div>
-                  )}
+                
+                 
                   
                   <div className="border-t-2 border-[#3e2626] pt-4 mt-4">
                     <div className="flex justify-between text-xl font-bold text-[#3e2626]">
                       <span>Total</span>
-                      <span className="text-2xl">R$ {finalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span className="text-2xl">R$ {selectedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 </div>

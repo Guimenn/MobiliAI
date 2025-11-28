@@ -82,6 +82,29 @@ export interface Product {
   totalStock?: number; // Estoque total somado de todas as lojas
   // Estoque por filial (para admin)
   stockByStore?: Array<{ storeId: string; storeName: string; quantity: number }>;
+  // Store inventory com informações completas da loja
+  storeInventory?: Array<{
+    storeId: string;
+    quantity: number;
+    store?: {
+      id: string;
+      name: string;
+      address?: string;
+      zipCode?: string;
+      city?: string;
+      state?: string;
+      isActive?: boolean;
+    };
+  }>;
+  // Relação direta com loja (para produtos que pertencem a uma loja específica)
+  store?: {
+    id: string;
+    name: string;
+    address?: string;
+    zipCode?: string;
+    city?: string;
+    state?: string;
+  };
 }
 
 export interface CartItem {
@@ -308,6 +331,27 @@ export const useAppStore = create<AppState>()(
                     storeId: item.product.storeId || item.product.store?.id || '',
                     storeName: item.product.store?.name,
                     storeAddress: item.product.store?.address,
+                    store: item.product.store ? {
+                      id: item.product.store.id,
+                      name: item.product.store.name,
+                      address: item.product.store.address,
+                      zipCode: item.product.store.zipCode,
+                      city: item.product.store.city,
+                      state: item.product.store.state,
+                    } : undefined,
+                    storeInventory: item.product.storeInventory ? item.product.storeInventory.map((inv: any) => ({
+                      storeId: inv.storeId,
+                      quantity: inv.quantity,
+                      store: inv.store ? {
+                        id: inv.store.id,
+                        name: inv.store.name,
+                        address: inv.store.address,
+                        zipCode: inv.store.zipCode,
+                        city: inv.store.city,
+                        state: inv.store.state,
+                        isActive: inv.store.isActive,
+                      } : undefined,
+                    })) : undefined,
                   },
                   quantity: item.quantity,
                 }));
@@ -489,6 +533,27 @@ export const useAppStore = create<AppState>()(
                 storeId: item.product.storeId || item.product.store?.id || '',
                 storeName: item.product.store?.name,
                 storeAddress: item.product.store?.address,
+                store: item.product.store ? {
+                  id: item.product.store.id,
+                  name: item.product.store.name,
+                  address: item.product.store.address,
+                  zipCode: item.product.store.zipCode,
+                  city: item.product.store.city,
+                  state: item.product.store.state,
+                } : undefined,
+                storeInventory: item.product.storeInventory ? item.product.storeInventory.map((inv: any) => ({
+                  storeId: inv.storeId,
+                  quantity: inv.quantity,
+                  store: inv.store ? {
+                    id: inv.store.id,
+                    name: inv.store.name,
+                    address: inv.store.address,
+                    zipCode: inv.store.zipCode,
+                    city: inv.store.city,
+                    state: inv.store.state,
+                    isActive: inv.store.isActive,
+                  } : undefined,
+                })) : undefined,
               },
               quantity: item.quantity,
             }));
@@ -576,7 +641,30 @@ export const useAppStore = create<AppState>()(
               colorName: item.product.colorName,
               colorHex: item.product.colorHex,
               brand: item.product.brand,
-              storeId: item.product.storeId || '',
+              storeId: item.product.storeId || item.product.store?.id || '',
+              storeName: item.product.store?.name,
+              storeAddress: item.product.store?.address,
+              store: item.product.store ? {
+                id: item.product.store.id,
+                name: item.product.store.name,
+                address: item.product.store.address,
+                zipCode: item.product.store.zipCode,
+                city: item.product.store.city,
+                state: item.product.store.state,
+              } : undefined,
+              storeInventory: item.product.storeInventory ? item.product.storeInventory.map((inv: any) => ({
+                storeId: inv.storeId,
+                quantity: inv.quantity,
+                store: inv.store ? {
+                  id: inv.store.id,
+                  name: inv.store.name,
+                  address: inv.store.address,
+                  zipCode: inv.store.zipCode,
+                  city: inv.store.city,
+                  state: inv.store.state,
+                  isActive: inv.store.isActive,
+                } : undefined,
+              })) : undefined,
             },
             quantity: item.quantity,
           }));

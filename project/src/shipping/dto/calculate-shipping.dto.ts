@@ -45,9 +45,9 @@ export class CalculateShippingDto {
   mode: ShippingMode = ShippingMode.BOTH;
 
   /**
-   * Tipo de serviço dos Correios:
-   * - 'standard': PAC (mais barato, mais lento)
-   * - 'express': SEDEX (mais caro, mais rápido)
+   * Tipo de serviço de frete:
+   * - 'standard': Padrão (mais barato, mais lento)
+   * - 'express': Expresso (mais caro, mais rápido)
    */
   @IsOptional()
   @IsEnum(ShippingServiceType)

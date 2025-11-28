@@ -1519,10 +1519,10 @@ export const paymentAPI = {
   },
 };
 
-// Shipping API (frete / CEP via backend + Correios)
+// Shipping API (frete / CEP via backend usando ViaCEP)
 export const shippingAPI = {
   /**
-   * Proxy para consulta de CEP via backend (que usa Correios).
+   * Proxy para consulta de CEP via backend (que usa ViaCEP - API pública).
    */
   lookupCep: async (cep: string) => {
     const cleanCep = (cep || '').replace(/\D/g, '');

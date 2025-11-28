@@ -43,6 +43,7 @@ import {
   Share2,
   Eye,
   Store,
+  Clock,
 } from 'lucide-react';
 import Image from 'next/image';
 import { env } from '@/lib/env';
@@ -82,6 +83,7 @@ export default function ProductDetailPage() {
   const [shippingInfo, setShippingInfo] = useState<string | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewKey, setReviewKey] = useState(0);
+  const [flashSecondsLeft, setFlashSecondsLeft] = useState<number | null>(null);
 
   const productId = params.id as string;
 
@@ -216,6 +218,41 @@ export default function ProductDetailPage() {
       fetchProduct();
     }
   }, [productId, products]);
+
+  // Atualiza o tempo restante da oferta relâmpago com base na data de término do produto
+  useEffect(() => {
+    if (!product || !product.isFlashSale || !product.flashSaleEndDate) {
+      setFlashSecondsLeft(null);
+      return;
+    }
+
+    const updateTimeLeft = () => {
+      const now = new Date();
+      const end = new Date(product.flashSaleEndDate as string);
+      const diffInSeconds = Math.max(
+        0,
+        Math.floor((end.getTime() - now.getTime()) / 1000)
+      );
+
+      setFlashSecondsLeft(diffInSeconds);
+    };
+
+    updateTimeLeft();
+    const intervalId = setInterval(updateTimeLeft, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [product]);
+
+  const formatFlashTime = (totalSeconds: number | null) => {
+    if (totalSeconds === null) return '--h --m';
+    const h = Math.floor(totalSeconds / 3600)
+      .toString()
+      .padStart(2, '0');
+    const m = Math.floor((totalSeconds % 3600) / 60)
+      .toString()
+      .padStart(2, '0');
+    return `${h}h ${m}m`;
+  };
 
   const handleAddToCart = async () => {
     if (product) {
@@ -855,18 +892,38 @@ export default function ProductDetailPage() {
                     {/* Mostrar desconto se houver oferta relâmpago configurada */}
                     {hasDiscount && (
                       <>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <div className="flex items-center gap-2 mt-3 flex-wrap">
                           <span className="text-sm text-gray-500 line-through">
                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalPrice)}
                           </span>
-                          <Badge className="bg-red-600 text-white text-xs font-bold">
+                          <Badge className="bg-red-600 text-white text-xs font-bold shadow-sm">
                             -{flashDiscountPercent}% OFF
                           </Badge>
                         </div>
-                        {product?.isFlashSale && hasDiscount && (
-                          <div className="flex items-center gap-1 mt-2 text-xs text-yellow-600 font-medium">
-                            <Zap className="h-3 w-3" />
-                            <span>Oferta Relâmpago Ativa</span>
+
+                        {product?.isFlashSale && (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            {/* Badge Oferta Relâmpago (similar ao da home) */}
+                            <div className="relative overflow-hidden bg-gradient-to-r from-[#3e2626] to-[#2a1f1f] text-white rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(62,38,38,0.55)]">
+                              <Zap className="h-3.5 w-3.5 fill-white animate-pulse" />
+                              <span className="text-[11px] font-semibold tracking-wide uppercase">
+                                Oferta Relâmpago
+                              </span>
+                            </div>
+
+                            {/* Timer da oferta, baseado na data de término do produto */}
+                            {flashSecondsLeft !== null && flashSecondsLeft > 0 && (
+                              <div className="relative flex items-center gap-1 rounded-full bg-[#3e2626] text-white px-3 py-1.5 text-[11px] font-semibold shadow-[0_4px_12px_rgba(0,0,0,0.25)]">
+                                <Clock className="h-3 w-3" />
+                                <span className="tabular-nums">
+                                  {formatFlashTime(flashSecondsLeft)}
+                                </span>
+                              </div>
+                            )}
+
+                            <span className="text-[11px] font-medium text-[#3e2626]/80">
+                              Oferta exclusiva por tempo limitado neste produto.
+                            </span>
                           </div>
                         )}
                       </>

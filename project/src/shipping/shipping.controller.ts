@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { ShippingService, CorreiosCepResponse } from './shipping.service';
+import { ShippingService, CepResponse } from './shipping.service';
 import { CalculateShippingDto, ShippingMode } from './dto/calculate-shipping.dto';
 
 @Controller('shipping')
@@ -7,11 +7,12 @@ export class ShippingController {
   constructor(private readonly shippingService: ShippingService) {}
 
   /**
-   * Consulta de CEP via Correios.
+   * Consulta de CEP via ViaCEP (API pública e gratuita).
    * Permite buscar endereço a partir do CEP.
+   * Referência: https://viacep.com.br/
    */
   @Get('cep/:cep')
-  async lookupCep(@Param('cep') cep: string): Promise<CorreiosCepResponse> {
+  async lookupCep(@Param('cep') cep: string): Promise<CepResponse> {
     return this.shippingService.lookupCep(cep);
   }
 
@@ -38,24 +39,45 @@ export class ShippingController {
   }
 
   /**
-   * Calcula frete usando Correios considerando múltiplas lojas.
+   * Calcula frete manualmente (sem API dos Correios) considerando múltiplas lojas.
    * Retorna opções de frete SEPARADO e COMBINADO para o frontend exibir ao cliente.
+   * O cálculo é baseado em distância estimada, peso e tipo de serviço.
    */
   @Post('quote')
   async calculateShipping(@Body() body: CalculateShippingDto) {
-    // Garantir valor padrão seguro para mode
-    if (!body.mode) {
-      body.mode = ShippingMode.BOTH;
+    try {
+      // Garantir valor padrão seguro para mode
+      if (!body.mode) {
+        body.mode = ShippingMode.BOTH;
+      }
+
+      console.log('📦 Iniciando cálculo de frete:', {
+        destinationZipCode: body.destinationZipCode,
+        itemsCount: body.items?.length || 0,
+        serviceType: body.serviceType,
+        mode: body.mode,
+      });
+
+      const result = await this.shippingService.calculateShipping(body);
+      
+      // Log para debug
+      console.log('📦 Resultado do cálculo de frete:', JSON.stringify({
+        destination: result.destination,
+        modeRequested: result.modeRequested,
+        separateGroups: result.separate?.groups?.length || 0,
+        combinedAvailable: !!result.combined,
+      }, null, 2));
+      
+      return result;
+    } catch (error: any) {
+      console.error('❌ Erro no controller de shipping:', {
+        error: error.message,
+        stack: error.stack,
+        status: error.status,
+        response: error.response,
+      });
+      throw error;
     }
-    const result = await this.shippingService.calculateShipping(body);
-    // Log para debug
-    console.log('📦 Resultado do cálculo de frete:', JSON.stringify({
-      destination: result.destination,
-      modeRequested: result.modeRequested,
-      separateGroups: result.separate?.groups?.length || 0,
-      combinedAvailable: !!result.combined,
-    }, null, 2));
-    return result;
   }
 }
 

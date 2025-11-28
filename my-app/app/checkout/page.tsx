@@ -299,7 +299,7 @@ export default function CheckoutPage() {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [storesWithDistance, setStoresWithDistance] = useState<any[]>([]);
 
-  // Cálculo de frete via Correios (backend)
+  // Cálculo de frete manual (backend - sem API dos Correios)
   const [shippingMode, setShippingMode] = useState<'combined' | 'separate'>('separate');
   const [shippingQuoteStandard, setShippingQuoteStandard] = useState<any | null>(null);
   const [shippingQuoteExpress, setShippingQuoteExpress] = useState<any | null>(null);
@@ -431,7 +431,7 @@ export default function CheckoutPage() {
     // Escolher a cotação baseada no tipo de serviço selecionado
     const quote = selectedShipping === 'express' ? shippingQuoteExpress : shippingQuoteStandard;
     
-    // Se houver cotação de frete via Correios, usar valor conforme modo escolhido
+    // Se houver cotação de frete, usar valor conforme modo escolhido
     if (quote) {
       if (shippingMode === 'combined' && quote.combined?.finalPrice) {
         return quote.combined.finalPrice;
@@ -441,11 +441,27 @@ export default function CheckoutPage() {
       }
     }
 
-    // Fallback antigo caso backend de frete não esteja configurado
-    return selectedShipping === 'express' ? 49.90 : 29.90;
+    // Se não houver cotação, calcular um valor estimado baseado no peso e distância
+    // Isso não deve acontecer normalmente, mas serve como fallback de segurança
+    if (!quote) {
+      // Calcular estimativa básica: R$ 10 base + R$ 2 por kg estimado
+      const estimatedWeight = checkoutItems.reduce((total, item) => {
+        // Assumir 0.5kg por produto se não tiver peso
+        return total + (item.quantity * 0.5);
+      }, 0);
+      const basePrice = selectedShipping === 'express' ? 20.00 : 10.00;
+      const weightPrice = estimatedWeight * (selectedShipping === 'express' ? 5.00 : 2.50);
+      return Math.round((basePrice + weightPrice) * 100) / 100;
+    }
+    
+    // Se chegou aqui, há cotação mas não encontrou preço válido - retornar 0 para forçar recálculo
+    return 0;
   }, [subtotal, selectedShipping, shippingQuoteStandard, shippingQuoteExpress, shippingMode]);
 
-  const insuranceCost = shippingInsurance ? 5.00 : 0;
+  // Seguro de envio: 2% do valor da compra (apenas para entregas)
+  const insuranceCost = shippingInsurance && selectedShipping !== 'pickup' 
+    ? Math.round((subtotal * 0.02) * 100) / 100 
+    : 0;
   const tax = subtotal * 0.1; // 10% de impostos estimados
   
   // Calcular desconto: se for cupom de frete, aplicar apenas ao frete
@@ -456,7 +472,7 @@ export default function CheckoutPage() {
   
   const total = subtotal + finalShippingCost + insuranceCost + tax - productDiscount;
 
-  // Prazo estimado de entrega baseado na cotação dos Correios
+    // Prazo estimado de entrega baseado na cotação de frete
   const shippingDeadlineDays = useMemo(() => {
     if (selectedShipping === 'pickup') return null;
     
@@ -475,7 +491,7 @@ export default function CheckoutPage() {
     return null;
   }, [shippingQuoteStandard, shippingQuoteExpress, shippingMode, selectedShipping]);
 
-  // Buscar cotação de frete via backend (Correios) quando endereço e itens estiverem prontos
+  // Buscar cotação de frete via backend (cálculo manual) quando endereço e itens estiverem prontos
   useEffect(() => {
     const hasDestination =
       shippingAddress.zipCode &&
@@ -490,31 +506,52 @@ export default function CheckoutPage() {
     // Identificar lojas distintas considerando storeId direto e storeInventory
     const distinctStores = new Set<string>();
     checkoutItems.forEach((item) => {
-      // Se tiver storeId direto, usar ele
-      if (item.product.storeId) {
-        distinctStores.add(item.product.storeId);
-        console.log(`📦 Produto ${item.product.id}: usando storeId direto ${item.product.storeId}`);
+      let storeId: string | null = null;
+      
+      // Prioridade 1: Se tiver storeId direto com informações completas, usar ele
+      if (item.product.storeId && item.product.storeId !== 'unknown' && item.product.storeId !== '') {
+        // Verificar se tem informações da loja (store.name ou storeInventory)
+        if (item.product.store?.name || (item.product.storeInventory && item.product.storeInventory.length > 0)) {
+          storeId = item.product.storeId;
+          distinctStores.add(storeId);
+          console.log(`📦 Produto ${item.product.id}: usando storeId direto ${storeId}`);
+        }
       }
-      // Se não tiver, usar a primeira loja do storeInventory com estoque
-      else if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
+      
+      // Prioridade 2: Se não tiver storeId válido, usar storeInventory
+      if (!storeId && item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
         console.log(`📦 Produto ${item.product.id}: tem ${item.product.storeInventory.length} lojas no storeInventory`);
+        
+        // Buscar loja com estoque suficiente e ativa
         const availableStore = item.product.storeInventory
-          .find((inv: any) => inv.store?.isActive && inv.quantity >= item.quantity);
+          .find((inv: any) => inv.store?.isActive && inv.quantity >= item.quantity && inv.store?.zipCode);
+        
         if (availableStore) {
-          distinctStores.add(availableStore.storeId);
-          console.log(`📦 Produto ${item.product.id}: usando loja ${availableStore.storeId} (${availableStore.store?.name}) do storeInventory com estoque`);
+          storeId = availableStore.storeId;
+          distinctStores.add(storeId);
+          console.log(`📦 Produto ${item.product.id}: usando loja ${storeId} (${availableStore.store?.name}) do storeInventory com estoque`);
         } else {
-          // Se nenhuma tem estoque suficiente, usar a primeira loja ativa
-          const firstActive = item.product.storeInventory.find((inv: any) => inv.store?.isActive);
+          // Se nenhuma tem estoque suficiente, usar a primeira loja ativa com CEP
+          const firstActive = item.product.storeInventory.find((inv: any) => inv.store?.isActive && inv.store?.zipCode);
           if (firstActive) {
-            distinctStores.add(firstActive.storeId);
-            console.log(`📦 Produto ${item.product.id}: usando primeira loja ativa ${firstActive.storeId} (${firstActive.store?.name}) do storeInventory`);
+            storeId = firstActive.storeId;
+            distinctStores.add(storeId);
+            console.log(`📦 Produto ${item.product.id}: usando primeira loja ativa ${storeId} (${firstActive.store?.name}) do storeInventory`);
           } else {
-            console.warn(`⚠️ Produto ${item.product.id}: nenhuma loja ativa encontrada no storeInventory`);
+            // Último recurso: qualquer loja com CEP
+            const anyStore = item.product.storeInventory.find((inv: any) => inv.store?.zipCode);
+            if (anyStore) {
+              storeId = anyStore.storeId;
+              distinctStores.add(storeId);
+              console.log(`📦 Produto ${item.product.id}: usando loja ${storeId} (${anyStore.store?.name}) do storeInventory (qualquer loja com CEP)`);
+            }
           }
         }
-      } else {
-        console.warn(`⚠️ Produto ${item.product.id}: sem storeId e sem storeInventory`);
+      }
+      
+      // Se ainda não encontrou loja, avisar
+      if (!storeId) {
+        console.warn(`⚠️ Produto ${item.product.id}: sem loja válida identificada (storeId=${item.product.storeId}, storeInventory=${item.product.storeInventory?.length || 0})`);
       }
     });
     
@@ -529,36 +566,155 @@ export default function CheckoutPage() {
     }));
 
     const fetchQuotes = async () => {
+      // Validar se há itens no carrinho
+      if (!checkoutItems || checkoutItems.length === 0) {
+        console.warn('⚠️ Nenhum item no carrinho para calcular frete');
+        setIsLoadingShippingQuote(false);
+        return;
+      }
+
+      // Validar se o CEP está preenchido
+      if (!shippingAddress.zipCode || shippingAddress.zipCode.replace(/\D/g, '').length !== 8) {
+        console.warn('⚠️ CEP inválido ou não preenchido');
+        setIsLoadingShippingQuote(false);
+        return;
+      }
+
+      // Verificar se todos os produtos têm loja identificada
+      const productsWithoutStore = checkoutItems.filter(item => {
+        const hasStoreId = item.product.storeId && item.product.storeId !== 'unknown' && item.product.storeId !== '';
+        const hasStoreInventory = item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0;
+        return !hasStoreId && !hasStoreInventory;
+      });
+
+      if (productsWithoutStore.length > 0) {
+        console.warn('⚠️ Alguns produtos não têm loja identificada:', productsWithoutStore.map(item => item.product.id));
+        showAlert('warning', 'Alguns produtos não têm loja associada. O cálculo de frete pode não estar disponível.');
+      }
+
       setIsLoadingShippingQuote(true);
       try {
+        // Validar payload antes de enviar
+        const cleanZipCode = shippingAddress.zipCode.replace(/\D/g, '');
+        if (cleanZipCode.length !== 8) {
+          throw new Error('CEP inválido. Deve conter 8 dígitos.');
+        }
+
+        // Verificar se há produtos válidos
+        if (itemsPayload.length === 0) {
+          throw new Error('Nenhum produto no carrinho para calcular frete.');
+        }
+
+        // Verificar se todos os produtos têm ID válido
+        const invalidProducts = itemsPayload.filter(item => !item.productId || item.quantity <= 0);
+        if (invalidProducts.length > 0) {
+          console.warn('⚠️ Produtos inválidos no payload:', invalidProducts);
+        }
+
+        const payloadStandard = {
+          destinationZipCode: cleanZipCode,
+          destinationCity: shippingAddress.city,
+          destinationState: shippingAddress.state,
+          mode,
+          serviceType: 'standard' as const,
+          items: itemsPayload,
+        };
+
+        const payloadExpress = {
+          destinationZipCode: cleanZipCode,
+          destinationCity: shippingAddress.city,
+          destinationState: shippingAddress.state,
+          mode,
+          serviceType: 'express' as const,
+          items: itemsPayload,
+        };
+
         console.log('📦 Calculando cotações de frete:', {
-          cep: shippingAddress.zipCode,
+          cep: cleanZipCode,
           cidade: shippingAddress.city,
           estado: shippingAddress.state,
           mode,
           itemsCount: itemsPayload.length,
           items: itemsPayload,
+          distinctStores: Array.from(distinctStores),
+          payloadStandard: JSON.stringify(payloadStandard, null, 2),
+          payloadExpress: JSON.stringify(payloadExpress, null, 2),
         });
 
         // Calcular ambos os tipos de serviço em paralelo
-        const [quoteStandard, quoteExpress] = await Promise.all([
-          shippingAPI.calculateQuote({
-            destinationZipCode: shippingAddress.zipCode,
-            destinationCity: shippingAddress.city,
-            destinationState: shippingAddress.state,
-            mode,
-            serviceType: 'standard',
-            items: itemsPayload,
-          }),
-          shippingAPI.calculateQuote({
-            destinationZipCode: shippingAddress.zipCode,
-            destinationCity: shippingAddress.city,
-            destinationState: shippingAddress.state,
-            mode,
-            serviceType: 'express',
-            items: itemsPayload,
-          }),
+        // Se um falhar, o outro ainda pode funcionar
+        const [quoteStandardResult, quoteExpressResult] = await Promise.allSettled([
+          shippingAPI.calculateQuote(payloadStandard),
+          shippingAPI.calculateQuote(payloadExpress),
         ]);
+
+        // Processar resultado do STANDARD
+        let quoteStandard: any = null;
+        if (quoteStandardResult.status === 'fulfilled') {
+          quoteStandard = quoteStandardResult.value;
+        } else {
+          const reason = quoteStandardResult.reason;
+          const errorDetails = {
+            error: reason,
+            errorType: reason?.constructor?.name,
+            response: reason?.response,
+            status: reason?.response?.status,
+            statusText: reason?.response?.statusText,
+            data: reason?.response?.data,
+            message: reason?.message || reason?.response?.data?.message || reason?.response?.data?.error,
+            stack: reason?.stack,
+            config: reason?.config,
+            request: {
+              url: reason?.config?.url,
+              method: reason?.config?.method,
+              data: reason?.config?.data,
+            },
+          };
+          console.error('❌ Erro ao calcular frete STANDARD:', errorDetails);
+          
+          // Log mais detalhado se houver dados de resposta
+          if (reason?.response?.data) {
+            console.error('📋 Detalhes da resposta do servidor:', JSON.stringify(reason.response.data, null, 2));
+          }
+        }
+
+        // Processar resultado do EXPRESS
+        let quoteExpress: any = null;
+        if (quoteExpressResult.status === 'fulfilled') {
+          quoteExpress = quoteExpressResult.value;
+        } else {
+          const reason = quoteExpressResult.reason;
+          const errorDetails = {
+            error: reason,
+            errorType: reason?.constructor?.name,
+            response: reason?.response,
+            status: reason?.response?.status,
+            statusText: reason?.response?.statusText,
+            data: reason?.response?.data,
+            message: reason?.message || reason?.response?.data?.message || reason?.response?.data?.error,
+            stack: reason?.stack,
+            config: reason?.config,
+            request: {
+              url: reason?.config?.url,
+              method: reason?.config?.method,
+              data: reason?.config?.data,
+            },
+          };
+          console.error('❌ Erro ao calcular frete EXPRESS:', errorDetails);
+          
+          // Log mais detalhado se houver dados de resposta
+          if (reason?.response?.data) {
+            console.error('📋 Detalhes da resposta do servidor:', JSON.stringify(reason.response.data, null, 2));
+          }
+        }
+
+        // Se ambos falharam, lançar erro
+        if (!quoteStandard && !quoteExpress) {
+          const lastError = quoteStandardResult.status === 'rejected' 
+            ? quoteStandardResult.reason 
+            : quoteExpressResult.reason;
+          throw lastError || new Error('Não foi possível calcular frete para nenhum serviço');
+        }
 
         console.log('📦 Cotações recebidas:', {
           standard: {
@@ -586,8 +742,59 @@ export default function CheckoutPage() {
         } else {
           setShippingMode('separate');
         }
-      } catch (error) {
-        console.error('Erro ao calcular frete via Correios:', error);
+      } catch (error: any) {
+        // Extrair informações detalhadas do erro
+        const errorStatus = error?.response?.status;
+        const errorData = error?.response?.data;
+        const errorMessage = error?.message;
+        const errorResponseMessage = errorData?.message || errorData?.error || errorData?.mensagem;
+        
+        console.error('❌ Erro ao calcular frete:', {
+          status: errorStatus,
+          statusText: error?.response?.statusText,
+          message: errorResponseMessage || errorMessage,
+          data: errorData,
+          error: errorMessage,
+          stack: error?.stack,
+          config: {
+            url: error?.config?.url,
+            method: error?.config?.method,
+            data: error?.config?.data,
+          },
+        });
+        
+        // Extrair mensagem de erro mais detalhada para o usuário
+        let userMessage = 'Não foi possível calcular o frete no momento';
+        
+        if (errorStatus === 500) {
+          // Erro interno do servidor
+          if (errorResponseMessage) {
+            if (errorResponseMessage.includes('loja') || errorResponseMessage.includes('CEP')) {
+              userMessage = 'Erro ao calcular frete: alguns produtos podem não ter loja ou CEP configurado.';
+            } else {
+              userMessage = `Erro no servidor: ${errorResponseMessage}`;
+            }
+          } else {
+            userMessage = 'Erro interno ao calcular frete. Verifique se todos os produtos têm loja associada e tente novamente.';
+          }
+        } else if (errorStatus === 400) {
+          // Erro de validação
+          userMessage = errorResponseMessage || 'Dados inválidos para cálculo de frete. Verifique o CEP e os produtos.';
+        } else if (errorStatus === 401 || errorStatus === 403) {
+          userMessage = 'Não autorizado para calcular frete. Faça login novamente.';
+        } else if (errorMessage) {
+          userMessage = errorMessage;
+        }
+        
+        // Mostrar alerta ao usuário apenas se não for erro de validação (400)
+        // Erros 400 geralmente são problemas de dados que o usuário pode corrigir
+        if (errorStatus !== 400) {
+          showAlert('warning', userMessage);
+        } else {
+          // Para erros 400, logar mas não mostrar alerta (pode ser muito frequente)
+          console.warn('⚠️ Erro de validação no cálculo de frete:', errorResponseMessage);
+        }
+        
         // Não bloquear o checkout: manter fallback fixo
         setShippingQuoteStandard(null);
         setShippingQuoteExpress(null);
@@ -686,8 +893,19 @@ export default function CheckoutPage() {
           setIsLoadingLocation(false);
         },
         (error) => {
-          console.error('Erro ao obter localização:', error);
+          // Tratar diferentes tipos de erro de geolocalização
+          let errorMessage = 'Não foi possível obter sua localização';
+          if (error.code === 1) {
+            errorMessage = 'Permissão de localização negada';
+          } else if (error.code === 2) {
+            errorMessage = 'Localização indisponível';
+          } else if (error.code === 3) {
+            errorMessage = 'Tempo de espera esgotado';
+          }
+          
+          console.warn('Erro ao obter localização:', errorMessage, error);
           setIsLoadingLocation(false);
+          
           // Se o usuário negar, tentar usar o endereço do perfil como fallback
           if (shippingAddress.city && shippingAddress.state) {
             // Tentar geocodificar o endereço do usuário
@@ -700,6 +918,8 @@ export default function CheckoutPage() {
               if (coords) {
                 setUserLocation(coords);
               }
+            }).catch(() => {
+              // Silenciosamente falhar se geocodificação também falhar
             });
           }
         },
@@ -2693,7 +2913,13 @@ export default function CheckoutPage() {
                                   <span className="text-gray-400">Calculando...</span>
                                 ) : (() => {
                                   const quote = shippingQuoteStandard;
-                                  let price = 29.90; // fallback
+                                  // Calcular estimativa se não houver cotação
+                                  const estimatedWeight = checkoutItems.reduce((total, item) => {
+                                    return total + ((item.product.weight || 0.5) * item.quantity);
+                                  }, 0);
+                                  const basePrice = selectedShipping === 'express' ? 20.00 : 10.00;
+                                  const weightPrice = estimatedWeight * (selectedShipping === 'express' ? 5.00 : 2.50);
+                                  let price = Math.round((basePrice + weightPrice) * 100) / 100;
                                   if (quote) {
                                     if (shippingMode === 'combined' && quote.combined?.finalPrice) {
                                       price = quote.combined.finalPrice;
@@ -2892,7 +3118,7 @@ export default function CheckoutPage() {
                         />
                         <Label htmlFor="insurance" className="cursor-pointer">
                           <span className="font-semibold">Seguro de envio</span>
-                          <span className="text-gray-600 ml-2">(R$ 5,00) - Reenvio gratuito se o item for perdido ou danificado</span>
+                          <span className="text-gray-600 "> - Reenvio gratuito se o item for perdido ou danificado</span>
                         </Label>
                       </div>
                     )}
