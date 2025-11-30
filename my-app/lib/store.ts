@@ -47,6 +47,7 @@ export interface Product {
   description?: string;
   category: 'sofa' | 'mesa' | 'cadeira' | 'armario' | 'cama' | 'decoracao' | 'iluminacao' | 'mesa_centro';
   price: number;
+  costPrice?: number;
   stock: number;
   color?: string;
   material?: string;

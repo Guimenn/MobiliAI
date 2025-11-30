@@ -220,6 +220,9 @@ export default function EmployeeProductsPage() {
           name: editedProduct.name.trim(),
           description: editedProduct.description?.trim() || '',
           price: Number(editedProduct.price),
+          costPrice: editedProduct.costPrice !== undefined && editedProduct.costPrice !== null && editedProduct.costPrice !== '' 
+            ? Number(editedProduct.costPrice) 
+            : undefined,
           stock: Number(editedProduct.stock),
           category: editedProduct.category,
           brand: editedProduct.brand?.trim() || undefined,
@@ -257,6 +260,9 @@ export default function EmployeeProductsPage() {
           name: editedProduct.name.trim(),
           description: editedProduct.description?.trim() || '',
           price: Number(editedProduct.price),
+          costPrice: editedProduct.costPrice !== undefined && editedProduct.costPrice !== null && editedProduct.costPrice !== '' 
+            ? Number(editedProduct.costPrice) 
+            : undefined,
           stock: Number(editedProduct.stock),
           category: editedProduct.category,
           imageUrl: allImageUrls[0] || undefined,

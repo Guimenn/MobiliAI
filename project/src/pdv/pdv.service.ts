@@ -190,11 +190,18 @@ export class PdvService {
         items: {
           create: createSaleDto.items.map(item => {
             const product = products.find(p => p.id === item.productId);
+            const unitPrice = Number(product.price);
+            const costPrice = product.costPrice ? Number(product.costPrice) : null;
+            const totalPrice = unitPrice * item.quantity;
+            const profit = costPrice !== null ? (unitPrice - costPrice) * item.quantity : null;
+            
             return {
               productId: item.productId,
               quantity: item.quantity,
-              unitPrice: Number(product.price),
-              totalPrice: Number(product.price) * item.quantity,
+              unitPrice: unitPrice,
+              totalPrice: totalPrice,
+              costPrice: costPrice,
+              profit: profit,
               notes: item.notes,
             };
           }),

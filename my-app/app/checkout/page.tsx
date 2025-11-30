@@ -68,33 +68,20 @@ interface PaymentMethod {
   type: 'pix' | 'card';
 }
 
-// Funções de validação
+// Funções de validação - CPF simplificado (apenas formato básico)
 const validateCPF = (cpf: string): boolean => {
+  if (!cpf || !cpf.trim()) return false; // CPF vazio é inválido
+  
   const cleanCPF = cpf.replace(/\D/g, '');
   
+  // Validar apenas formato básico (11 dígitos)
   if (cleanCPF.length !== 11) return false;
-  if (/^(\d)\1{10}$/.test(cleanCPF)) return false; // Todos os dígitos iguais
   
-  let sum = 0;
-  let remainder;
+  // Validar se não são todos os dígitos iguais (ex: 111.111.111-11)
+  if (/^(\d)\1{10}$/.test(cleanCPF)) return false;
   
-  // Validação do primeiro dígito verificador
-  for (let i = 1; i <= 9; i++) {
-    sum += parseInt(cleanCPF.substring(i - 1, i)) * (11 - i);
-  }
-  remainder = (sum * 10) % 11;
-  if (remainder === 10 || remainder === 11) remainder = 0;
-  if (remainder !== parseInt(cleanCPF.substring(9, 10))) return false;
-  
-  // Validação do segundo dígito verificador
-  sum = 0;
-  for (let i = 1; i <= 10; i++) {
-    sum += parseInt(cleanCPF.substring(i - 1, i)) * (12 - i);
-  }
-  remainder = (sum * 10) % 11;
-  if (remainder === 10 || remainder === 11) remainder = 0;
-  if (remainder !== parseInt(cleanCPF.substring(10, 11))) return false;
-  
+  // Aceita qualquer CPF com 11 dígitos e não todos iguais
+  // (validação de dígitos verificadores removida para evitar falsos positivos)
   return true;
 };
 
@@ -2253,14 +2240,25 @@ export default function CheckoutPage() {
         showAlert('warning', 'Por favor, informe seu telefone');
         return false;
       }
-      if (!address.cpf?.trim()) {
-        showAlert('warning', 'Por favor, informe seu CPF');
-        return false;
+      // CPF é opcional para retirada na loja, mas se fornecido deve ter formato válido
+      if (address.cpf && address.cpf.trim()) {
+        const cpf = address.cpf.replace(/\D/g, '');
+        if (cpf.length > 0 && cpf.length !== 11) {
+          setCpfError('CPF deve ter 11 dígitos');
+          showAlert('warning', 'CPF deve ter 11 dígitos');
+          return false;
+        }
+        if (cpf.length === 11 && /^(\d)\1{10}$/.test(cpf)) {
+          setCpfError('CPF inválido');
+          showAlert('warning', 'CPF inválido');
+          return false;
+        }
       }
       if (!selectedStore) {
         showAlert('warning', 'Por favor, selecione uma loja para retirada');
         return false;
       }
+      setCpfError(''); // Limpar erro se tudo estiver ok
       return true;
     }
     
@@ -2280,18 +2278,25 @@ export default function CheckoutPage() {
       return false;
     }
 
-    // Validar CPF
-    const cpf = address.cpf.replace(/\D/g, '');
-    if (cpf.length !== 11) {
-      setCpfError('CPF inválido. Digite um CPF válido com 11 dígitos');
-      showAlert('warning', 'Por favor, digite um CPF válido');
-      return false;
-    }
-
-    if (!validateCPF(shippingAddress.cpf)) {
-      setCpfError('CPF inválido. Verifique os dígitos');
-      showAlert('error', 'CPF inválido. Verifique os dígitos');
-      return false;
+    // Validar CPF (mais flexível - apenas formato básico)
+    if (address.cpf && address.cpf.trim()) {
+      const cpf = address.cpf.replace(/\D/g, '');
+      if (cpf.length !== 11) {
+        setCpfError('CPF deve ter 11 dígitos');
+        showAlert('warning', 'CPF deve ter 11 dígitos');
+        return false;
+      }
+      // Validação básica - apenas verifica se tem 11 dígitos e não são todos iguais
+      if (/^(\d)\1{10}$/.test(cpf)) {
+        setCpfError('CPF inválido');
+        showAlert('warning', 'CPF inválido');
+        return false;
+      }
+      // Limpar erro se CPF estiver válido
+      setCpfError('');
+    } else {
+      // CPF é opcional, mas se fornecido deve ser válido
+      setCpfError('');
     }
 
     return true;
@@ -3588,10 +3593,19 @@ export default function CheckoutPage() {
                   <Input
                     id="edit-cpf"
                     value={editAddress.cpf || ''}
-                    onChange={(e) => setEditAddress({ ...editAddress, cpf: e.target.value })}
+                    onChange={(e) => {
+                      const formatted = formatCPF(e.target.value);
+                      setEditAddress({ ...editAddress, cpf: formatted });
+                      // Limpar erro ao digitar
+                      if (cpfError) setCpfError('');
+                    }}
                     placeholder="000.000.000-00"
-                    className="mt-1"
+                    className={`mt-1 ${cpfError ? 'border-red-500' : ''}`}
+                    maxLength={14}
                   />
+                  {cpfError && (
+                    <p className="text-xs text-red-500 mt-1">{cpfError}</p>
+                  )}
                 </div>
               </div>
             </div>

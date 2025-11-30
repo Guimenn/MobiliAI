@@ -60,6 +60,7 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
   const [dateFilter, setDateFilter] = useState('all');
   const [salesStats, setSalesStats] = useState({
     totalRevenue: 0,
+    totalProfit: 0,
     totalSales: 0,
     averageTicket: 0,
     growthRate: 0
@@ -69,8 +70,13 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
 
   useEffect(() => {
     loadSales();
-    loadSalesStats();
   }, [storeId]);
+
+  useEffect(() => {
+    if (sales.length > 0) {
+      loadSalesStats();
+    }
+  }, [sales]);
 
   const loadSales = async () => {
     try {
@@ -90,16 +96,32 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
   const loadSalesStats = async () => {
     try {
       const stats = await adminAPI.getStoreSalesStats(storeId);
+      // Calcular lucro total a partir das vendas
+      const totalProfit = sales.reduce((sum, sale) => {
+        const saleProfit = sale.items?.reduce((itemSum: number, item: any) => {
+          return itemSum + (item.profit ? Number(item.profit) : 0);
+        }, 0) || 0;
+        return sum + saleProfit;
+      }, 0);
+      
       // Garantir que os valores numéricos sejam válidos
       setSalesStats({
         totalRevenue: Number(stats?.totalRevenue) || 0,
+        totalProfit: totalProfit,
         totalSales: Number(stats?.totalSales) || 0,
         averageTicket: Number(stats?.averageTicket) || 0,
         growthRate: Number(stats?.growthRate) || 0
       });
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
-      // Manter valores padrão em caso de erro
+      // Calcular lucro mesmo em caso de erro
+      const totalProfit = sales.reduce((sum, sale) => {
+        const saleProfit = sale.items?.reduce((itemSum: number, item: any) => {
+          return itemSum + (item.profit ? Number(item.profit) : 0);
+        }, 0) || 0;
+        return sum + saleProfit;
+      }, 0);
+      setSalesStats(prev => ({ ...prev, totalProfit }));
     }
   };
 
@@ -206,7 +228,7 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
         <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
@@ -218,6 +240,22 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
                   R$ {salesStats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs sm:text-sm text-gray-500">Receita Total</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-600 truncate">
+                  R$ {salesStats.totalProfit?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0.00'}
+                </p>
+                <p className="text-xs sm:text-sm text-gray-500">Lucro Total</p>
               </div>
             </div>
           </CardContent>

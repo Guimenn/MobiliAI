@@ -259,6 +259,9 @@ export default function ManagerProductsPage() {
           name: editedProduct.name.trim(),
           description: editedProduct.description?.trim() || '',
           price: Number(editedProduct.price),
+          costPrice: editedProduct.costPrice !== undefined && editedProduct.costPrice !== null && editedProduct.costPrice !== '' 
+            ? Number(editedProduct.costPrice) 
+            : undefined,
           stock: Number(editedProduct.stock),
           category: editedProduct.category,
           brand: editedProduct.brand?.trim() || undefined,
@@ -335,6 +338,9 @@ export default function ManagerProductsPage() {
           name: editedProduct.name.trim(),
           description: editedProduct.description?.trim() || '',
           price: Number(editedProduct.price),
+          costPrice: editedProduct.costPrice !== undefined && editedProduct.costPrice !== null && editedProduct.costPrice !== '' 
+            ? Number(editedProduct.costPrice) 
+            : undefined,
           stock: Number(editedProduct.stock),
           category: editedProduct.category,
           imageUrl: allImageUrls[0] || undefined,
@@ -926,7 +932,7 @@ export default function ManagerProductsPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
                           <Label htmlFor="modal-price" className="text-xs sm:text-sm font-semibold text-gray-700 mb-2 block">
-                            Preço *
+                            Preço de Venda *
                           </Label>
                           <div className="relative mt-1.5">
                             <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-600 font-semibold text-sm sm:text-base">R$</span>
@@ -945,20 +951,40 @@ export default function ManagerProductsPage() {
                         </div>
 
                         <div>
-                          <Label htmlFor="modal-stock" className="text-xs sm:text-sm font-semibold text-gray-700 mb-2 block">
-                            Estoque *
+                          <Label htmlFor="modal-costPrice" className="text-xs sm:text-sm font-semibold text-gray-700 mb-2 block">
+                            Preço Base (Custo)
                           </Label>
-                          <Input
-                            id="modal-stock"
-                            type="number"
-                            min="0"
-                            value={editedProduct?.stock || 0}
-                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, stock: parseInt(e.target.value) || 0 } : null)}
-                            placeholder="0"
-                            className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] text-base sm:text-lg font-semibold"
-                            disabled={productModalMode === 'view'}
-                          />
+                          <div className="relative mt-1.5">
+                            <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-600 font-semibold text-sm sm:text-base">R$</span>
+                            <Input
+                              id="modal-costPrice"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={editedProduct?.costPrice || ''}
+                              onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, costPrice: e.target.value ? parseFloat(e.target.value) : undefined } : null)}
+                              placeholder="0.00"
+                              className="pl-10 sm:pl-12 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] text-base sm:text-lg font-semibold"
+                              disabled={productModalMode === 'view'}
+                            />
+                          </div>
                         </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="modal-stock" className="text-xs sm:text-sm font-semibold text-gray-700 mb-2 block">
+                          Estoque *
+                        </Label>
+                        <Input
+                          id="modal-stock"
+                          type="number"
+                          min="0"
+                          value={editedProduct?.stock || 0}
+                          onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, stock: parseInt(e.target.value) || 0 } : null)}
+                          placeholder="0"
+                          className="mt-1.5 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] text-base sm:text-lg font-semibold"
+                          disabled={productModalMode === 'view'}
+                        />
                       </div>
                     </CardContent>
                   </Card>

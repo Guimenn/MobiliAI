@@ -248,6 +248,9 @@ export default function ReportsPage() {
     const totalSales = stores.reduce((sum: number, store: any) => 
       sum + Number(store.totalSales || 0), 0
     );
+    const totalProfit = stores.reduce((sum: number, store: any) => 
+      sum + Number(store.totalProfit || 0), 0
+    );
     const averageTicket = totalSales > 0 ? totalRevenue / totalSales : 0;
     const activeStores = stores.filter((s: any) => s.isActive !== false).length;
     const totalStores = stores.length;
@@ -261,6 +264,7 @@ export default function ReportsPage() {
     return {
       totalRevenue: useCalculated ? totalRevenue : (summary.totalRevenue || 0),
       totalSales: useCalculated ? totalSales : (summary.totalSales || 0),
+      totalProfit: useCalculated ? totalProfit : (summary.totalProfit || 0),
       averageTicket: useCalculated ? averageTicket : (summary.averageTicket || 0),
       totalStores: summary.totalStores || totalStores,
       activeStores: useCalculated ? activeStores : (summary.activeStores || activeStores)
@@ -520,6 +524,20 @@ export default function ReportsPage() {
                     <CardContent>
                       <div className="text-2xl font-semibold text-gray-900">
                         {summary.activeStores || 0}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white border-0 shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-600">Lucro Total</CardTitle>
+                      <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <TrendingUp className="h-5 w-5 text-green-600" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-semibold text-gray-900">
+                        R$ {Number(summary.totalProfit || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </div>
                     </CardContent>
                   </Card>

@@ -41,7 +41,14 @@ export class AdminService {
             customer: { select: { name: true, email: true } },
             store: { select: { name: true } },
             items: {
-              include: {
+              select: {
+                id: true,
+                quantity: true,
+                unitPrice: true,
+                totalPrice: true,
+                costPrice: true,
+                profit: true,
+                notes: true,
                 product: { select: { name: true, price: true } }
               }
             }
@@ -73,6 +80,40 @@ export class AdminService {
         monthlyRevenue = 0;
       }
 
+      // Calcular lucro total de todas as vendas
+      let totalProfit = 0;
+      try {
+        const allSalesItems = await this.prisma.saleItem.findMany({
+          select: {
+            profit: true,
+            unitPrice: true,
+            costPrice: true,
+            quantity: true
+          }
+        });
+        totalProfit = allSalesItems.reduce((sum, item) => {
+          // Se já tem profit calculado, usar ele
+          if (item.profit !== null && item.profit !== undefined) {
+            const profitValue = Number(item.profit);
+            return sum + (isNaN(profitValue) ? 0 : profitValue);
+          }
+          // Se não tem profit mas tem costPrice, calcular
+          if (item.costPrice !== null && item.costPrice !== undefined && item.unitPrice && item.quantity) {
+            const unitPrice = Number(item.unitPrice);
+            const costPrice = Number(item.costPrice);
+            const quantity = Number(item.quantity);
+            if (!isNaN(unitPrice) && !isNaN(costPrice) && !isNaN(quantity)) {
+              return sum + ((unitPrice - costPrice) * quantity);
+            }
+          }
+          return sum;
+        }, 0);
+        console.log(`💰 Lucro total calculado: R$ ${totalProfit.toFixed(2)} (${allSalesItems.length} itens)`);
+      } catch (profitError) {
+        console.error('Erro ao calcular lucro total:', profitError);
+        totalProfit = 0;
+      }
+
       return {
         overview: {
           totalStores,
@@ -80,6 +121,7 @@ export class AdminService {
           totalProducts,
           totalSales,
           monthlyRevenue,
+          totalProfit,
           activeStores
         },
         recentSales,
@@ -95,6 +137,7 @@ export class AdminService {
           totalProducts: 0,
           totalSales: 0,
           monthlyRevenue: 0,
+          totalProfit: 0,
           activeStores: 0
         },
         recentSales: [],
@@ -2264,6 +2307,24 @@ export class AdminService {
     const totalSales = sales.length;
     const averageTicket = totalSales > 0 ? totalRevenue / totalSales : 0;
     
+    // Calcular lucro total do dia
+    let totalProfit = 0;
+    sales.forEach(sale => {
+      sale.items.forEach(item => {
+        // Se já tem profit calculado, usar ele
+        if (item.profit !== null && item.profit !== undefined) {
+          totalProfit += Number(item.profit);
+        } 
+        // Se não tem profit mas tem costPrice, calcular
+        else if (item.costPrice !== null && item.costPrice !== undefined && item.unitPrice && item.quantity) {
+          const unitPrice = Number(item.unitPrice);
+          const costPrice = Number(item.costPrice);
+          const quantity = Number(item.quantity);
+          totalProfit += (unitPrice - costPrice) * quantity;
+        }
+      });
+    });
+    
     // Métricas por método de pagamento
     const paymentMethods = sales.reduce((acc, sale) => {
       const method = sale.paymentMethod;
@@ -2281,11 +2342,30 @@ export class AdminService {
       const storeRevenue = storeSales.reduce((sum, sale) => sum + Number(sale.totalAmount || 0), 0);
       const storeDailyCash = dailyCash.find(dc => dc.storeId === store.id);
       
+      // Calcular lucro da loja
+      let storeProfit = 0;
+      storeSales.forEach(sale => {
+        sale.items.forEach(item => {
+          // Se já tem profit calculado, usar ele
+          if (item.profit !== null && item.profit !== undefined) {
+            storeProfit += Number(item.profit);
+          } 
+          // Se não tem profit mas tem costPrice, calcular
+          else if (item.costPrice !== null && item.costPrice !== undefined && item.unitPrice && item.quantity) {
+            const unitPrice = Number(item.unitPrice);
+            const costPrice = Number(item.costPrice);
+            const quantity = Number(item.quantity);
+            storeProfit += (unitPrice - costPrice) * quantity;
+          }
+        });
+      });
+      
       return {
         storeId: store.id,
         storeName: store.name,
         totalSales: storeSales.length,
         totalRevenue: storeRevenue,
+        totalProfit: storeProfit,
         averageTicket: storeSales.length > 0 ? storeRevenue / storeSales.length : 0,
         isActive: store.isActive,
         openingAmount: storeDailyCash?.openingAmount ? Number(storeDailyCash.openingAmount) : 0,
@@ -2400,6 +2480,7 @@ export class AdminService {
       summary: {
         totalRevenue,
         totalSales,
+        totalProfit,
         averageTicket,
         totalStores: stores.length,
         activeStores: stores.filter(s => s.isActive).length

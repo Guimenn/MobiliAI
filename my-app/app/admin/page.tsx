@@ -25,6 +25,7 @@ type DashboardOverview = {
   totalProducts: number;
   totalSales: number;
   monthlyRevenue: number;
+  totalProfit?: number;
   activeStores: number;
 };
 
@@ -268,6 +269,28 @@ export default function AdminDashboard() {
     return `${value.toFixed(1)}%`;
   }, []);
 
+  // Calcular lucro total - priorizar do overview (calculado no backend), senão calcular das vendas recentes
+  const totalProfit = useMemo(() => {
+    // Priorizar lucro total do overview se disponível (calculado no backend de TODAS as vendas)
+    if (dashboardData?.overview?.totalProfit !== undefined && dashboardData.overview.totalProfit !== null) {
+      const profit = Number(dashboardData.overview.totalProfit);
+      if (!isNaN(profit) && profit >= 0) {
+        return profit;
+      }
+    }
+    // Fallback: calcular das vendas recentes (apenas as últimas 10)
+    if (!dashboardData?.recentSales || dashboardData.recentSales.length === 0) return 0;
+    const calculatedProfit = dashboardData.recentSales.reduce((sum, sale) => {
+      if (!sale.items || !Array.isArray(sale.items)) return sum;
+      const saleProfit = sale.items.reduce((itemSum: number, item: any) => {
+        const itemProfit = item.profit !== undefined && item.profit !== null ? Number(item.profit) : 0;
+        return itemSum + (isNaN(itemProfit) ? 0 : itemProfit);
+      }, 0);
+      return sum + saleProfit;
+    }, 0);
+    return calculatedProfit;
+  }, [dashboardData]);
+
   const overviewCards = useMemo(() => {
     const overview = dashboardData?.overview;
 
@@ -298,8 +321,14 @@ export default function AdminDashboard() {
         helper: overview ? `${formatNumber(overview.totalSales)} pedidos no período` : '---',
         icon: DollarSign,
       },
+      {
+        title: 'Lucro total',
+        value: formatCurrency(totalProfit),
+        helper: 'Lucro acumulado das vendas recentes',
+        icon: TrendingUp,
+      },
     ];
-  }, [dashboardData, formatNumber, formatCurrency]);
+  }, [dashboardData, formatNumber, formatCurrency, totalProfit]);
 
   const performance = summaryData?.performance;
 
@@ -550,7 +579,7 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
         {overviewCards.map((card) => {
           const Icon = card.icon;
           return (

@@ -31,6 +31,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   ArrowUpRight,
+  TrendingUp,
 } from 'lucide-react';
 import AdminProductModal from '@/components/AdminProductModal';
 import ProductViewer3D from '@/components/ProductViewer3D';
@@ -422,6 +423,13 @@ function ProductsStats({ products, totalProducts }: any) {
       onSale: productsOnSale.length,
       onSaleProduct: firstProductOnSale,
       totalValue: products.reduce((sum: number, p: any) => sum + (p.price * (p.stock || 0)), 0),
+      totalProfit: products.reduce((sum: number, p: any) => {
+        if (p.costPrice && p.stock) {
+          const profitPerUnit = p.price - p.costPrice;
+          return sum + (profitPerUnit * p.stock);
+        }
+        return sum;
+      }, 0),
     };
   }, [products, totalProducts]);
 
@@ -463,6 +471,13 @@ function ProductsStats({ products, totalProducts }: any) {
         </div>
         <p className="text-lg sm:text-2xl font-semibold leading-tight truncate">{formatPrice(stats.totalValue)}</p>
         <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">Valor Total</p>
+      </div>
+      <div className="rounded-xl sm:rounded-2xl border border-green-500/30 bg-green-500/20 p-3 sm:p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-300" />
+        </div>
+        <p className="text-lg sm:text-2xl font-semibold leading-tight truncate text-green-300">{formatPrice(stats.totalProfit)}</p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-green-300/70 mt-1">Lucro Potencial</p>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { salesAPI } from '@/lib/api';
+import { useAppStore } from '@/lib/store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -113,6 +114,8 @@ interface SaleDetails {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    profit?: number;
+    costPrice?: number;
     notes?: string;
     product: {
       name: string;
@@ -187,8 +190,10 @@ const formatDateTime = (date?: string) =>
     : '-';
 
 export default function SaleDetailsPanel({ saleId, onClose }: SaleDetailsPanelProps) {
+  const { user } = useAppStore();
   const [sale, setSale] = useState<SaleDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const canViewProfit = user?.role === 'ADMIN' || user?.role === 'admin';
 
   useEffect(() => {
     if (saleId) {
@@ -219,10 +224,29 @@ export default function SaleDetailsPanel({ saleId, onClose }: SaleDetailsPanelPr
         additionalFees: 0,
         netAmount: 0,
         gross: 0,
+        profit: 0,
       };
     }
 
     const subtotal = (sale.totalAmount || 0) + (sale.discount || 0) - (sale.tax || 0);
+    // Calcular lucro: usar profit se disponível, senão calcular a partir de costPrice
+    const profit = sale.items?.reduce((sum: number, item: any) => {
+      // Se já tem profit calculado, usar ele
+      if (item.profit !== undefined && item.profit !== null) {
+        return sum + Number(item.profit);
+      }
+      // Se não tem profit mas tem costPrice, calcular
+      if (item.costPrice !== undefined && item.costPrice !== null && item.unitPrice && item.quantity) {
+        const unitPrice = Number(item.unitPrice);
+        const costPrice = Number(item.costPrice);
+        const quantity = Number(item.quantity);
+        if (!isNaN(unitPrice) && !isNaN(costPrice) && !isNaN(quantity)) {
+          return sum + ((unitPrice - costPrice) * quantity);
+        }
+      }
+      return sum;
+    }, 0) || 0;
+    
     return {
       subtotal,
       discount: sale.discount || 0,
@@ -231,6 +255,7 @@ export default function SaleDetailsPanel({ saleId, onClose }: SaleDetailsPanelPr
       additionalFees: sale.additionalFees || 0,
       netAmount: sale.netAmount || sale.totalAmount || 0,
       gross: sale.totalAmount || 0,
+      profit,
     };
   }, [sale]);
 
@@ -436,6 +461,29 @@ export default function SaleDetailsPanel({ saleId, onClose }: SaleDetailsPanelPr
                       </div>
                       <div className="text-right">
                         <p className="text-base font-semibold text-gray-900">{formatCurrency(item.totalPrice)}</p>
+                        {canViewProfit && (() => {
+                          // Calcular lucro do item: usar profit se disponível, senão calcular
+                          let itemProfit = 0;
+                          if (item.profit !== undefined && item.profit !== null) {
+                            itemProfit = Number(item.profit);
+                          } else if (item.costPrice !== undefined && item.costPrice !== null && item.unitPrice && item.quantity) {
+                            const unitPrice = Number(item.unitPrice);
+                            const costPrice = Number(item.costPrice);
+                            const quantity = Number(item.quantity);
+                            if (!isNaN(unitPrice) && !isNaN(costPrice) && !isNaN(quantity)) {
+                              itemProfit = (unitPrice - costPrice) * quantity;
+                            }
+                          }
+                          return itemProfit > 0 ? (
+                            <p className="text-sm font-medium text-green-600 mt-1">
+                              Lucro: {formatCurrency(itemProfit)}
+                            </p>
+                          ) : itemProfit === 0 && (item.profit !== undefined || item.costPrice !== undefined) ? (
+                            <p className="text-sm text-gray-500 mt-1">
+                              Lucro: {formatCurrency(0)}
+                            </p>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -454,6 +502,12 @@ export default function SaleDetailsPanel({ saleId, onClose }: SaleDetailsPanelPr
               {totals.additionalFees !== 0 && (
                 <MetricTile label="Taxas adicionais" value={formatCurrency(totals.additionalFees)} />
               )}
+              {canViewProfit && (totals.profit > 0 || (totals.profit === 0 && sale.items?.some((item: any) => item.profit !== undefined || item.costPrice !== undefined))) ? (
+                <div className="flex justify-between text-lg font-semibold text-green-600 border-t pt-3">
+                  <span>Lucro Total</span>
+                  <span>{formatCurrency(totals.profit)}</span>
+                </div>
+              ) : null}
               <div className="flex justify-between text-lg font-semibold text-gray-900 border-t pt-3">
                 <span>Total pago</span>
                 <span>{formatCurrency(totals.gross)}</span>

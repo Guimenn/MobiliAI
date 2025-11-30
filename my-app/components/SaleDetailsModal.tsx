@@ -17,6 +17,7 @@ import {
   X
 } from 'lucide-react';
 import { salesAPI } from '@/lib/api';
+import { useAppStore } from '@/lib/store';
 
 interface SaleDetailsModalProps {
   saleId: string | null;
@@ -52,6 +53,7 @@ interface SaleDetails {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    profit?: number;
     notes?: string;
     product: {
       name: string;
@@ -61,8 +63,10 @@ interface SaleDetails {
 }
 
 export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetailsModalProps) {
+  const { user } = useAppStore();
   const [sale, setSale] = useState<SaleDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const canViewProfit = user?.role === 'ADMIN' || user?.role === 'admin';
 
   useEffect(() => {
     if (saleId && isOpen) {
@@ -253,6 +257,11 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                       </div>
                       <div className="text-left sm:text-right flex-shrink-0">
                         <p className="font-medium">{formatCurrency(item.totalPrice)}</p>
+                        {canViewProfit && item.profit !== undefined && item.profit !== null && (
+                          <p className="text-sm font-medium text-green-600 mt-1">
+                            Lucro: {formatCurrency(item.profit)}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -286,6 +295,17 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                       <span>+{formatCurrency(sale.tax)}</span>
                     </div>
                   )}
+                  {canViewProfit && (() => {
+                    const totalProfit = sale.items.reduce((sum, item) => {
+                      return sum + (item.profit ? Number(item.profit) : 0);
+                    }, 0);
+                    return totalProfit > 0 ? (
+                      <div className="flex justify-between text-green-600 font-semibold">
+                        <span>Lucro Total:</span>
+                        <span>{formatCurrency(totalProfit)}</span>
+                      </div>
+                    ) : null;
+                  })()}
                   <Separator />
                   <div className="flex justify-between font-bold text-lg">
                     <span>Total:</span>

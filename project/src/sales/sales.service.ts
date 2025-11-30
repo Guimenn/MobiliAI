@@ -108,11 +108,17 @@ export class SalesService {
           throw new NotFoundException(`Produto ${item.productId} não encontrado`);
         }
 
+        // Calcular lucro se costPrice estiver disponível
+        const costPrice = product.costPrice ? Number(product.costPrice) : null;
+        const profit = costPrice !== null ? (item.unitPrice - costPrice) * item.quantity : null;
+        
         await tx.saleItem.create({
           data: {
             ...item,
             saleId: sale.id,
             totalPrice: item.quantity * item.unitPrice,
+            costPrice: costPrice,
+            profit: profit,
           },
         });
 
@@ -286,6 +292,7 @@ export class SalesService {
           include: {
             product: true,
           },
+          // Todos os campos de SaleItem são retornados automaticamente, incluindo profit e costPrice
         },
       },
     });

@@ -401,12 +401,21 @@ export class CustomerCartService {
           shippingPhone: shippingInfo?.phone,
           notes: additionalCosts?.notes,
           items: {
-            create: validation.validItems.map(item => ({
-              product: { connect: { id: item.productId } },
-              quantity: item.quantity,
-              unitPrice: item.product.price,
-              totalPrice: Number(item.product.price) * item.quantity
-            }))
+            create: validation.validItems.map(item => {
+              const unitPrice = Number(item.product.price);
+              const costPrice = item.product.costPrice ? Number(item.product.costPrice) : null;
+              const totalPrice = unitPrice * item.quantity;
+              const profit = costPrice !== null ? (unitPrice - costPrice) * item.quantity : null;
+              
+              return {
+                product: { connect: { id: item.productId } },
+                quantity: item.quantity,
+                unitPrice: unitPrice,
+                totalPrice: totalPrice,
+                costPrice: costPrice,
+                profit: profit
+              };
+            })
           }
         },
         include: {

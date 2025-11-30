@@ -43,6 +43,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
         name: '',
         description: '',
         price: 0,
+        costPrice: undefined,
         stock: 0,
         category: 'MESA_CENTRO',
         sku: '',
@@ -184,6 +185,9 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
           description: editedProduct.description?.trim() || '',
           category: editedProduct.category,
           price: Number(editedProduct.price),
+          costPrice: editedProduct.costPrice !== undefined && editedProduct.costPrice !== null && editedProduct.costPrice !== '' 
+            ? Number(editedProduct.costPrice) 
+            : undefined,
           stock: Number(editedProduct.stock),
           sku: editedProduct.sku?.trim() || '',
           isAvailable: editedProduct.isActive ?? true, // Usar isAvailable conforme DTO
@@ -573,6 +577,9 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
             description: editedProduct.description,
             category: editedProduct.category,
             price: editedProduct.price,
+            costPrice: editedProduct.costPrice !== undefined && editedProduct.costPrice !== null && editedProduct.costPrice !== '' 
+              ? Number(editedProduct.costPrice) 
+              : undefined,
             stock: editedProduct.stock,
             sku: editedProduct.sku,
             isActive: editedProduct.isActive,
@@ -1088,7 +1095,7 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="price" className="text-sm font-semibold text-gray-700 mb-2 block">
-                        Preço *
+                        Preço de Venda *
                       </Label>
                       {isEditing ? (
                         <div className="relative mt-1.5">
@@ -1112,9 +1119,42 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                     </div>
 
                     <div>
-                      <Label htmlFor="stock" className="text-sm font-semibold text-gray-700 mb-2 block">
-                        Estoque *
+                      <Label htmlFor="costPrice" className="text-sm font-semibold text-gray-700 mb-2 block">
+                        Preço Base (Custo)
                       </Label>
+                      {isEditing ? (
+                        <div className="relative mt-1.5">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">R$</span>
+                          <Input
+                            id="costPrice"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editedProduct?.costPrice || ''}
+                            onChange={(e) => setEditedProduct((prev: any) => prev ? { ...prev, costPrice: e.target.value ? parseFloat(e.target.value) : undefined } : null)}
+                            placeholder="0.00"
+                            className="pl-12 border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] text-lg font-semibold"
+                          />
+                        </div>
+                      ) : (
+                        <div className="mt-1.5 space-y-1">
+                          <p className="text-2xl font-bold text-[#3e2626]">
+                            {product?.costPrice ? formatPrice(product.costPrice) : 'Não informado'}
+                          </p>
+                          {product?.costPrice && product?.price && (
+                            <p className="text-sm text-green-600 font-medium">
+                              Lucro: {formatPrice(product.price - product.costPrice)} ({((product.price - product.costPrice) / product.costPrice * 100).toFixed(1)}%)
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="stock" className="text-sm font-semibold text-gray-700 mb-2 block">
+                      Estoque *
+                    </Label>
                       {isEditing ? (
                         <Input
                           id="stock"
@@ -1163,7 +1203,6 @@ export default function AdminProductModal({ product, isOpen, mode, onClose, onPr
                           )}
                         </div>
                       )}
-                    </div>
                   </div>
 
                   <div>
