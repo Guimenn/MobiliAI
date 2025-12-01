@@ -79,6 +79,7 @@ export default function AITestModal({
   const [isSelectingPosition, setIsSelectingPosition] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<{ x: number; y: number } | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
+  const [productPositions, setProductPositions] = useState<Map<string, Position>>(new Map());
   const canvasRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isDraggingRef = useRef(false);
@@ -105,9 +106,43 @@ export default function AITestModal({
     },
     multiple: false,
     maxSize: 10 * 1024 * 1024, // 10MB
-    noClick: true,
+    noClick: false,
     noKeyboard: true,
   });
+
+  // Alternar seleção de produto
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+        // Remover posição quando deselecionar
+        setProductPositions(prevPos => {
+          const newPos = new Map(prevPos);
+          newPos.delete(productId);
+          return newPos;
+        });
+      } else {
+        newSet.add(productId);
+        // Definir posição padrão como 'center' quando selecionar
+        setProductPositions(prevPos => {
+          const newPos = new Map(prevPos);
+          newPos.set(productId, 'center');
+          return newPos;
+        });
+      }
+      return newSet;
+    });
+  };
+
+  // Definir posição de um produto
+  const setProductPosition = (productId: string, position: Position) => {
+    setProductPositions(prev => {
+      const newPos = new Map(prev);
+      newPos.set(productId, position);
+      return newPos;
+    });
+  };
 
   // Abrir câmera
   const handleCameraClick = () => {
@@ -205,22 +240,94 @@ export default function AITestModal({
       };
 
       const pos = calculatePosition();
-      const productImageUrl = product.imageUrl;
 
-      // Preparar arquivos
+      // Preparar arquivos: imagem do ambiente + imagem do produto (OBRIGATÓRIA)
       const productFiles: File[] = [];
-      if (productImageUrl) {
-        try {
-          const response = await fetch(productImageUrl);
-          const blob = await response.blob();
-          const productFile = new File([blob], `product-${product.id}.jpg`, { type: 'image/jpeg' });
-          productFiles.push(productFile);
-        } catch (err) {
-          console.error('Erro ao carregar imagem do produto:', err);
-        }
+      
+      // OBRIGATÓRIO: Buscar imagem do produto selecionado
+      let productImageUrl = product.imageUrl || '';
+      
+      if (!productImageUrl) {
+        throw new Error(`Produto ${product.name} não possui imagem. Por favor, selecione um produto com imagem.`);
       }
 
+      console.log('🖼️ Carregando imagem do produto:', productImageUrl);
+      
+      try {
+        // Tentar carregar a imagem do produto
+        const response = await fetch(productImageUrl, {
+          mode: 'cors',
+          credentials: 'omit',
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Erro ao carregar imagem: ${response.status} ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        
+        // Verificar se é uma imagem válida
+        if (!blob.type.startsWith('image/')) {
+          throw new Error('Arquivo não é uma imagem válida');
+        }
+        
+        const productFile = new File([blob], `product-${product.id}-${Date.now()}.${blob.type.split('/')[1] || 'jpg'}`, { 
+          type: blob.type || 'image/jpeg' 
+        });
+        
+        productFiles.push(productFile);
+        console.log('✅ Imagem do produto carregada com sucesso:', productFile.name, productFile.size, 'bytes');
+      } catch (err) {
+        console.error('❌ Erro ao carregar imagem do produto:', err);
+        throw new Error(`Não foi possível carregar a imagem do produto ${product.name}. Verifique se a URL da imagem está acessível.`);
+      }
+
+      // Calcular posição relativa na imagem (em porcentagem) para o prompt
+      let positionDescription = '';
+      if (position && imageRef.current && canvasRef.current) {
+        const imgRect = imageRef.current.getBoundingClientRect();
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const imgOffsetX = imgRect.left - canvasRect.left;
+        const imgOffsetY = imgRect.top - canvasRect.top;
+        
+        // Calcular posição relativa (0-100%)
+        const relativeX = ((position.x + 75 - imgOffsetX) / imgRect.width) * 100;
+        const relativeY = ((position.y + 75 - imgOffsetY) / imgRect.height) * 100;
+        
+        // Determinar região aproximada
+        let region = '';
+        if (relativeX < 33) region += 'lado esquerdo';
+        else if (relativeX > 67) region += 'lado direito';
+        else region += 'centro horizontal';
+        
+        if (relativeY < 33) region += ' da parte superior';
+        else if (relativeY > 67) region += ' da parte inferior';
+        else region += ' do meio';
+        
+        positionDescription = `\n\nPOSIÇÃO ESPECÍFICA: Coloque o produto na região ${region} da imagem (aproximadamente ${Math.round(relativeX)}% da esquerda, ${Math.round(relativeY)}% do topo).`;
+      }
+
+      // Criar prompt detalhado que ESPECIFICA usar a imagem do produto enviada
+      const prompt = `IMPORTANTE: Use EXATAMENTE a imagem do produto que foi enviada como arquivo adicional. 
+
+Adicione o ${product.name}${product.category ? ` (${product.category.toLowerCase()})` : ''} desta imagem de produto na sala de forma realista e natural.${positionDescription}
+
+REQUISITOS OBRIGATÓRIOS:
+- Use a imagem EXATA do produto que foi enviada, não invente ou substitua por outro produto
+- O produto deve estar perfeitamente integrado ao ambiente com iluminação e sombras corretas
+- Perspectiva adequada que respeita o ponto de vista da foto original
+- Proporções realistas em relação aos outros elementos da sala
+- Texturas e materiais que combinam com o ambiente
+- Sem distorções ou artefatos visuais
+- O produto deve parecer que realmente está na sala, como se tivesse sido fotografado no local
+
+NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviada.`;
+
+      // Usar o arquivo original (pode ser qualquer tipo)
+      // Se temos uma imagem processada, usar ela; senão usar arquivo original
       let environmentFile: File = uploadedFile!;
+      
+      // Se temos uma imagem processada anteriormente, usar ela como base
       if (processedImage && processedImage.startsWith('http')) {
         try {
           const response = await fetch(processedImage);
@@ -228,27 +335,39 @@ export default function AITestModal({
             const blob = await response.blob();
             environmentFile = new File([blob], 'environment-processed.jpg', { type: 'image/jpeg' });
           }
-        } catch {
-          // Usar arquivo original se falhar
+        } catch (err) {
+          console.warn('Não foi possível usar imagem processada, usando arquivo original:', err);
+          // Continuar com arquivo original
         }
       } else if (uploadedImage && uploadedImage.startsWith('data:image')) {
+        // Se temos data URL de imagem, converter para File
         try {
           const response = await fetch(uploadedImage);
           const blob = await response.blob();
           environmentFile = new File([blob], 'environment.jpg', { type: blob.type || 'image/jpeg' });
-        } catch {
-          // Usar arquivo original se falhar
+        } catch (err) {
+          console.warn('Não foi possível converter data URL, usando arquivo original:', err);
+          // Continuar com arquivo original
         }
       }
 
-      const prompt = `Adicione o produto "${product.name}" nesta imagem do ambiente. O produto deve estar perfeitamente integrado ao ambiente, com iluminação, sombras e perspectiva realistas. O produto deve parecer fotografado no local.`;
+      // Validar que temos a imagem do produto antes de enviar
+      if (productFiles.length === 0) {
+        throw new Error('Erro: Imagem do produto não foi carregada. Por favor, tente novamente.');
+      }
 
+      console.log('📤 Enviando para IA:');
+      console.log('  - Ambiente:', environmentFile.name, environmentFile.size, 'bytes');
+      console.log('  - Produto:', productFiles[0].name, productFiles[0].size, 'bytes');
+      console.log('  - Prompt:', prompt.substring(0, 100) + '...');
+
+      // Chamar nossa IA - usar endpoint público para demo
       const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
       const formData = new FormData();
       formData.append('images', environmentFile);
-      if (productFiles.length > 0) {
-        productFiles.forEach(file => formData.append('productImages', file));
-      }
+      productFiles.forEach((productFile) => {
+        formData.append('images', productFile);
+      });
       formData.append('prompt', prompt);
       formData.append('outputFormat', 'jpg');
 
@@ -345,45 +464,9 @@ export default function AITestModal({
         return;
       }
 
-      // Criar prompt com posições específicas para cada produto
-      const productPositionDescriptions: string[] = [];
-      selectedProductsList.forEach((product, index) => {
-        if (product && productFiles[index]) {
-          const position = productPositions.get(product.id) || 'center';
-          let positionDescription = '';
-          
-          switch (position) {
-            case 'left':
-              positionDescription = 'no lado esquerdo da imagem';
-              break;
-            case 'right':
-              positionDescription = 'no lado direito da imagem';
-              break;
-            case 'center':
-              positionDescription = 'no centro da imagem';
-              break;
-            case 'background':
-              positionDescription = 'no fundo/plano de fundo da imagem';
-              break;
-            case 'foreground':
-              positionDescription = 'na frente/primeiro plano da imagem';
-              break;
-            default:
-              positionDescription = 'na imagem';
-          }
-          
-          productPositionDescriptions.push(
-            `O produto da imagem ${index + 2} (${product.name}) deve ser posicionado ${positionDescription}`
-          );
-        }
-      });
-
-      const positionInstructions = productPositionDescriptions.length > 0
-        ? `\n\nINSTRUÇÕES DE POSICIONAMENTO:\n${productPositionDescriptions.join('.\n')}.`
-        : '';
-
-      // Prompt com posições específicas
-      const prompt = `Adicione os produtos mostrados nas imagens na foto do ambiente de forma realista e natural. NÃO altere, remova ou modifique NADA na imagem original do ambiente. Apenas adicione os produtos das imagens fornecidas, posicionando-os de forma que pareçam ter sempre estado lá, integrados perfeitamente ao ambiente. Mantenha a iluminação, cores e estilo da foto original.${positionInstructions}`;
+      // Prompt simples para adicionar produtos
+      const productNames = selectedProductsList.map(p => p?.name).filter(Boolean).join(', ');
+      const prompt = `Adicione os produtos mostrados nas imagens na foto do ambiente de forma realista e natural. NÃO altere, remova ou modifique NADA na imagem original do ambiente. Apenas adicione os produtos das imagens fornecidas (${productNames}), posicionando-os de forma que pareçam ter sempre estado lá, integrados perfeitamente ao ambiente. Mantenha a iluminação, cores e estilo da foto original.`;
 
       // Processar imagem usando a API do Replicate
       const result = await aiAPI.processImageWithUpload({
@@ -433,13 +516,15 @@ export default function AITestModal({
       setIsSelectingPosition(false);
       setSelectedPosition(null);
       setError(null);
+      setSelectedProducts(new Set());
+      setProductPositions(new Map());
     }
   }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-7xl w-full max-h-[95vh] overflow-hidden border-[#3e2626]/20 bg-white shadow-2xl p-0">
-        <DialogHeader className="border-b border-[#3e2626]/10 px-6 py-4 bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white">
+      <DialogContent className="max-w-7xl w-full max-h-[95vh] flex flex-col border-[#3e2626]/20 bg-white shadow-2xl p-0 z-[1000]">
+        <DialogHeader className="border-b border-[#3e2626]/10 px-6 py-4 bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white shrink-0">
           <DialogTitle className="text-2xl font-black flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-[#C07A45]" />
             Visualizar como vai ficar
@@ -449,7 +534,30 @@ export default function AITestModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
+        {/* Mensagem de seleção de posição */}
+        {isSelectingPosition && pendingProduct && (
+          <div className="bg-[#C07A45]/10 border-b border-[#C07A45]/30 px-6 py-3 shrink-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-[#C07A45] animate-pulse" />
+                <p className="text-sm font-medium text-[#3e2626]">
+                  <span className="font-semibold">Clique na imagem</span> para escolher onde colocar: <span className="text-[#C07A45]">{pendingProduct.name}</span>
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelPositionSelection}
+                className="text-[#3e2626] hover:bg-[#C07A45]/20 h-7 px-2"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+          <div className="space-y-6">
           {/* Upload de Imagem */}
           <Card>
             <CardHeader>
@@ -481,22 +589,146 @@ export default function AITestModal({
                 </div>
               ) : (
                 <div className="relative">
-                  <div className="relative w-full h-64 rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-100">
-                    <img
-                      src={uploadedImage}
-                      alt="Imagem enviada"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleRemoveImage}
-                    className="mt-2"
+                  <div
+                    ref={canvasRef}
+                    onClick={handleCanvasClick}
+                    onMouseMove={(e) => {
+                      if (isSelectingPosition && imageRef.current && canvasRef.current) {
+                        const canvasRect = canvasRef.current.getBoundingClientRect();
+                        const imgRect = imageRef.current.getBoundingClientRect();
+                        const imgOffsetX = imgRect.left - canvasRect.left;
+                        const imgOffsetY = imgRect.top - canvasRect.top;
+                        
+                        const mouseX = e.clientX - canvasRect.left;
+                        const mouseY = e.clientY - canvasRect.top;
+                        
+                        if (mouseX >= imgOffsetX && mouseX <= imgOffsetX + imgRect.width &&
+                            mouseY >= imgOffsetY && mouseY <= imgOffsetY + imgRect.height) {
+                          setHoverPosition({
+                            x: mouseX - 75,
+                            y: mouseY - 75,
+                          });
+                        } else {
+                          setHoverPosition(null);
+                        }
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      if (isSelectingPosition) {
+                        setHoverPosition(null);
+                      }
+                    }}
+                    className={`relative w-full rounded-lg overflow-hidden border-2 bg-gray-100 ${
+                      isSelectingPosition
+                        ? 'border-[#C07A45] cursor-crosshair'
+                        : 'border-gray-200'
+                    }`}
+                    style={{ minHeight: '400px', maxHeight: '600px' }}
                   >
-                    <X className="h-4 w-4 mr-2" />
-                    Remover Imagem
-                  </Button>
+                    <div className="relative w-full h-full">
+                      <img
+                        ref={imageRef}
+                        src={uploadedImage || ''}
+                        alt="Imagem enviada"
+                        className="w-full h-full object-contain"
+                      />
+                      
+                      {/* Overlay de seleção de posição */}
+                      {isSelectingPosition && !isProcessing && (
+                        <div className="absolute inset-0 rounded-lg border-2 border-dashed border-[#C07A45]/50 bg-[#C07A45]/5 pointer-events-none z-10" />
+                      )}
+
+                      {/* Indicador de hover (posição do mouse) */}
+                      {hoverPosition && isSelectingPosition && !isProcessing && !selectedPosition && imageRef.current && canvasRef.current && (
+                        <div
+                          className="absolute z-20 pointer-events-none"
+                          style={{
+                            left: `${hoverPosition.x}px`,
+                            top: `${hoverPosition.y}px`,
+                            width: '150px',
+                            height: '150px',
+                          }}
+                        >
+                          <div className="relative w-full h-full border-2 border-[#C07A45] border-dashed rounded-lg bg-[#C07A45]/5">
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45]/80 text-white px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
+                              {pendingProduct?.name}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Indicador de posição selecionada */}
+                      {selectedPosition && isSelectingPosition && !isProcessing && imageRef.current && canvasRef.current && (
+                        <div
+                          className="absolute z-20 pointer-events-none"
+                          style={{
+                            left: `${selectedPosition.x}px`,
+                            top: `${selectedPosition.y}px`,
+                            width: '150px',
+                            height: '150px',
+                          }}
+                        >
+                          <div className="relative w-full h-full border-4 border-[#C07A45] border-dashed rounded-lg bg-[#C07A45]/10 animate-pulse">
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45] text-white px-3 py-1 rounded-full text-xs font-semibold">
+                              {pendingProduct?.name}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Overlay de IA processando */}
+                      {isProcessing && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm z-30">
+                          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-[#3e2626]/20">
+                            <Loader2 className="h-12 w-12 animate-spin text-[#C07A45]" />
+                            <p className="text-lg font-semibold text-[#3e2626]">Processando com nossa IA...</p>
+                            <p className="text-sm text-[#4f3a2f]/70">Aguarde alguns segundos</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Mostrar produtos posicionados */}
+                      {placedProducts.map((item) => (
+                        <div
+                          key={item.id}
+                          className="absolute z-10"
+                          style={{
+                            left: `${item.x}px`,
+                            top: `${item.y}px`,
+                            width: `${item.width}px`,
+                            height: `${item.height}px`,
+                            transform: `rotate(${item.rotation}deg) scale(${item.scale})`,
+                            transformOrigin: 'center',
+                            border: item.isSelected ? '2px solid #C07A45' : 'none',
+                            cursor: 'move',
+                          }}
+                        >
+                          {item.image && (
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="w-full h-full object-contain"
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleRemoveImage}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Remover Imagem
+                    </Button>
+                    {isSelectingPosition && (
+                      <p className="text-sm text-[#C07A45] font-medium">
+                        Clique na imagem para posicionar o produto
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -507,35 +739,31 @@ export default function AITestModal({
             <CardHeader>
               <CardTitle className="text-lg flex items-center space-x-2">
                 <Package className="h-5 w-5" />
-                <span>2. Selecione os itens e suas posições</span>
+                <span>2. Clique nos produtos para adicionar à imagem</span>
               </CardTitle>
               <CardDescription>
-                Escolha os produtos e defina onde cada um deve aparecer na foto
+                Clique em um produto e depois clique na imagem para posicioná-lo
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
                 {products.map((product) => {
                   const isSelected = selectedProducts.has(product.id);
-                  const position = productPositions.get(product.id) || 'center';
+                  const isPending = pendingProduct?.id === product.id;
                   
                   return (
                     <div
                       key={product.id}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        isSelected
+                      className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                        isPending
+                          ? 'border-[#C07A45] bg-[#F7C194]/20'
+                          : isSelected
                           ? 'border-purple-500 bg-purple-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                       }`}
+                      onClick={() => handleStartAddProduct(product)}
                     >
-                      <div
-                        className="flex items-center space-x-3 cursor-pointer"
-                        onClick={() => toggleProductSelection(product.id)}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={() => toggleProductSelection(product.id)}
-                        />
+                      <div className="flex items-center space-x-3">
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm text-gray-900 truncate">
                             {product.name}
@@ -545,9 +773,19 @@ export default function AITestModal({
                               {product.category}
                             </Badge>
                           )}
+                          {isSelected && (
+                            <p className="text-xs text-green-600 mt-1 font-medium">
+                              ✓ Adicionado
+                            </p>
+                          )}
+                          {isPending && (
+                            <p className="text-xs text-[#C07A45] mt-1 font-medium">
+                              Clique na imagem para posicionar
+                            </p>
+                          )}
                         </div>
                         {product.imageUrl && (
-                          <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                          <div className="w-16 h-16 rounded overflow-hidden flex-shrink-0 border border-gray-200">
                             <img
                               src={product.imageUrl}
                               alt={product.name}
@@ -556,48 +794,13 @@ export default function AITestModal({
                           </div>
                         )}
                       </div>
-                      
-                      {/* Seleção de Posição */}
-                      {isSelected && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">
-                            Posição na foto:
-                          </Label>
-                          <div className="grid grid-cols-5 gap-2">
-                            {[
-                              { value: 'left', label: '⬅️ Esquerda', icon: '⬅️' },
-                              { value: 'center', label: '⬆️ Centro', icon: '⬆️' },
-                              { value: 'right', label: '➡️ Direita', icon: '➡️' },
-                              { value: 'background', label: '🔙 Fundo', icon: '🔙' },
-                              { value: 'foreground', label: '🔝 Frente', icon: '🔝' },
-                            ].map((pos) => (
-                              <button
-                                key={pos.value}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setProductPosition(product.id, pos.value as Position);
-                                }}
-                                className={`px-2 py-2 rounded text-xs font-medium transition-all ${
-                                  position === pos.value
-                                    ? 'bg-purple-600 text-white shadow-md'
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-purple-100'
-                                }`}
-                              >
-                                <div className="text-base mb-1">{pos.icon}</div>
-                                <div className="text-[10px]">{pos.label.split(' ')[1]}</div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
               </div>
-              {selectedProducts.size === 0 && (
+              {products.length === 0 && (
                 <p className="text-sm text-gray-500 mt-4 text-center">
-                  Selecione pelo menos um produto para continuar
+                  Nenhum produto disponível
                 </p>
               )}
             </CardContent>
@@ -674,7 +877,7 @@ export default function AITestModal({
           )}
 
           {/* Botões de Ação */}
-          <div className="flex justify-between pt-4 border-t">
+          <div className="flex justify-between pt-4 border-t shrink-0">
             <Button variant="outline" onClick={handleSkip}>
               Pular e Ir para Checkout
             </Button>
@@ -687,9 +890,11 @@ export default function AITestModal({
               </Button>
             )}
           </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
 
