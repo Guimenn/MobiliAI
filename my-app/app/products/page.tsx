@@ -588,9 +588,9 @@ export default function ProductsPage() {
     
       <Header />
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {/* Breadcrumbs */}
-        <Breadcrumb className="mb-4 mt-8">
+        <Breadcrumb className="mb-4 sm:mb-6 mt-4 sm:mt-8">
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink href="/" className="text-brand-700 hover:text-brand-800">Início</BreadcrumbLink>
@@ -605,11 +605,11 @@ export default function ProductsPage() {
         </Breadcrumb>
 
         {/* Título */}
-        <div className="mb-4">
-          <h1 className="text-2xl font-semibold text-brand-700 mb-1">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-semibold text-brand-700 mb-1 sm:mb-2">
             {searchTerm ? `Resultados para "${searchTerm}"` : 'Nossos Produtos'}
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-xs sm:text-sm text-gray-600">
             {filteredProducts.length} {filteredProducts.length === 1 ? 'produto encontrado' : 'produtos encontrados'}
           </p>
         </div>
@@ -620,7 +620,7 @@ export default function ProductsPage() {
             const hasActiveFlashSale = specialOfferProduct && isFlashSaleActuallyActive(specialOfferProduct) && specialOfferProduct.isFlashSale;
             
             return (
-              <div className="mb-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="mb-4 sm:mb-6 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
                 
                 {/* Card de Oferta Relâmpago - só mostra se houver oferta ativa */}
                 {hasActiveFlashSale && specialOfferProduct && (() => {
@@ -854,11 +854,11 @@ export default function ProductsPage() {
           })()}
 
         {/* Ordenação */}
-        <div className="flex items-center justify-end mt-4 mb-4">
+        <div className="flex items-center justify-end mt-4 sm:mt-6 mb-4 sm:mb-6">
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
-            className="border-2 border-brand-200 rounded-lg px-4 py-2 text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
+            className="border-2 border-brand-200 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
           >
             <option value="name">Ordenar por: Mais relevantes</option>
             <option value="price">Menor preço</option>
@@ -867,31 +867,31 @@ export default function ProductsPage() {
         </div>
 
         {/* Seção de Localização e Categorias */}
-        <div className="flex flex-col lg:flex-row gap-4 mt-6 mb-6">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mt-4 sm:mt-6 mb-6 sm:mb-8">
           {/* Localização do Usuário */}
           <div className="flex-shrink-0 lg:w-80">
-            <div className="bg-white border border-gray-200 rounded-xl p-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-brand-700 rounded-full p-1.5">
-                  <MapPin className="h-4 w-4 text-white" />
+            <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="bg-brand-700 rounded-full p-1.5 flex-shrink-0">
+                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
                   {isAuthenticated && user ? (
                     <>
-                      <p className="text-xs text-gray-500">Enviar para</p>
-                      <p className="text-sm font-bold text-gray-900 truncate">{getUserLocation()}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-500">Enviar para</p>
+                      <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">{getUserLocation()}</p>
                     </>
                   ) : (
                     <>
-                      <p className="text-xs text-gray-500">Entrar para melhor experiência</p>
-                      <p className="text-sm font-bold text-gray-900">Cadastre sua localização</p>
+                      <p className="text-[10px] sm:text-xs text-gray-500">Entrar para melhor experiência</p>
+                      <p className="text-xs sm:text-sm font-bold text-gray-900">Cadastre sua localização</p>
                     </>
                   )}
                 </div>
                 {!isAuthenticated && (
                   <Button
                     onClick={() => router.push('/login')}
-                    className="bg-brand-700 hover:bg-brand-700/90 text-white"
+                    className="bg-brand-700 hover:bg-brand-700/90 text-white text-xs px-2 sm:px-3 h-7 sm:h-8"
                     size="sm"
                   >
                     Criar
@@ -902,7 +902,7 @@ export default function ProductsPage() {
                     onClick={() => router.push('/profile')}
                     variant="outline"
                     size="sm"
-                    className="border-gray-300"
+                    className="border-gray-300 text-xs px-2 sm:px-3 h-7 sm:h-8"
                   >
                     Editar
                   </Button>
@@ -919,7 +919,7 @@ export default function ProductsPage() {
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseLeave}
-              className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-3 py-4"
+              className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-0 sm:ml-3 py-3 sm:py-4 gap-2 sm:gap-0"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {categories.map((cat) => {
@@ -933,18 +933,18 @@ export default function ProductsPage() {
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className="flex flex-col items-center justify-center gap-3 whitespace-nowrap flex-1 min-w-0 px-2 py-2 rounded-xl transition-all duration-200"
+                    className="flex flex-col items-center justify-center gap-2 sm:gap-3 whitespace-nowrap flex-shrink-0 min-w-0 px-2 sm:px-3 py-2 rounded-xl transition-all duration-200"
                   >
-                    <div className={`relative w-20 h-20 rounded-full border-[3px] flex items-center justify-center transition-all duration-200 ${
+                    <div className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] flex items-center justify-center transition-all duration-200 ${
                       isSelected
                         ? 'border-[#3e2626] bg-[#3e2626] shadow-xl shadow-[#3e2626]/30 scale-110 ring-4 ring-[#3e2626]/20'
                         : 'bg-white border-gray-300 hover:border-brand-400 hover:shadow-lg hover:bg-brand-50/50'
                     }`}>
-                      <Icon className={`h-8 w-8 transition-colors duration-200 ${
+                      <Icon className={`h-6 w-6 sm:h-8 sm:w-8 transition-colors duration-200 ${
                         isSelected ? 'text-white' : 'text-gray-600'
                       }`} />
                     </div>
-                    <span className={`text-xs font-medium transition-all duration-200 px-2 py-1 rounded-md ${
+                    <span className={`text-[10px] sm:text-xs font-medium transition-all duration-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md ${
                       isSelected 
                         ? 'text-brand-700 font-bold bg-brand-100' 
                         : 'text-gray-700 hover:text-brand-700'
@@ -958,10 +958,10 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
           {/* Sidebar de filtros estilo Mercado Livre */}
           <aside className={`lg:col-span-3 ${mobileFiltersOpen ? '' : 'hidden'} lg:block`}>
-            <div className="bg-white rounded-lg shadow-sm border-2 border-brand-100 sticky top-20 p-3">
+            <div className="bg-white rounded-lg shadow-sm border-2 border-brand-100 sticky top-20 p-3 sm:p-4">
              
 
               {/* Frete Grátis */}
@@ -1141,7 +1141,7 @@ export default function ProductsPage() {
               <Button
               variant="outline"
               onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
-              className="mb-4 lg:hidden w-full border-brand-300 text-brand-700 hover:bg-brand-50 hover:border-brand-400"
+              className="mb-4 sm:mb-6 lg:hidden w-full border-brand-300 text-brand-700 hover:bg-brand-50 hover:border-brand-400 h-10 sm:h-11"
             >
               <Filter className="h-4 w-4 mr-2 text-brand-700" />
               Filtros
@@ -1174,7 +1174,7 @@ export default function ProductsPage() {
             ) : (
               <>
                 {/* Grid de produtos estilo Mercado Livre */}
-                <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                   {paginatedProducts.map((product) => (
                     <ProductCard
                       key={product.id}
@@ -1188,16 +1188,17 @@ export default function ProductsPage() {
 
             {/* Paginação */}
                 {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center gap-2">
+              <div className="mt-6 sm:mt-8 flex items-center justify-center gap-2 sm:gap-3">
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={currentPage <= 1}
                       onClick={() => setPage(p => Math.max(1, p - 1))}
+                      className="text-xs sm:text-sm px-3 sm:px-4"
                     >
                   Anterior
                 </Button>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-xs sm:text-sm text-gray-600">
                       Página {currentPage} de {totalPages}
                     </span>
                     <Button
@@ -1205,6 +1206,7 @@ export default function ProductsPage() {
                       size="sm"
                       disabled={currentPage >= totalPages}
                       onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      className="text-xs sm:text-sm px-3 sm:px-4"
                     >
                   Próxima
                 </Button>
