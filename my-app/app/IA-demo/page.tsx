@@ -917,7 +917,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
   });
 
   // Click no canvas para deselecionar ou selecionar posição
-  const handleCanvasClick = (e: React.MouseEvent) => {
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isSelectingPosition) {
       handleImageClickForPosition(e);
       return;
@@ -1152,22 +1152,11 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                     }}
                   >
                     <div className="relative max-h-full max-w-full animate-in zoom-in-95 duration-500">
-                      {uploadedImage && uploadedImage.startsWith('data:image') ? (
+                      {(processedImageUrl || uploadedImage) ? (
                         <Image
                           ref={imageRef}
-                          src={processedImageUrl || uploadedImage}
+                          src={processedImageUrl || uploadedImage || ''}
                           alt="Ambiente"
-                          width={1024}
-                          height={768}
-                          className="h-auto max-w-full rounded-lg shadow-2xl"
-                          style={{ maxHeight: 'calc(100vh - 200px)' }}
-                          unoptimized
-                        />
-                      ) : processedImageUrl ? (
-                        <Image
-                          ref={imageRef}
-                          src={processedImageUrl}
-                          alt="Ambiente processado pela IA"
                           width={1024}
                           height={768}
                           className="h-auto max-w-full rounded-lg shadow-2xl"
@@ -1176,7 +1165,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                         />
                       ) : uploadedImageFile ? (
                         <div className="rounded-lg bg-gray-100 p-12 text-center">
-                          <p className="mb-4 text-gray-600">Arquivo carr  egado: {uploadedImageFile.name}</p>
+                          <p className="mb-4 text-gray-600">Arquivo carregado: {uploadedImageFile.name}</p>
                           <p className="text-sm text-gray-500">Adicione um móvel para processar com IA</p>
                         </div>
                       ) : null}
