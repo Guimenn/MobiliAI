@@ -1,4 +1,4 @@
-5'use client';
+'use client';
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useAppStore, Product } from '@/lib/store';
