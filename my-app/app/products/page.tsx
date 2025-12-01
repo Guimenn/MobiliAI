@@ -48,6 +48,7 @@ import {
 import { customerAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import { showAlert } from '@/lib/alerts';
+import CTA from "@/components/ui/CTA"
 
 // Mapeamento de categorias para ícones
 const categoryIcons: Record<string, any> = {
@@ -686,24 +687,22 @@ export default function ProductsPage() {
                 
                 return (
                   <div 
-                    className="lg:col-span-3 relative bg-white rounded-lg border-2 border-yellow-400 hover:border-yellow-500 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer h-72 shadow-yellow-100"
+                    className="lg:col-span-3 relative bg-gray-50 rounded-lg border border-gray-200 hover:border-[#3e2626] transition-all duration-200 overflow-hidden group cursor-pointer h-72"
                     onClick={() => router.push(`/products/${specialOfferProduct.id}`)}
                   >
                     {/* Badge Oferta Relâmpago - Topo Esquerdo */}
                     <div className="absolute top-3 left-3 z-20">
-                      <div className="inline-flex items-center gap-1.5 bg-yellow-500 text-white rounded-lg px-3 py-1.5 shadow-lg animate-pulse">
+                      <div className="inline-flex items-center gap-1.5 bg-[#3e2626] text-white rounded-lg px-3 py-1.5 shadow-lg ">
                         <Zap className="h-4 w-4 fill-white text-white" />
                         <span className="text-[11px] font-bold uppercase tracking-tight">Oferta Relâmpago</span>
-                        {flashDiscountPercent > 0 && (
-                          <span className="ml-1 text-[10px] font-bold">-{flashDiscountPercent}%</span>
-                        )}
+                      
                       </div>
                     </div>
 
                     {/* Timer - Topo Direito */}
                     {offerSecondsLeft > 0 && (
                       <div className="absolute top-3 right-3 z-20">
-                        <div className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-lg px-3 py-1.5 shadow-lg">
+                        <div className="inline-flex items-center gap-1.5 bg-[#3e2626] text-white rounded-lg px-3 py-1.5 shadow-lg">
                           <Clock className="h-4 w-4" />
                           <span className="font-mono text-xs font-bold">{formatTime(offerSecondsLeft)}</span>
                         </div>
@@ -711,7 +710,7 @@ export default function ProductsPage() {
                     )}
 
                     {/* Conteúdo Principal */}
-                    <div className="relative z-10 h-full flex flex-row gap-4 pt-14">
+                    <div className="relative z-10 h-full flex flex-row gap-4 pt-14 bg-gray-100">
                       
                       {/* Seção da Imagem - Esquerda */}
                       <div className="flex-shrink-0 w-40 h-48 items-center justify-center overflow-hidden">
@@ -748,7 +747,7 @@ export default function ProductsPage() {
                               <span className="text-sm text-gray-500 line-through">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalFlashPrice)}
                               </span>
-                              <span className="inline-flex items-center px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded uppercase">
+                              <span className="inline-flex items-center px-2 py-0.5 bg-[#3e2626] text-white text-[10px] font-bold rounded uppercase">
                                 -{flashDiscountPercent}% OFF
                               </span>
                             </div>
@@ -764,7 +763,7 @@ export default function ProductsPage() {
                             </div>
                             {savings > 0 && (
                               <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
-                                <Sparkles className="h-3 w-3" />
+                                
                                 Economia de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(savings)}
                               </p>
                             )}

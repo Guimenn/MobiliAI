@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   User, 
-  CreditCard, 
   MapPin, 
   Lock, 
   Cookie, 
@@ -27,7 +26,6 @@ interface SidebarItem {
 const menuItems = {
   minhaConta: [
     { label: "Perfil", href: "/profile", icon: User },
-    { label: "Cartões / Contas Bancárias", href: "/profile/cards", icon: CreditCard },
     { label: "Endereços", href: "/profile/addresses", icon: MapPin },
     { label: "Trocar Senha", href: "/profile/password", icon: Lock },
   ],

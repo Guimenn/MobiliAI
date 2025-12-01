@@ -23,6 +23,7 @@ model User {
   updatedAt              DateTime             @updatedAt
   storeId                String?
   cpf                    String?              @unique
+  gender                 String?
   workingHours           Json?
   avatarUrl              String?
   passwordChangedAt      DateTime?            @default(now())

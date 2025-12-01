@@ -73,6 +73,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import CTA from "@/components/ui/CTA"
+
 
 export default function HomePage() {
   const { user, isAuthenticated, logout } = useAppStore();
@@ -1848,6 +1850,8 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      <CTA />
 
     
 

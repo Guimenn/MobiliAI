@@ -11,10 +11,12 @@ export default function AddressesPage() {
       <Header />
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-200px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar - Left */}
-          <div className="lg:col-span-1 h-full">
-            <ProfileSidebar />
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <ProfileSidebar />
+            </div>
           </div>
 
           {/* Main Content - Right */}

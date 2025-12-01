@@ -40,6 +40,7 @@ export default function ProfilePage() {
       name: sanitize(data.name),
       phone: sanitize(data.phone),
       cpf: sanitize(data.cpf)?.replace(/\D/g, ""),
+      gender: sanitize(data.gender),
     };
 
     Object.keys(payload).forEach((key) => {
@@ -160,6 +161,7 @@ export default function ProfilePage() {
                     phone: user?.phone,
                     username: username,
                     cpf: (user as { cpf?: string } | null)?.cpf,
+                    gender: (user as { gender?: string } | null)?.gender,
                   }}
                   onSave={handleSaveProfile}
                   isSaving={isSavingProfile}
