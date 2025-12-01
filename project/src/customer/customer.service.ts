@@ -53,29 +53,60 @@ export class CustomerService {
   }
 
   async getProfile(customerId: string) {
-    const customer = await this.prisma.user.findUnique({
-      where: { id: customerId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        address: true,
-        city: true,
-        state: true,
-        zipCode: true,
-        cpf: true,
-        role: true,
-        isActive: true,
-        createdAt: true
+    try {
+      const customer = await this.prisma.user.findUnique({
+        where: { id: customerId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          address: true,
+          city: true,
+          state: true,
+          zipCode: true,
+          cpf: true,
+          gender: true,
+          role: true,
+          isActive: true,
+          createdAt: true
+        }
+      });
+
+      if (!customer) {
+        throw new NotFoundException('Cliente não encontrado');
       }
-    });
 
-    if (!customer) {
-      throw new NotFoundException('Cliente não encontrado');
+      return customer;
+    } catch (error: any) {
+      // Se o erro for relacionado ao campo gender não existir, buscar sem ele
+      if (error?.message?.includes('gender') || error?.code === 'P2002') {
+        const customer = await this.prisma.user.findUnique({
+          where: { id: customerId },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            city: true,
+            state: true,
+            zipCode: true,
+            cpf: true,
+            role: true,
+            isActive: true,
+            createdAt: true
+          }
+        });
+
+        if (!customer) {
+          throw new NotFoundException('Cliente não encontrado');
+        }
+
+        return customer;
+      }
+      throw error;
     }
-
-    return customer;
   }
 
   async updateProfile(customerId: string, updateData: {
@@ -86,6 +117,7 @@ export class CustomerService {
     state?: string;
     zipCode?: string;
     cpf?: string;
+    gender?: string;
     avatarUrl?: string;
   }) {
     const customer = await this.prisma.user.findUnique({
@@ -96,25 +128,74 @@ export class CustomerService {
       throw new NotFoundException('Cliente não encontrado');
     }
 
-    return this.prisma.user.update({
-      where: { id: customerId },
-      data: updateData,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        address: true,
-        city: true,
-        state: true,
-        zipCode: true,
-        cpf: true,
-        role: true,
-        isActive: true,
-        avatarUrl: true,
-        updatedAt: true
+    // Filtrar campos undefined e tentar atualizar
+    const cleanUpdateData = Object.fromEntries(
+      Object.entries(updateData).filter(([_, value]) => value !== undefined)
+    );
+
+    // Se gender estiver presente mas não existir no banco, remover antes de tentar atualizar
+    const hasGender = 'gender' in cleanUpdateData;
+    let dataToUpdate = { ...cleanUpdateData };
+    
+    try {
+      return await this.prisma.user.update({
+        where: { id: customerId },
+        data: dataToUpdate,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          address: true,
+          city: true,
+          state: true,
+          zipCode: true,
+          cpf: true,
+          gender: true,
+          role: true,
+          isActive: true,
+          avatarUrl: true,
+          updatedAt: true
+        }
+      });
+    } catch (error: any) {
+      // Se o erro for relacionado a campo desconhecido (como gender não existir), tentar sem ele
+      const errorMessage = error?.message || '';
+      const isUnknownFieldError = 
+        errorMessage.includes('Unknown arg') || 
+        errorMessage.includes('Unknown field') ||
+        errorMessage.includes('gender') ||
+        error?.code === 'P2002' ||
+        error?.code === 'P2009';
+      
+      if (isUnknownFieldError && hasGender) {
+        const { gender, ...dataWithoutGender } = dataToUpdate;
+        try {
+          return await this.prisma.user.update({
+            where: { id: customerId },
+            data: dataWithoutGender,
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              address: true,
+              city: true,
+              state: true,
+              zipCode: true,
+              cpf: true,
+              role: true,
+              isActive: true,
+              avatarUrl: true,
+              updatedAt: true
+            }
+          });
+        } catch (retryError) {
+          throw retryError;
+        }
       }
-    });
+      throw error;
+    }
   }
 
   async changePassword(customerId: string, currentPassword: string, newPassword: string) {

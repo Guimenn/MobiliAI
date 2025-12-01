@@ -22,6 +22,7 @@ import {
   X,
   Package,
   Store,
+  ArrowLeft,
 } from 'lucide-react';
 import { showAlert } from '@/lib/alerts';
 import Image from 'next/image';
@@ -60,6 +61,7 @@ interface PDVComponentProps {
 export default function PDVComponent({ initialCustomer, pickupOrders = [], onReset }: PDVComponentProps = {}) {
   const { user } = useAppStore();
   const [activeTab, setActiveTab] = useState<'products' | 'pickup'>('products');
+  const [mobileView, setMobileView] = useState<'products' | 'cart'>('products'); // Novo estado para mobile
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
@@ -162,6 +164,9 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
     setCustomerEmail('');
     setCustomerPhone('');
     setCustomerCpf('');
+    
+    // Voltar para tela de produtos no mobile
+    setMobileView('products');
     
     // Se tiver callback de reset, chamar
     if (onReset) {
@@ -274,10 +279,11 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
 
       const sale = await salesAPI.create(saleData);
       
-      showAlert('success', `Venda #${sale.saleNumber} finalizada com sucesso!`);
-      
-      // Limpar carrinho e campos
-      clearCart();
+    showAlert('success', `Venda #${sale.saleNumber} finalizada com sucesso!`);
+    
+    // Voltar para tela de produtos no mobile e limpar carrinho
+    setMobileView('products');
+    clearCart();
       
     } catch (error: any) {
       console.error('Erro ao finalizar venda:', error);
@@ -302,7 +308,8 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
 
     showAlert('success', `Venda #${currentSale?.saleNumber} finalizada com sucesso!`);
     
-    // Limpar carrinho e campos
+    // Voltar para tela de produtos no mobile e limpar carrinho
+    setMobileView('products');
     clearCart();
     setCurrentSale(null);
   };
@@ -312,35 +319,35 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-gray-50">
+    <div className="flex flex-col h-full w-full overflow-hidden bg-gray-50">
       {/* Abas de Navegação */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="flex gap-2 p-4">
+      <div className="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
+        <div className="flex gap-2 p-2 sm:p-4">
           <Button
             variant={activeTab === 'products' ? 'default' : 'ghost'}
             onClick={() => setActiveTab('products')}
-            className={`flex-1 h-12 text-base font-semibold transition-all ${
+            className={`flex-1 h-10 sm:h-12 text-sm sm:text-base font-semibold transition-all ${
               activeTab === 'products'
                 ? 'bg-[#3e2626] hover:bg-[#5a3a3a] text-white shadow-lg'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <Store className="h-5 w-5 mr-2" />
+            <Store className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
             Produtos
           </Button>
           <Button
             variant={activeTab === 'pickup' ? 'default' : 'ghost'}
             onClick={() => setActiveTab('pickup')}
-            className={`flex-1 h-12 text-base font-semibold transition-all relative ${
+            className={`flex-1 h-10 sm:h-12 text-sm sm:text-base font-semibold transition-all relative ${
               activeTab === 'pickup'
                 ? 'bg-[#3e2626] hover:bg-[#5a3a3a] text-white shadow-lg'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <Package className="h-5 w-5 mr-2" />
+            <Package className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
             Retiradas
             {pendingPickupOrders.length > 0 && (
-              <Badge className="ml-2 bg-red-500 text-white">
+              <Badge className="ml-1 sm:ml-2 bg-red-500 text-white text-xs">
                 {pendingPickupOrders.length}
               </Badge>
             )}
@@ -348,59 +355,373 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
         </div>
       </div>
 
-      <div className={`grid flex-1 overflow-hidden p-6 gap-6 ${
-        activeTab === 'products' 
-          ? 'grid-cols-1 lg:grid-cols-3' 
-          : 'grid-cols-1'
-      }`}>
-        {/* Coluna Esquerda - Conteúdo Principal */}
-        <div className={activeTab === 'products' ? 'lg:col-span-2 overflow-hidden' : 'overflow-hidden'}>
-          {activeTab === 'products' ? (
-            <PDVProductsPage
-              cart={cart}
-              onAddToCart={addToCart}
-              onUpdateQuantity={updateQuantity}
-              onRemoveFromCart={removeFromCart}
-            />
-          ) : (
-            <PDVPickupPage
-              pickupOrders={pendingPickupOrders}
-              onOrderPickedUp={handleOrderPickedUp}
-            />
-          )}
-        </div>
+      {/* Mobile: Tela de Carrinho Completa */}
+      {activeTab === 'products' && mobileView === 'cart' && (
+        <div className="flex-1 overflow-y-auto p-4 lg:hidden">
+          <div className="max-w-2xl mx-auto space-y-4">
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileView('products')}
+                className="h-9 w-9 p-0"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <h2 className="text-xl font-bold text-[#3e2626]">Carrinho</h2>
+              {cart.length > 0 && (
+                <Badge className="ml-auto bg-[#3e2626] text-white">
+                  {cart.length} item{cart.length !== 1 ? 's' : ''}
+                </Badge>
+              )}
+            </div>
 
-      {/* Coluna Direita - Carrinho e Finalização (apenas na aba de produtos) */}
-      {activeTab === 'products' && (
-      <div className="space-y-4">
-        <Card className="sticky top-4 shadow-xl border-0">
-          <CardHeader className="bg-[#3e2626] text-white rounded-t-lg">
-            <CardTitle className="flex items-center justify-between text-white">
+            {/* Itens do Carrinho */}
+            {cart.length === 0 ? (
+              <Card className="p-8 text-center">
+                <ShoppingCart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 font-medium">Carrinho vazio</p>
+                <p className="text-sm text-gray-400 mt-2">Adicione produtos ao carrinho</p>
+                <Button
+                  onClick={() => setMobileView('products')}
+                  className="mt-4 bg-[#3e2626] hover:bg-[#5a3a3a] text-white"
+                >
+                  Ver Produtos
+                </Button>
+              </Card>
+            ) : (
+              <>
+                <Card>
+                  <CardContent className="p-4 space-y-3">
+                    {cart.map((item) => (
+                      <div key={item.productId} className="border rounded-lg p-3">
+                        <div className="flex items-start gap-3">
+                          {item.imageUrl ? (
+                            <div className="relative w-16 h-16 rounded overflow-hidden flex-shrink-0">
+                              <Image
+                                src={item.imageUrl}
+                                alt={item.name}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                              <ShoppingCart className="h-6 w-6 text-gray-400" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-sm mb-1">{item.name}</h4>
+                            <p className="text-xs text-gray-500 mb-2">
+                              {formatCurrency(item.unitPrice)} cada
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <span className="text-sm font-medium w-8 text-center">
+                                  {item.quantity}
+                                </span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                                  disabled={item.quantity >= item.stock}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-[#3e2626]">
+                                  {formatCurrency(item.total)}
+                                </p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-red-500 hover:text-red-700 mt-1"
+                                  onClick={() => removeFromCart(item.productId)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Desconto */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Desconto</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex space-x-2">
+                      <Button
+                        variant={discountType === 'percent' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setDiscountType('percent');
+                          setDiscount(0);
+                        }}
+                        className="flex-1 h-10"
+                      >
+                        %
+                      </Button>
+                      <Button
+                        variant={discountType === 'fixed' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setDiscountType('fixed');
+                          setDiscount(0);
+                        }}
+                        className="flex-1 h-10"
+                      >
+                        R$
+                      </Button>
+                    </div>
+                    <Input
+                      type="number"
+                      placeholder={discountType === 'percent' ? 'Ex: 10' : 'Ex: 50,00'}
+                      value={discount || ''}
+                      onChange={(e) => setDiscount(Number(e.target.value))}
+                      min="0"
+                      max={discountType === 'percent' ? '100' : undefined}
+                      step={discountType === 'percent' ? '1' : '0.01'}
+                      className="h-10"
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Método de Pagamento */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Método de Pagamento</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        variant={paymentMethod === 'CASH' ? 'default' : 'outline'}
+                        size="lg"
+                        onClick={() => setPaymentMethod('CASH')}
+                        className="flex flex-col items-center h-auto py-4"
+                      >
+                        <Banknote className="h-6 w-6 mb-2" />
+                        <span className="text-sm font-medium">Dinheiro</span>
+                      </Button>
+                      <Button
+                        variant={paymentMethod === 'PIX' ? 'default' : 'outline'}
+                        size="lg"
+                        onClick={() => setPaymentMethod('PIX')}
+                        className="flex flex-col items-center h-auto py-4"
+                      >
+                        <QrCode className="h-6 w-6 mb-2" />
+                        <span className="text-sm font-medium">PIX</span>
+                      </Button>
+                      <Button
+                        variant={paymentMethod === 'CREDIT_CARD' ? 'default' : 'outline'}
+                        size="lg"
+                        onClick={() => setPaymentMethod('CREDIT_CARD')}
+                        className="flex flex-col items-center h-auto py-4"
+                      >
+                        <CreditCard className="h-6 w-6 mb-2" />
+                        <span className="text-sm font-medium">Crédito</span>
+                      </Button>
+                      <Button
+                        variant={paymentMethod === 'DEBIT_CARD' ? 'default' : 'outline'}
+                        size="lg"
+                        onClick={() => setPaymentMethod('DEBIT_CARD')}
+                        className="flex flex-col items-center h-auto py-4"
+                      >
+                        <CreditCard className="h-6 w-6 mb-2" />
+                        <span className="text-sm font-medium">Débito</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Dados do Cliente (Opcional para PIX e Cartão) */}
+                {(paymentMethod === 'PIX' || paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Dados do Cliente (Opcional)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Input
+                        type="text"
+                        placeholder="Nome do cliente"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                      />
+                      <Input
+                        type="email"
+                        placeholder="Email do cliente"
+                        value={customerEmail}
+                        onChange={(e) => setCustomerEmail(e.target.value)}
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          type="tel"
+                          placeholder="Telefone"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
+                        />
+                        <Input
+                          type="text"
+                          placeholder="CPF"
+                          value={customerCpf}
+                          onChange={(e) => setCustomerCpf(e.target.value)}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Resumo e Total */}
+                <Card className="bg-[#3e2626] text-white">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(calculateSubtotal())}</span>
+                    </div>
+                    {discount > 0 && (
+                      <div className="flex justify-between text-sm text-red-300">
+                        <span>Desconto:</span>
+                        <span>-{formatCurrency(calculateDiscountAmount())}</span>
+                      </div>
+                    )}
+                    <Separator className="bg-white/20" />
+                    <div className="flex justify-between text-xl font-bold">
+                      <span>Total:</span>
+                      <span>{formatCurrency(calculateTotal())}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Botões de Ação */}
+                <div className="space-y-3 pb-4">
+                  <Button
+                    onClick={handleFinishSale}
+                    disabled={isProcessingSale || cart.length === 0}
+                    className="w-full bg-[#3e2626] hover:bg-[#2a1f1f] text-white h-12 text-lg font-bold"
+                  >
+                    {isProcessingSale ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Processando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-5 w-5 mr-2" />
+                        Finalizar Venda
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={clearCart}
+                    className="w-full h-11"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Limpar Carrinho
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile: Tela de Produtos | Desktop: Layout Normal */}
+      {mobileView === 'products' && (
+        <div className={`flex flex-1 overflow-hidden ${
+          activeTab === 'products' 
+            ? 'flex-col lg:flex-row' 
+            : 'flex-col'
+        } gap-4 lg:gap-6 p-4 lg:p-6`}>
+          {/* Coluna Esquerda - Conteúdo Principal */}
+          <div className={`${
+            activeTab === 'products' 
+              ? 'flex-1 lg:flex-[2] min-w-0 overflow-hidden relative' 
+              : 'flex-1 overflow-hidden'
+          }`}>
+            {activeTab === 'products' ? (
+              <>
+                <PDVProductsPage
+                  cart={cart}
+                  onAddToCart={addToCart}
+                  onUpdateQuantity={updateQuantity}
+                  onRemoveFromCart={removeFromCart}
+                />
+                
+                {/* Botão Flutuante do Carrinho (Mobile) */}
+                {cart.length > 0 && (
+                  <div className="lg:hidden fixed bottom-4 left-4 right-4 z-50">
+                    <Button
+                      onClick={() => setMobileView('cart')}
+                      className="w-full bg-[#3e2626] hover:bg-[#5a3a3a] text-white h-14 text-base font-bold shadow-2xl rounded-xl"
+                    >
+                      <ShoppingCart className="h-5 w-5 mr-2" />
+                      Ver Carrinho
+                      <Badge className="ml-2 bg-white text-[#3e2626] font-bold">
+                        {cart.length}
+                      </Badge>
+                      <span className="ml-auto font-semibold">
+                        {formatCurrency(calculateTotal())}
+                      </span>
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <PDVPickupPage
+                pickupOrders={pendingPickupOrders}
+                onOrderPickedUp={handleOrderPickedUp}
+              />
+            )}
+          </div>
+
+        {/* Desktop: Coluna Direita - Carrinho Lateral */}
+        {activeTab === 'products' && (
+        <div className="hidden lg:block space-y-3 sm:space-y-4 lg:w-96 lg:flex-shrink-0">
+        <Card className="sticky top-0 lg:top-4 shadow-xl border-0 max-h-[calc(100vh-1rem)] lg:max-h-[calc(100vh-200px)] flex flex-col">
+          <CardHeader className="bg-[#3e2626] text-white rounded-t-lg p-4 sm:p-6 flex-shrink-0">
+            <CardTitle className="flex items-center justify-between text-white text-base sm:text-lg">
               <span className="flex items-center gap-2">
-                <ShoppingCart className="h-6 w-6" />
+                <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
                 Carrinho
               </span>
               {cart.length > 0 && (
-                <Badge className="bg-white text-[#3e2626] font-bold text-base px-3 py-1">{cart.length} item(s)</Badge>
+                <Badge className="bg-white text-[#3e2626] font-bold text-xs sm:text-sm px-2 sm:px-3 py-1">{cart.length}</Badge>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+          <CardContent className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 flex-1 overflow-y-auto min-h-0">
             {/* Itens do Carrinho */}
             {cart.length === 0 ? (
-              <div className="text-center py-12">
-                <ShoppingCart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">Carrinho vazio</p>
-                <p className="text-sm text-gray-400 mt-2">Busque e adicione produtos</p>
+              <div className="text-center py-8 sm:py-12">
+                <ShoppingCart className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                <p className="text-gray-500 text-sm sm:text-base">Carrinho vazio</p>
+                <p className="text-xs sm:text-sm text-gray-400 mt-1 sm:mt-2">Busque e adicione produtos</p>
               </div>
             ) : (
               <>
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {cart.map((item) => (
-                    <div key={item.productId} className="border rounded-lg p-3">
-                      <div className="flex items-start space-x-3">
+                    <div key={item.productId} className="border rounded-lg p-2 sm:p-3">
+                      <div className="flex items-start space-x-2 sm:space-x-3">
                         {item.imageUrl ? (
-                          <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                          <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded overflow-hidden flex-shrink-0">
                             <Image
                               src={item.imageUrl}
                               alt={item.name}
@@ -409,31 +730,31 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
                             />
                           </div>
                         ) : (
-                          <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                            <ShoppingCart className="h-5 w-5 text-gray-400" />
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                            <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm truncate">{item.name}</h4>
+                          <h4 className="font-semibold text-xs sm:text-sm truncate">{item.name}</h4>
                           <p className="text-xs text-gray-500">
                             {formatCurrency(item.unitPrice)} x {item.quantity}
                           </p>
-                          <div className="flex items-center space-x-2 mt-2">
+                          <div className="flex items-center space-x-1.5 sm:space-x-2 mt-1.5 sm:mt-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 w-7 p-0"
+                              className="h-6 w-6 sm:h-7 sm:w-7 p-0"
                               onClick={() => updateQuantity(item.productId, item.quantity - 1)}
                             >
                               <Minus className="h-3 w-3" />
                             </Button>
-                            <span className="text-sm font-medium w-8 text-center">
+                            <span className="text-xs sm:text-sm font-medium w-6 sm:w-8 text-center">
                               {item.quantity}
                             </span>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 w-7 p-0"
+                              className="h-6 w-6 sm:h-7 sm:w-7 p-0"
                               onClick={() => updateQuantity(item.productId, item.quantity + 1)}
                               disabled={item.quantity >= item.stock}
                             >
@@ -442,13 +763,13 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 ml-auto text-red-500 hover:text-red-700"
+                              className="h-6 w-6 sm:h-7 sm:w-7 p-0 ml-auto text-red-500 hover:text-red-700"
                               onClick={() => removeFromCart(item.productId)}
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
-                          <p className="text-sm font-bold text-[#3e2626] mt-1">
+                          <p className="text-xs sm:text-sm font-bold text-[#3e2626] mt-1">
                             {formatCurrency(item.total)}
                           </p>
                         </div>
@@ -461,7 +782,7 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
 
                 {/* Desconto */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Desconto</label>
+                  <label className="text-xs sm:text-sm font-medium">Desconto</label>
                   <div className="flex space-x-2">
                     <Button
                       variant={discountType === 'percent' ? 'default' : 'outline'}
@@ -470,7 +791,7 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
                         setDiscountType('percent');
                         setDiscount(0);
                       }}
-                      className="flex-1"
+                      className="flex-1 h-8 sm:h-9 text-xs"
                     >
                       %
                     </Button>
@@ -481,7 +802,7 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
                         setDiscountType('fixed');
                         setDiscount(0);
                       }}
-                      className="flex-1"
+                      className="flex-1 h-8 sm:h-9 text-xs"
                     >
                       R$
                     </Button>
@@ -494,6 +815,7 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
                     min="0"
                     max={discountType === 'percent' ? '100' : undefined}
                     step={discountType === 'percent' ? '1' : '0.01'}
+                    className="h-8 sm:h-9 text-xs sm:text-sm"
                   />
                 </div>
 
@@ -501,36 +823,36 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
 
                 {/* Dados do Cliente (Opcional para PIX e Cartão) */}
                 {(paymentMethod === 'PIX' || paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') && (
-                  <div className="space-y-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <label className="text-sm font-medium text-blue-900">Dados do Cliente (Opcional)</label>
+                  <div className="space-y-2 sm:space-y-3 p-2 sm:p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <label className="text-xs sm:text-sm font-medium text-blue-900">Dados do Cliente (Opcional)</label>
                     <Input
                       type="text"
                       placeholder="Nome do cliente"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      className="text-sm"
+                      className="text-xs sm:text-sm h-8 sm:h-9"
                     />
                     <Input
                       type="email"
                       placeholder="Email do cliente"
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
-                      className="text-sm"
+                      className="text-xs sm:text-sm h-8 sm:h-9"
                     />
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                       <Input
                         type="tel"
                         placeholder="Telefone"
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
-                        className="text-sm"
+                        className="text-xs sm:text-sm h-8 sm:h-9"
                       />
                       <Input
                         type="text"
                         placeholder="CPF"
                         value={customerCpf}
                         onChange={(e) => setCustomerCpf(e.target.value)}
-                        className="text-sm"
+                        className="text-xs sm:text-sm h-8 sm:h-9"
                       />
                     </div>
                   </div>
@@ -538,42 +860,42 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
 
                 {/* Método de Pagamento */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Método de Pagamento</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs sm:text-sm font-medium">Método de Pagamento</label>
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <Button
                       variant={paymentMethod === 'CASH' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setPaymentMethod('CASH')}
-                      className="flex flex-col items-center h-auto py-3"
+                      className="flex flex-col items-center h-auto py-2 sm:py-3"
                     >
-                      <Banknote className="h-5 w-5 mb-1" />
+                      <Banknote className="h-4 w-4 sm:h-5 sm:w-5 mb-0.5 sm:mb-1" />
                       <span className="text-xs">Dinheiro</span>
                     </Button>
                     <Button
                       variant={paymentMethod === 'PIX' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setPaymentMethod('PIX')}
-                      className="flex flex-col items-center h-auto py-3"
+                      className="flex flex-col items-center h-auto py-2 sm:py-3"
                     >
-                      <QrCode className="h-5 w-5 mb-1" />
+                      <QrCode className="h-4 w-4 sm:h-5 sm:w-5 mb-0.5 sm:mb-1" />
                       <span className="text-xs">PIX</span>
                     </Button>
                     <Button
                       variant={paymentMethod === 'CREDIT_CARD' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setPaymentMethod('CREDIT_CARD')}
-                      className="flex flex-col items-center h-auto py-3"
+                      className="flex flex-col items-center h-auto py-2 sm:py-3"
                     >
-                      <CreditCard className="h-5 w-5 mb-1" />
+                      <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 mb-0.5 sm:mb-1" />
                       <span className="text-xs">Crédito</span>
                     </Button>
                     <Button
                       variant={paymentMethod === 'DEBIT_CARD' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setPaymentMethod('DEBIT_CARD')}
-                      className="flex flex-col items-center h-auto py-3"
+                      className="flex flex-col items-center h-auto py-2 sm:py-3"
                     >
-                      <CreditCard className="h-5 w-5 mb-1" />
+                      <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 mb-0.5 sm:mb-1" />
                       <span className="text-xs">Débito</span>
                     </Button>
                   </div>
@@ -583,18 +905,18 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
 
                 {/* Totais */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs sm:text-sm">
                     <span>Subtotal:</span>
                     <span>{formatCurrency(calculateSubtotal())}</span>
                   </div>
                   {discount > 0 && (
-                    <div className="flex justify-between text-sm text-red-600">
+                    <div className="flex justify-between text-xs sm:text-sm text-red-600">
                       <span>Desconto:</span>
                       <span>-{formatCurrency(calculateDiscountAmount())}</span>
                     </div>
                   )}
                   <Separator />
-                  <div className="flex justify-between text-lg font-bold">
+                  <div className="flex justify-between text-base sm:text-lg font-bold">
                     <span>Total:</span>
                     <span className="text-[#3e2626]">{formatCurrency(calculateTotal())}</span>
                   </div>
@@ -604,7 +926,7 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
                 <Button
                   onClick={handleFinishSale}
                   disabled={isProcessingSale || cart.length === 0}
-                  className="w-full bg-[#3e2626] hover:bg-[#2a1f1f] text-white h-12 text-lg font-bold"
+                  className="w-full bg-[#3e2626] hover:bg-[#2a1f1f] text-white h-10 sm:h-12 text-sm sm:text-base lg:text-lg font-bold flex-shrink-0"
                 >
                   {isProcessingSale ? (
                     <>
@@ -623,9 +945,9 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
                   <Button
                     variant="outline"
                     onClick={clearCart}
-                    className="w-full"
+                    className="w-full h-9 sm:h-10 text-xs sm:text-sm flex-shrink-0"
                   >
-                    <X className="h-4 w-4 mr-2" />
+                    <X className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                     Limpar Carrinho
                   </Button>
                 )}
@@ -633,9 +955,10 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+        )}
+        </div>
       )}
-      </div>
 
       {/* Modal de Pagamento */}
       {currentSale && (

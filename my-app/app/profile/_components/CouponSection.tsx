@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Clipboard, Check, Ticket, Calendar, Percent, ShoppingCart, ArrowRight } from "lucide-react";
-import { useAppStore, Coupon, CouponStatus } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { customerAPI } from "@/lib/api";
+import { useAppStore } from "@/lib/store";
 
 type FilterOption = "ativos" | "utilizados" | "expirados" | "todos";
 
@@ -39,19 +40,114 @@ function formatDate(date: string) {
   });
 }
 
+interface BackendCoupon {
+  id: string;
+  code: string;
+  description: string | null;
+  discountType: "PERCENTAGE" | "FIXED";
+  discountValue: number;
+  minimumPurchase?: number;
+  maximumDiscount?: number;
+  usageLimit?: number;
+  usedCount: number;
+  userUsageCount?: number; // Quantas vezes o usuário específico usou
+  isActive: boolean;
+  validFrom: string;
+  validUntil: string;
+  applicableTo: string;
+  categoryId?: string;
+  productId?: string;
+  storeId?: string;
+  assignmentType?: string;
+  couponType?: string;
+  createdAt: string;
+}
+
+interface MappedCoupon {
+  id: string;
+  code: string;
+  description: string;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  minimumPurchase?: number;
+  expiresAt: string;
+  status: CouponStatus;
+  usageLimit?: number;
+  usedCount?: number;
+  category?: string;
+}
+
 export default function CouponSection() {
-  const { coupons, updateCouponStatus } = useAppStore();
+  const { user } = useAppStore();
   const [filter, setFilter] = useState<FilterOption>("ativos");
   const [copiedCouponId, setCopiedCouponId] = useState<string | null>(null);
+  const [coupons, setCoupons] = useState<MappedCoupon[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCoupons = async () => {
+      try {
+        setLoading(true);
+        const backendCoupons: BackendCoupon[] = await customerAPI.getCoupons();
+        
+        // Mapear cupons do backend para o formato esperado
+        const mappedCoupons: MappedCoupon[] = backendCoupons.map((coupon) => {
+          const now = new Date();
+          const validUntil = new Date(coupon.validUntil);
+          const isExpired = validUntil < now;
+          
+          // Determinar status: se expirou, é expired; caso contrário, verificar se foi usado pelo usuário
+          let status: CouponStatus = "active";
+          if (isExpired) {
+            status = "expired";
+          } else if (coupon.userUsageCount !== undefined && coupon.userUsageCount > 0) {
+            // Se o usuário já usou o cupom pelo menos uma vez, marcar como usado
+            status = "used";
+          }
+
+          return {
+            id: coupon.id,
+            code: coupon.code,
+            description: coupon.description || "",
+            discountType: coupon.discountType === "PERCENTAGE" ? "percentage" : "fixed",
+            discountValue: coupon.discountValue,
+            minimumPurchase: coupon.minimumPurchase,
+            expiresAt: coupon.validUntil,
+            status,
+            usageLimit: coupon.usageLimit,
+            usedCount: coupon.usedCount,
+            category: coupon.categoryId || undefined,
+          };
+        });
+
+        setCoupons(mappedCoupons);
+      } catch (error) {
+        console.error("Erro ao buscar cupons:", error);
+        toast.error("Não foi possível carregar os cupons.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchCoupons();
+    }
+  }, [user]);
 
   const filteredCoupons = useMemo(() => {
     switch (filter) {
       case "ativos":
-        return coupons.filter((coupon) => coupon.status === "active");
+        return coupons.filter((coupon) => {
+          const isExpired = new Date(coupon.expiresAt) < new Date();
+          return coupon.status === "active" && !isExpired;
+        });
       case "utilizados":
         return coupons.filter((coupon) => coupon.status === "used");
       case "expirados":
-        return coupons.filter((coupon) => coupon.status === "expired");
+        return coupons.filter((coupon) => {
+          const isExpired = new Date(coupon.expiresAt) < new Date();
+          return isExpired || coupon.status === "expired";
+        });
       case "todos":
       default:
         return coupons;
@@ -59,13 +155,20 @@ export default function CouponSection() {
   }, [coupons, filter]);
 
   const summary = useMemo(() => {
-    const activeCount = coupons.filter((coupon) => coupon.status === "active").length;
+    const now = new Date();
+    const activeCount = coupons.filter((coupon) => {
+      const isExpired = new Date(coupon.expiresAt) < now;
+      return coupon.status === "active" && !isExpired;
+    }).length;
     const usedCount = coupons.filter((coupon) => coupon.status === "used").length;
-    const expiredCount = coupons.filter((coupon) => coupon.status === "expired").length;
+    const expiredCount = coupons.filter((coupon) => {
+      const isExpired = new Date(coupon.expiresAt) < now;
+      return isExpired || coupon.status === "expired";
+    }).length;
     return { activeCount, usedCount, expiredCount };
   }, [coupons]);
 
-  const handleCopyCode = async (coupon: Coupon) => {
+  const handleCopyCode = async (coupon: MappedCoupon) => {
     try {
       await navigator.clipboard.writeText(coupon.code);
       setCopiedCouponId(coupon.id);
@@ -76,14 +179,14 @@ export default function CouponSection() {
     }
   };
 
-  const handleMarkAsUsed = (coupon: Coupon) => {
+  const handleMarkAsUsed = (coupon: MappedCoupon) => {
     if (coupon.status !== "active") {
-      toast.error("Somente cupons ativos podem ser marcados como usados.");
+      toast.error("Somente cupons ativos podem ser usados.");
       return;
     }
 
-    updateCouponStatus(coupon.id, "used");
-    toast.success(`Cupom ${coupon.code} marcado como usado!`);
+    // Redirecionar para a página de produtos para usar o cupom
+    window.location.href = `/products?coupon=${coupon.code}`;
   };
 
   return (
@@ -134,7 +237,11 @@ export default function CouponSection() {
       </div>
 
       <div className="p-6 space-y-4">
-        {filteredCoupons.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Carregando cupons...</p>
+          </div>
+        ) : filteredCoupons.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-gray-200 rounded-lg">
             <Ticket className="h-10 w-10 text-gray-300 mx-auto mb-4" />
             <h2 className="text-lg font-semibold text-gray-700 mb-1">Nenhum cupom por aqui</h2>
@@ -144,7 +251,9 @@ export default function CouponSection() {
           </div>
         ) : (
           filteredCoupons.map((coupon) => {
-            const isExpired = coupon.status === "expired" || new Date(coupon.expiresAt) < new Date();
+            const now = new Date();
+            const expiresAt = new Date(coupon.expiresAt);
+            const isExpired = expiresAt < now;
             const showMarkUsed = coupon.status === "active" && !isExpired;
             const effectiveStatus = isExpired ? "expired" : coupon.status;
 

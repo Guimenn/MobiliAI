@@ -1272,6 +1272,12 @@ export const customerAPI = {
     return response.data;
   },
 
+  // Cupons
+  getCoupons: async () => {
+    const response = await api.get('/customer/coupons');
+    return response.data;
+  },
+
   // Endereços de Entrega
   getShippingAddresses: async () => {
     const response = await api.get('/customer/shipping-addresses');

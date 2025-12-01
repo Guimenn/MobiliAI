@@ -30,6 +30,7 @@ import { Marquee, MarqueeContent, MarqueeItem } from '@/components/ui/shadcn-io/
 import { CardContainer, CardBody, CardItem } from '@/components/ui/shadcn-io/3d-card';
 import { FlipWords } from '@/components/ui/shadcn-io/flip-words';
 import { TextRevealButton } from '@/components/ui/shadcn-io/text-reveal-button';
+import CTA from "@/components/ui/CTA"
 
 // Tipos para os dados do banco
 interface TransformationItem {
@@ -1008,127 +1009,11 @@ export default function TestIALandingPage() {
                 </MarqueeContent>
               </Marquee>
             </div>
-
-            {/* Grid de produtos principais */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {productShowcase.length > 0 ? productShowcase.map((product, idx) => (
-                <motion.div
-                  key={product.name}
-                  className="relative h-full rounded-3xl bg-white overflow-hidden shadow-xl border-2 border-white/20 group cursor-pointer"
-                  initial={{ opacity: 0, y: 50 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: idx * 0.15 }}
-                  whileHover={{ y: -8 }}
-                >
-                  {/* Imagem */}
-                  <div className="relative h-64 bg-linear-to-br from-[#f7f3ef] to-white overflow-hidden">
-                    <motion.div
-                      className="relative w-full h-full"
-                      whileHover={{ scale: 1.1 }}
-                      transition={{ duration: 0.6 }}
-                    >
-                      <Image
-                        src={product.src}
-                        alt={product.name}
-                        fill
-                        className="object-contain p-6"
-                        sizes="(max-width: 768px) 100vw, 400px"
-                      />
-                    </motion.div>
-                    
-                    {/* Badge */}
-                    <motion.div 
-                      className="absolute top-4 left-4 inline-flex items-center gap-2 rounded-full bg-[#3e2626] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-white shadow-lg"
-                      initial={{ scale: 0 }}
-                      whileInView={{ scale: 1 }}
-                      viewport={{ once: true }}
-                      transition={{ 
-                        type: "spring",
-                        stiffness: 200,
-                        delay: idx * 0.15 + 0.2
-                      }}
-                    >
-                      <Star className="h-3 w-3 text-[#C07A45]" />
-                      {product.category}
-                    </motion.div>
-                  </div>
-                  
-                  {/* Conteúdo */}
-                  <div className="p-6 bg-white">
-                    <h3 className="text-xl font-bold text-[#3e2626] mb-2">
-                      {product.name}
-                    </h3>
-                    <p className="text-sm text-[#4f3a2f]/70 leading-relaxed mb-4">
-                      {product.description}
-                    </p>
-                    
-                    {/* Barra decorativa */}
-                    <motion.div
-                      className="h-1 w-0 bg-linear-to-r from-[#C07A45] to-[#F7C194] rounded-full group-hover:w-full transition-all duration-500"
-                    />
-                  </div>
-                  
-                  {/* Efeito de brilho */}
-                  <motion.div
-                    className="absolute inset-0 bg-linear-to-br from-[#C07A45]/10 to-[#8B4513]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                  />
-                </motion.div>
-              )) : (
-                <div className="col-span-full text-center py-12 text-white/60">
-                  Carregando produtos...
-                </div>
-              )}
-            </div>
           </div>
         </section>
 
         {/* CTA */}
-        <section className="relative overflow-hidden bg-[#3e2626] py-20 text-white">
-          {/* Gradiente superior para transição */}
-          <div className="absolute top-0 left-0 right-0 h-32 bg-linear-to-b from-[#3e2626] via-[#3e2626]/80 to-transparent pointer-events-none z-10" />
-          
-          {/* Background Beams */}
-          
-          <div className="absolute inset-0 opacity-10 z-0">
-            <Image src="/hero-bg.png" alt="" fill className="object-cover" />
-          </div>
-          <div className="relative mx-auto max-w-4xl px-4 text-center">
-            <h2 className="text-4xl font-black leading-tight sm:text-5xl">
-              Transforme o atendimento em uma experiência memorável.
-          </h2>
-            <p className="mt-4 text-white/80">
-              Faça o upload de um ambiente agora e veja a IA aplicar a paleta da PintAi, sugerir produtos reais e gerar
-              imagens que vendem.
-          </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button
-              size="lg"
-                className="h-14 rounded-full bg-white px-10 text-base font-semibold text-[#3e2626] transition hover:bg-white/90"
-              asChild
-            >
-              <Link href="/IA-demo">
-                <Rocket className="mr-2 h-5 w-5" />
-                  Entrar no simulador
-              </Link>
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-                className="h-14 bg-transparent rounded-full border-white/60 px-10 text-base font-semibold text-white transition hover:bg-white/10 hover:text-white"
-              asChild
-            >
-              <Link href="/products">
-                  Conferir catálogo
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-          </div>
-            <p className="mt-4 text-xs uppercase tracking-[0.35em] text-white/60">
-              a mesma experiência nas lojas físicas e online
-            </p>
-        </div>
-      </section>
+        <CTA />
       </main>
 
       <Footer />

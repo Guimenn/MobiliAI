@@ -983,30 +983,49 @@ export class CouponsService {
     );
     
     // Filtrar cupons baseado nos resultados das verificações assíncronas
-    const filteredCoupons = couponValidityChecks
-      .filter(check => check.isValid)
-      .map(check => check.coupon)
-      .map(coupon => ({
-        id: coupon.id,
-        code: coupon.code,
-        description: coupon.description,
-        discountType: coupon.discountType,
-        discountValue: Number(coupon.discountValue),
-        minimumPurchase: coupon.minimumPurchase ? Number(coupon.minimumPurchase) : undefined,
-        maximumDiscount: coupon.maximumDiscount ? Number(coupon.maximumDiscount) : undefined,
-        usageLimit: coupon.usageLimit,
-        usedCount: coupon._count.couponUsages,
-        isActive: coupon.isActive,
-        validFrom: coupon.validFrom.toISOString(),
-        validUntil: coupon.validUntil.toISOString(),
-        applicableTo: coupon.applicableTo,
-        categoryId: coupon.categoryId,
-        productId: coupon.productId,
-        storeId: coupon.storeId,
-        assignmentType: coupon.assignmentType,
-        couponType: coupon.couponType,
-        createdAt: coupon.createdAt.toISOString(),
-      }));
+    // Também verificar se o usuário já usou cada cupom
+    const couponsWithUsage = await Promise.all(
+      couponValidityChecks
+        .filter(check => check.isValid)
+        .map(check => check.coupon)
+        .map(async (coupon) => {
+          // Verificar se o usuário já usou este cupom
+          const userUsageCount = await this.prisma.couponUsage.count({
+            where: {
+              couponId: coupon.id,
+              userId: customerId,
+            },
+          });
+
+          return {
+            coupon,
+            userUsageCount,
+          };
+        })
+    );
+
+    const filteredCoupons = couponsWithUsage.map(({ coupon, userUsageCount }) => ({
+      id: coupon.id,
+      code: coupon.code,
+      description: coupon.description,
+      discountType: coupon.discountType,
+      discountValue: Number(coupon.discountValue),
+      minimumPurchase: coupon.minimumPurchase ? Number(coupon.minimumPurchase) : undefined,
+      maximumDiscount: coupon.maximumDiscount ? Number(coupon.maximumDiscount) : undefined,
+      usageLimit: coupon.usageLimit,
+      usedCount: coupon._count.couponUsages,
+      userUsageCount, // Quantas vezes o usuário específico usou
+      isActive: coupon.isActive,
+      validFrom: coupon.validFrom.toISOString(),
+      validUntil: coupon.validUntil.toISOString(),
+      applicableTo: coupon.applicableTo,
+      categoryId: coupon.categoryId,
+      productId: coupon.productId,
+      storeId: coupon.storeId,
+      assignmentType: coupon.assignmentType,
+      couponType: coupon.couponType,
+      createdAt: coupon.createdAt.toISOString(),
+    }));
 
     console.log('✅ Cupons retornados para o cliente:', {
       total: filteredCoupons.length,

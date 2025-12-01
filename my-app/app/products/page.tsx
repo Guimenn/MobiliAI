@@ -1,4 +1,4 @@
-'use client';
+5'use client';
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useAppStore, Product } from '@/lib/store';
@@ -48,6 +48,7 @@ import {
 import { customerAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import { showAlert } from '@/lib/alerts';
+import CTA from "@/components/ui/CTA"
 
 // Mapeamento de categorias para ícones
 const categoryIcons: Record<string, any> = {
@@ -426,14 +427,38 @@ export default function ProductsPage() {
     setIsDragging(false);
   };
 
-  // Função para obter a localização formatada
+  // Função para obter a localização formatada completa
   const getUserLocation = () => {
-    if (user?.city && user?.state) {
+    if (!user) return 'Localização não cadastrada';
+    
+    const parts: string[] = [];
+    
+    if (user.address) {
+      parts.push(user.address);
+    }
+    if (user.city && user.state) {
+      parts.push(`${user.city} - ${user.state}`);
+    } else if (user.city) {
+      parts.push(user.city);
+    } else if (user.state) {
+      parts.push(user.state);
+    }
+    if (user.zipCode) {
+      const formattedZip = user.zipCode.replace(/(\d{5})(\d{3})/, '$1-$2');
+      parts.push(`CEP ${formattedZip}`);
+    }
+    
+    return parts.length > 0 ? parts.join(', ') : 'Localização não cadastrada';
+  };
+  
+  // Função auxiliar para obter endereço resumido (apenas cidade-estado)
+  const getUserLocationShort = () => {
+    if (!user) return 'Localização não cadastrada';
+    if (user.city && user.state) {
       return `${user.city} - ${user.state}`;
     }
-    if (user?.address) {
-      return user.address;
-    }
+    if (user.city) return user.city;
+    if (user.state) return user.state;
     return 'Localização não cadastrada';
   };
 
@@ -662,24 +687,22 @@ export default function ProductsPage() {
                 
                 return (
                   <div 
-                    className="lg:col-span-3 relative bg-white rounded-lg border-2 border-yellow-400 hover:border-yellow-500 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer h-72 shadow-yellow-100"
+                    className="lg:col-span-3 relative bg-gray-50 rounded-lg border border-gray-200 hover:border-[#3e2626] transition-all duration-200 overflow-hidden group cursor-pointer h-72"
                     onClick={() => router.push(`/products/${specialOfferProduct.id}`)}
                   >
                     {/* Badge Oferta Relâmpago - Topo Esquerdo */}
                     <div className="absolute top-3 left-3 z-20">
-                      <div className="inline-flex items-center gap-1.5 bg-yellow-500 text-white rounded-lg px-3 py-1.5 shadow-lg animate-pulse">
+                      <div className="inline-flex items-center gap-1.5 bg-[#3e2626] text-white rounded-lg px-3 py-1.5 shadow-lg ">
                         <Zap className="h-4 w-4 fill-white text-white" />
                         <span className="text-[11px] font-bold uppercase tracking-tight">Oferta Relâmpago</span>
-                        {flashDiscountPercent > 0 && (
-                          <span className="ml-1 text-[10px] font-bold">-{flashDiscountPercent}%</span>
-                        )}
+                      
                       </div>
                     </div>
 
                     {/* Timer - Topo Direito */}
                     {offerSecondsLeft > 0 && (
                       <div className="absolute top-3 right-3 z-20">
-                        <div className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-lg px-3 py-1.5 shadow-lg">
+                        <div className="inline-flex items-center gap-1.5 bg-[#3e2626] text-white rounded-lg px-3 py-1.5 shadow-lg">
                           <Clock className="h-4 w-4" />
                           <span className="font-mono text-xs font-bold">{formatTime(offerSecondsLeft)}</span>
                         </div>
@@ -687,7 +710,7 @@ export default function ProductsPage() {
                     )}
 
                     {/* Conteúdo Principal */}
-                    <div className="relative z-10 h-full flex flex-row gap-4 pt-14">
+                    <div className="relative z-10 h-full flex flex-row gap-4 pt-14 bg-gray-100">
                       
                       {/* Seção da Imagem - Esquerda */}
                       <div className="flex-shrink-0 w-40 h-48 items-center justify-center overflow-hidden">
@@ -724,7 +747,7 @@ export default function ProductsPage() {
                               <span className="text-sm text-gray-500 line-through">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalFlashPrice)}
                               </span>
-                              <span className="inline-flex items-center px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded uppercase">
+                              <span className="inline-flex items-center px-2 py-0.5 bg-[#3e2626] text-white text-[10px] font-bold rounded uppercase">
                                 -{flashDiscountPercent}% OFF
                               </span>
                             </div>
@@ -740,7 +763,7 @@ export default function ProductsPage() {
                             </div>
                             {savings > 0 && (
                               <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
-                                <Sparkles className="h-3 w-3" />
+                                
                                 Economia de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(savings)}
                               </p>
                             )}
@@ -790,13 +813,13 @@ export default function ProductsPage() {
                         </div>
 
                         <div className="flex-1">
-                          <h3 className="text-xl font-black text-brand-800">
+                          <h3 className="text-2xl font-black text-brand-800 text-center">
                             Confira Nossos{' '}
                             <span className="text-brand-700">
                               Produtos Mais Recentes
                             </span>
                           </h3>
-                          <p className="text-lg lg:text-sm text-brand-700/80 font-medium">
+                          <p className="text-md lg:text-md text-brand-700/80 font-medium text-center">
                             Descubra as últimas novidades em móveis e decoração
                           </p>
                         </div>
@@ -870,21 +893,33 @@ export default function ProductsPage() {
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mt-4 sm:mt-6 mb-6 sm:mb-8">
           {/* Localização do Usuário */}
           <div className="flex-shrink-0 lg:w-80">
-            <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="bg-brand-700 rounded-full p-1.5 flex-shrink-0">
-                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+            <div className="bg-white border border-[#3e2626]/10 rounded-xl w-[350px] mt-7 p-5 shadow-sm hover:shadow-md transition-shadow ">
+              <div className="flex items-start gap-3">
+                <div className="bg-gradient-to-br from-[#3e2626] to-[#2d1a1a] rounded-full p-2 flex-shrink-0 shadow-sm">
+                  <MapPin className="h-4 w-4 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
                   {isAuthenticated && user ? (
                     <>
-                      <p className="text-[10px] sm:text-xs text-gray-500">Enviar para</p>
-                      <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">{getUserLocation()}</p>
+                      <p className="text-xs text-[#3e2626]/60 font-medium mb-1">Enviar para</p>
+                      {user.address ? (
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-[#3e2626] leading-tight">{user.address}</p>
+                          <p className="text-xs text-[#3e2626]/70 leading-tight">
+                            {[user.city, user.state].filter(Boolean).join(' - ')}
+                            {user.zipCode && ` • CEP ${user.zipCode.replace(/(\d{5})(\d{3})/, '$1-$2')}`}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm font-semibold text-[#3e2626]">
+                          {getUserLocationShort()}
+                        </p>
+                      )}
                     </>
                   ) : (
                     <>
-                      <p className="text-[10px] sm:text-xs text-gray-500">Entrar para melhor experiência</p>
-                      <p className="text-xs sm:text-sm font-bold text-gray-900">Cadastre sua localização</p>
+                      <p className="text-xs text-[#3e2626]/60 font-medium mb-1">Entrar para melhor experiência</p>
+                      <p className="text-sm font-semibold text-[#3e2626]">Cadastre sua localização</p>
                     </>
                   )}
                 </div>
@@ -902,7 +937,7 @@ export default function ProductsPage() {
                     onClick={() => router.push('/profile')}
                     variant="outline"
                     size="sm"
-                    className="border-gray-300 text-xs px-2 sm:px-3 h-7 sm:h-8"
+                    className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5 flex-shrink-0 shadow-sm"
                   >
                     Editar
                   </Button>
@@ -911,8 +946,8 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Carrossel de Categorias */}
-          <div className="flex-1">
+          {/* Carrossel de Categorias e Ordenação */}
+          <div className="flex-1 flex flex-col">
             <div
               ref={categoriesScrollRef}
               onMouseDown={handleMouseDown}
@@ -932,8 +967,12 @@ export default function ProductsPage() {
                 return (
                   <button
                     key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className="flex flex-col items-center justify-center gap-2 sm:gap-3 whitespace-nowrap flex-shrink-0 min-w-0 px-2 sm:px-3 py-2 rounded-xl transition-all duration-200"
+                    onClick={() => {
+                      // Se a categoria já está selecionada, desseleciona (volta para 'all')
+                      // Caso contrário, seleciona a categoria clicada
+                      setSelectedCategory(isSelected ? 'all' : cat);
+                    }}
+                    className="flex flex-col items-center justify-center gap-3 whitespace-nowrap flex-1 min-w-0 px-2 py-2 rounded-xl transition-all duration-200"
                   >
                     <div className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] flex items-center justify-center transition-all duration-200 ${
                       isSelected
@@ -954,6 +993,19 @@ export default function ProductsPage() {
                   </button>
                 );
               })}
+            </div>
+            
+            {/* Ordenação */}
+            <div className="flex items-center justify-end mt-2 mb-4 pr-3">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
+                className="border-2 border-brand-200 rounded-lg px-4 py-2 text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
+              >
+                <option value="name">Ordenar por: Mais relevantes</option>
+                <option value="price">Menor preço</option>
+                <option value="stock">Maior estoque</option>
+              </select>
             </div>
           </div>
         </div>

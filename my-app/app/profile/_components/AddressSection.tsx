@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, MapPin, Edit, Trash2 } from "lucide-react";
+import { Plus, MapPin, Edit, Trash2, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +14,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { customerAPI } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { toast } from "sonner";
@@ -37,6 +39,7 @@ interface Address {
 }
 
 export function AddressSection() {
+  const { user } = useAppStore();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
@@ -61,14 +64,21 @@ export function AddressSection() {
     loadAddresses();
   }, []);
 
+  // Recarregar endereços quando o usuário mudar
+  useEffect(() => {
+    if (user) {
+      loadAddresses();
+    }
+  }, [user?.address, user?.city, user?.state, user?.zipCode]);
+
   const loadAddresses = async () => {
     try {
       setLoading(true);
-      const { user } = useAppStore.getState();
       
       // Buscar endereços apenas da tabela users
       const userAddresses: Address[] = [];
       
+      // Exibir endereço se tiver pelo menos endereço, cidade e estado
       if (user && user.address && user.city && user.state) {
         // Extrair número do endereço se existir
         const addressParts = user.address.split(',').map((s: string) => s.trim());
@@ -108,10 +118,8 @@ export function AddressSection() {
     e.preventDefault();
     
     try {
-      // Atualizar endereço no perfil do usuário
-      const { user } = useAppStore.getState();
       if (!user) {
-        alert("Usuário não encontrado.");
+        toast.error("Usuário não encontrado. Faça login novamente.");
         return;
       }
 
@@ -120,37 +128,47 @@ export function AddressSection() {
         ? `${formData.address}, ${formData.number}` 
         : formData.address;
 
-      // Atualizar perfil do usuário
-      const updatedUser = await customerAPI.updateProfile({
+      // Atualizar perfil do usuário (também atualizar o nome se fornecido)
+      const updateData: any = {
         address: fullAddress,
         city: formData.city,
         state: formData.state,
         zipCode: formData.zipCode,
-        phone: formData.phone,
-      });
+      };
+
+      // Se o telefone foi fornecido, atualizar
+      if (formData.phone) {
+        updateData.phone = formData.phone;
+      }
+
+      // Se o nome do destinatário foi fornecido e é diferente do nome atual, atualizar
+      if (formData.recipientName && formData.recipientName !== user.name) {
+        updateData.name = formData.recipientName;
+      }
+
+      const updatedUser = await customerAPI.updateProfile(updateData);
       
       // Atualizar store local com os dados retornados do servidor
-      if (updatedUser) {
+      const currentUser = useAppStore.getState().user;
+      if (updatedUser && currentUser) {
         useAppStore.getState().setUser({
-          ...user,
+          ...currentUser,
           ...updatedUser,
         });
-      } else {
+      } else if (currentUser) {
         // Fallback: atualizar apenas os campos que enviamos
         useAppStore.getState().setUser({
-          ...user,
-          address: fullAddress,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-          phone: formData.phone,
+          ...currentUser,
+          ...updateData,
         });
       }
+      
+      // Recarregar lista de endereços após atualizar
+      await loadAddresses();
       
       setIsDialogOpen(false);
       setEditingAddress(null);
       resetForm();
-      await loadAddresses(); // Recarregar lista
       
       // Feedback visual de sucesso
       toast.success("Endereço atualizado com sucesso!", {
@@ -167,15 +185,17 @@ export function AddressSection() {
 
   const handleEdit = (address: Address) => {
     setEditingAddress(address);
+    
+    // Preencher o formulário com os dados do endereço
     setFormData({
-      name: address.name,
-      recipientName: address.recipientName,
-      phone: address.phone,
-      cpf: address.cpf || "",
+      name: address.name || "Endereço Principal",
+      recipientName: address.recipientName || user?.name || "",
+      phone: address.phone || user?.phone || "",
+      cpf: address.cpf || user?.cpf || "",
       address: address.address,
       number: address.number,
       complement: address.complement || "",
-      neighborhood: address.neighborhood,
+      neighborhood: address.neighborhood || "",
       city: address.city,
       state: address.state,
       zipCode: address.zipCode,
@@ -228,11 +248,12 @@ export function AddressSection() {
   };
 
   const resetForm = () => {
+    // Preencher com dados do usuário se disponíveis
     setFormData({
-      name: "",
-      recipientName: "",
-      phone: "",
-      cpf: "",
+      name: "Endereço Principal",
+      recipientName: user?.name || "",
+      phone: user?.phone || "",
+      cpf: user?.cpf || "",
       address: "",
       number: "",
       complement: "",
@@ -256,29 +277,42 @@ export function AddressSection() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 h-full">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">Meus endereços</h2>
-          <p className="text-sm text-gray-500">Gerencie seus endereços de entrega</p>
-        </div>
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) {
-              setEditingAddress(null);
-              resetForm();
-            }
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="bg-[#3e2626] hover:bg-[#5a3a3a] text-white shadow-md hover:shadow-lg transition-all duration-200">
-              <Plus className="h-4 w-4 mr-2" />
-              Inserir novo endereço
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+    <>
+      <Card className="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-xl font-semibold text-gray-900">Meus endereços</CardTitle>
+              <CardDescription className="mt-1">
+                Gerencie seus endereços de entrega
+              </CardDescription>
+            </div>
+            <Dialog
+              open={isDialogOpen}
+              onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (open && !editingAddress) {
+                  // Quando abrir para criar novo endereço, preencher com dados do usuário
+                  resetForm();
+                } else if (!open) {
+                  setEditingAddress(null);
+                  resetForm();
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button 
+                  className="bg-[#3e2626] hover:bg-[#5a3a3a] text-white"
+                  onClick={() => {
+                    setEditingAddress(null);
+                    resetForm();
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Inserir novo endereço
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
             <DialogHeader>
               <DialogTitle>
                 {editingAddress ? "Editar Endereço" : "Adicionar Novo Endereço"}
@@ -394,10 +428,10 @@ export function AddressSection() {
                     onValueChange={(value) => setFormData({ ...formData, state: value })}
                     required
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="state" className="w-full">
                       <SelectValue placeholder="Selecione o estado" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[1002]" position="popper">
                       <SelectItem value="AC">Acre</SelectItem>
                       <SelectItem value="AL">Alagoas</SelectItem>
                       <SelectItem value="AP">Amapá</SelectItem>
@@ -472,131 +506,139 @@ export function AddressSection() {
                 </Button>
               </div>
             </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-2 border-[#3e2626] border-t-transparent"></div>
-          <p className="text-gray-500 text-center mt-4 font-medium">Carregando endereços...</p>
-        </div>
-      ) : addresses.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-            <MapPin className="h-12 w-12 text-gray-400" />
+              </DialogContent>
+            </Dialog>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum endereço cadastrado</h3>
-          <p className="text-gray-500 text-center max-w-md">
-            Adicione um endereço para facilitar suas compras e entregas
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {addresses.map((address) => (
-            <div
-              key={address.id}
-              className="relative border-2 border-gray-200 rounded-xl p-6 hover:border-[#3e2626] hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-gray-50/50"
-            >
-              {/* Badges no topo */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg font-bold text-gray-900">{address.name}</h3>
-                  {address.isDefault && (
-                    <span className="px-3 py-1 text-xs font-semibold bg-[#3e2626] text-white rounded-full shadow-sm">
-                      Padrão
-                    </span>
-                  )}
-                  {address.isFromUserProfile && (
-                    <span className="px-3 py-1 text-xs font-semibold bg-blue-500 text-white rounded-full shadow-sm">
-                      Do Perfil
-                    </span>
-                  )}
-                </div>
-                
-                {/* Botões de ação */}
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(address)}
-                    className="h-8 w-8 p-0 text-[#3e2626] hover:text-white hover:bg-[#3e2626] rounded-lg transition-all"
-                    title="Editar endereço"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(address.id, address.isFromUserProfile)}
-                    className="h-8 w-8 p-0 text-red-600 hover:text-white hover:bg-red-600 rounded-lg transition-all"
-                    title="Remover endereço"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+        </CardHeader>
 
-              {/* Informações do destinatário */}
-              <div className="space-y-3 mb-4 pb-4 border-b border-gray-200">
-                <div className="flex items-start gap-2">
-                  <div className="w-8 h-8 bg-[#3e2626]/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <MapPin className="h-4 w-4 text-[#3e2626]" />
+      <CardContent>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-[#3e2626] border-t-transparent"></div>
+            <p className="text-gray-500 text-center mt-4 font-medium">Carregando endereços...</p>
+          </div>
+        ) : addresses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+              <MapPin className="h-12 w-12 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum endereço cadastrado</h3>
+            <p className="text-gray-500 text-center max-w-md">
+              Adicione um endereço para facilitar suas compras e entregas
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {addresses.map((address) => (
+              <Card
+                key={address.id}
+                className="relative hover:shadow-lg transition-all duration-300 border-gray-200"
+              >
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2 flex-wrap flex-1">
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        {address.name}
+                      </CardTitle>
+                      {address.isDefault && (
+                        <Badge className="bg-[#3e2626] text-white hover:bg-[#5a3a3a]">
+                          Padrão
+                        </Badge>
+                      )}
+                      {address.isFromUserProfile && (
+                        <Badge variant="secondary" className="bg-blue-500 text-white hover:bg-blue-600">
+                          Do Perfil
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {/* Botões de ação */}
+                    <div className="flex items-center gap-1 ml-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(address)}
+                        className="h-8 w-8 p-0 text-[#3e2626] hover:text-white hover:bg-[#3e2626]"
+                        title="Editar endereço"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(address.id, address.isFromUserProfile)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-white hover:bg-red-600"
+                        title="Remover endereço"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">
-                      Destinatário
-                    </p>
-                    <p className="text-sm font-semibold text-gray-900">{address.recipientName}</p>
-                  </div>
-                </div>
-                
-                {address.phone && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <span className="text-gray-500">Telefone:</span>
-                    <span className="font-medium">{address.phone}</span>
-                  </div>
-                )}
-              </div>
+                </CardHeader>
 
-              {/* Endereço completo */}
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <div className="text-sm text-gray-900 font-medium leading-relaxed">
-                    <p className="mb-1">
-                      {address.address}
-                      {address.number && `, ${address.number}`}
-                      {address.complement && ` - ${address.complement}`}
-                    </p>
-                    <p className="text-gray-600">
-                      {address.neighborhood && `${address.neighborhood}, `}
-                      {address.city} - {address.state}
-                    </p>
-                    {address.zipCode && (
-                      <p className="text-gray-500 text-xs mt-1">CEP: {address.zipCode}</p>
+                <CardContent className="space-y-4">
+                  {/* Informações do destinatário */}
+                  <div className="space-y-3 pb-4 border-b border-gray-200">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-[#3e2626]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <MapPin className="h-5 w-5 text-[#3e2626]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">
+                          Destinatário
+                        </p>
+                        <p className="text-sm font-semibold text-gray-900">{address.recipientName}</p>
+                      </div>
+                    </div>
+                    
+                    {address.phone && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600 ml-[52px]">
+                        <Phone className="h-4 w-4 text-gray-400" />
+                        <span className="text-gray-500">Telefone:</span>
+                        <span className="font-medium">{address.phone}</span>
+                      </div>
                     )}
                   </div>
-                </div>
-              </div>
 
-              {/* Botão definir como padrão (se não for padrão e não for do perfil) */}
-              {!address.isDefault && !address.isFromUserProfile && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSetDefault(address.id)}
-                    className="w-full text-sm border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white transition-all"
-                  >
-                    Definir como padrão
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+                  {/* Endereço completo */}
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-900 leading-relaxed">
+                      <p className="mb-1 font-medium">
+                        {address.address}
+                        {address.number && `, ${address.number}`}
+                        {address.complement && ` - ${address.complement}`}
+                      </p>
+                      <p className="text-gray-600">
+                        {address.neighborhood && `${address.neighborhood}, `}
+                        {address.city} - {address.state}
+                      </p>
+                      {address.zipCode && (
+                        <p className="text-gray-500 text-xs mt-1">CEP: {address.zipCode}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Botão definir como padrão (se não for padrão e não for do perfil) */}
+                  {!address.isDefault && !address.isFromUserProfile && (
+                    <div className="pt-4 border-t border-gray-200">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSetDefault(address.id)}
+                        className="w-full text-sm border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
+                      >
+                        Definir como padrão
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </CardContent>
+      </Card>
+    </>
   );
 }
 
