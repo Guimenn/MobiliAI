@@ -134,21 +134,21 @@ export default function PDVProductsPage({
   return (
     <div className="h-full flex flex-col">
       {/* Busca de Produtos */}
-      <Card className="mb-6 shadow-lg border-2 border-[#3e2626]/10">
-        <CardContent className="p-4">
+      <Card className="mb-4 sm:mb-6 shadow-lg border-2 border-[#3e2626]/10">
+        <CardContent className="p-3 sm:p-4">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-[#3e2626] z-10" />
+            <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 text-[#3e2626] z-10" />
             <Input
               ref={searchInputRef}
               type="text"
-              placeholder="Buscar por nome, SKU ou código de barras..."
+              placeholder="Buscar por nome, SKU ou código..."
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
               onKeyPress={handleKeyPress}
-              className="pl-12 pr-12 h-14 text-lg border-2 border-[#3e2626]/20 focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 rounded-lg font-medium"
+              className="pl-10 sm:pl-12 pr-10 sm:pr-12 h-12 sm:h-14 text-sm sm:text-lg border-2 border-[#3e2626]/20 focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 rounded-lg font-medium"
             />
             {isSearching && (
-              <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-[#3e2626] animate-spin" />
+              <Loader2 className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 text-[#3e2626] animate-spin" />
             )}
           </div>
         </CardContent>
@@ -156,43 +156,44 @@ export default function PDVProductsPage({
 
       {/* Lista de Produtos */}
       <Card className="flex-1 shadow-lg border-0 overflow-hidden flex flex-col">
-        <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white rounded-t-lg">
-          <CardTitle className="flex items-center justify-between text-white">
+        <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white rounded-t-lg p-4 sm:p-6">
+          <CardTitle className="flex items-center justify-between text-white text-base sm:text-lg">
             <span className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Produtos Disponíveis
+              <Package className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">Produtos Disponíveis</span>
+              <span className="sm:hidden">Produtos</span>
             </span>
             {products.length > 0 && (
-              <Badge className="bg-white text-[#3e2626] font-semibold">
-                {products.length} encontrado{products.length !== 1 ? 's' : ''}
+              <Badge className="bg-white text-[#3e2626] font-semibold text-xs">
+                {products.length}
               </Badge>
             )}
           </CardTitle>
         </CardHeader>
         
-        <CardContent className="p-6 flex-1 overflow-y-auto">
+        <CardContent className={`p-3 sm:p-4 lg:p-6 flex-1 overflow-y-auto ${cart.length > 0 ? 'pb-20 lg:pb-6' : ''}`}>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[#3e2626]" />
             </div>
           ) : products.length === 0 && searchTerm ? (
-            <div className="text-center py-16">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-red-50 rounded-full mb-4">
-                <AlertCircle className="h-10 w-10 text-red-400" />
+            <div className="text-center py-8 sm:py-16">
+              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-red-50 rounded-full mb-3 sm:mb-4">
+                <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 text-red-400" />
               </div>
-              <p className="text-[#3e2626] font-semibold text-lg mb-2">Nenhum produto encontrado</p>
-              <p className="text-gray-500 text-sm">Tente buscar com outro termo</p>
+              <p className="text-[#3e2626] font-semibold text-base sm:text-lg mb-1 sm:mb-2">Nenhum produto encontrado</p>
+              <p className="text-gray-500 text-xs sm:text-sm">Tente buscar com outro termo</p>
             </div>
           ) : products.length === 0 && !searchTerm ? (
-            <div className="text-center py-16">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-50 rounded-full mb-4">
-                <Barcode className="h-10 w-10 text-blue-400" />
+            <div className="text-center py-8 sm:py-16">
+              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-blue-50 rounded-full mb-3 sm:mb-4">
+                <Barcode className="h-8 w-8 sm:h-10 sm:w-10 text-blue-400" />
               </div>
-              <p className="text-[#3e2626] font-semibold text-lg mb-2">Buscar Produtos</p>
-              <p className="text-gray-500 text-sm">Digite o nome, SKU ou código de barras para buscar</p>
+              <p className="text-[#3e2626] font-semibold text-base sm:text-lg mb-1 sm:mb-2">Buscar Produtos</p>
+              <p className="text-gray-500 text-xs sm:text-sm">Digite o nome, SKU ou código de barras para buscar</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
               {products.map((product) => {
                 const cartItem = cart.find(item => item.productId === product.id);
                 const currentQuantity = cartItem?.quantity || 0;
@@ -200,12 +201,12 @@ export default function PDVProductsPage({
                 return (
                   <div
                     key={product.id}
-                    className="border-2 rounded-xl p-4 hover:border-[#3e2626] hover:shadow-xl transition-all bg-white group"
+                    className="border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 hover:border-[#3e2626] hover:shadow-lg transition-all bg-white group flex flex-col"
                   >
-                    <div className="flex flex-col space-y-3">
+                    <div className="flex flex-col space-y-2 sm:space-y-3 flex-1">
                       {/* Imagem do Produto */}
                       {product.imageUrl ? (
-                        <div className="relative w-full h-40 rounded-lg overflow-hidden bg-gray-100">
+                        <div className="relative w-full h-32 sm:h-40 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                           <Image
                             src={product.imageUrl}
                             alt={product.name}
@@ -214,21 +215,21 @@ export default function PDVProductsPage({
                           />
                         </div>
                       ) : (
-                        <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <ShoppingCart className="h-12 w-12 text-gray-400" />
+                        <div className="w-full h-32 sm:h-40 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <ShoppingCart className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
                         </div>
                       )}
                       
                       {/* Informações do Produto */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-base text-[#3e2626] line-clamp-2 mb-2 min-h-[3rem]">
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <h3 className="font-bold text-sm sm:text-base text-[#3e2626] line-clamp-2 mb-1 sm:mb-2 min-h-[2.5rem] sm:min-h-[3rem]">
                           {product.name}
                         </h3>
-                        <p className="text-2xl font-bold text-[#3e2626] mb-3">
+                        <p className="text-lg sm:text-2xl font-bold text-[#3e2626] mb-2 sm:mb-3">
                           {formatCurrency(product.price)}
                         </p>
                         
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-1">
                           <Badge 
                             variant={product.stock > 0 ? 'default' : 'destructive'} 
                             className="text-xs"
@@ -236,13 +237,13 @@ export default function PDVProductsPage({
                             Estoque: {product.stock}
                           </Badge>
                           {product.barcode && (
-                            <span className="text-xs text-gray-500">#{product.barcode}</span>
+                            <span className="text-xs text-gray-500 truncate">#{product.barcode}</span>
                           )}
                         </div>
                         
                         {/* Indicador de Item no Carrinho */}
                         {cartItem && (
-                          <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                          <div className="mb-2 sm:mb-3 p-1.5 sm:p-2 bg-green-50 rounded-lg border border-green-200">
                             <p className="text-xs text-green-700 font-medium">
                               No carrinho: {currentQuantity} unidade{currentQuantity !== 1 ? 's' : ''}
                             </p>
@@ -250,50 +251,66 @@ export default function PDVProductsPage({
                         )}
                         
                         {/* Controles de Quantidade */}
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 h-9"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (cartItem) {
-                                onUpdateQuantity(product.id, cartItem.quantity - 1);
-                              }
-                            }}
-                            disabled={!cartItem || cartItem.quantity <= 0}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onAddToCart(product, 1);
-                            }}
-                            className="flex-1 bg-[#3e2626] hover:bg-[#5a3a3a] text-white h-9"
-                            disabled={product.stock === 0 || (cartItem && cartItem.quantity >= product.stock)}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Adicionar
-                          </Button>
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 h-9"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (cartItem) {
-                                onUpdateQuantity(product.id, cartItem.quantity + 1);
-                              } else {
+                        <div className="flex gap-1.5 sm:gap-2 mt-auto">
+                          {cartItem ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 sm:h-9 w-8 sm:w-9 p-0 flex-shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onUpdateQuantity(product.id, cartItem.quantity - 1);
+                                }}
+                                disabled={cartItem.quantity <= 0}
+                              >
+                                <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                              
+                              <div className="flex-1 flex items-center justify-center">
+                                <span className="text-sm sm:text-base font-semibold text-[#3e2626]">
+                                  {currentQuantity}
+                                </span>
+                              </div>
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 sm:h-9 w-8 sm:w-9 p-0 flex-shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onUpdateQuantity(product.id, cartItem.quantity + 1);
+                                }}
+                                disabled={cartItem.quantity >= product.stock}
+                              >
+                                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                              
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onAddToCart(product, 1);
+                                }}
+                                className="flex-1 bg-[#3e2626] hover:bg-[#5a3a3a] text-white h-8 sm:h-9 text-xs sm:text-sm"
+                                disabled={product.stock === 0 || cartItem.quantity >= product.stock}
+                              >
+                                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                <span className="hidden sm:inline">Mais</span>
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 onAddToCart(product, 1);
-                              }
-                            }}
-                            disabled={product.stock === 0 || (cartItem && cartItem.quantity >= product.stock)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                              }}
+                              className="flex-1 bg-[#3e2626] hover:bg-[#5a3a3a] text-white h-8 sm:h-9 text-xs sm:text-sm font-semibold"
+                              disabled={product.stock === 0}
+                            >
+                              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                              Adicionar
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
