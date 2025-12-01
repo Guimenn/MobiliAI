@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -21,20 +21,24 @@ model User {
   isActive               Boolean              @default(true)
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
-  passwordChangedAt      DateTime?            @default(now())
   storeId                String?
   cpf                    String?              @unique
   workingHours           Json?
   avatarUrl              String?
+  passwordChangedAt      DateTime?            @default(now())
   cartItems              CartItem[]
   cashExpenses           CashExpense[]
   cashFlows              CashFlow[]
   chatSessions           ChatSession[]
   colorAnalyses          ColorAnalysis[]
   comparisons            Comparison[]
+  couponUsages           CouponUsage[]
+  createdCoupons         Coupon[]             @relation("CouponCreator")
   dailyCash              DailyCash[]
   favorites              Favorite[]
   furnitureAnalyses      FurnitureAnalysis[]
+  medicalCertificates    MedicalCertificate[] @relation("EmployeeCertificates")
+  registeredCertificates MedicalCertificate[] @relation("RegisteredByCertificates")
   moodboards             Moodboard[]
   notifications          Notification[]
   passwordResets         PasswordReset[]
@@ -45,10 +49,6 @@ model User {
   shippingAddresses      ShippingAddress[]
   systemLogs             SystemLog[]
   timeClockRecords       TimeClock[]
-  medicalCertificates    MedicalCertificate[] @relation("EmployeeCertificates")
-  registeredCertificates MedicalCertificate[] @relation("RegisteredByCertificates")
-  createdCoupons         Coupon[]             @relation("CouponCreator")
-  couponUsages           CouponUsage[]
   store                  Store?               @relation(fields: [storeId], references: [id])
 
   @@map("users")
@@ -76,13 +76,13 @@ model Store {
   workingDays  String[]
   imageUrl     String?
   cashFlows    CashFlow[]
+  coupons      Coupon[]
   dailyCash    DailyCash[]
   products     Product[]
   reports      Report[]
   sales        Sale[]
   inventory    StoreInventory[]
   employees    User[]
-  coupons      Coupon[]
 
   @@map("stores")
 }
@@ -124,7 +124,7 @@ model Product {
   isAvailable              Boolean                @default(true)
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
-  storeId                  String? // Opcional: produto pode estar em múltiplas lojas via StoreInventory
+  storeId                  String?
   collectionId             String?
   supplierId               String?
   model3DUrl               String?
@@ -147,7 +147,7 @@ model Product {
   reviews                  ProductReview[]
   variants                 ProductVariant[]
   collection               Collection?            @relation(fields: [collectionId], references: [id])
-  store                    Store?                 @relation(fields: [storeId], references: [id]) // Opcional
+  store                    Store?                 @relation(fields: [storeId], references: [id])
   supplier                 Supplier?              @relation(fields: [supplierId], references: [id])
   saleItems                SaleItem[]
   storeInventory           StoreInventory[]
@@ -195,13 +195,13 @@ model SaleItem {
   quantity   Int
   unitPrice  Decimal  @db.Decimal(10, 2)
   totalPrice Decimal  @db.Decimal(10, 2)
-  costPrice  Decimal? @db.Decimal(10, 2)
-  profit     Decimal? @db.Decimal(10, 2)
   notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   saleId     String
   productId  String
+  costPrice  Decimal? @db.Decimal(10, 2)
+  profit     Decimal? @db.Decimal(10, 2)
   product    Product  @relation(fields: [productId], references: [id])
   sale       Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
@@ -651,9 +651,9 @@ model Coupon {
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   createdBy       String
+  couponUsages    CouponUsage[]
   creator         User                  @relation("CouponCreator", fields: [createdBy], references: [id])
   store           Store?                @relation(fields: [storeId], references: [id])
-  couponUsages    CouponUsage[]
 
   @@map("coupons")
 }

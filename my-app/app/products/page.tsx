@@ -426,14 +426,38 @@ export default function ProductsPage() {
     setIsDragging(false);
   };
 
-  // Função para obter a localização formatada
+  // Função para obter a localização formatada completa
   const getUserLocation = () => {
-    if (user?.city && user?.state) {
+    if (!user) return 'Localização não cadastrada';
+    
+    const parts: string[] = [];
+    
+    if (user.address) {
+      parts.push(user.address);
+    }
+    if (user.city && user.state) {
+      parts.push(`${user.city} - ${user.state}`);
+    } else if (user.city) {
+      parts.push(user.city);
+    } else if (user.state) {
+      parts.push(user.state);
+    }
+    if (user.zipCode) {
+      const formattedZip = user.zipCode.replace(/(\d{5})(\d{3})/, '$1-$2');
+      parts.push(`CEP ${formattedZip}`);
+    }
+    
+    return parts.length > 0 ? parts.join(', ') : 'Localização não cadastrada';
+  };
+  
+  // Função auxiliar para obter endereço resumido (apenas cidade-estado)
+  const getUserLocationShort = () => {
+    if (!user) return 'Localização não cadastrada';
+    if (user.city && user.state) {
       return `${user.city} - ${user.state}`;
     }
-    if (user?.address) {
-      return user.address;
-    }
+    if (user.city) return user.city;
+    if (user.state) return user.state;
     return 'Localização não cadastrada';
   };
 
@@ -790,13 +814,13 @@ export default function ProductsPage() {
                         </div>
 
                         <div className="flex-1">
-                          <h3 className="text-xl font-black text-brand-800">
+                          <h3 className="text-2xl font-black text-brand-800 text-center">
                             Confira Nossos{' '}
                             <span className="text-brand-700">
                               Produtos Mais Recentes
                             </span>
                           </h3>
-                          <p className="text-lg lg:text-sm text-brand-700/80 font-medium">
+                          <p className="text-md lg:text-md text-brand-700/80 font-medium text-center">
                             Descubra as últimas novidades em móveis e decoração
                           </p>
                         </div>
@@ -853,45 +877,44 @@ export default function ProductsPage() {
             );
           })()}
 
-        {/* Ordenação */}
-        <div className="flex items-center justify-end mt-4 mb-4">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
-            className="border-2 border-brand-200 rounded-lg px-4 py-2 text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
-          >
-            <option value="name">Ordenar por: Mais relevantes</option>
-            <option value="price">Menor preço</option>
-            <option value="stock">Maior estoque</option>
-          </select>
-        </div>
-
         {/* Seção de Localização e Categorias */}
         <div className="flex flex-col lg:flex-row gap-4 mt-6 mb-6">
           {/* Localização do Usuário */}
           <div className="flex-shrink-0 lg:w-80">
-            <div className="bg-white border border-gray-200 rounded-xl p-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-brand-700 rounded-full p-1.5">
+            <div className="bg-white border border-[#3e2626]/10 rounded-xl w-[350px] mt-7 p-5 shadow-sm hover:shadow-md transition-shadow ">
+              <div className="flex items-start gap-3">
+                <div className="bg-gradient-to-br from-[#3e2626] to-[#2d1a1a] rounded-full p-2 flex-shrink-0 shadow-sm">
                   <MapPin className="h-4 w-4 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
                   {isAuthenticated && user ? (
                     <>
-                      <p className="text-xs text-gray-500">Enviar para</p>
-                      <p className="text-sm font-bold text-gray-900 truncate">{getUserLocation()}</p>
+                      <p className="text-xs text-[#3e2626]/60 font-medium mb-1">Enviar para</p>
+                      {user.address ? (
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-[#3e2626] leading-tight">{user.address}</p>
+                          <p className="text-xs text-[#3e2626]/70 leading-tight">
+                            {[user.city, user.state].filter(Boolean).join(' - ')}
+                            {user.zipCode && ` • CEP ${user.zipCode.replace(/(\d{5})(\d{3})/, '$1-$2')}`}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm font-semibold text-[#3e2626]">
+                          {getUserLocationShort()}
+                        </p>
+                      )}
                     </>
                   ) : (
                     <>
-                      <p className="text-xs text-gray-500">Entrar para melhor experiência</p>
-                      <p className="text-sm font-bold text-gray-900">Cadastre sua localização</p>
+                      <p className="text-xs text-[#3e2626]/60 font-medium mb-1">Entrar para melhor experiência</p>
+                      <p className="text-sm font-semibold text-[#3e2626]">Cadastre sua localização</p>
                     </>
                   )}
                 </div>
                 {!isAuthenticated && (
                   <Button
                     onClick={() => router.push('/login')}
-                    className="bg-brand-700 hover:bg-brand-700/90 text-white"
+                    className="bg-[#3e2626] hover:bg-[#2d1a1a] text-white shadow-sm flex-shrink-0"
                     size="sm"
                   >
                     Criar
@@ -902,7 +925,7 @@ export default function ProductsPage() {
                     onClick={() => router.push('/profile')}
                     variant="outline"
                     size="sm"
-                    className="border-gray-300"
+                    className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5 flex-shrink-0 shadow-sm"
                   >
                     Editar
                   </Button>
@@ -911,8 +934,8 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Carrossel de Categorias */}
-          <div className="flex-1">
+          {/* Carrossel de Categorias e Ordenação */}
+          <div className="flex-1 flex flex-col">
             <div
               ref={categoriesScrollRef}
               onMouseDown={handleMouseDown}
@@ -932,7 +955,11 @@ export default function ProductsPage() {
                 return (
                   <button
                     key={cat}
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => {
+                      // Se a categoria já está selecionada, desseleciona (volta para 'all')
+                      // Caso contrário, seleciona a categoria clicada
+                      setSelectedCategory(isSelected ? 'all' : cat);
+                    }}
                     className="flex flex-col items-center justify-center gap-3 whitespace-nowrap flex-1 min-w-0 px-2 py-2 rounded-xl transition-all duration-200"
                   >
                     <div className={`relative w-20 h-20 rounded-full border-[3px] flex items-center justify-center transition-all duration-200 ${
@@ -954,6 +981,19 @@ export default function ProductsPage() {
                   </button>
                 );
               })}
+            </div>
+            
+            {/* Ordenação */}
+            <div className="flex items-center justify-end mt-2 mb-4 pr-3">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
+                className="border-2 border-brand-200 rounded-lg px-4 py-2 text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
+              >
+                <option value="name">Ordenar por: Mais relevantes</option>
+                <option value="price">Menor preço</option>
+                <option value="stock">Maior estoque</option>
+              </select>
             </div>
           </div>
         </div>

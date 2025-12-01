@@ -47,9 +47,10 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import Image from 'next/image';
 import { env } from '@/lib/env';
-import { customerAPI } from '@/lib/api';
+import { customerAPI, shippingAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import { showAlert } from '@/lib/alerts';
+import { Loader2 } from 'lucide-react';
 import ProductReviews from '@/components/ProductReviews';
 import ReviewForm from '@/components/ReviewForm';
 
@@ -84,6 +85,12 @@ export default function ProductDetailPage() {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewKey, setReviewKey] = useState(0);
   const [flashSecondsLeft, setFlashSecondsLeft] = useState<number | null>(null);
+  
+  // Estados para cálculo de frete
+  const [isSearchingCep, setIsSearchingCep] = useState(false);
+  const [isLoadingShipping, setIsLoadingShipping] = useState(false);
+  const [cepData, setCepData] = useState<{ city?: string; state?: string } | null>(null);
+  const [shippingQuote, setShippingQuote] = useState<any | null>(null);
 
   const productId = params.id as string;
 
@@ -339,18 +346,171 @@ export default function ProductDetailPage() {
     router.push('/cart');
   };
 
-  const handleCalcShipping = () => {
-    if (!cep || cep.replace(/\D/g, '').length < 8) {
+  // Buscar CEP via ViaCEP
+  const handleSearchCep = async (cepValue: string) => {
+    const cleanCep = cepValue.replace(/\D/g, '');
+    if (cleanCep.length !== 8) {
+      setShippingInfo('CEP inválido. Digite 8 dígitos.');
+      return;
+    }
+
+    setIsSearchingCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        setShippingInfo('CEP não encontrado');
+        setCepData(null);
+        return;
+      }
+
+      setCepData({
+        city: data.localidade || '',
+        state: data.uf || '',
+      });
+
+      // Após buscar CEP, calcular frete automaticamente
+      await handleCalcShipping(cleanCep, data.localidade, data.uf);
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      setShippingInfo('Erro ao buscar CEP. Tente novamente.');
+      setCepData(null);
+    } finally {
+      setIsSearchingCep(false);
+    }
+  };
+
+  // Calcular frete usando a mesma lógica do checkout
+  const handleCalcShipping = async (cepValue?: string, city?: string, state?: string) => {
+    const cleanCep = (cepValue || cep).replace(/\D/g, '');
+    
+    if (cleanCep.length !== 8) {
       setShippingInfo('Informe um CEP válido');
       return;
     }
+
+    if (!product || !product.id) {
+      setShippingInfo('Produto não disponível');
+      return;
+    }
+
     const available = (product?.stock || 0) > 0;
     if (!available) {
       setShippingInfo('Indisponível no momento');
       return;
     }
-    const days = Math.floor(2 + Math.random() * 4);
-    setShippingInfo(`Chegará em até ${days} dia${days > 1 ? 's' : ''} • Frete grátis`);
+
+    setIsLoadingShipping(true);
+    setShippingInfo(null);
+
+    try {
+      // Usar dados do CEP se disponíveis, senão buscar novamente
+      let destinationCity = city || cepData?.city;
+      let destinationState = state || cepData?.state;
+
+      // Se não tiver cidade/estado, buscar CEP primeiro
+      if (!destinationCity || !destinationState) {
+        try {
+          const cepResponse = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+          const cepInfo = await cepResponse.json();
+          if (!cepInfo.erro) {
+            destinationCity = cepInfo.localidade;
+            destinationState = cepInfo.uf;
+            setCepData({ city: destinationCity, state: destinationState });
+          }
+        } catch (error) {
+          console.error('Erro ao buscar dados do CEP:', error);
+        }
+      }
+
+      // Identificar loja do produto
+      let storeId = product.storeId;
+      
+      // Se não tiver storeId direto, tentar buscar do produto completo
+      if (!storeId || storeId === 'unknown' || storeId === '') {
+        try {
+          const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+          const productResponse = await fetch(`${apiBaseUrl}/public/products/${product.id}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          
+          if (productResponse.ok) {
+            const productData = await productResponse.json();
+            storeId = productData.store?.id || productData.storeId;
+          }
+        } catch (error) {
+          console.error('Erro ao buscar dados completos do produto:', error);
+        }
+      }
+
+      // Preparar payload para cálculo de frete
+      const payload = {
+        destinationZipCode: cleanCep,
+        destinationCity: destinationCity || '',
+        destinationState: destinationState || '',
+        mode: 'separate' as const,
+        serviceType: 'express' as const, // SEDEX como padrão
+        items: [
+          {
+            productId: product.id,
+            quantity: quantity,
+          },
+        ],
+      };
+
+      // Calcular frete
+      const quote = await shippingAPI.calculateQuote(payload);
+      setShippingQuote(quote);
+
+      // Processar resultado
+      if (quote && quote.separate && quote.separate.totalPrice !== undefined) {
+        const price = quote.separate.totalPrice;
+        const deadlineDays = quote.separate.maxDeadlineDays || 4;
+        const formattedPrice = new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(price);
+
+        if (price === 0) {
+          setShippingInfo(`Chegará em até ${deadlineDays} dia${deadlineDays > 1 ? 's' : ''} • Frete grátis`);
+        } else {
+          setShippingInfo(`${formattedPrice} • Chegará em até ${deadlineDays} dia${deadlineDays > 1 ? 's' : ''}`);
+        }
+      } else if (quote && quote.combined && quote.combined.finalPrice !== undefined) {
+        const price = quote.combined.finalPrice;
+        const deadlineDays = quote.combined.deadlineDays || 4;
+        const formattedPrice = new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(price);
+
+        if (price === 0) {
+          setShippingInfo(`Chegará em até ${deadlineDays} dia${deadlineDays > 1 ? 's' : ''} • Frete grátis`);
+        } else {
+          setShippingInfo(`${formattedPrice} • Chegará em até ${deadlineDays} dia${deadlineDays > 1 ? 's' : ''}`);
+        }
+      } else {
+        // Fallback: cálculo estimado
+        const days = Math.floor(2 + Math.random() * 4);
+        setShippingInfo(`Chegará em até ${days} dia${days > 1 ? 's' : ''} • Frete grátis`);
+      }
+    } catch (error: any) {
+      console.error('Erro ao calcular frete:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erro ao calcular frete';
+      
+      // Tentar cálculo estimado como fallback
+      const days = Math.floor(2 + Math.random() * 4);
+      setShippingInfo(`Chegará em até ${days} dia${days > 1 ? 's' : ''} • Frete grátis`);
+      
+      // Mostrar toast apenas se for erro crítico
+      if (error?.response?.status !== 400) {
+        toast.error('Não foi possível calcular o frete exato. Mostrando estimativa.');
+      }
+    } finally {
+      setIsLoadingShipping(false);
+    }
   };
 
   const handleQuantityChange = (delta: number) => {
@@ -769,7 +929,7 @@ const experienceHighlights: Array<{
               {product.description && (
                 <div className="space-y-6 rounded-2xl border border-[#3e2626]/10 bg-white/90 p-6 shadow-sm shadow-[#3e2626]/5">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-[#3e2626]" />
+                   
                     <h2 className="text-2xl md:text-3xl font-bold text-[#3e2626]">Descrição do Produto</h2>
                   </div>
                   <p className="text-gray-700 leading-relaxed">{product.description}</p>
@@ -778,25 +938,25 @@ const experienceHighlights: Array<{
                     <h3 className="text-xl font-semibold text-[#3e2626]">Detalhes adicionais</h3>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       {product.material && (
-                        <div className="rounded-xl border border-[#3e2626]/15 bg-[#fdf6f2] p-4">
+                        <div className="rounded-xl border border-[#3e2626]/15 bg-white p-4">
                           <p className="text-xs uppercase text-[#3e2626]/70">Material</p>
                           <p className="text-sm font-semibold text-[#3e2626]">{product.material}</p>
                         </div>
                       )}
                       {product.color && (
-                        <div className="rounded-xl border border-[#3e2626]/15 bg-[#fdf6f2] p-4">
+                        <div className="rounded-xl border border-[#3e2626]/15 bg-white p-4">
                           <p className="text-xs uppercase text-[#3e2626]/70">Cor</p>
                           <p className="text-sm font-semibold text-[#3e2626]">{product.color}</p>
                         </div>
                       )}
                       {product.style && (
-                        <div className="rounded-xl border border-[#3e2626]/15 bg-[#fdf6f2] p-4">
+                        <div className="rounded-xl border border-[#3e2626]/15 bg-white p-4">
                           <p className="text-xs uppercase text-[#3e2626]/70">Estilo</p>
                           <p className="text-sm font-semibold text-[#3e2626]">{product.style}</p>
                         </div>
                       )}
                       {product.brand && (
-                        <div className="rounded-xl border border-[#3e2626]/15 bg-[#fdf6f2] p-4">
+                        <div className="rounded-xl border border-[#3e2626]/15 bg-white p-4">
                           <p className="text-xs uppercase text-[#3e2626]/70">Marca</p>
                           <p className="text-sm font-semibold text-[#3e2626]">{product.brand}</p>
                         </div>
@@ -804,7 +964,7 @@ const experienceHighlights: Array<{
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-dashed border-[#3e2626]/20 bg-[#fff9f5] p-4 text-sm text-gray-600 leading-relaxed">
+                  <div className="rounded-xl border border-dashed border-[#3e2626]/20 bg-white p-4 text-sm text-gray-600 leading-relaxed">
                     Este produto foi cuidadosamente selecionado para oferecer qualidade e durabilidade.
                     {product.material && ` Fabricado em ${product.material.toLowerCase()},`}
                     {product.style && ` com estilo ${product.style.toLowerCase()},`} este item combina funcionalidade e
@@ -818,8 +978,8 @@ const experienceHighlights: Array<{
 
               <section className="space-y-6 rounded-2xl border border-[#3e2626]/10 bg-white/90 p-6 shadow-sm shadow-[#3e2626]/5">
                 <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-[#3e2626]" />
-                  <h3 className="text-2xl font-semibold text-[#3e2626]">Características essenciais</h3>
+                  
+                  <h3 className="text-2xl md:text-3xl font-bold text-[#3e2626]">Características essenciais</h3>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {product.dimensions && (
@@ -1020,11 +1180,50 @@ const experienceHighlights: Array<{
                       <span>Informe seu CEP para calcular o frete</span>
                     </div>
                     <div className="flex gap-2">
-                      <Input value={cep} onChange={(e) => setCep(e.target.value)} placeholder="00000-000" className="h-10 border-[#3e2626]/30 focus:border-[#3e2626]" />
-                      <Button onClick={handleCalcShipping} variant="outline" className="h-10 px-4 border-[#3e2626]/40 text-[#3e2626] hover:bg-[#3e2626]/10">Calcular</Button>
+                      <Input 
+                        value={cep} 
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          const formatted = value.length > 5 
+                            ? `${value.slice(0, 5)}-${value.slice(5, 8)}` 
+                            : value;
+                          setCep(formatted);
+                        }}
+                        onBlur={(e) => {
+                          const cleanCep = e.target.value.replace(/\D/g, '');
+                          if (cleanCep.length === 8) {
+                            handleSearchCep(cleanCep);
+                          }
+                        }}
+                        placeholder="00000-000" 
+                        maxLength={9}
+                        className="h-10 border-[#3e2626]/30 focus:border-[#3e2626]" 
+                      />
+                      <Button 
+                        onClick={() => {
+                          const cleanCep = cep.replace(/\D/g, '');
+                          if (cleanCep.length === 8) {
+                            handleSearchCep(cleanCep);
+                          } else {
+                            handleCalcShipping();
+                          }
+                        }}
+                        variant="outline" 
+                        disabled={isLoadingShipping || isSearchingCep}
+                        className="h-10 px-4 border-[#3e2626]/40 text-[#3e2626] hover:bg-[#3e2626]/10 disabled:opacity-50"
+                      >
+                        {(isLoadingShipping || isSearchingCep) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Calcular'
+                        )}
+                      </Button>
                     </div>
                     {shippingInfo && (
-                      <p className="text-sm text-[#3e2626] flex items-center gap-2"><Truck className="h-4 w-4 text-[#3e2626]" /> {shippingInfo}</p>
+                      <p className="text-sm text-[#3e2626] flex items-center gap-2">
+                        <Truck className="h-4 w-4 text-[#3e2626]" /> 
+                        {shippingInfo}
+                      </p>
                     )}
             </div>
 
