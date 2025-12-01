@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { aiAPI } from '@/lib/api';
+import { env } from '@/lib/env';
+import { showAlert } from '@/lib/alerts';
 import {
   Dialog,
   DialogContent,
@@ -18,13 +20,16 @@ import {
 import {
   Sparkles,
   Upload,
+  Camera,
   X,
   Image as ImageIcon,
   Loader2,
   CheckCircle,
+  CheckCircle2,
   Package,
   Wand2,
 } from 'lucide-react';
+import Image from 'next/image';
 
 interface Product {
   id: string;
@@ -36,9 +41,18 @@ interface Product {
 
 type Position = 'left' | 'right' | 'center' | 'background' | 'foreground' | '';
 
-interface ProductWithPosition {
-  product: Product;
-  position: Position;
+interface PlacedProduct {
+  id: string;
+  productId: string;
+  name: string;
+  image: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  scale: number;
+  isSelected: boolean;
 }
 
 interface AITestModalProps {
@@ -57,10 +71,18 @@ export default function AITestModal({
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
-  const [productPositions, setProductPositions] = useState<Map<string, Position>>(new Map());
+  const [placedProducts, setPlacedProducts] = useState<PlacedProduct[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
+  const [isSelectingPosition, setIsSelectingPosition] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<{ x: number; y: number } | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const isDraggingRef = useRef(false);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -76,45 +98,201 @@ export default function AITestModal({
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.webp'],
     },
     multiple: false,
     maxSize: 10 * 1024 * 1024, // 10MB
+    noClick: true,
+    noKeyboard: true,
   });
 
-  const toggleProductSelection = (productId: string) => {
-    setSelectedProducts((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(productId)) {
-        newSet.delete(productId);
-        // Remover posição quando desmarcar
-        setProductPositions((prevPos) => {
-          const newPos = new Map(prevPos);
-          newPos.delete(productId);
-          return newPos;
-        });
-      } else {
-        newSet.add(productId);
-        // Definir posição padrão como centro
-        setProductPositions((prevPos) => {
-          const newPos = new Map(prevPos);
-          newPos.set(productId, 'center');
-          return newPos;
-        });
+  // Abrir câmera
+  const handleCameraClick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        onDrop([file]);
       }
-      return newSet;
-    });
+    };
+    input.click();
   };
 
-  const setProductPosition = (productId: string, position: Position) => {
-    setProductPositions((prev) => {
-      const newPos = new Map(prev);
-      newPos.set(productId, position);
-      return newPos;
-    });
+  // Iniciar seleção de posição
+  const handleStartAddProduct = (product: Product) => {
+    if (!uploadedFile && !uploadedImage) {
+      showAlert('warning', 'Por favor, faça upload de uma imagem do ambiente primeiro');
+      return;
+    }
+    
+    setPendingProduct(product);
+    setIsSelectingPosition(true);
+    setSelectedPosition(null);
+  };
+
+  // Cancelar seleção de posição
+  const handleCancelPositionSelection = () => {
+    setPendingProduct(null);
+    setIsSelectingPosition(false);
+    setSelectedPosition(null);
+  };
+
+  // Click na imagem para selecionar posição
+  const handleImageClickForPosition = (e: React.MouseEvent) => {
+    if (!isSelectingPosition || !pendingProduct || !imageRef.current || !canvasRef.current) return;
+
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const imgRect = imageRef.current.getBoundingClientRect();
+    
+    const imgOffsetX = imgRect.left - canvasRect.left;
+    const imgOffsetY = imgRect.top - canvasRect.top;
+    
+    const mouseX = e.clientX - canvasRect.left;
+    const mouseY = e.clientY - canvasRect.top;
+    
+    if (mouseX >= imgOffsetX && mouseX <= imgOffsetX + imgRect.width &&
+        mouseY >= imgOffsetY && mouseY <= imgOffsetY + imgRect.height) {
+      const position = {
+        x: mouseX - 75,
+        y: mouseY - 75,
+      };
+      setSelectedPosition(position);
+      handleAddProductToImage(pendingProduct, position);
+    }
+  };
+
+  // Click no canvas para deselecionar
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (isSelectingPosition) {
+      handleImageClickForPosition(e);
+      return;
+    }
+    setPlacedProducts(prev => prev.map(item => ({ ...item, isSelected: false })));
+  };
+
+  // Adicionar produto à imagem
+  const handleAddProductToImage = async (product: Product, position?: { x: number; y: number }) => {
+    if (!uploadedFile && !uploadedImage) {
+      showAlert('warning', 'Por favor, faça upload de uma imagem do ambiente primeiro');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setIsSelectingPosition(false);
+
+      const calculatePosition = (): { x: number; y: number } => {
+        if (position) return position;
+        if (!imageRef.current || !canvasRef.current) {
+          return { x: 200, y: 200 };
+        }
+        const imgRect = imageRef.current.getBoundingClientRect();
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const imgOffsetX = imgRect.left - canvasRect.left;
+        const imgOffsetY = imgRect.top - canvasRect.top;
+        const centerX = imgOffsetX + imgRect.width / 2 - 75;
+        const centerY = imgOffsetY + imgRect.height / 2 - 75;
+        return {
+          x: Math.max(imgOffsetX, centerX),
+          y: Math.max(imgOffsetY, centerY),
+        };
+      };
+
+      const pos = calculatePosition();
+      const productImageUrl = product.imageUrl;
+
+      // Preparar arquivos
+      const productFiles: File[] = [];
+      if (productImageUrl) {
+        try {
+          const response = await fetch(productImageUrl);
+          const blob = await response.blob();
+          const productFile = new File([blob], `product-${product.id}.jpg`, { type: 'image/jpeg' });
+          productFiles.push(productFile);
+        } catch (err) {
+          console.error('Erro ao carregar imagem do produto:', err);
+        }
+      }
+
+      let environmentFile: File = uploadedFile!;
+      if (processedImage && processedImage.startsWith('http')) {
+        try {
+          const response = await fetch(processedImage);
+          if (response.ok) {
+            const blob = await response.blob();
+            environmentFile = new File([blob], 'environment-processed.jpg', { type: 'image/jpeg' });
+          }
+        } catch {
+          // Usar arquivo original se falhar
+        }
+      } else if (uploadedImage && uploadedImage.startsWith('data:image')) {
+        try {
+          const response = await fetch(uploadedImage);
+          const blob = await response.blob();
+          environmentFile = new File([blob], 'environment.jpg', { type: blob.type || 'image/jpeg' });
+        } catch {
+          // Usar arquivo original se falhar
+        }
+      }
+
+      const prompt = `Adicione o produto "${product.name}" nesta imagem do ambiente. O produto deve estar perfeitamente integrado ao ambiente, com iluminação, sombras e perspectiva realistas. O produto deve parecer fotografado no local.`;
+
+      const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+      const formData = new FormData();
+      formData.append('images', environmentFile);
+      if (productFiles.length > 0) {
+        productFiles.forEach(file => formData.append('productImages', file));
+      }
+      formData.append('prompt', prompt);
+      formData.append('outputFormat', 'jpg');
+
+      const response = await fetch(`${apiBaseUrl}/public/ai/process-upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Erro ao processar imagem' }));
+        throw new Error(errorData.message || `Erro ${response.status}`);
+      }
+
+      const result = await response.json();
+      const processedUrl = result.processedImageUrl || result.imageUrl;
+
+      if (processedUrl) {
+        setProcessedImage(processedUrl);
+        const newItem: PlacedProduct = {
+          id: `${product.id}-${Date.now()}`,
+          productId: product.id,
+          name: product.name,
+          image: productImageUrl || '',
+          x: pos.x,
+          y: pos.y,
+          width: 150,
+          height: 150,
+          rotation: 0,
+          scale: 1,
+          isSelected: false,
+        };
+        setPlacedProducts(prev => [...prev, newItem]);
+        setSelectedProducts(prev => new Set([...prev, product.id]));
+        setPendingProduct(null);
+        setSelectedPosition(null);
+        showAlert('success', 'Produto adicionado com sucesso!');
+      }
+    } catch (error: any) {
+      console.error('Erro ao adicionar produto:', error);
+      setError(error.message || 'Erro ao processar imagem com IA');
+      showAlert('error', error.message || 'Erro ao processar imagem com IA');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleProcessImage = async () => {
@@ -244,16 +422,30 @@ export default function AITestModal({
     onContinue();
   };
 
+  // Resetar estados ao fechar
+  useEffect(() => {
+    if (!isOpen) {
+      setUploadedImage(null);
+      setUploadedFile(null);
+      setProcessedImage(null);
+      setPlacedProducts([]);
+      setPendingProduct(null);
+      setIsSelectingPosition(false);
+      setSelectedPosition(null);
+      setError(null);
+    }
+  }, [isOpen]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2 text-2xl">
-            <Sparkles className="h-6 w-6 text-purple-600" />
-            <span>Teste Nossa IA de Visualização</span>
+      <DialogContent className="max-w-7xl w-full max-h-[95vh] overflow-hidden border-[#3e2626]/20 bg-white shadow-2xl p-0">
+        <DialogHeader className="border-b border-[#3e2626]/10 px-6 py-4 bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white">
+          <DialogTitle className="text-2xl font-black flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-[#C07A45]" />
+            Visualizar como vai ficar
           </DialogTitle>
-          <DialogDescription className="text-base pt-2">
-            Envie uma foto do seu ambiente e veja como os produtos ficarão antes de comprar!
+          <DialogDescription className="text-sm text-white/80 mt-2">
+            Faça upload de uma foto do ambiente e clique para posicionar os produtos • {products.length} {products.length === 1 ? 'produto' : 'produtos'} disponíveis
           </DialogDescription>
         </DialogHeader>
 

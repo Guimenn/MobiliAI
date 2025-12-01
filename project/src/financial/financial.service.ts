@@ -16,9 +16,9 @@ export class FinancialService {
     }
 
     const data: any = {
-      ...createCashFlowDto,
-      storeId: userStoreId,
-      userId,
+        ...createCashFlowDto,
+        storeId: userStoreId,
+        userId,
     };
 
     // Converter date string para Date se fornecido

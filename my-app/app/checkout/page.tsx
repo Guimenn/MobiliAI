@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useDropzone } from 'react-dropzone';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -36,7 +38,14 @@ import {
   ShoppingCart,
   DollarSign,
   Headphones,
-  Store
+  Store,
+  Upload,
+  Camera,
+  RotateCw,
+  ZoomIn,
+  Sparkles,
+  Download,
+  CheckCircle2
 } from 'lucide-react';
 import { customerAPI, authAPI, storesAPI, shippingAPI } from '@/lib/api';
 import { env } from '@/lib/env';
@@ -310,6 +319,249 @@ export default function CheckoutPage() {
 
   // Modal: itens da compra (sumário detalhado)
   const [isItemsModalOpen, setIsItemsModalOpen] = useState(false);
+
+  // Estados para visualização com IA
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
+  const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
+  const [placedItems, setPlacedItems] = useState<Array<{
+    id: string;
+    productId: string;
+    name: string;
+    image: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    scale: number;
+    isSelected: boolean;
+  }>>([]);
+  const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [pendingProduct, setPendingProduct] = useState<any | null>(null);
+  const [isSelectingPosition, setIsSelectingPosition] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<{ x: number; y: number } | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const isDraggingRef = useRef(false);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+
+  // Configuração do dropzone
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    const isImage = file.type.startsWith('image/');
+    
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageUrl = e.target?.result as string;
+        setUploadedImage(imageUrl);
+        setUploadedImageFile(file);
+        setProcessedImageUrl(null);
+        setPlacedItems([]);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setUploadedImageFile(file);
+      setUploadedImage(null);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDrop,
+    multiple: false,
+    noClick: true,
+    noKeyboard: true,
+  });
+
+  // Abrir câmera
+  const handleCameraClick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        onDrop([file]);
+      }
+    };
+    input.click();
+  };
+
+  // Iniciar seleção de posição
+  const handleStartAddProduct = (product: any) => {
+    if (!uploadedImageFile && !uploadedImage) {
+      showAlert('warning', 'Por favor, faça upload de uma imagem do ambiente primeiro');
+      return;
+    }
+    
+    setPendingProduct(product);
+    setIsSelectingPosition(true);
+    setSelectedPosition(null);
+  };
+
+  // Cancelar seleção de posição
+  const handleCancelPositionSelection = () => {
+    setPendingProduct(null);
+    setIsSelectingPosition(false);
+    setSelectedPosition(null);
+  };
+
+  // Click na imagem para selecionar posição
+  const handleImageClickForPosition = (e: React.MouseEvent) => {
+    if (!isSelectingPosition || !pendingProduct || !imageRef.current || !canvasRef.current) return;
+
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const imgRect = imageRef.current.getBoundingClientRect();
+    
+    const imgOffsetX = imgRect.left - canvasRect.left;
+    const imgOffsetY = imgRect.top - canvasRect.top;
+    
+    const mouseX = e.clientX - canvasRect.left;
+    const mouseY = e.clientY - canvasRect.top;
+    
+    if (mouseX >= imgOffsetX && mouseX <= imgOffsetX + imgRect.width &&
+        mouseY >= imgOffsetY && mouseY <= imgOffsetY + imgRect.height) {
+      const position = {
+        x: mouseX - 75,
+        y: mouseY - 75,
+      };
+      setSelectedPosition(position);
+      handleAddProductToImage(pendingProduct, position);
+    }
+  };
+
+  // Click no canvas para deselecionar
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (isSelectingPosition) {
+      handleImageClickForPosition(e);
+      return;
+    }
+    setSelectedItem(null);
+    setPlacedItems(prev => prev.map(item => ({ ...item, isSelected: false })));
+  };
+
+  // Adicionar produto à imagem
+  const handleAddProductToImage = async (product: any, position?: { x: number; y: number }) => {
+    if (!uploadedImageFile && !uploadedImage) {
+      showAlert('warning', 'Por favor, faça upload de uma imagem do ambiente primeiro');
+      return;
+    }
+
+    try {
+      setIsProcessingAI(true);
+      setIsSelectingPosition(false);
+
+      const calculatePosition = (): { x: number; y: number } => {
+        if (position) return position;
+        if (!imageRef.current || !canvasRef.current) {
+          return { x: 200, y: 200 };
+        }
+        const imgRect = imageRef.current.getBoundingClientRect();
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const imgOffsetX = imgRect.left - canvasRect.left;
+        const imgOffsetY = imgRect.top - canvasRect.top;
+        const centerX = imgOffsetX + imgRect.width / 2 - 75;
+        const centerY = imgOffsetY + imgRect.height / 2 - 75;
+        return {
+          x: Math.max(imgOffsetX, centerX),
+          y: Math.max(imgOffsetY, centerY),
+        };
+      };
+
+      const pos = calculatePosition();
+      const productImageUrl = product.imageUrls?.[0] || product.imageUrl;
+
+      // Preparar arquivos
+      const productFiles: File[] = [];
+      if (productImageUrl) {
+        try {
+          const response = await fetch(productImageUrl);
+          const blob = await response.blob();
+          const productFile = new File([blob], `product-${product.id}.jpg`, { type: 'image/jpeg' });
+          productFiles.push(productFile);
+        } catch (err) {
+          console.error('Erro ao carregar imagem do produto:', err);
+        }
+      }
+
+      let environmentFile: File = uploadedImageFile!;
+      if (processedImageUrl && processedImageUrl.startsWith('http')) {
+        try {
+          const response = await fetch(processedImageUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            environmentFile = new File([blob], 'environment-processed.jpg', { type: 'image/jpeg' });
+          }
+        } catch {
+          // Usar arquivo original se falhar
+        }
+      } else if (uploadedImage && uploadedImage.startsWith('data:image')) {
+        try {
+          const response = await fetch(uploadedImage);
+          const blob = await response.blob();
+          environmentFile = new File([blob], 'environment.jpg', { type: blob.type || 'image/jpeg' });
+        } catch {
+          // Usar arquivo original se falhar
+        }
+      }
+
+      const prompt = `Adicione o produto "${product.name}" nesta imagem do ambiente. O produto deve estar perfeitamente integrado ao ambiente, com iluminação, sombras e perspectiva realistas. O produto deve parecer fotografado no local.`;
+
+      const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+      const formData = new FormData();
+      formData.append('images', environmentFile);
+      if (productFiles.length > 0) {
+        productFiles.forEach(file => formData.append('productImages', file));
+      }
+      formData.append('prompt', prompt);
+      formData.append('outputFormat', 'jpg');
+
+      const response = await fetch(`${apiBaseUrl}/public/ai/process-upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Erro ao processar imagem' }));
+        throw new Error(errorData.message || `Erro ${response.status}`);
+      }
+
+      const result = await response.json();
+      const processedUrl = result.processedImageUrl || result.imageUrl;
+
+      if (processedUrl) {
+        setProcessedImageUrl(processedUrl);
+        const newItem = {
+          id: `${product.id}-${Date.now()}`,
+          productId: product.id,
+          name: product.name,
+          image: productImageUrl || '',
+          x: pos.x,
+          y: pos.y,
+          width: 150,
+          height: 150,
+          rotation: 0,
+          scale: 1,
+          isSelected: false,
+        };
+        setPlacedItems(prev => [...prev, newItem]);
+        setPendingProduct(null);
+        setSelectedPosition(null);
+        showAlert('success', 'Produto adicionado com sucesso!');
+      }
+    } catch (error: any) {
+      console.error('Erro ao adicionar produto:', error);
+      showAlert('error', error.message || 'Erro ao processar imagem com IA');
+    } finally {
+      setIsProcessingAI(false);
+    }
+  };
 
   // Função para obter o preço atual com desconto (se houver oferta relâmpago configurada)
   const getCurrentPrice = (product: any): number => {
@@ -3750,20 +4002,271 @@ export default function CheckoutPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Itens da Compra */}
+      {/* Modal Visualizar como vai ficar */}
       <Dialog open={isItemsModalOpen} onOpenChange={setIsItemsModalOpen}>
-        <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Detalhes do Pedido</DialogTitle>
-            <DialogDescription>
-              Visualizar {totalCheckoutQuantity} {totalCheckoutQuantity === 1 ? 'item' : 'itens'}
+        <DialogContent className="max-w-7xl w-full max-h-[95vh] overflow-hidden border-[#3e2626]/20 bg-white shadow-2xl p-0">
+          <DialogHeader className="border-b border-[#3e2626]/10 px-6 py-4 bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white">
+            <DialogTitle className="text-2xl font-black flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-[#C07A45]" />
+              Visualizar como vai ficar
+            </DialogTitle>
+            <DialogDescription className="text-sm text-white/80 mt-2">
+              {totalCheckoutQuantity} {totalCheckoutQuantity === 1 ? 'item selecionado' : 'itens selecionados'} no seu pedido • Faça upload de uma foto do ambiente e posicione os produtos
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex h-[calc(95vh-120px)] overflow-hidden">
+            {/* Coluna esquerda - Canvas */}
+            <div className="flex flex-1 flex-col overflow-hidden border-r border-[#3e2626]/10 bg-white">
+              {!uploadedImage ? (
+                <div className="flex flex-1 items-center justify-center p-8">
+                  <Card className="w-full max-w-2xl border-[#3e2626]/20 bg-white shadow-xl">
+                    <CardContent className="p-8">
+                      <div
+                        {...getRootProps()}
+                        className={`cursor-pointer rounded-3xl border-2 border-dashed p-12 text-center transition-all ${
+                          isDragActive ? 'border-[#C07A45] bg-[#F7C194]/20 scale-105' : 'border-[#3e2626]/30 hover:border-[#C07A45] hover:bg-white'
+                        }`}
+                      >
+                        <input {...getInputProps()} />
+                        <Upload className="mx-auto mb-4 h-16 w-16 text-[#C07A45]" />
+                        <p className="mb-2 text-lg font-semibold text-[#3e2626]">
+                          {isDragActive ? 'Solte a imagem aqui' : 'Arraste sua foto aqui ou clique para enviar'}
+                        </p>
+                        <p className="mb-6 text-sm text-[#4f3a2f]/70">
+                          Faça upload de uma foto do seu ambiente para visualizar os produtos
+                        </p>
+                        <div className="flex justify-center gap-4">
+                          <Button
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              open();
+                            }}
+                            className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10"
+                          >
+                            <Upload className="mr-2 h-4 w-4" />
+                            Enviar foto
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCameraClick();
+                            }}
+                            className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10"
+                          >
+                            <Camera className="mr-2 h-4 w-4" />
+                            Abrir câmera
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="relative flex flex-1 overflow-auto bg-white">
+                  <div
+                    ref={canvasRef}
+                    className={`relative flex min-h-full items-center justify-center p-8 ${
+                      isSelectingPosition ? 'cursor-crosshair' : 'cursor-default'
+                    }`}
+                    onClick={handleCanvasClick}
+                  >
+                    <div className="relative max-h-full max-w-full">
+                      {processedImageUrl ? (
+                        <Image
+                          ref={imageRef}
+                          src={processedImageUrl}
+                          alt="Ambiente processado pela IA"
+                          width={1024}
+                          height={768}
+                          className="h-auto max-w-full rounded-lg shadow-2xl"
+                          style={{ maxHeight: 'calc(95vh - 200px)' }}
+                          unoptimized
+                        />
+                      ) : uploadedImage ? (
+                        <Image
+                          ref={imageRef}
+                          src={uploadedImage}
+                          alt="Ambiente"
+                          width={1024}
+                          height={768}
+                          className="h-auto max-w-full rounded-lg shadow-2xl"
+                          style={{ maxHeight: 'calc(95vh - 200px)' }}
+                          unoptimized
+                        />
+                      ) : null}
+
+                      {/* Overlay de seleção de posição */}
+                      {isSelectingPosition && !isProcessingAI && (
+                        <div className="absolute inset-0 rounded-lg border-2 border-dashed border-[#C07A45]/50 bg-[#C07A45]/5 pointer-events-none z-10" />
+                      )}
+
+                      {/* Overlay de processamento */}
+                      {isProcessingAI && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm z-30">
+                          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-[#3e2626]/20">
+                            <Loader2 className="h-12 w-12 animate-spin text-[#C07A45]" />
+                            <p className="text-lg font-semibold text-[#3e2626]">Processando com nossa IA...</p>
+                            <p className="text-sm text-[#4f3a2f]/70">Aguarde alguns segundos</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Coluna direita - Lista de Produtos */}
+            <div className="flex w-96 flex-col border-l border-[#3e2626]/10 bg-white overflow-y-auto">
+              <div className="border-b border-[#3e2626]/10 p-4 bg-white sticky top-0 z-10">
+                <h3 className="text-lg font-black text-[#3e2626] mb-4 flex items-center gap-2">
+                  <Package className="h-5 w-5 text-[#C07A45]" />
+                  Produtos do Pedido
+                </h3>
+                {isSelectingPosition && pendingProduct && (
+                  <div className="bg-[#C07A45]/10 border border-[#C07A45]/30 rounded-lg p-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-[#C07A45] animate-pulse" />
+                        <p className="text-sm font-medium text-[#3e2626]">
+                          Clique na imagem para posicionar: <span className="text-[#C07A45] font-bold">{pendingProduct.name}</span>
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCancelPositionSelection}
+                        className="h-6 w-6 p-0 text-[#3e2626] hover:bg-[#C07A45]/20"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-4 p-4">
+                {checkoutItems.length === 0 ? (
+                  <div className="py-8 text-center text-[#4f3a2f]/60">
+                    <Package className="h-12 w-12 mx-auto mb-4 text-[#4f3a2f]/40" />
+                    <p>Nenhum produto no pedido</p>
+                  </div>
+                ) : (
+                  checkoutItems.map((item) => {
+                    const isPlaced = placedItems.some(pi => pi.productId === item.product.id);
+                    const imageUrl = item.product.imageUrls?.[0] || item.product.imageUrl;
+                    
+                    return (
+                      <Card
+                        key={item.product.id}
+                        className={`transition-all border-[#3e2626]/10 hover:border-[#C07A45]/30 ${
+                          isPlaced ? 'bg-green-50 border-green-300' : ''
+                        }`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex gap-4">
+                            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white border border-[#3e2626]/10">
+                              {imageUrl ? (
+                                <img
+                                  src={imageUrl}
+                                  alt={item.product.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <Package className="h-8 w-8 text-[#4f3a2f]/40" />
+                              )}
+                              {isPlaced && (
+                                <div className="absolute top-1 right-1 bg-green-500 rounded-full p-1">
+                                  <CheckCircle2 className="h-3 w-3 text-white" />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <h3 className="mb-1 truncate text-sm font-semibold text-[#3e2626]">{item.product.name}</h3>
+                              <p className="mb-2 text-xs text-[#4f3a2f]/70">Qtd: {item.quantity}</p>
+                              <p className="mb-3 text-lg font-bold text-[#C07A45]">
+                                R$ {getCurrentPrice(item.product).toLocaleString('pt-BR', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </p>
+                              <Button
+                                size="sm"
+                                className={`w-full ${
+                                  isPlaced
+                                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                                    : 'bg-[#3e2626] hover:bg-[#4f3223] text-white'
+                                }`}
+                                onClick={() => {
+                                  if (!uploadedImage && !uploadedImageFile) {
+                                    showAlert('warning', 'Por favor, faça upload de uma imagem do ambiente primeiro');
+                                    return;
+                                  }
+                                  if (isPlaced) {
+                                    setPlacedItems(prev => prev.filter(pi => pi.productId !== item.product.id));
+                                    if (placedItems.length === 1) {
+                                      setProcessedImageUrl(null);
+                                    }
+                                  } else {
+                                    handleStartAddProduct(item.product);
+                                  }
+                                }}
+                                disabled={isProcessingAI || isSelectingPosition}
+                              >
+                                {isProcessingAI && pendingProduct?.id === item.product.id ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Processando...
+                                  </>
+                                ) : isPlaced ? (
+                                  <>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    Remover
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="mr-2 h-4 w-4" />
+                                    Adicionar ao ambiente
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Resumo */}
+              <div className="border-t border-[#3e2626]/10 p-4 bg-gradient-to-r from-[#3e2626]/5 to-transparent">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-[#4f3a2f]">Total de itens:</span>
+                  <span className="text-base font-black text-[#3e2626]">{totalCheckoutQuantity}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-[#4f3a2f]">Valor total:</span>
+                  <span className="text-xl font-black text-[#3e2626]">
+                    R$ {checkoutItems.reduce((sum, it) => {
+                      const currentPrice = getCurrentPrice(it.product);
+                      return sum + currentPrice * (it.quantity || 1);
+                    }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
             {checkoutItems.map((item) => (
-              <div key={item.product.id} className="flex items-start gap-4 border-b last:border-b-0 pb-4">
-                <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-100 shrink-0">
+              <div key={item.product.id} className="group rounded-xl border-2 border-[#3e2626]/20 bg-white p-4 hover:border-[#C07A45]/50 hover:shadow-lg transition-all duration-300">
+                <div className="flex items-start gap-4">
+                  <div className="w-24 h-24 rounded-lg overflow-hidden bg-gradient-to-br from-[#3e2626] to-[#5a3a3a] shrink-0 shadow-md">
                   {(() => {
                     const imageUrl = item.product.imageUrls && item.product.imageUrls.length > 0 
                       ? item.product.imageUrls[0] 
@@ -3780,19 +4283,19 @@ export default function CheckoutPage() {
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
-                        <Package className="h-6 w-6 text-white" />
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="h-8 w-8 text-white" />
                       </div>
                     );
                   })()}
-                  <div className="hidden w-full h-full flex items-center justify-center bg-gradient-to-br from-[#3e2626] to-[#5a3a3a]">
-                    <Package className="h-6 w-6 text-white" />
+                  <div className="hidden w-full h-full flex items-center justify-center">
+                    <Package className="h-8 w-8 text-white" />
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
-                    <h4 className="font-semibold text-[#1f2937] truncate pr-2">{item.product.name}</h4>
-                    <div className="text-sm text-gray-500 whitespace-nowrap">
+                  <div className="flex items-start justify-between mb-3">
+                    <h4 className="text-lg font-black text-[#3e2626] truncate pr-2">{item.product.name}</h4>
+                    <div className="text-base font-bold text-[#C07A45] whitespace-nowrap ml-4">
                       {(() => {
                         const originalPrice = Number(item.product.price);
                         const currentPrice = getCurrentPrice(item.product);
@@ -3811,13 +4314,13 @@ export default function CheckoutPage() {
                       })()}
                     </div>
                   </div>
-                  <div className="mt-2 flex items-center gap-3">
-                    <div className="flex items-center border rounded">
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="flex items-center border-2 border-[#3e2626]/20 rounded-lg overflow-hidden">
                       <button
-                        className={`px-3 py-1.5 ${
+                        className={`px-4 py-2 text-[#3e2626] font-semibold transition-colors ${
                           checkoutItems.length === 1
-                            ? 'opacity-50 cursor-not-allowed'
-                            : 'hover:bg-gray-100'
+                            ? 'opacity-50 cursor-not-allowed bg-gray-50'
+                            : 'hover:bg-[#3e2626]/10 active:bg-[#3e2626]/20'
                         }`}
                         disabled={checkoutItems.length === 1}
                         onClick={() => {
@@ -3844,16 +4347,16 @@ export default function CheckoutPage() {
                           }
                         }}
                       >-</button>
-                      <div className="w-10 text-center">{item.quantity}</div>
+                      <div className="w-12 text-center font-bold text-[#3e2626] bg-[#3e2626]/5 py-2">{item.quantity}</div>
                       <button
-                        className="px-3 py-1.5 hover:bg-gray-100"
+                        className="px-4 py-2 text-[#3e2626] font-semibold hover:bg-[#3e2626]/10 active:bg-[#3e2626]/20 transition-colors"
                         onClick={() => {
                           const store = useAppStore.getState();
                           store.updateCartItemQuantity(item.product.id, (item.quantity || 1) + 1);
                         }}
                       >+</button>
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="flex-1 text-right">
                       {(() => {
                         const originalPrice = Number(item.product.price);
                         const currentPrice = getCurrentPrice(item.product);
@@ -3863,29 +4366,37 @@ export default function CheckoutPage() {
                         const hasDiscount = currentPrice < originalPrice;
                         
                         return (
-                          <div className="flex flex-col">
-                            <span>Subtotal: R$ {itemTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-lg font-bold text-[#3e2626]">R$ {itemTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                             {hasDiscount && (
-                              <span className="text-xs line-through">
+                              <span className="text-sm text-[#4f3a2f]/60 line-through">
                                 R$ {originalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                               </span>
                             )}
+                            <span className="text-xs text-[#4f3a2f]/70 mt-1">Subtotal do item</span>
                           </div>
                         );
                       })()}
                     </div>
                   </div>
                 </div>
+                </div>
               </div>
             ))}
 
-            <div className="pt-2 flex items-center justify-between">
-              <div className="text-sm text-gray-600">Total de itens: {totalCheckoutQuantity}</div>
-              <div className="text-base font-semibold text-[#3e2626]">
-                Total: R$ {checkoutItems.reduce((sum, it) => {
-                  const currentPrice = getCurrentPrice(it.product);
-                  return sum + currentPrice * (it.quantity || 1);
-                }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <div className="pt-6 mt-6 border-t-2 border-[#3e2626]/20 flex items-center justify-between bg-gradient-to-r from-[#3e2626]/5 to-transparent rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-[#C07A45]" />
+                <span className="text-base font-semibold text-[#4f3a2f]">Total de itens: {totalCheckoutQuantity}</span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-2xl font-black text-[#3e2626]">
+                  R$ {checkoutItems.reduce((sum, it) => {
+                    const currentPrice = getCurrentPrice(it.product);
+                    return sum + currentPrice * (it.quantity || 1);
+                  }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-xs text-[#4f3a2f]/70 mt-1">Valor total do pedido</span>
               </div>
             </div>
           </div>

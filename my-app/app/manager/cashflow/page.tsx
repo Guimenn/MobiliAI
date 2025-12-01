@@ -597,9 +597,9 @@ export default function ManagerCashFlowPage() {
               <Loader2 className="h-8 w-8 animate-spin text-[#3e2626]" />
             </div>
           ) : chartData.length === 0 ? (
-            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+          <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+            <div className="text-center">
+              <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-500">Nenhum dado disponível para o período selecionado</p>
                 <p className="text-sm text-gray-400 mt-1">Crie transações para visualizar o gráfico</p>
               </div>

@@ -1176,7 +1176,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                         />
                       ) : uploadedImageFile ? (
                         <div className="rounded-lg bg-gray-100 p-12 text-center">
-                          <p className="mb-4 text-gray-600">Arquivo carregado: {uploadedImageFile.name}</p>
+                          <p className="mb-4 text-gray-600">Arquivo carr  egado: {uploadedImageFile.name}</p>
                           <p className="text-sm text-gray-500">Adicione um móvel para processar com IA</p>
                         </div>
                       ) : null}
