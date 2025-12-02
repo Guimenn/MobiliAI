@@ -98,6 +98,9 @@ export default function ProductsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [hasMoved, setHasMoved] = useState(false);
+  
+  const dragThreshold = 10; // pixels - threshold para diferenciar clique de arrasto
   
   // Estados temporários para preço (não atualizam automaticamente)
   const [tempMinPrice, setTempMinPrice] = useState<string>(searchParams.get('min') || '');
@@ -251,6 +254,18 @@ export default function ProductsPage() {
     return false;
   }, []);
 
+  // Função para normalizar texto (remover acentos e caracteres especiais)
+  const normalizeText = useCallback((text: string): string => {
+    if (!text) return '';
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^\w\s]/g, '') // Remove caracteres especiais
+      .replace(/\s+/g, ' ') // Remove espaços múltiplos
+      .trim();
+  }, []);
+
   // Função para verificar se a oferta relâmpago está REALMENTE ativa (já começou)
   const isFlashSaleActuallyActive = useCallback((product: Product): boolean => {
     if (!product.isFlashSale || !product.flashSaleStartDate || !product.flashSaleEndDate) {
@@ -307,12 +322,45 @@ export default function ProductsPage() {
   }, [isFlashSaleActuallyActive]);
 
   const filteredProducts = useMemo(() => {
-    const term = debouncedTerm.trim().toLowerCase();
+    const normalizedTerm = normalizeText(debouncedTerm);
+    
     return products
       .filter((product) => {
-        const matchesSearch = !term ||
-          product.name.toLowerCase().includes(term) ||
-          (product.brand?.toLowerCase().includes(term) ?? false);
+        // Busca flexível: sem acentos, case-insensitive, busca parcial
+        let matchesSearch = true;
+        if (normalizedTerm) {
+          const normalizedProductName = normalizeText(product.name || '');
+          const normalizedBrand = normalizeText(product.brand || '');
+          const normalizedDescription = normalizeText(product.description || '');
+          
+          // Combinar todos os campos em um único texto para busca
+          const combinedText = `${normalizedProductName} ${normalizedBrand} ${normalizedDescription}`;
+          
+          // Dividir o termo de busca em palavras
+          const searchWords = normalizedTerm.split(' ').filter(word => word.length > 0);
+          
+          // Busca flexível:
+          // 1. Busca exata do termo completo
+          // 2. Busca por todas as palavras do termo (não precisam estar juntas)
+          // 3. Busca por palavras individuais (para encontrar mesmo com palavras extras no meio)
+          matchesSearch = 
+            combinedText.includes(normalizedTerm) || // Busca exata do termo completo
+            (searchWords.length > 0 && searchWords.every(word => // Todas as palavras devem estar presentes
+              word.length > 1 && (
+                combinedText.includes(word) ||
+                normalizedProductName.includes(word) ||
+                normalizedBrand.includes(word)
+              )
+            )) ||
+            searchWords.some(word => // Pelo menos uma palavra significativa deve estar presente
+              word.length > 2 && (
+                normalizedProductName.includes(word) ||
+                normalizedBrand.includes(word) ||
+                normalizedDescription.includes(word)
+              )
+            );
+        }
+        
         const matchesCategory = !selectedCategory || selectedCategory.toUpperCase() === 'ALL' || 
           product.category?.toString().toUpperCase() === selectedCategory.toUpperCase();
         const matchesColor = !selectedColor || product.color === selectedColor;
@@ -326,7 +374,7 @@ export default function ProductsPage() {
         }
         return matchesSearch && matchesCategory && matchesColor && matchesMin && matchesMax && matchesDiscount;
       });
-  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount, isSaleActive, getCurrentPrice]);
+  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount, isSaleActive, getCurrentPrice, normalizeText]);
 
   const sortedProducts = useMemo(() => {
     return [...filteredProducts].sort((a, b) => {
@@ -403,63 +451,76 @@ export default function ProductsPage() {
     }
   };
 
-  // Funções para o carrossel de categorias - Mouse
+  // Funções para o carrossel de categorias - Mouse (desktop) - Arrasto manual
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!categoriesScrollRef.current) return;
     setIsDragging(true);
-    if (categoriesScrollRef.current) {
-      setStartX(e.pageX - categoriesScrollRef.current.offsetLeft);
-      setScrollLeft(categoriesScrollRef.current.scrollLeft);
-    }
+    setHasMoved(false);
+    setStartX(e.pageX);
+    setScrollLeft(categoriesScrollRef.current.scrollLeft);
+    categoriesScrollRef.current.style.cursor = 'grabbing';
+    categoriesScrollRef.current.style.userSelect = 'none';
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging || !categoriesScrollRef.current) return;
     e.preventDefault();
-    const x = e.pageX - categoriesScrollRef.current.offsetLeft;
-    const walk = (x - startX) * 2;
+    
+    const x = e.pageX;
+    const walk = (x - startX) * 1.5;
     categoriesScrollRef.current.scrollLeft = scrollLeft - walk;
+    
+    if (Math.abs(walk) > dragThreshold) {
+      setHasMoved(true);
+    }
   };
 
   const handleMouseUp = () => {
+    if (categoriesScrollRef.current) {
+      categoriesScrollRef.current.style.cursor = 'grab';
+      categoriesScrollRef.current.style.userSelect = '';
+    }
     setIsDragging(false);
+    setTimeout(() => setHasMoved(false), 200);
   };
 
   const handleMouseLeave = () => {
+    if (categoriesScrollRef.current) {
+      categoriesScrollRef.current.style.cursor = 'grab';
+      categoriesScrollRef.current.style.userSelect = '';
+    }
     setIsDragging(false);
+    setTimeout(() => setHasMoved(false), 200);
   };
 
-  // Funções para o carrossel de categorias - Touch (Mobile)
+  // Funções para o carrossel de categorias - Touch (Mobile) - Usa scroll nativo do navegador
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     const touch = e.touches[0];
     touchStartX.current = touch.pageX;
     touchStartY.current = touch.pageY;
-    setIsDragging(true);
-    if (categoriesScrollRef.current) {
-      setStartX(touch.pageX - categoriesScrollRef.current.offsetLeft);
-      setScrollLeft(categoriesScrollRef.current.scrollLeft);
-    }
+    setHasMoved(false);
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isDragging || !categoriesScrollRef.current) return;
+    if (!touchStartX.current || !touchStartY.current) return;
     
     const touch = e.touches[0];
     const deltaX = Math.abs(touch.pageX - touchStartX.current);
     const deltaY = Math.abs(touch.pageY - touchStartY.current);
     
-    // Só prevenir o scroll padrão se o movimento horizontal for maior que o vertical
-    if (deltaX > deltaY && deltaX > 10) {
-      e.preventDefault();
-      const x = touch.pageX - categoriesScrollRef.current.offsetLeft;
-      const walk = (x - startX) * 2;
-      categoriesScrollRef.current.scrollLeft = scrollLeft - walk;
+    // Se movimento horizontal > vertical e > threshold, é arrasto
+    if (deltaX > deltaY && deltaX > dragThreshold) {
+      setHasMoved(true);
     }
   };
 
   const handleTouchEnd = () => {
-    setIsDragging(false);
-    touchStartX.current = 0;
-    touchStartY.current = 0;
+    // Delay para permitir que o scroll termine antes de permitir clicks
+    setTimeout(() => {
+      setHasMoved(false);
+      touchStartX.current = 0;
+      touchStartY.current = 0;
+    }, 200);
   };
 
   // Função para obter a localização formatada
@@ -642,21 +703,68 @@ export default function ProductsPage() {
 
         {/* Título */}
         <div className="mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-2xl font-semibold text-brand-700 mb-1 sm:mb-2">
-            {searchTerm ? `Resultados para "${searchTerm}"` : 'Nossos Produtos'}
+          <h1 className="text-xl sm:text-2xl font-semibold mb-1 sm:mb-2">
+            {searchTerm ? (
+              <span className="text-[#3e2626] break-words whitespace-normal">
+                Resultados para "<span className="text-[#3e2626] font-semibold break-words">{searchTerm}</span>"
+              </span>
+            ) : (
+              <span className="text-brand-700">Nossos Produtos</span>
+            )}
           </h1>
           <p className="text-xs sm:text-sm text-gray-600">
             {filteredProducts.length} {filteredProducts.length === 1 ? 'produto encontrado' : 'produtos encontrados'}
           </p>
         </div>
 
-        {/* Seção Principal: Banner e Oferta Relâmpago */}
-          {!searchTerm && (() => {
+        {/* Seção Principal: Barra de Pesquisa, Banner e Oferta Relâmpago */}
+        <div className="mb-4 sm:mb-6">
+          {/* Barra de Pesquisa alinhada com o banner */}
+          <div className="mb-3 sm:mb-4">
+            <div className="relative max-w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[#3e2626]/60 z-10" />
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (searchTerm.trim()) {
+                    router.push(`/products?q=${encodeURIComponent(searchTerm.trim())}`);
+                  }
+                }}
+                className="w-full"
+              >
+                <Input
+                  type="text"
+                  placeholder="Pesquisar produtos..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setPage(1);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (searchTerm.trim()) {
+                        router.push(`/products?q=${encodeURIComponent(searchTerm.trim())}`);
+                      }
+                    }
+                  }}
+                  className="pl-10 pr-4 min-h-10 border-2 border-[#3e2626]/20 focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 rounded-lg font-medium text-sm w-full text-[#3e2626] placeholder:text-[#3e2626]/50 break-words whitespace-normal"
+                  style={{
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word',
+                  }}
+                />
+              </form>
+            </div>
+          </div>
+
+          {/* Banner e Oferta Relâmpago */}
+          {(() => {
             // Verificar se há oferta relâmpago REALMENTE ativa (já começou)
             const hasActiveFlashSale = specialOfferProduct && isFlashSaleActuallyActive(specialOfferProduct) && specialOfferProduct.isFlashSale;
             
             return (
-              <div className="mb-4 sm:mb-6 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
                 
                 {/* Card de Oferta Relâmpago - só mostra se houver oferta ativa */}
                 {hasActiveFlashSale && specialOfferProduct && (() => {
@@ -698,24 +806,22 @@ export default function ProductsPage() {
                 
                 return (
                   <div 
-                    className="lg:col-span-3 relative bg-white rounded-lg border-2 border-yellow-400 hover:border-yellow-500 hover:shadow-xl transition-all duration-200 overflow-hidden group cursor-pointer h-72 shadow-yellow-100"
+                    className="lg:col-span-3 relative bg-gray-50 rounded-lg border border-gray-200 hover:border-[#3e2626] transition-all duration-200 overflow-hidden group cursor-pointer h-72"
                     onClick={() => router.push(`/products/${specialOfferProduct.id}`)}
                   >
                     {/* Badge Oferta Relâmpago - Topo Esquerdo */}
                     <div className="absolute top-3 left-3 z-20">
-                      <div className="inline-flex items-center gap-1.5 bg-yellow-500 text-white rounded-lg px-3 py-1.5 shadow-lg animate-pulse">
+                      <div className="inline-flex items-center gap-1.5 bg-[#3e2626] text-white rounded-lg px-3 py-1.5 shadow-lg ">
                         <Zap className="h-4 w-4 fill-white text-white" />
                         <span className="text-[11px] font-bold uppercase tracking-tight">Oferta Relâmpago</span>
-                        {flashDiscountPercent > 0 && (
-                          <span className="ml-1 text-[10px] font-bold">-{flashDiscountPercent}%</span>
-                        )}
+                      
                       </div>
                     </div>
 
                     {/* Timer - Topo Direito */}
                     {offerSecondsLeft > 0 && (
                       <div className="absolute top-3 right-3 z-20">
-                        <div className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-lg px-3 py-1.5 shadow-lg">
+                        <div className="inline-flex items-center gap-1.5 bg-[#3e2626] text-white rounded-lg px-3 py-1.5 shadow-lg">
                           <Clock className="h-4 w-4" />
                           <span className="font-mono text-xs font-bold">{formatTime(offerSecondsLeft)}</span>
                         </div>
@@ -723,7 +829,7 @@ export default function ProductsPage() {
                     )}
 
                     {/* Conteúdo Principal */}
-                    <div className="relative z-10 h-full flex flex-row gap-4 pt-14">
+                    <div className="relative z-10 h-full flex flex-row gap-4 pt-14 bg-gray-100">
                       
                       {/* Seção da Imagem - Esquerda */}
                       <div className="flex-shrink-0 w-40 h-48 items-center justify-center overflow-hidden">
@@ -760,7 +866,7 @@ export default function ProductsPage() {
                               <span className="text-sm text-gray-500 line-through">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalFlashPrice)}
                               </span>
-                              <span className="inline-flex items-center px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded uppercase">
+                              <span className="inline-flex items-center px-2 py-0.5 bg-[#3e2626] text-white text-[10px] font-bold rounded uppercase">
                                 -{flashDiscountPercent}% OFF
                               </span>
                             </div>
@@ -776,7 +882,7 @@ export default function ProductsPage() {
                             </div>
                             {savings > 0 && (
                               <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
-                                <Sparkles className="h-3 w-3" />
+                                
                                 Economia de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(savings)}
                               </p>
                             )}
@@ -888,39 +994,39 @@ export default function ProductsPage() {
               </div>
             );
           })()}
-
-        {/* Ordenação */}
-        <div className="flex items-center justify-end mt-4 sm:mt-6 mb-4 sm:mb-6">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
-            className="border-2 border-brand-200 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
-          >
-            <option value="name">Ordenar por: Mais relevantes</option>
-            <option value="price">Menor preço</option>
-            <option value="stock">Maior estoque</option>
-          </select>
         </div>
 
         {/* Seção de Localização e Categorias */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mt-4 sm:mt-6 mb-6 sm:mb-8">
           {/* Localização do Usuário */}
           <div className="flex-shrink-0 lg:w-80">
-            <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="bg-brand-700 rounded-full p-1.5 flex-shrink-0">
-                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+            <div className="bg-white border border-[#3e2626]/10 rounded-xl w-[350px] mt-7 p-5 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start gap-3">
+                <div className="bg-gradient-to-br from-[#3e2626] to-[#2d1a1a] rounded-full p-2 flex-shrink-0 shadow-sm">
+                  <MapPin className="h-4 w-4 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
                   {isAuthenticated && user ? (
                     <>
-                      <p className="text-[10px] sm:text-xs text-gray-500">Enviar para</p>
-                      <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">{getUserLocation()}</p>
+                      <p className="text-xs text-[#3e2626]/60 font-medium mb-1">Enviar para</p>
+                      {user.address ? (
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-[#3e2626] leading-tight">{user.address}</p>
+                          <p className="text-xs text-[#3e2626]/70 leading-tight">
+                            {[user.city, user.state].filter(Boolean).join(' - ')}
+                            {user.zipCode && ` • CEP ${user.zipCode.replace(/(\d{5})(\d{3})/, '$1-$2')}`}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm font-semibold text-[#3e2626]">
+                          {getUserLocation()}
+                        </p>
+                      )}
                     </>
                   ) : (
                     <>
-                      <p className="text-[10px] sm:text-xs text-gray-500">Entrar para melhor experiência</p>
-                      <p className="text-xs sm:text-sm font-bold text-gray-900">Cadastre sua localização</p>
+                      <p className="text-xs text-[#3e2626]/60 font-medium mb-1">Entrar para melhor experiência</p>
+                      <p className="text-sm font-semibold text-[#3e2626]">Cadastre sua localização</p>
                     </>
                   )}
                 </div>
@@ -938,7 +1044,7 @@ export default function ProductsPage() {
                     onClick={() => router.push('/profile')}
                     variant="outline"
                     size="sm"
-                    className="border-gray-300 text-xs px-2 sm:px-3 h-7 sm:h-8"
+                    className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/5 flex-shrink-0 shadow-sm"
                   >
                     Editar
                   </Button>
@@ -948,7 +1054,7 @@ export default function ProductsPage() {
           </div>
 
           {/* Carrossel de Categorias */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div
               ref={categoriesScrollRef}
               onMouseDown={handleMouseDown}
@@ -958,8 +1064,16 @@ export default function ProductsPage() {
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-0 sm:ml-3 py-3 sm:py-4 gap-2 sm:gap-0"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
+              className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-0 sm:ml-3 py-3 sm:py-4 gap-5 sm:gap-6 lg:gap-8"
+              style={{ 
+                scrollbarWidth: 'none', 
+                msOverflowStyle: 'none',
+                WebkitOverflowScrolling: 'touch',
+                scrollBehavior: 'smooth',
+                scrollSnapType: 'x mandatory',
+                touchAction: 'pan-x',
+                overscrollBehaviorX: 'contain'
+              }}
             >
               {categories.map((cat) => {
                 const Icon = categoryIcons[cat] || Package;
@@ -971,8 +1085,21 @@ export default function ProductsPage() {
                 return (
                   <button
                     key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className="flex flex-col items-center justify-center gap-2 sm:gap-3 whitespace-nowrap flex-shrink-0 min-w-0 px-2 sm:px-3 py-2 rounded-xl transition-all duration-200"
+                    onClick={(e) => {
+                      // Prevenir clique se houve movimento (arrasto)
+                      if (hasMoved) {
+                        e.preventDefault();
+                        return;
+                      }
+                      // Se a categoria já está selecionada, desseleciona (volta para 'all')
+                      // Caso contrário, seleciona a categoria clicada
+                      setSelectedCategory(isSelected ? 'all' : cat);
+                    }}
+                    onTouchStart={(e) => {
+                      // Permitir que o touch event prossiga para o container
+                      e.stopPropagation();
+                    }}
+                    className="flex flex-col items-center justify-center gap-3 whitespace-nowrap flex-shrink-0 min-w-[80px] sm:min-w-[100px] px-3 sm:px-4 py-2 rounded-xl transition-all duration-200 snap-center select-none"
                   >
                     <div className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] flex items-center justify-center transition-all duration-200 ${
                       isSelected
@@ -993,6 +1120,19 @@ export default function ProductsPage() {
                   </button>
                 );
               })}
+            </div>
+            
+            {/* Ordenação */}
+            <div className="flex items-center justify-end mt-2 mb-4 pr-3">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
+                className="border-2 border-brand-200 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors flex-shrink-0"
+              >
+                <option value="name">Ordenar por: Mais relevantes</option>
+                <option value="price">Menor preço</option>
+                <option value="stock">Maior estoque</option>
+              </select>
             </div>
           </div>
         </div>

@@ -568,29 +568,52 @@ export default function CheckoutPage() {
   // Função para obter o preço atual com desconto (se houver oferta relâmpago configurada)
   const getCurrentPrice = (product: any): number => {
     const originalPrice = Number(product.price);
-    
-    // Se houver oferta relâmpago configurada, calcular preço com desconto
-    if (product.isFlashSale) {
-      // Se tem flashSaleDiscountPercent, calcular preço
-      if (product.flashSaleDiscountPercent && product.flashSaleDiscountPercent > 0) {
-        const discount = (originalPrice * product.flashSaleDiscountPercent) / 100;
-        return originalPrice - discount;
-      }
-      // Se tem flashSalePrice, usar ele
-      if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
-        return Number(product.flashSalePrice);
+    const now = new Date();
+
+    // Prioridade para oferta relâmpago - verificar se está realmente ativa
+    if (product.isFlashSale && product.flashSaleStartDate && product.flashSaleEndDate) {
+      try {
+        const flashStart = new Date(product.flashSaleStartDate);
+        const flashEnd = new Date(product.flashSaleEndDate);
+        
+        // Verificar se a oferta relâmpago está ativa (já começou e ainda não expirou)
+        if (now >= flashStart && now <= flashEnd) {
+          // Se tem flashSalePrice, usar ele
+          if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+            return Number(product.flashSalePrice);
+          }
+          // Se não tem flashSalePrice mas tem flashSaleDiscountPercent, calcular
+          if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && originalPrice) {
+            const discount = (originalPrice * Number(product.flashSaleDiscountPercent)) / 100;
+            return originalPrice - discount;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar oferta relâmpago:', error);
+        // Continuar com outras verificações se houver erro
       }
     }
     
-    // Se houver oferta normal ativa
-    if (product.isOnSale && product.salePrice) {
-      const now = new Date();
-      if (product.saleStartDate && product.saleEndDate) {
-        const start = new Date(product.saleStartDate);
-        const end = new Date(product.saleEndDate);
-        if (now >= start && now <= end) {
-          return Number(product.salePrice);
+    // Depois verificar oferta normal - apenas se estiver ativa
+    if (product.isOnSale && product.saleStartDate && product.saleEndDate) {
+      try {
+        const saleStart = new Date(product.saleStartDate);
+        const saleEnd = new Date(product.saleEndDate);
+        
+        if (now >= saleStart && now <= saleEnd) {
+          // Se tem salePrice, usar ele
+          if (product.salePrice !== undefined && product.salePrice !== null) {
+            return Number(product.salePrice);
+          }
+          // Se não tem salePrice mas tem saleDiscountPercent, calcular
+          if (product.saleDiscountPercent !== undefined && product.saleDiscountPercent !== null && originalPrice) {
+            const discount = (originalPrice * Number(product.saleDiscountPercent)) / 100;
+            return originalPrice - discount;
+          }
         }
+      } catch (error) {
+        console.error('Erro ao verificar oferta normal:', error);
+        // Continuar com preço original se houver erro
       }
     }
     
@@ -2573,16 +2596,28 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
-      // Sincronizar carrinho do frontend com o backend antes do checkout
-      console.log('Sincronizando carrinho com o backend...', checkoutItems.length, 'itens');
+      // Verificar carrinho do backend antes de sincronizar
+      const backendCartBefore = await customerAPI.getCart();
+      const backendProductIds = new Set((backendCartBefore?.items || []).map((item: any) => item.product?.id).filter(Boolean));
       
-      // Adicionar todos os itens do carrinho do frontend ao backend
+      // Adicionar apenas produtos que ainda não estão no carrinho do backend ou atualizar quantidades
       for (const item of checkoutItems) {
         try {
-          await customerAPI.addToCart(item.product.id, item.quantity);
-          console.log(`Produto ${item.product.id} adicionado ao backend`);
+          const existingBackendItem = (backendCartBefore?.items || []).find(
+            (bi: any) => bi.product?.id === item.product.id
+          );
+          
+          if (existingBackendItem) {
+            // Produto já existe no backend, apenas atualizar quantidade se necessário
+            if (existingBackendItem.quantity !== item.quantity) {
+              await customerAPI.updateCartItem(existingBackendItem.id, item.quantity);
+            }
+          } else {
+            // Produto não está no backend, adicionar
+            await customerAPI.addToCart(item.product.id, item.quantity);
+          }
         } catch (error: any) {
-          console.warn(`Erro ao adicionar produto ${item.product.id} ao backend:`, error.message);
+          console.error(`Erro ao sincronizar produto ${item.product.id}:`, error.message);
           // Continuar mesmo se houver erro em um produto
         }
       }
@@ -2595,8 +2630,20 @@ export default function CheckoutPage() {
         router.push('/cart');
         return;
       }
-
-      console.log('Carrinho sincronizado:', backendCart.items.length, 'itens no backend');
+      
+      // Verificar duplicação de produtos no carrinho do backend
+      const productIdCounts: { [key: string]: number } = {};
+      backendCart.items.forEach((item: any) => {
+        const productId = item.product?.id;
+        if (productId) {
+          productIdCounts[productId] = (productIdCounts[productId] || 0) + 1;
+        }
+      });
+      
+      const duplicatedProducts = Object.entries(productIdCounts).filter(([_, count]) => count > 1);
+      if (duplicatedProducts.length > 0) {
+        showAlert('warning', 'Foram encontrados produtos duplicados no carrinho. Limpando duplicatas...');
+      }
 
       // Determinar loja (retirada na loja usa a loja selecionada, entrega usa a loja dos produtos)
       const firstProduct = checkoutItems[0]?.product;
@@ -2672,8 +2719,6 @@ export default function CheckoutPage() {
       });
 
       // Limpar carrinho do frontend imediatamente após checkout bem-sucedido
-      // O backend já limpou o carrinho, mas precisamos sincronizar o frontend
-      console.log('✅ Checkout realizado com sucesso. Limpando carrinho do frontend...');
       clearCart();
 
       // Salvar ID da venda no sessionStorage para a página de sucesso
@@ -2681,12 +2726,52 @@ export default function CheckoutPage() {
         sessionStorage.setItem('last-sale-id', saleResponse.id);
       }
 
-      // Redirecionar para a página de pagamento apropriada
-      if (selectedPaymentMethod === 'card') {
-        router.push(`/payment/card?saleId=${saleResponse.id}`);
-      } else {
-        router.push(`/payment/pix?saleId=${saleResponse.id}`);
-      }
+      // Limpar estado de processamento antes de redirecionar
+      setIsProcessing(false);
+
+      // Verificar se a venda foi realmente criada antes de redirecionar
+      // Isso garante que a venda está disponível no backend antes de tentar criar o pagamento
+      const verifyAndRedirect = async () => {
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        while (attempts < maxAttempts) {
+          try {
+            // Tentar buscar a venda para verificar se ela está disponível
+            const order = await customerAPI.getOrderById(saleResponse.id);
+            if (order && order.id) {
+              // Venda encontrada, pode redirecionar
+              // Usar window.location.href para garantir que a navegação aconteça
+              if (selectedPaymentMethod === 'card') {
+                window.location.href = `/payment/card?saleId=${saleResponse.id}`;
+              } else {
+                window.location.href = `/payment/pix?saleId=${saleResponse.id}`;
+              }
+              return;
+            }
+          } catch (err: any) {
+            // Se não encontrar a venda, aguardar um pouco e tentar novamente
+            attempts++;
+            if (attempts < maxAttempts) {
+              const waitTime = attempts * 500; // 500ms, 1000ms, 1500ms, 2000ms
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+            } else {
+              // Se não conseguir verificar após várias tentativas, redirecionar mesmo assim
+              // A página do PIX vai tentar novamente
+              if (selectedPaymentMethod === 'card') {
+                window.location.href = `/payment/card?saleId=${saleResponse.id}`;
+              } else {
+                window.location.href = `/payment/pix?saleId=${saleResponse.id}`;
+              }
+            }
+          }
+        }
+      };
+
+      // Aguardar um pouco antes de verificar (dá tempo para a venda ser persistida)
+      setTimeout(() => {
+        verifyAndRedirect();
+      }, 500);
     } catch (error: any) {
       console.error('Erro ao finalizar pedido:', error);
       console.error('Detalhes do erro:', {

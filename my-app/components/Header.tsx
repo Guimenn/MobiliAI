@@ -84,6 +84,8 @@ export default function Header() {
     
     // Verifica se está na home page
     const isHomePage = pathname === '/';
+    // Verifica se está na página de produtos
+    const isProductsPage = pathname === '/products';
     
     // Estados locais para favoritos e carrinho
     const [favoritesCount, setFavoritesCount] = useState(0);
@@ -719,8 +721,8 @@ export default function Header() {
               </Link>
             </div>
 
-            {/* Barra de Pesquisa quando aberta - substitui todo o header no mobile */}
-            {searchOpen && (
+            {/* Barra de Pesquisa quando aberta - expande da direita até perto do logo */}
+            {searchOpen && !isProductsPage && (
               <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex items-center justify-between px-2 sm:px-4 z-50" ref={searchRef}>
                 {/* No mobile, não deixar espaço para logo e ícones - barra ocupa tudo */}
                 <div className="hidden md:block w-24 md:w-48 flex-shrink-0"></div>
@@ -799,26 +801,26 @@ export default function Header() {
             )}
 
             {/* Right Side Icons */}
-            <div className={`flex items-center space-x-3 sm:space-x-4 md:space-x-6 transition-all duration-300 ${
-              searchOpen ? 'opacity-0 scale-0 pointer-events-none md:opacity-100 md:scale-100 md:pointer-events-auto' : 'opacity-100 scale-100'
-            }`}>
-               {/* Search Icon with Animation */}
-               <div className="relative search-icon-container">
-                 <button 
-                   onClick={handleOpenSearch}
-                   className={`p-2.5 sm:p-2 transition-all duration-500 ${
-                     searchOpen 
-                       ? 'opacity-0 scale-0 pointer-events-none' 
-                       : 'opacity-100 scale-100 pointer-events-auto'
-                   } ${
-                     isHomePage 
-                       ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
-                       : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
-                   }`}
-                 >
-                   <Search className="h-6 w-6 sm:h-6 sm:w-6" />
-                 </button>
-               </div>
+            <div className="flex items-center space-x-2 sm:space-x-4 md:space-x-6">
+               {/* Search Icon with Animation - esconder na página de produtos */}
+               {!isProductsPage && (
+                 <div className="relative search-icon-container">
+                   <button 
+                     onClick={handleOpenSearch}
+                     className={`p-1.5 sm:p-2 transition-all duration-500 ${
+                       searchOpen 
+                         ? 'opacity-0 scale-0 pointer-events-none' 
+                         : 'opacity-100 scale-100 pointer-events-auto'
+                     } ${
+                       isHomePage 
+                         ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
+                         : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
+                     }`}
+                   >
+                     <Search className="h-5 w-5 sm:h-6 sm:w-6" />
+                   </button>
+                 </div>
+               )}
                {/* Favorites Icon */}
                <button 
                  onClick={goToFavorites}

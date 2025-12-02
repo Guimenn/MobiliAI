@@ -25,7 +25,8 @@ export default function PixPaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, token } = useAppStore();
-  const saleId = searchParams.get('saleId');
+  const saleIdFromUrl = searchParams.get('saleId');
+  const [saleId, setSaleId] = useState<string | null>(saleIdFromUrl);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingPayment, setIsCreatingPayment] = useState(false);
@@ -38,6 +39,8 @@ export default function PixPaymentPage() {
   const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
   const [simulationMessage, setSimulationMessage] = useState<string>('');
   const [simulationError, setSimulationError] = useState<string>('');
+  const [retryCount, setRetryCount] = useState(0);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const isProductionEnv =
     env.ABACATEPAY_ENVIRONMENT === 'production' || env.NODE_ENV === 'production';
@@ -97,24 +100,84 @@ export default function PixPaymentPage() {
     return buildStaticPixBrCode(Number(paymentData?.amount) || 0);
   }, [paymentData?.amount]);
 
+  // Verificar se temos todas as dependências necessárias e buscar saleId do sessionStorage se necessário
+  useEffect(() => {
+    // Aguardar um pouco para garantir que o store tenha carregado
+    const checkDependencies = setTimeout(() => {
+      let finalSaleId = saleId;
+      
+      // Se não tiver saleId na URL, tentar buscar do sessionStorage
+      if (!finalSaleId && typeof window !== 'undefined') {
+        const storedSaleId = sessionStorage.getItem('last-sale-id');
+        if (storedSaleId) {
+          finalSaleId = storedSaleId;
+          setSaleId(storedSaleId);
+          // Atualizar a URL sem recarregar a página
+          router.replace(`/payment/pix?saleId=${storedSaleId}`, { scroll: false });
+        }
+      }
+      
+      setIsInitializing(false);
+      
+      if (!finalSaleId) {
+        setError('ID da venda não encontrado. Redirecionando...');
+        setTimeout(() => router.push('/checkout'), 2000);
+        return;
+      }
+      
+      if (!user || !token) {
+        setError('Você precisa estar autenticado para realizar o pagamento. Redirecionando...');
+        setTimeout(() => router.push('/checkout'), 2000);
+        return;
+      }
+    }, 500);
+
+    return () => clearTimeout(checkDependencies);
+  }, [saleIdFromUrl, saleId, user, token, router]);
+
   // Carregar dados do pagamento
   useEffect(() => {
-    if (!saleId || !user || !token) {
-      router.push('/checkout');
+    if (isInitializing) {
       return;
     }
 
-    const loadPayment = async () => {
+    // Usar o saleId do estado (que pode vir da URL ou sessionStorage)
+    const finalSaleId = saleId || (typeof window !== 'undefined' ? sessionStorage.getItem('last-sale-id') : null);
+    
+    if (!finalSaleId || !user || !token) {
+      return;
+    }
+
+    let timeoutId: NodeJS.Timeout;
+    let isMounted = true;
+
+    const loadPayment = async (attemptNumber = 1) => {
+      if (!isMounted) return;
+      
       setIsLoading(true);
       setError('');
+      
+      // Timeout de segurança - se demorar mais de 30 segundos, mostrar erro
+      timeoutId = setTimeout(() => {
+        if (isMounted) {
+          setError('O carregamento está demorando mais que o esperado. Tente novamente.');
+          setIsLoading(false);
+        }
+      }, 30000);
+      
       try {
-        const data = await customerAPI.createPixPayment(saleId, {
+        const data = await customerAPI.createPixPayment(finalSaleId, {
           name: user.name,
           email: user.email,
           phone: user.phone,
           cpf: user.cpf,
         });
+        
+        if (!isMounted) return;
+        
+        clearTimeout(timeoutId);
         setPaymentData(data);
+        setRetryCount(0); // Reset retry count on success
         
         // Calcular tempo restante
         if (data.expiresAt) {
@@ -124,13 +187,10 @@ export default function PixPaymentPage() {
           setTimeLeft(remaining);
         }
       } catch (err: any) {
-        console.error('Erro ao carregar pagamento:', err);
-        console.error('Detalhes do erro:', {
-          message: err.message,
-          response: err.response?.data,
-          status: err.response?.status,
-          saleId,
-        });
+        if (!isMounted) return;
+        
+        clearTimeout(timeoutId);
+        console.error(`Erro ao carregar pagamento (tentativa ${attemptNumber}):`, err);
         
         // Extrair mensagem de erro mais detalhada
         let errorMessage = 'Erro ao gerar QR code PIX';
@@ -142,14 +202,52 @@ export default function PixPaymentPage() {
           errorMessage = err.message;
         }
         
+        // Tentar novamente se for erro de rede/404 e ainda não excedeu o limite de tentativas
+        // 404 pode acontecer se a venda ainda não estiver disponível no backend
+        const isNetworkError = !err.response || err.response?.status >= 500;
+        const isNotFound = err.response?.status === 404;
+        const maxRetries = 5;
+        
+        if ((isNetworkError || isNotFound) && attemptNumber < maxRetries) {
+          // Delay crescente: 1s, 2s, 3s, 4s, 5s
+          const waitTime = attemptNumber * 1000;
+          console.log(`Venda pode ainda não estar disponível. Tentando novamente em ${waitTime}ms... (tentativa ${attemptNumber + 1}/${maxRetries})`);
+          setRetryCount(attemptNumber);
+          
+          setTimeout(() => {
+            if (isMounted) {
+              loadPayment(attemptNumber + 1);
+            }
+          }, waitTime);
+          
+          return; // Não definir erro ainda
+        }
+        
         setError(errorMessage);
+        setRetryCount(0);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    loadPayment();
-  }, [saleId, user, token, router]);
+    // Aguardar um tempo antes de tentar criar o pagamento
+    // Isso dá tempo para a venda estar completamente disponível no backend
+    // Delay maior na primeira tentativa para dar mais tempo
+    const initialDelay = 1500; // 1.5 segundos
+    const timer = setTimeout(() => {
+      if (isMounted) {
+        loadPayment();
+      }
+    }, initialDelay);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+      clearTimeout(timeoutId);
+    };
+  }, [saleId, user, token, isInitializing]);
 
   // Atualizar contador de tempo
   useEffect(() => {
@@ -283,7 +381,7 @@ export default function PixPaymentPage() {
     return `${String(hours).padStart(2, '0')} : ${String(minutes).padStart(2, '0')} : ${String(secs).padStart(2, '0')}`;
   };
 
-  if (isLoading) {
+  if (isInitializing || isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white page-with-fixed-header">
         <Header />
@@ -291,7 +389,18 @@ export default function PixPaymentPage() {
           <div className="flex items-center justify-center">
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-[#3e2626] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-600">Gerando QR code PIX...</p>
+              <p className="text-gray-600">
+                {isInitializing 
+                  ? 'Carregando informações...' 
+                  : retryCount > 0 
+                    ? `Verificando venda e gerando QR code PIX... (tentativa ${retryCount + 1}/5)`
+                    : 'Aguardando venda estar disponível...'}
+              </p>
+              {retryCount > 0 && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Isso pode levar alguns segundos. Por favor, aguarde...
+                </p>
+              )}
             </div>
           </div>
         </div>
