@@ -712,7 +712,7 @@ export default function Header() {
                   alt="MobiliAI"
                   width={100}
                   height={40}
-                  className={`h-16 sm:h-16 md:h-24 w-auto max-w-none transition-all duration-300 ${
+                  className={`h-24 sm:h-24 md:h-24 w-auto max-w-none transition-all duration-300 ${
                     isHomePage ? '' : 'brightness-0 invert drop-shadow-lg'
                   }`}
                 />
