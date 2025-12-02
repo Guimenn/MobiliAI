@@ -2718,60 +2718,21 @@ export default function CheckoutPage() {
         notes: notes,
       });
 
-      // Limpar carrinho do frontend imediatamente após checkout bem-sucedido
-      clearCart();
-
-      // Salvar ID da venda no sessionStorage para a página de sucesso
+      // Salvar ID da venda no sessionStorage para a página de pagamento
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('last-sale-id', saleResponse.id);
       }
 
-      // Limpar estado de processamento antes de redirecionar
-      setIsProcessing(false);
-
-      // Verificar se a venda foi realmente criada antes de redirecionar
-      // Isso garante que a venda está disponível no backend antes de tentar criar o pagamento
-      const verifyAndRedirect = async () => {
-        let attempts = 0;
-        const maxAttempts = 5;
-        
-        while (attempts < maxAttempts) {
-          try {
-            // Tentar buscar a venda para verificar se ela está disponível
-            const order = await customerAPI.getOrderById(saleResponse.id);
-            if (order && order.id) {
-              // Venda encontrada, pode redirecionar
-              // Usar window.location.href para garantir que a navegação aconteça
-              if (selectedPaymentMethod === 'card') {
-                window.location.href = `/payment/card?saleId=${saleResponse.id}`;
-              } else {
-                window.location.href = `/payment/pix?saleId=${saleResponse.id}`;
-              }
-              return;
-            }
-          } catch (err: any) {
-            // Se não encontrar a venda, aguardar um pouco e tentar novamente
-            attempts++;
-            if (attempts < maxAttempts) {
-              const waitTime = attempts * 500; // 500ms, 1000ms, 1500ms, 2000ms
-              await new Promise(resolve => setTimeout(resolve, waitTime));
-            } else {
-              // Se não conseguir verificar após várias tentativas, redirecionar mesmo assim
-              // A página do PIX vai tentar novamente
-              if (selectedPaymentMethod === 'card') {
-                window.location.href = `/payment/card?saleId=${saleResponse.id}`;
-              } else {
-                window.location.href = `/payment/pix?saleId=${saleResponse.id}`;
-              }
-            }
-          }
-        }
-      };
-
-      // Aguardar um pouco antes de verificar (dá tempo para a venda ser persistida)
-      setTimeout(() => {
-        verifyAndRedirect();
-      }, 500);
+      // Redirecionar IMEDIATAMENTE sem limpar o carrinho primeiro
+      // O carrinho será limpo automaticamente após o checkout no backend
+      // Isso evita mostrar a tela de carrinho vazio
+      const paymentUrl = selectedPaymentMethod === 'card' 
+        ? `/payment/card?saleId=${saleResponse.id}`
+        : `/payment/pix?saleId=${saleResponse.id}`;
+      
+      // Usar window.location.replace para redirecionar imediatamente sem histórico
+      // Isso impede que o usuário volte e veja o carrinho vazio
+      window.location.replace(paymentUrl);
     } catch (error: any) {
       console.error('Erro ao finalizar pedido:', error);
       console.error('Detalhes do erro:', {
