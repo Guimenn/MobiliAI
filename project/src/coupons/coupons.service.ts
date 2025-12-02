@@ -822,7 +822,10 @@ export class CouponsService {
   async getCustomerCoupons(customerId: string) {
     // Buscar cupons atribuídos ao cliente
     // Inclui cupons com assignmentType = ALL_ACCOUNTS ou NEW_ACCOUNTS_ONLY
-    // Não inclui cupons EXCLUSIVE (esses precisam ser digitados)
+    // NÃO inclui cupons EXCLUSIVE (esses precisam ser resgatados primeiro)
+    // NÃO inclui cupons com assignmentType NULL (tratados como EXCLUSIVE)
+    
+    console.log('🔍 INÍCIO getCustomerCoupons para cliente:', customerId);
     
     const now = new Date();
     
@@ -892,24 +895,27 @@ export class CouponsService {
     });
 
     // Buscar cupons com ALL_ACCOUNTS ou NEW_ACCOUNTS_ONLY (se for primeira compra)
-    // Não incluir cupons EXCLUSIVE (esses precisam ser digitados)
+    // NÃO incluir cupons EXCLUSIVE aqui - eles só aparecem depois de serem resgatados
     // Não incluir cupons com assignmentType NULL (tratá-los como EXCLUSIVE por padrão)
     // Se o cliente já fez compras, buscar apenas ALL_ACCOUNTS
-    const whereClause: any = {
+    // IMPORTANTE: Usar apenas os tipos permitidos, excluindo EXCLUSIVE e NULL
+    const allowedTypes = hasMadePurchase 
+      ? [CouponAssignmentType.ALL_ACCOUNTS] 
+      : assignmentTypeFilter;
+    
+    // Buscar TODOS os cupons válidos e filtrar manualmente no código
+    // Isso garante que nenhum cupom EXCLUSIVE ou NULL passe
+    const whereClauseFinal: any = {
       isActive: true,
       validFrom: { lte: now },
-      validUntil: { gte: now },
-      assignmentType: {
-        in: hasMadePurchase 
-          ? [CouponAssignmentType.ALL_ACCOUNTS] 
-          : assignmentTypeFilter
-      }
+      validUntil: { gte: now }
     };
 
-    console.log('🔍 Query where clause:', JSON.stringify(whereClause, null, 2));
+    console.log('🔍 Query where clause (buscando todos os cupons válidos):', JSON.stringify(whereClauseFinal, null, 2));
+    console.log('🔍 Tipos permitidos:', allowedTypes.map(t => t.toString()));
 
-    const coupons = await this.prisma.coupon.findMany({
-      where: whereClause,
+    const allCouponsFromDB = await this.prisma.coupon.findMany({
+      where: whereClauseFinal,
       include: {
         _count: {
           select: {
@@ -922,7 +928,7 @@ export class CouponsService {
       }
     });
 
-    console.log('📋 Cupons encontrados antes do filtro:', coupons.length, coupons.map(c => ({
+    console.log('📋 TODOS os cupons encontrados no banco:', allCouponsFromDB.length, allCouponsFromDB.map(c => ({
       code: c.code,
       assignmentType: c.assignmentType,
       isActive: c.isActive,
@@ -931,11 +937,68 @@ export class CouponsService {
       usageLimit: c.usageLimit,
       usedCount: c._count.couponUsages
     })));
+    
+    // FILTRAR MANUALMENTE: Apenas cupons com tipos permitidos
+    // EXCLUIR explicitamente EXCLUSIVE e NULL
+    const coupons = allCouponsFromDB.filter(c => {
+      // Verificar se o assignmentType está na lista de tipos permitidos
+      const isAllowed = c.assignmentType && allowedTypes.includes(c.assignmentType as CouponAssignmentType);
+      
+      // Verificar se é EXCLUSIVE ou NULL (NÃO PERMITIDOS)
+      const isExclusive = !c.assignmentType || c.assignmentType === CouponAssignmentType.EXCLUSIVE;
+      
+      if (isExclusive) {
+        console.error('🚫🚫🚫 CUPOM EXCLUSIVE/NULL REMOVIDO - não permitido na lista automática!', {
+          code: c.code,
+          assignmentType: c.assignmentType,
+          id: c.id,
+          motivo: isExclusive ? 'É EXCLUSIVE ou NULL' : 'Tipo não permitido'
+        });
+        return false;
+      }
+      
+      if (!isAllowed) {
+        console.error('🚫 CUPOM REMOVIDO - tipo não está na lista permitida!', {
+          code: c.code,
+          assignmentType: c.assignmentType,
+          id: c.id,
+          allowedTypes: allowedTypes.map(t => t.toString())
+        });
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log('✅ Cupons APÓS filtro manual (apenas tipos permitidos):', coupons.length, coupons.map(c => ({
+      code: c.code,
+      assignmentType: c.assignmentType
+    })));
+
+    if (allCouponsFromDB.length !== coupons.length) {
+      console.error('❌ ERRO CRÍTICO: Cupons EXCLUSIVE ou NULL foram encontrados e removidos!', {
+        totalEncontrados: allCouponsFromDB.length,
+        totalValidos: coupons.length,
+        removidos: allCouponsFromDB.length - coupons.length
+      });
+    }
 
     // Filtrar cupons
     // Primeiro, verificar quais cupons devem ser mantidos (operações assíncronas)
     const couponValidityChecks = await Promise.all(
       coupons.map(async (coupon) => {
+        // PROTEÇÃO CRÍTICA: Remover cupons EXCLUSIVE da lista automática
+        // Cupons EXCLUSIVE só devem aparecer se foram resgatados (serão adicionados depois)
+        const isExclusive = !coupon.assignmentType || coupon.assignmentType === CouponAssignmentType.EXCLUSIVE;
+        if (isExclusive) {
+          console.log('🚫 CUPOM EXCLUSIVE REMOVIDO da lista automática - deve ser resgatado primeiro:', {
+            couponCode: coupon.code,
+            couponId: coupon.id,
+            assignmentType: coupon.assignmentType
+          });
+          return { coupon, isValid: false };
+        }
+
         // PROTEÇÃO CRÍTICA: Remover cupons NEW_ACCOUNTS_ONLY se o cliente já fez compras
         // Esta é uma verificação dupla de segurança além da query
         if (coupon.assignmentType === CouponAssignmentType.NEW_ACCOUNTS_ONLY) {
@@ -1040,8 +1103,132 @@ export class CouponsService {
       hasMadePurchase
     });
     
-    // VERIFICAÇÃO FINAL DE SEGURANÇA: Se ainda houver cupons NEW_ACCOUNTS_ONLY e o cliente já fez compras, remover
-    const finalCoupons = filteredCoupons.filter(coupon => {
+    // Buscar cupons EXCLUSIVE que foram resgatados pelo usuário
+    // IMPORTANTE: Cupons EXCLUSIVE só aparecem se o usuário os resgatou (tem CouponUsage com saleId null)
+    // Primeiro, buscar os IDs dos cupons que foram resgatados pelo usuário
+    const redeemedCouponUsages = await this.prisma.couponUsage.findMany({
+      where: {
+        userId: customerId,
+        saleId: null, // Apenas resgates (não usados em vendas ainda)
+        coupon: {
+          OR: [
+            { assignmentType: CouponAssignmentType.EXCLUSIVE },
+            { assignmentType: null } // Tratar NULL como EXCLUSIVE
+          ],
+          isActive: true,
+          validFrom: { lte: now },
+          validUntil: { gte: now }
+        }
+      },
+      select: {
+        couponId: true
+      },
+      distinct: ['couponId']
+    });
+
+    const redeemedCouponIds = redeemedCouponUsages.map(usage => usage.couponId);
+    
+    console.log('🎫 Cupons EXCLUSIVE resgatados encontrados (IDs):', redeemedCouponIds.length, redeemedCouponIds);
+
+    // Agora buscar os cupons EXCLUSIVE que foram realmente resgatados
+    const redeemedExclusiveCoupons = redeemedCouponIds.length > 0 ? await this.prisma.coupon.findMany({
+      where: {
+        id: {
+          in: redeemedCouponIds
+        },
+        isActive: true,
+        validFrom: { lte: now },
+        validUntil: { gte: now },
+        OR: [
+          { assignmentType: CouponAssignmentType.EXCLUSIVE },
+          { assignmentType: null } // Tratar NULL como EXCLUSIVE
+        ]
+      },
+      include: {
+        _count: {
+          select: {
+            couponUsages: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    }) : [];
+    
+    console.log('🎫 Cupons EXCLUSIVE resgatados encontrados:', redeemedExclusiveCoupons.length, redeemedExclusiveCoupons.map(c => ({
+      code: c.code,
+      assignmentType: c.assignmentType,
+      id: c.id
+    })));
+
+    // Processar cupons EXCLUSIVE resgatados
+    const exclusiveCouponsWithUsage = await Promise.all(
+      redeemedExclusiveCoupons.map(async (coupon) => {
+        const userUsageCount = await this.prisma.couponUsage.count({
+          where: {
+            couponId: coupon.id,
+            userId: customerId,
+          },
+        });
+
+        return {
+          coupon,
+          userUsageCount,
+        };
+      })
+    );
+
+    // Adicionar cupons EXCLUSIVE resgatados à lista
+    const exclusiveCoupons = exclusiveCouponsWithUsage.map(({ coupon, userUsageCount }) => ({
+      id: coupon.id,
+      code: coupon.code,
+      description: coupon.description,
+      discountType: coupon.discountType,
+      discountValue: Number(coupon.discountValue),
+      minimumPurchase: coupon.minimumPurchase ? Number(coupon.minimumPurchase) : undefined,
+      maximumDiscount: coupon.maximumDiscount ? Number(coupon.maximumDiscount) : undefined,
+      usageLimit: coupon.usageLimit,
+      usedCount: coupon._count.couponUsages,
+      userUsageCount,
+      isActive: coupon.isActive,
+      validFrom: coupon.validFrom.toISOString(),
+      validUntil: coupon.validUntil.toISOString(),
+      applicableTo: coupon.applicableTo,
+      categoryId: coupon.categoryId,
+      productId: coupon.productId,
+      storeId: coupon.storeId,
+      assignmentType: coupon.assignmentType,
+      couponType: coupon.couponType,
+      createdAt: coupon.createdAt.toISOString(),
+    }));
+
+    // VERIFICAÇÃO CRÍTICA: Garantir que filteredCoupons NÃO contém nenhum cupom EXCLUSIVE
+    const filteredCouponsWithoutExclusive = filteredCoupons.filter(c => {
+      const isExclusive = !c.assignmentType || c.assignmentType === 'EXCLUSIVE';
+      if (isExclusive) {
+        console.error('❌❌❌ ERRO CRÍTICO: Cupom EXCLUSIVE encontrado em filteredCoupons!', {
+          code: c.code,
+          id: c.id,
+          assignmentType: c.assignmentType
+        });
+        return false;
+      }
+      return true;
+    });
+    
+    console.log('✅ filteredCoupons após remover EXCLUSIVE:', {
+      antes: filteredCoupons.length,
+      depois: filteredCouponsWithoutExclusive.length,
+      removidos: filteredCoupons.length - filteredCouponsWithoutExclusive.length
+    });
+
+    // Combinar cupons normais com cupons EXCLUSIVE resgatados
+    const allCoupons = [...filteredCouponsWithoutExclusive, ...exclusiveCoupons];
+
+    // VERIFICAÇÃO FINAL DE SEGURANÇA: Remover cupons que não deveriam estar aqui
+    const finalCoupons = allCoupons.filter(coupon => {
+      // Remover cupons NEW_ACCOUNTS_ONLY se o cliente já fez compras
       if (coupon.assignmentType === 'NEW_ACCOUNTS_ONLY' && (hasMadePurchase || purchaseCount > 0)) {
         console.error('❌ ERRO CRÍTICO: Cupom NEW_ACCOUNTS_ONLY ainda presente após filtro!', {
           couponCode: coupon.code,
@@ -1050,17 +1237,146 @@ export class CouponsService {
         });
         return false;
       }
+
+      // VERIFICAÇÃO CRÍTICA: Remover cupons EXCLUSIVE que não foram resgatados
+      // Se é EXCLUSIVE ou null (tratado como EXCLUSIVE), deve ter sido resgatado
+      const isExclusive = !coupon.assignmentType || coupon.assignmentType === 'EXCLUSIVE';
+      if (isExclusive) {
+        // Verificar se este cupom está na lista de cupons EXCLUSIVE resgatados
+        const wasRedeemed = exclusiveCoupons.some(ec => ec.id === coupon.id);
+        if (!wasRedeemed) {
+          console.error('❌ ERRO CRÍTICO: Cupom EXCLUSIVE presente sem resgate! REMOVENDO...', {
+            couponCode: coupon.code,
+            couponId: coupon.id,
+            assignmentType: coupon.assignmentType,
+            isInExclusiveList: false,
+            exclusiveCouponsIds: exclusiveCoupons.map(ec => ec.id)
+          });
+          return false;
+        } else {
+          console.log('✅ Cupom EXCLUSIVE válido (foi resgatado):', {
+            couponCode: coupon.code,
+            couponId: coupon.id
+          });
+        }
+      }
+      
+      // VERIFICAÇÃO ADICIONAL: Se o cupom está em filteredCoupons mas é EXCLUSIVE, remover
+      // Isso garante que nenhum cupom EXCLUSIVE passou pela query principal
+      const isInFiltered = filteredCoupons.some(fc => fc.id === coupon.id);
+      if (isInFiltered && isExclusive) {
+        console.error('❌ ERRO CRÍTICO: Cupom EXCLUSIVE encontrado em filteredCoupons! REMOVENDO...', {
+          couponCode: coupon.code,
+          couponId: coupon.id,
+          assignmentType: coupon.assignmentType
+        });
+        return false;
+      }
+
       return true;
     });
     
-    if (finalCoupons.length !== filteredCoupons.length) {
-      console.warn('⚠️ Cupons adicionais removidos na verificação final:', {
-        antes: filteredCoupons.length,
-        depois: finalCoupons.length
+    if (finalCoupons.length !== allCoupons.length) {
+      console.warn('⚠️ Cupons removidos na verificação final:', {
+        antes: allCoupons.length,
+        depois: finalCoupons.length,
+        removidos: allCoupons.length - finalCoupons.length
       });
     }
     
-    return finalCoupons;
+    // VERIFICAÇÃO FINAL ABSOLUTA: Garantir que NENHUM cupom EXCLUSIVE ou NULL está sendo retornado sem resgate
+    const exclusiveInFinal = finalCoupons.filter(c => {
+      const isExclusive = !c.assignmentType || c.assignmentType === 'EXCLUSIVE';
+      if (isExclusive) {
+        // Verificar se foi resgatado
+        const wasRedeemed = exclusiveCoupons.some(ec => ec.id === c.id);
+        if (!wasRedeemed) {
+          return true; // Este cupom não deveria estar aqui!
+        }
+      }
+      return false;
+    });
+
+    if (exclusiveInFinal.length > 0) {
+      console.error('❌❌❌ ERRO CRÍTICO ABSOLUTO: Cupons EXCLUSIVE sem resgate sendo retornados! REMOVENDO...', {
+        cupons: exclusiveInFinal.map(c => ({
+          code: c.code,
+          assignmentType: c.assignmentType,
+          id: c.id
+        }))
+      });
+      // Remover esses cupons da lista final
+      const finalCouponsCleaned = finalCoupons.filter(c => {
+        const isExclusive = !c.assignmentType || c.assignmentType === 'EXCLUSIVE';
+        if (isExclusive) {
+          const wasRedeemed = exclusiveCoupons.some(ec => ec.id === c.id);
+          return wasRedeemed; // Só manter se foi resgatado
+        }
+        return true;
+      });
+      
+      // Log final com todos os cupons retornados e seus tipos
+      console.log('✅ Cupons FINAIS retornados para o cliente (APÓS LIMPEZA):', {
+        total: finalCouponsCleaned.length,
+        cupons: finalCouponsCleaned.map(c => ({
+          code: c.code,
+          assignmentType: c.assignmentType,
+          description: c.description,
+          foiResgatado: c.assignmentType === 'EXCLUSIVE' || !c.assignmentType
+        })),
+        temExclusive: finalCouponsCleaned.some(c => !c.assignmentType || c.assignmentType === 'EXCLUSIVE'),
+        customerId
+      });
+      
+      return finalCouponsCleaned;
+    }
+    
+    // VERIFICAÇÃO FINAL ABSOLUTA ANTES DE RETORNAR
+    // Garantir que NENHUM cupom EXCLUSIVE ou NULL seja retornado sem resgate
+    const finalCouponsVerified = finalCoupons.filter(c => {
+      const isExclusive = !c.assignmentType || c.assignmentType === 'EXCLUSIVE';
+      if (isExclusive) {
+        // Se é EXCLUSIVE, deve estar na lista de cupons resgatados
+        const wasRedeemed = exclusiveCoupons.some(ec => ec.id === c.id);
+        if (!wasRedeemed) {
+          console.error('🚫🚫🚫 CUPOM EXCLUSIVE SEM RESGATE REMOVIDO NO RETORNO FINAL!', {
+            code: c.code,
+            id: c.id,
+            assignmentType: c.assignmentType
+          });
+          return false;
+        }
+      }
+      
+      // Verificar se o assignmentType está na lista de tipos permitidos
+      const isAllowedType = c.assignmentType && allowedTypes.includes(c.assignmentType as CouponAssignmentType);
+      if (!isAllowedType && !isExclusive) {
+        console.error('🚫 CUPOM COM TIPO NÃO PERMITIDO REMOVIDO!', {
+          code: c.code,
+          assignmentType: c.assignmentType,
+          allowedTypes: allowedTypes.map(t => t.toString())
+        });
+        return false;
+      }
+      
+      return true;
+    });
+    
+    // Log final com todos os cupons retornados e seus tipos
+    console.log('✅ Cupons FINAIS retornados para o cliente (APÓS VERIFICAÇÃO FINAL):', {
+      total: finalCouponsVerified.length,
+      cupons: finalCouponsVerified.map(c => ({
+        code: c.code,
+        assignmentType: c.assignmentType,
+        description: c.description,
+        foiResgatado: c.assignmentType === 'EXCLUSIVE' || !c.assignmentType
+      })),
+      temExclusive: finalCouponsVerified.some(c => !c.assignmentType || c.assignmentType === 'EXCLUSIVE'),
+      customerId,
+      removidosNaVerificacaoFinal: finalCoupons.length - finalCouponsVerified.length
+    });
+    
+    return finalCouponsVerified;
   }
 
   async remove(id: string, user: User) {
@@ -1108,6 +1424,103 @@ export class CouponsService {
         },
       },
     });
+  }
+
+  async redeemCouponForCustomer(customerId: string, code: string) {
+    const now = new Date();
+    const codeUpper = code.toUpperCase().trim();
+
+    // Buscar o cupom pelo código
+    const coupon = await this.prisma.coupon.findUnique({
+      where: { code: codeUpper },
+    });
+
+    if (!coupon) {
+      throw new NotFoundException('Cupom não encontrado');
+    }
+
+    // Verificar se o cupom está ativo
+    if (!coupon.isActive) {
+      throw new BadRequestException('Este cupom não está mais ativo');
+    }
+
+    // Verificar validade
+    const validFrom = new Date(coupon.validFrom);
+    const validUntil = new Date(coupon.validUntil);
+
+    if (now < validFrom) {
+      throw new BadRequestException('Este cupom ainda não está válido');
+    }
+
+    if (now > validUntil) {
+      throw new BadRequestException('Este cupom expirou');
+    }
+
+    // Verificar se é um cupom EXCLUSIVE (ou null, que é tratado como EXCLUSIVE)
+    // Cupons ALL_ACCOUNTS e NEW_ACCOUNTS_ONLY já aparecem automaticamente na lista
+    const isExclusive = !coupon.assignmentType || coupon.assignmentType === CouponAssignmentType.EXCLUSIVE;
+
+    if (!isExclusive) {
+      throw new BadRequestException('Este cupom já está disponível na sua conta');
+    }
+
+    // Verificar limite de uso por usuário
+    const userUsageCount = await this.prisma.couponUsage.count({
+      where: {
+        couponId: coupon.id,
+        userId: customerId,
+      },
+    });
+
+    if (coupon.usageLimit && userUsageCount >= coupon.usageLimit) {
+      throw new BadRequestException('Você já atingiu o limite de uso deste cupom');
+    }
+
+    // Verificar limite geral de uso
+    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+      throw new BadRequestException('Este cupom atingiu o limite de uso geral');
+    }
+
+    // Verificar se o cupom já foi resgatado pelo usuário
+    const alreadyRedeemed = await this.prisma.couponUsage.findFirst({
+      where: {
+        couponId: coupon.id,
+        userId: customerId,
+        saleId: null, // Resgatado mas não usado ainda
+      },
+    });
+
+    if (alreadyRedeemed) {
+      throw new BadRequestException('Você já resgatou este cupom');
+    }
+
+    // Criar registro de resgate (CouponUsage sem saleId indica que foi resgatado mas ainda não usado)
+    await this.prisma.couponUsage.create({
+      data: {
+        couponId: coupon.id,
+        userId: customerId,
+        saleId: null, // null indica que foi resgatado mas ainda não usado em uma venda
+      },
+    });
+
+    // Cupom válido e foi resgatado com sucesso
+    // Retornar informações do cupom
+    return {
+      message: 'Cupom resgatado com sucesso!',
+      coupon: {
+        id: coupon.id,
+        code: coupon.code,
+        description: coupon.description,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        minimumPurchase: coupon.minimumPurchase,
+        maximumDiscount: coupon.maximumDiscount,
+        usageLimit: coupon.usageLimit,
+        validFrom: coupon.validFrom,
+        validUntil: coupon.validUntil,
+        couponType: coupon.couponType,
+      },
+    };
   }
 }
 

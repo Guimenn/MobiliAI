@@ -226,3 +226,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Garantir que o Portal do Radix UI funcione corretamente */
+[data-radix-portal] {
+  z-index: 9999;
+}
+
+/* Garantir que o Select Content seja visível */
+[data-radix-select-content] {
+  z-index: 9999 !important;
+}

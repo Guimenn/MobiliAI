@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAppStore } from '@/lib/store';
-import { adminAPI } from '@/lib/api';
+import { adminAPI, authAPI } from '@/lib/api';
 import { ArrowLeft, User, Mail, Building2, Shield, Calendar, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,11 +18,18 @@ export default function ProfilePage() {
   const { user, isAuthenticated, token, setUser } = useAppStore();
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
+  });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
   });
 
   useEffect(() => {
@@ -125,6 +132,70 @@ export default function ProfilePage() {
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleOpenPasswordModal = () => {
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    });
+    setIsPasswordModalOpen(true);
+  };
+
+  const handleClosePasswordModal = () => {
+    setIsPasswordModalOpen(false);
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    });
+  };
+
+  const handleChangePassword = async () => {
+    // Validações
+    if (!passwordData.currentPassword.trim()) {
+      toast.error('A senha atual é obrigatória');
+      return;
+    }
+
+    if (!passwordData.newPassword.trim()) {
+      toast.error('A nova senha é obrigatória');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast.error('A nova senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('As senhas não coincidem');
+      return;
+    }
+
+    if (passwordData.currentPassword === passwordData.newPassword) {
+      toast.error('A nova senha deve ser diferente da senha atual');
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      await authAPI.changePassword(
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
+
+      toast.success('Senha alterada com sucesso!');
+      handleClosePasswordModal();
+    } catch (error: any) {
+      console.error('Erro ao alterar senha:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erro ao alterar senha';
+      toast.error(errorMessage);
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -264,11 +335,12 @@ export default function ProfilePage() {
           <CardDescription>Gerencie as configurações da sua conta</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button variant="outline" className="w-full sm:w-auto">
+          <Button 
+            variant="outline" 
+            className="w-full sm:w-auto"
+            onClick={handleOpenPasswordModal}
+          >
             Alterar Senha
-          </Button>
-          <Button variant="outline" className="w-full sm:w-auto ml-0 sm:ml-2">
-            Preferências de Notificação
           </Button>
         </CardContent>
       </Card>
@@ -335,6 +407,74 @@ export default function ProfilePage() {
               className="bg-[#3e2626] hover:bg-[#3e2626]/90"
             >
               {isSaving ? 'Salvando...' : 'Salvar alterações'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Alterar Senha */}
+      <Dialog open={isPasswordModalOpen} onOpenChange={(open) => {
+        setIsPasswordModalOpen(open);
+        if (!open) {
+          handleClosePasswordModal();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Alterar Senha</DialogTitle>
+            <DialogDescription>
+              Digite sua senha atual e a nova senha desejada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="currentPassword">Senha Atual *</Label>
+              <Input
+                id="currentPassword"
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                placeholder="Digite sua senha atual"
+                disabled={isChangingPassword}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="newPassword">Nova Senha *</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                placeholder="Digite a nova senha (mín. 6 caracteres)"
+                disabled={isChangingPassword}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="confirmPassword">Confirmar Nova Senha *</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                placeholder="Confirme a nova senha"
+                disabled={isChangingPassword}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleClosePasswordModal}
+              disabled={isChangingPassword}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={isChangingPassword}
+              className="bg-[#3e2626] hover:bg-[#3e2626]/90"
+            >
+              {isChangingPassword ? 'Alterando...' : 'Alterar Senha'}
             </Button>
           </DialogFooter>
         </DialogContent>

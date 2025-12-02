@@ -22,6 +22,12 @@ import {
   Eye,
   Package,
   Quote,
+  Globe,
+  Layers,
+  Brush,
+  MessageCircle,
+  ShieldCheck,
+  Headphones,
 } from 'lucide-react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -66,6 +72,7 @@ export default function TestIALandingPage() {
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
   const [referenceIndex, setReferenceIndex] = useState(0);
   const [trendIndex, setTrendIndex] = useState(0);
+  const [activeUseCase, setActiveUseCase] = useState(0);
   
   // Estados para dados do banco
   const [transformationGallery, setTransformationGallery] = useState<TransformationItem[]>([]);
@@ -127,6 +134,127 @@ export default function TestIALandingPage() {
     {
       title: '100% satisfação',
       subtitle: 'Clientes aprovam projetos antes mesmo de começar a pintura.',
+    },
+  ];
+
+  const heroMetrics = [
+    {
+      value: '12s',
+      label: 'tempo médio',
+      description: 'para aplicar uma nova paleta completa com IA',
+    },
+    {
+      value: '98%',
+      label: 'fidelidade cromática',
+      description: 'comparada ao catálogo físico das lojas',
+    },
+    {
+      value: '+42',
+      label: 'kits sugeridos',
+      description: 'por sessão combinando tintas e acessórios',
+    },
+  ];
+
+  const immersiveHighlights = [
+    {
+      icon: <Globe className="h-6 w-6" />,
+      title: 'Studio omnicanal',
+      description: 'Compartilhe o preview via link, QR Code, WhatsApp ou totens de autoatendimento.',
+    },
+    {
+      icon: <Layers className="h-6 w-6" />,
+      title: 'Comparador interativo',
+      description: 'Slider antes/depois respeitando textura, profundidade e iluminação do ambiente.',
+    },
+    {
+      icon: <Brush className="h-6 w-6" />,
+      title: 'Checklist automático',
+      description: 'IA lista tintas, primers e acessórios correspondentes ao render aprovado.',
+    },
+  ];
+
+  const useCaseTabs = [
+    {
+      title: 'Equipe de loja',
+      badge: 'Ponto de venda',
+      description: 'Transforme cada atendimento em consultoria visual com recomendações prontas.',
+      bullets: [
+        'Simulador otimizado para tablets e totens com o mesmo layout responsivo.',
+        'Checklist automático envia a lista de produtos direto para o caixa.',
+        'Histórico da sessão fica salvo no CRM para futuras campanhas.',
+      ],
+      ctaLabel: 'Ativar no PDV',
+      ctaHref: '/stores',
+      secondaryLabel: 'Baixar guia rápido',
+      secondaryHref: '/help',
+      image: '/IAsection/ImagemIA4.png',
+    },
+    {
+      title: 'Arquiteto parceiro',
+      badge: 'Projetos B2B',
+      description: 'Ofereça pacotes exclusivos com renderizações aprovadas em tempo recorde.',
+      bullets: [
+        'Integração com moodboards e bibliotecas compartilhadas com o time criativo.',
+        'Versões comentadas com notas técnicas e orçamentos sugeridos.',
+        'Exportação com watermark e carimbo automático de simulação.',
+      ],
+      ctaLabel: 'Convidar arquitetos',
+      ctaHref: '/manager/partners',
+      secondaryLabel: 'Ver contrato modelo',
+      secondaryHref: '/terms',
+      image: '/IAsection/ImagemIA2.png',
+    },
+    {
+      title: 'Cliente final',
+      badge: 'Autoatendimento',
+      description: 'Deixe o consumidor experimentar, salvar favoritos e fechar pedido no mesmo fluxo.',
+      bullets: [
+        'Assistente sugere paletas complementares com base no estilo selecionado.',
+        'Comparativo de consumo estimado por metro quadrado e acabamentos.',
+        'Checkout integrado com PIX e kits complementares recomendados.',
+      ],
+      ctaLabel: 'Liberar experiência completa',
+      ctaHref: '/IA-demo',
+      secondaryLabel: 'Ver histórias reais',
+      secondaryHref: '/products',
+      image: '/IAsection/ImagemIA3.png',
+    },
+  ];
+
+  const assistantHighlights = [
+    {
+      icon: <MessageCircle className="h-5 w-5" />,
+      title: 'Chat co-criativo',
+      description: 'Prompts naturais com memória compartilhada entre vendedor e cliente.',
+    },
+    {
+      icon: <ShieldCheck className="h-5 w-5" />,
+      title: 'Governança garantida',
+      description: 'Todas as renderizações levam aviso de simulação e log completo em auditoria.',
+    },
+    {
+      icon: <Headphones className="h-5 w-5" />,
+      title: 'Onboarding guiado',
+      description: 'Biblioteca de scripts, vídeos e scripts de atendimento para cada loja.',
+    },
+  ];
+
+  const faqItems = [
+    {
+      question: 'Posso usar a IA mesmo com fotos amadoras?',
+      answer: 'Sim. O motor detecta profundidade e corrige ruídos de iluminação antes de aplicar as novas cores.',
+    },
+    {
+      question: 'As renderizações ficam salvas onde?',
+      answer: 'Tudo fica centralizado no PintAi Studio com controle de permissões por loja e equipe.',
+    },
+    {
+      question: 'Quais dispositivos são suportados?',
+      answer: 'Desktop, tablets iOS/Android e totens web. O layout adapta automaticamente aos tamanhos.',
+    },
+    {
+      question: 'Preciso treinar o time?',
+      answer: 'Oferecemos onboarding remoto, scripts prontos e suporte dedicado durante o lançamento.',
     },
   ];
 
@@ -289,6 +417,26 @@ export default function TestIALandingPage() {
                   />
                 </Link>
               </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.7 }}
+                className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+              >
+                {heroMetrics.map((metric) => (
+                  <div
+                    key={metric.label}
+                    className="rounded-2xl border border-white/15 bg-white/5 p-5 backdrop-blur-sm shadow-lg"
+                  >
+                    <p className="text-4xl font-black text-white">{metric.value}</p>
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.4em] text-white/70">
+                      {metric.label}
+                    </p>
+                    <p className="mt-3 text-sm text-white/80">{metric.description}</p>
+                  </div>
+                ))}
+              </motion.div>
               
               <motion.p
                 initial={{ opacity: 0 }}
@@ -330,6 +478,94 @@ export default function TestIALandingPage() {
                 <p className="mt-3 text-xs font-medium uppercase tracking-[0.3em] text-white/80">Resultado em 12s</p>
                 <p className="text-sm text-white">IA posicionou paleta e mobiliário da coleção Oslo automaticamente.</p>
               </motion.div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Immersive studio */}
+        <section className="relative overflow-hidden bg-[#150d0a] py-24 text-white">
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-linear-to-br from-[#150d0a] via-[#3e2626] to-[#8B4513]/70 opacity-90" />
+            <div className="absolute -left-32 top-1/4 h-72 w-72 rounded-full bg-[#F7C194]/20 blur-[140px]" />
+            <div className="absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-[#C07A45]/20 blur-[140px]" />
+          </div>
+
+          <div className="container relative z-10 mx-auto grid gap-12 px-4 lg:grid-cols-2 lg:items-center">
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="relative"
+            >
+              <div className="rounded-[40px] border border-white/10 bg-white/5 p-6 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.8)] backdrop-blur">
+                <div className="relative h-[420px] overflow-hidden rounded-[28px] border border-white/10 bg-white/5">
+                  <Image
+                    src="/IAsection/ImagemIA4.png"
+                    alt="Console do estúdio de IA"
+                    fill
+                    className="object-cover object-center"
+                    sizes="(max-width: 1024px) 100vw, 500px"
+                  />
+                  <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/15 bg-white/10 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.4em] text-white/70">Studio vivo</p>
+                    <p className="mt-2 text-lg font-semibold">Equipe Oslo · Render aprovado · 21:04</p>
+                    <p className="text-sm text-white/70">3 cores aplicadas · Kit Essencial + Selador premium</p>
+                  </div>
+                </div>
+              </div>
+              <div className="absolute -bottom-10 left-1/2 hidden w-64 -translate-x-1/2 rounded-3xl border border-white/10 bg-white/10 p-4 text-sm text-white/80 backdrop-blur-xl md:block">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/60">Live preview</p>
+                <p className="mt-2">Atualize elementos do ambiente em tempo real e compartilhe com o cliente em segundos.</p>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8, delay: 0.15 }}
+            >
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-white/80">
+                Studio IA em destaque
+              </span>
+              <h2 className="mt-6 text-4xl font-black leading-tight sm:text-5xl">
+                Um showroom imersivo que vive dentro do seu navegador.
+              </h2>
+              <p className="mt-4 text-lg text-white/80">
+                Replique a experiência física da sua loja com painéis 3D, playlists de cores e storytelling guiado pela IA.
+                Cada render pode virar campanha, catálogo ou treinamento em instantes.
+              </p>
+
+              <div className="mt-8 space-y-4">
+                {immersiveHighlights.map((item) => (
+                  <div key={item.title} className="flex items-start gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">{item.title}</h3>
+                      <p className="text-sm text-white/80">{item.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-10 flex flex-wrap gap-4">
+                <Link href="/IA-demo">
+                  <Button className="h-12 rounded-full bg-white px-8 text-sm font-semibold uppercase tracking-[0.3em] text-[#3e2626] hover:bg-white/90">
+                    Abrir estúdio agora
+                  </Button>
+                </Link>
+                <Link href="/contact">
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-full border-white/30 bg-transparent px-8 text-sm font-semibold uppercase tracking-[0.3em] text-white hover:bg-white/10"
+                  >
+                    Falar com especialistas
+                  </Button>
+                </Link>
+              </div>
             </motion.div>
           </div>
         </section>
@@ -406,6 +642,112 @@ export default function TestIALandingPage() {
           </div>
         </div>
       </section>
+
+        {/* Use cases */}
+        <section className="relative overflow-hidden bg-[#fdf7f1] py-24">
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-linear-to-b from-white via-transparent to-[#f7f3ef]" />
+            <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-[#F7C194]/20 to-transparent blur-3xl opacity-40" />
+          </div>
+
+          <div className="container relative z-10 mx-auto px-4">
+            <div className="text-center max-w-3xl mx-auto">
+              <span className="inline-flex items-center gap-2 rounded-full bg-[#3e2626]/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/80">
+                Fluxos preferidos das lojas
+              </span>
+              <h2 className="mt-6 text-4xl font-black text-[#3e2626] sm:text-5xl">Escolha o modo ideal para cada operação.</h2>
+              <p className="mt-4 text-lg text-[#4f3a2f]/75">
+                Personalize a jornada conforme o canal: atendimento físico, parceiros externos ou autoatendimento digital.
+              </p>
+            </div>
+
+            <div className="mt-14 grid gap-10 lg:grid-cols-[360px,1fr]">
+              <div className="space-y-4">
+                {useCaseTabs.map((useCase, idx) => (
+                  <button
+                    key={useCase.title}
+                    type="button"
+                    aria-pressed={activeUseCase === idx}
+                    onClick={() => setActiveUseCase(idx)}
+                    className={`w-full rounded-3xl border p-5 text-left transition-all ${
+                      activeUseCase === idx
+                        ? 'border-[#3e2626]/40 bg-white shadow-xl shadow-[#3e2626]/10'
+                        : 'border-[#3e2626]/10 bg-transparent hover:border-[#3e2626]/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/70">
+                          {useCase.badge}
+                        </p>
+                        <p className="mt-2 text-lg font-bold text-[#3e2626]">{useCase.title}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-[#C07A45]" />
+                    </div>
+                    <p className="mt-3 text-sm text-[#4f3a2f]/70">{useCase.description}</p>
+                  </button>
+                ))}
+              </div>
+
+              <motion.div
+                key={useCaseTabs[activeUseCase].title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="grid gap-8 lg:grid-cols-[1.1fr,0.9fr] lg:items-center"
+              >
+                <div className="rounded-3xl border border-[#3e2626]/10 bg-white p-8 shadow-xl">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-[#3e2626]/5 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/80">
+                    {useCaseTabs[activeUseCase].badge}
+                  </span>
+                  <h3 className="mt-4 text-3xl font-black text-[#3e2626]">{useCaseTabs[activeUseCase].title}</h3>
+                  <p className="mt-3 text-base text-[#4f3a2f]/75">{useCaseTabs[activeUseCase].description}</p>
+                  <ul className="mt-6 space-y-3 text-sm text-[#4f3a2f]/80">
+                    {useCaseTabs[activeUseCase].bullets.map((bullet) => (
+                      <li key={bullet} className="flex items-start gap-2">
+                        <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#C07A45]" />
+                        <span>{bullet}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-8 flex flex-wrap gap-4">
+                    <Link href={useCaseTabs[activeUseCase].ctaHref}>
+                      <Button className="h-11 rounded-full bg-[#3e2626] px-8 text-sm font-semibold text-white hover:bg-[#2a1a13]">
+                        {useCaseTabs[activeUseCase].ctaLabel}
+                      </Button>
+                    </Link>
+                    <Link href={useCaseTabs[activeUseCase].secondaryHref}>
+                      <Button
+                        variant="ghost"
+                        className="h-11 rounded-full border border-[#3e2626]/15 bg-white px-8 text-sm font-semibold text-[#3e2626]"
+                      >
+                        {useCaseTabs[activeUseCase].secondaryLabel}
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="relative h-[360px] rounded-3xl border border-[#3e2626]/15 bg-[#3e2626]/5 shadow-2xl overflow-hidden">
+                  <Image
+                    src={useCaseTabs[activeUseCase].image}
+                    alt={useCaseTabs[activeUseCase].title}
+                    fill
+                    className="object-cover object-center"
+                    sizes="(max-width: 1024px) 100vw, 420px"
+                  />
+                  <div className="absolute inset-x-6 bottom-6 rounded-2xl bg-white/85 p-4 text-[#3e2626] shadow-lg">
+                    <p className="text-xs font-semibold uppercase tracking-[0.35em]">Painel sincronizado</p>
+                    <p className="mt-2 text-sm">
+                      {useCaseTabs[activeUseCase].title} · Fluxo automatizado · {activeUseCase + 1}
+                      /{useCaseTabs.length}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </section>
 
         {/* Feature grid */}
         <section className="relative overflow-hidden bg-[#efe3d9] py-20">
@@ -807,6 +1149,88 @@ export default function TestIALandingPage() {
           </div>
         </div>
       </section>
+
+        {/* Assistant + FAQ */}
+        <section className="relative overflow-hidden bg-[#efe3d9] py-24">
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-linear-to-b from-white via-transparent to-[#f7f3ef]" />
+            <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-[#F7C194]/30 blur-[120px]" />
+          </div>
+          <div className="container relative z-10 mx-auto grid gap-12 px-4 lg:grid-cols-2">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="rounded-[32px] border border-[#3e2626]/15 bg-white p-8 shadow-xl"
+            >
+              <span className="inline-flex items-center gap-2 rounded-full bg-[#3e2626]/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/80">
+                Assistente virtual PintAi
+              </span>
+              <h2 className="mt-6 text-4xl font-black text-[#3e2626]">
+                Consultoria por IA que fala a mesma língua da sua equipe.
+              </h2>
+              <p className="mt-4 text-lg text-[#4f3a2f]/75">
+                Combine prompts guiados, roteiros de venda e recomendações de kits em um único chat com contexto do cliente.
+              </p>
+
+              <div className="mt-8 space-y-4">
+                {assistantHighlights.map((item) => (
+                  <div key={item.title} className="flex items-start gap-4 rounded-3xl border border-[#3e2626]/10 bg-[#fdf7f1] p-5">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3e2626]/10 text-[#3e2626]">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <p className="text-base font-semibold text-[#3e2626]">{item.title}</p>
+                      <p className="text-sm text-[#4f3a2f]/75">{item.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-10 flex flex-wrap gap-4">
+                <Link href="/customer">
+                  <Button className="h-11 rounded-full bg-[#3e2626] px-8 text-sm font-semibold text-white hover:bg-[#2a1a13]">
+                    Iniciar conversa guiada
+                  </Button>
+                </Link>
+                <Link href="/faq">
+                  <Button
+                    variant="outline"
+                    className="h-11 rounded-full border-[#3e2626]/30 bg-transparent px-8 text-sm font-semibold text-[#3e2626]"
+                  >
+                    Ver tutorial em vídeo
+                  </Button>
+                </Link>
+              </div>
+            </motion.div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.5em] text-[#3e2626]/60">FAQ rápido</p>
+              <h3 className="mt-4 text-3xl font-black text-[#3e2626]">Tudo pronto para lançar em qualquer loja.</h3>
+              <div className="mt-8 space-y-4">
+                {faqItems.map((faq, idx) => (
+                  <motion.div
+                    key={faq.question}
+                    initial={{ opacity: 0, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: idx * 0.05 }}
+                    className="rounded-3xl border border-[#3e2626]/10 bg-white p-6 shadow-sm hover:shadow-lg transition"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-lg font-semibold text-[#3e2626]">{faq.question}</p>
+                        <p className="mt-2 text-sm text-[#4f3a2f]/75">{faq.answer}</p>
+                      </div>
+                      <span className="text-2xl font-black text-[#F7C194]">{String(idx + 1).padStart(2, '0')}</span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* Product showcase */}
         <section className="relative overflow-hidden bg-[#3e2626] py-32">

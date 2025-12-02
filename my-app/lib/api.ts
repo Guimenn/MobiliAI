@@ -1278,6 +1278,11 @@ export const customerAPI = {
     return response.data;
   },
 
+  redeemCoupon: async (code: string) => {
+    const response = await api.post('/customer/coupons/redeem', { code });
+    return response.data;
+  },
+
   // Endereços de Entrega
   getShippingAddresses: async () => {
     const response = await api.get('/customer/shipping-addresses');

@@ -5,6 +5,7 @@ import { CustomerCartService } from './customer-cart.service';
 import { CustomerFavoritesService } from './customer-favorites.service';
 import { CustomerOrdersService } from './customer-orders.service';
 import { CouponsService } from '../coupons/coupons.service';
+import { RedeemCouponDto } from '../coupons/dto/redeem-coupon.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -368,9 +369,22 @@ export class CustomerController {
 
   // ==================== CUPONS ====================
 
+  @Post('coupons/redeem')
+  async redeemCoupon(@Request() req, @Body() body: RedeemCouponDto) {
+    console.log('📥 Endpoint POST /customer/coupons/redeem chamado para usuário:', req.user.id, req.user.email, 'código:', body.code);
+    try {
+      const result = await this.couponsService.redeemCouponForCustomer(req.user.id, body.code);
+      console.log('✅ Cupom resgatado com sucesso:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Erro ao resgatar cupom:', error);
+      throw error;
+    }
+  }
+
   @Get('coupons')
   async getCoupons(@Request() req) {
-    console.log('📥 Endpoint /customer/coupons chamado para usuário:', req.user.id, req.user.email);
+    console.log('📥 Endpoint GET /customer/coupons chamado para usuário:', req.user.id, req.user.email);
     const coupons = await this.couponsService.getCustomerCoupons(req.user.id);
     console.log('📤 Retornando cupons:', coupons.length);
     return coupons;

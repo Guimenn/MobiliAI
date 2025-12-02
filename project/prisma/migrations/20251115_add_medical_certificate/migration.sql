@@ -31,3 +31,4 @@ ALTER TABLE "medical_certificates" ADD CONSTRAINT "medical_certificates_employee
 -- AddForeignKey
 ALTER TABLE "medical_certificates" ADD CONSTRAINT "medical_certificates_registeredById_fkey" FOREIGN KEY ("registeredById") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+

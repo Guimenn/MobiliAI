@@ -243,24 +243,7 @@ export default function ProductsPage() {
                     <span className="hidden sm:inline">Oferta Relâmpago</span>
                     <span className="sm:hidden">Oferta</span>
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 w-full sm:w-auto"
-                    onClick={() => setIsPhotoTo3DOpen(true)}
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Foto para 3D</span>
-                    <span className="sm:hidden">Foto 3D</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 w-full sm:w-auto"
-                    onClick={() => setIsDirect3DUploadOpen(true)}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Upload 3D</span>
-                    <span className="sm:hidden">Upload</span>
-                  </Button>
+                 
                 </div>
               </div>
 

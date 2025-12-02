@@ -1446,7 +1446,6 @@ export class AdminService {
       },
       include: {
         purchases: {
-          take: 10,
           orderBy: { createdAt: 'desc' },
           include: {
             items: {

@@ -45,7 +45,9 @@ import {
   ZoomIn,
   Sparkles,
   Download,
-  CheckCircle2
+  CheckCircle2,
+  Calendar,
+  Users
 } from 'lucide-react';
 import { customerAPI, authAPI, storesAPI, shippingAPI } from '@/lib/api';
 import { env } from '@/lib/env';
@@ -4419,144 +4421,327 @@ export default function CheckoutPage() {
                     <div className="space-y-6">
                       {/* Cupons de Frete */}
                       {shippingCoupons.length > 0 && (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           <h3 className="text-lg font-semibold text-[#3e2626] flex items-center space-x-2">
-                            <Truck className="h-5 w-5" />
+                            <Truck className="h-5 w-5 text-[#3e2626]" />
                             <span>Cupons de Frete</span>
                           </h3>
-                          <div className="space-y-2">
-                            {shippingCoupons.map((coupon) => (
-                              <Card key={coupon.id || coupon.code} className="p-4 hover:shadow-md transition-shadow">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-2 mb-1">
-                                      <Badge className="bg-blue-500 text-white">{coupon.code}</Badge>
-                                      {coupon.discountType === 'percentage' ? (
-                                        <span className="text-lg font-bold text-green-600">
-                                          {coupon.discountValue}% OFF
-                                        </span>
-                                      ) : (
-                                        <span className="text-lg font-bold text-green-600">
-                                          R$ {coupon.discountValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </span>
-                                      )}
+                          <div className="space-y-4">
+                            {shippingCoupons.map((coupon) => {
+                              const discountValue = coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' 
+                                ? `${coupon.discountValue}%` 
+                                : `R$ ${Number(coupon.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                              const validUntil = coupon.validUntil || coupon.expiresAt;
+                              
+                              return (
+                                <div
+                                  key={coupon.id || coupon.code}
+                                  className="relative bg-gray-100 border-2 border-[#3e2626]/50 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
+                                  style={{
+                                    clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
+                                    backgroundColor: 'rgba(62, 38, 38, 0.08)'
+                                  }}
+                                >
+                                  {/* Efeito de papel rasgado no topo */}
+                                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3e2626]/40 to-transparent opacity-50"></div>
+                                  
+                                  <div className="p-5">
+                                    <div className="flex items-start justify-between gap-4">
+                                      {/* Lado esquerdo - Informações principais */}
+                                      <div className="flex-1 space-y-3">
+                                        {/* Cabeçalho do cupom */}
+                                        <div className="flex items-center gap-3">
+                                          <div className="bg-[#3e2626] text-white px-3 py-1 rounded-md font-bold text-sm shadow-md">
+                                            {coupon.code}
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-2xl font-black text-[#3e2626]">
+                                              {discountValue}
+                                            </div>
+                                            <div className="text-xs text-[#5a3a3a] font-semibold uppercase tracking-wide">
+                                              Desconto no Frete
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Descrição */}
+                                        <div className="bg-white/60 backdrop-blur-sm rounded-md p-3 border border-[#3e2626]/20">
+                                          <p className="text-sm font-medium text-gray-800">
+                                            {coupon.description || 'Cupom de frete grátis'}
+                                          </p>
+                                        </div>
+                                        
+                                        {/* Informações adicionais */}
+                                        <div className="space-y-1.5 text-xs text-gray-700">
+                                          {validUntil && (
+                                            <div className="flex items-center gap-2">
+                                              <Calendar className="h-3.5 w-3.5 text-[#3e2626]" />
+                                              <span className="font-medium">
+                                                Válido até: <span className="text-[#3e2626]">{new Date(validUntil).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                                              </span>
+                                            </div>
+                                          )}
+                                          {coupon.usageLimit && (
+                                            <div className="flex items-center gap-2">
+                                              <Users className="h-3.5 w-3.5 text-[#3e2626]" />
+                                              <span className="font-medium">
+                                                Limite: {coupon.usageLimit}x por cliente
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Lado direito - Botão de ação */}
+                                      <div className="flex flex-col items-center justify-center">
+                                        <Button
+                                          onClick={() => handleApplyCouponFromModal(coupon.code)}
+                                          className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] font-bold px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                                        >
+                                          <Truck className="h-4 w-4 mr-2" />
+                                          Usar
+                                        </Button>
+                                      </div>
                                     </div>
-                                    <p className="text-sm text-gray-600">{coupon.description || 'Cupom de frete'}</p>
-                                    {(coupon.validUntil || coupon.expiresAt) && (
-                                      <p className="text-xs text-gray-500 mt-1">
-                                        Válido até {new Date(coupon.validUntil || coupon.expiresAt).toLocaleDateString('pt-BR')}
-                                      </p>
-                                    )}
                                   </div>
-                                  <Button
-                                    onClick={() => handleApplyCouponFromModal(coupon.code)}
-                                    className="ml-4 bg-[#3e2626] text-white hover:bg-[#2a1f1f]"
-                                  >
-                                    Usar
-                                  </Button>
+                                  
+                                  {/* Linha pontilhada decorativa */}
+                                  <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#3e2626]/40 to-transparent"></div>
                                 </div>
-                              </Card>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
 
                       {/* Cupons Disponíveis */}
                       {availableCoupons.length > 0 && (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           <h3 className="text-lg font-semibold text-[#3e2626] flex items-center space-x-2">
-                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <CheckCircle className="h-5 w-5 text-[#3e2626]" />
                             <span>Cupons Disponíveis</span>
                           </h3>
-                          <div className="space-y-2">
-                            {availableCoupons.map((coupon) => (
-                              <Card key={coupon.id || coupon.code} className="p-4 hover:shadow-md transition-shadow border-green-200">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-2 mb-1">
-                                      <Badge className="bg-green-500 text-white">{coupon.code}</Badge>
-                                      {coupon.discountType === 'percentage' ? (
-                                        <span className="text-lg font-bold text-green-600">
-                                          {coupon.discountValue}% OFF
-                                        </span>
-                                      ) : (
-                                        <span className="text-lg font-bold text-green-600">
-                                          R$ {coupon.discountValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </span>
-                                      )}
+                          <div className="space-y-4">
+                            {availableCoupons.map((coupon) => {
+                              const discountValue = coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' 
+                                ? `${coupon.discountValue}%` 
+                                : `R$ ${Number(coupon.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                              const validUntil = coupon.validUntil || coupon.expiresAt;
+                              const maxDiscount = coupon.maximumDiscount;
+                              
+                              return (
+                                <div
+                                  key={coupon.id || coupon.code}
+                                  className="relative bg-gray-100 border-2 border-[#3e2626]/50 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
+                                  style={{
+                                    clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
+                                    backgroundColor: 'rgba(62, 38, 38, 0.12)'
+                                  }}
+                                >
+                                  {/* Efeito de papel rasgado no topo */}
+                                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3e2626]/50 to-transparent opacity-50"></div>
+                                  
+                                  <div className="p-5">
+                                    <div className="flex items-start justify-between gap-4">
+                                      {/* Lado esquerdo - Informações principais */}
+                                      <div className="flex-1 space-y-3">
+                                        {/* Cabeçalho do cupom */}
+                                        <div className="flex items-center gap-3">
+                                          <div className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white px-3 py-1 rounded-md font-bold text-sm shadow-md">
+                                            {coupon.code}
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-3xl font-black text-[#3e2626]">
+                                              {discountValue}
+                                              {coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' ? (
+                                                <span className="text-lg ml-1">OFF</span>
+                                              ) : null}
+                                            </div>
+                                            <div className="text-xs text-[#5a3a3a] font-semibold uppercase tracking-wide">
+                                              Desconto Especial
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Descrição */}
+                                        <div className="bg-white/70 backdrop-blur-sm rounded-md p-3 border border-[#3e2626]/25">
+                                          <p className="text-sm font-medium text-gray-800">
+                                            {coupon.description || 'Cupom de desconto disponível'}
+                                          </p>
+                                        </div>
+                                        
+                                        {/* Informações adicionais */}
+                                        <div className="space-y-1.5 text-xs text-gray-700">
+                                          {coupon.minimumPurchase && (
+                                            <div className="flex items-center gap-2">
+                                              <ShoppingCart className="h-3.5 w-3.5 text-[#3e2626]" />
+                                              <span className="font-medium">
+                                                Compra mínima: <span className="text-[#3e2626] font-bold">R$ {Number(coupon.minimumPurchase).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                              </span>
+                                            </div>
+                                          )}
+                                          {maxDiscount && (coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage') && (
+                                            <div className="flex items-center gap-2">
+                                              <DollarSign className="h-3.5 w-3.5 text-[#3e2626]" />
+                                              <span className="font-medium">
+                                                Desconto máximo: <span className="text-[#3e2626] font-bold">R$ {Number(maxDiscount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                              </span>
+                                            </div>
+                                          )}
+                                          {validUntil && (
+                                            <div className="flex items-center gap-2">
+                                              <Calendar className="h-3.5 w-3.5 text-[#3e2626]" />
+                                              <span className="font-medium">
+                                                Válido até: <span className="text-[#3e2626]">{new Date(validUntil).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                                              </span>
+                                            </div>
+                                          )}
+                                          {coupon.usageLimit && (
+                                            <div className="flex items-center gap-2">
+                                              <Users className="h-3.5 w-3.5 text-[#3e2626]" />
+                                              <span className="font-medium">
+                                                Limite: {coupon.usageLimit}x por cliente
+                                              </span>
+                                            </div>
+                                          )}
+                                          {coupon.applicableTo && coupon.applicableTo !== 'ALL' && (
+                                            <div className="flex items-center gap-2">
+                                              <Tag className="h-3.5 w-3.5 text-[#3e2626]" />
+                                              <span className="font-medium">
+                                                {coupon.applicableTo === 'CATEGORY' && coupon.categoryId ? `Válido para categoria: ${coupon.categoryId}` : null}
+                                                {coupon.applicableTo === 'PRODUCT' && coupon.productId ? 'Válido para produto específico' : null}
+                                                {coupon.applicableTo === 'STORE' && coupon.storeId ? 'Válido para loja específica' : null}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Lado direito - Botão de ação */}
+                                      <div className="flex flex-col items-center justify-center">
+                                        <Button
+                                          onClick={() => handleApplyCouponFromModal(coupon.code)}
+                                          className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white hover:from-[#2a1f1f] hover:to-[#3e2626] font-bold px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                                        >
+                                          <CheckCircle className="h-4 w-4 mr-2" />
+                                          Usar
+                                        </Button>
+                                      </div>
                                     </div>
-                                    <p className="text-sm text-gray-600">{coupon.description || 'Cupom disponível'}</p>
-                                    {coupon.minimumPurchase && (
-                                      <p className="text-xs text-gray-500 mt-1">
-                                        Compra mínima: R$ {coupon.minimumPurchase.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                      </p>
-                                    )}
-                                    {(coupon.validUntil || coupon.expiresAt) && (
-                                      <p className="text-xs text-gray-500 mt-1">
-                                        Válido até {new Date(coupon.validUntil || coupon.expiresAt).toLocaleDateString('pt-BR')}
-                                      </p>
-                                    )}
                                   </div>
-                                  <Button
-                                    onClick={() => handleApplyCouponFromModal(coupon.code)}
-                                    className="ml-4 bg-green-600 text-white hover:bg-green-700"
-                                  >
-                                    Usar
-                                  </Button>
+                                  
+                                  {/* Linha pontilhada decorativa */}
+                                  <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#3e2626]/50 to-transparent"></div>
                                 </div>
-                              </Card>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
 
                       {/* Cupons Indisponíveis */}
                       {unavailableCoupons.length > 0 && (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           <h3 className="text-lg font-semibold text-[#3e2626] flex items-center space-x-2">
-                            <AlertCircle className="h-5 w-5 text-orange-500" />
+                            <AlertCircle className="h-5 w-5 text-[#5a3a3a]" />
                             <span>Cupons Indisponíveis</span>
                           </h3>
-                          <div className="space-y-2">
+                          <div className="space-y-4">
                             {unavailableCoupons.map((coupon) => {
+                              const discountValue = coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' 
+                                ? `${coupon.discountValue}%` 
+                                : `R$ ${Number(coupon.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                              const validUntil = coupon.validUntil || coupon.expiresAt;
+                              
                               return (
-                                <Card key={coupon.id || coupon.code} className="p-4 bg-gray-50 border-gray-200 opacity-75">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center space-x-2 mb-1">
-                                        <Badge className="bg-gray-500 text-white">{coupon.code}</Badge>
-                                        {coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' ? (
-                                          <span className="text-lg font-bold text-gray-600">
-                                            {coupon.discountValue}% OFF
-                                          </span>
-                                        ) : (
-                                          <span className="text-lg font-bold text-gray-600">
-                                            R$ {Number(coupon.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <p className="text-sm text-gray-600 mb-2">{coupon.description || 'Cupom indisponível'}</p>
-                                      
-                                      {/* Mostrar motivo da indisponibilidade */}
-                                      {coupon.unavailableReason && (
-                                        <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
-                                          <div className="flex items-start space-x-2">
-                                            <Info className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                                            <p className="text-xs text-orange-700 font-medium">
-                                              {coupon.unavailableReason}
-                                            </p>
+                                <div
+                                  key={coupon.id || coupon.code}
+                                  className="relative bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 border-2 border-[#3e2626]/20 rounded-lg overflow-hidden shadow-md opacity-75"
+                                  style={{
+                                    clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))'
+                                  }}
+                                >
+                                  {/* Efeito de papel rasgado no topo */}
+                                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3e2626]/20 to-transparent opacity-30"></div>
+                                  
+                                  <div className="p-5">
+                                    <div className="flex items-start justify-between gap-4">
+                                      {/* Lado esquerdo - Informações principais */}
+                                      <div className="flex-1 space-y-3">
+                                        {/* Cabeçalho do cupom */}
+                                        <div className="flex items-center gap-3">
+                                          <div className="bg-[#3e2626]/40 text-gray-700 px-3 py-1 rounded-md font-bold text-sm shadow-md">
+                                            {coupon.code}
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-2xl font-black text-gray-500 line-through">
+                                              {discountValue}
+                                              {coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' ? (
+                                                <span className="text-lg ml-1">OFF</span>
+                                              ) : null}
+                                            </div>
+                                            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">
+                                              Cupom Indisponível
+                                            </div>
                                           </div>
                                         </div>
-                                      )}
+                                        
+                                        {/* Descrição */}
+                                        <div className="bg-white/50 backdrop-blur-sm rounded-md p-3 border border-[#3e2626]/10">
+                                          <p className="text-sm font-medium text-gray-600">
+                                            {coupon.description || 'Cupom indisponível'}
+                                          </p>
+                                        </div>
+                                        
+                                        {/* Informações adicionais */}
+                                        <div className="space-y-1.5 text-xs text-gray-600">
+                                          {coupon.minimumPurchase && (
+                                            <div className="flex items-center gap-2">
+                                              <ShoppingCart className="h-3.5 w-3.5 text-gray-400" />
+                                              <span className="font-medium">
+                                                Compra mínima: R$ {Number(coupon.minimumPurchase).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {validUntil && (
+                                            <div className="flex items-center gap-2">
+                                              <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                                              <span className="font-medium">
+                                                Válido até: {new Date(validUntil).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                        
+                                        {/* Mostrar motivo da indisponibilidade */}
+                                        {coupon.unavailableReason && (
+                                          <div className="mt-3 p-3 bg-[#3e2626]/10 border-2 border-[#3e2626]/30 rounded-md">
+                                            <div className="flex items-start gap-2">
+                                              <Info className="h-4 w-4 text-[#5a3a3a] mt-0.5 flex-shrink-0" />
+                                              <p className="text-xs text-[#3e2626] font-semibold">
+                                                {coupon.unavailableReason}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Lado direito - Botão desabilitado */}
+                                      <div className="flex flex-col items-center justify-center">
+                                        <Button
+                                          disabled
+                                          className="bg-[#3e2626]/30 text-[#3e2626]/60 cursor-not-allowed font-bold px-6 py-3 rounded-lg shadow-sm"
+                                        >
+                                          <Lock className="h-4 w-4 mr-2" />
+                                          Indisponível
+                                        </Button>
+                                      </div>
                                     </div>
-                                    <Button
-                                      disabled
-                                      className="ml-4 bg-gray-300 text-gray-500 cursor-not-allowed"
-                                    >
-                                      Indisponível
-                                    </Button>
                                   </div>
-                                </Card>
+                                  
+                                  {/* Linha pontilhada decorativa */}
+                                  <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#3e2626]/20 to-transparent opacity-30"></div>
+                                </div>
                               );
                             })}
                           </div>

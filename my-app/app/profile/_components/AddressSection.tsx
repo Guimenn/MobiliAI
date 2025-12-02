@@ -44,6 +44,7 @@ export function AddressSection() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingCEP, setLoadingCEP] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     recipientName: "",
@@ -75,37 +76,39 @@ export function AddressSection() {
     try {
       setLoading(true);
       
-      // Buscar endereços apenas da tabela users
-      const userAddresses: Address[] = [];
+      const allAddresses: Address[] = [];
       
-      // Exibir endereço se tiver pelo menos endereço, cidade e estado
-      if (user && user.address && user.city && user.state) {
-        // Extrair número do endereço se existir
-        const addressParts = user.address.split(',').map((s: string) => s.trim());
-        const lastPart = addressParts[addressParts.length - 1];
-        const numberMatch = lastPart.match(/\d+/);
-        const number = numberMatch ? numberMatch[0] : '';
-        const street = numberMatch ? user.address.replace(`, ${number}`, '').replace(number, '').trim() : user.address;
-
-        userAddresses.push({
-          id: `user-profile-${user.id}`,
-          name: "Endereço Principal",
-          recipientName: user.name || "",
-          phone: user.phone || "",
-          cpf: user.cpf || undefined,
-          address: street,
-          number: number || "",
-          complement: "",
-          neighborhood: "",
-          city: user.city,
-          state: user.state,
-          zipCode: user.zipCode || "",
-          isDefault: true,
-          isFromUserProfile: true,
-        });
+      // Buscar endereços de entrega da tabela shipping_addresses
+      try {
+        const shippingAddresses = await customerAPI.getShippingAddresses();
+        if (shippingAddresses && Array.isArray(shippingAddresses)) {
+          shippingAddresses.forEach((addr: any) => {
+            allAddresses.push({
+              id: addr.id,
+              name: addr.name || "Endereço",
+              recipientName: addr.recipientName || user?.name || "",
+              phone: addr.phone || user?.phone || "",
+              cpf: addr.cpf || user?.cpf || undefined,
+              address: addr.address || "",
+              number: addr.number || "",
+              complement: addr.complement || "",
+              neighborhood: addr.neighborhood || "",
+              city: addr.city,
+              state: addr.state,
+              zipCode: addr.zipCode || "",
+              isDefault: addr.isDefault || false,
+              isFromUserProfile: false, // Endereços de shipping_addresses nunca são do perfil
+            });
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao carregar endereços de entrega:", error);
       }
+      
+      // NÃO exibir endereço do perfil como um endereço separado
+      // O endereço do perfil deve ser editado apenas através do perfil do usuário
 
-      setAddresses(userAddresses);
+      setAddresses(allAddresses);
     } catch (error) {
       console.error("Erro ao carregar endereços:", error);
       setAddresses([]);
@@ -123,57 +126,136 @@ export function AddressSection() {
         return;
       }
 
-      // Combinar endereço e número
-      const fullAddress = formData.number 
-        ? `${formData.address}, ${formData.number}` 
-        : formData.address;
+      // Se estiver editando um endereço do perfil, atualizar o perfil
+      if (editingAddress && editingAddress.isFromUserProfile) {
+        // Combinar endereço e número
+        const fullAddress = formData.number 
+          ? `${formData.address}, ${formData.number}` 
+          : formData.address;
 
-      // Atualizar perfil do usuário (também atualizar o nome se fornecido)
-      const updateData: any = {
-        address: fullAddress,
-        city: formData.city,
-        state: formData.state,
-        zipCode: formData.zipCode,
-      };
+        // Atualizar perfil do usuário (também atualizar o nome se fornecido)
+        const updateData: any = {
+          address: fullAddress,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+        };
 
-      // Se o telefone foi fornecido, atualizar
-      if (formData.phone) {
-        updateData.phone = formData.phone;
-      }
+        // Se o telefone foi fornecido, atualizar
+        if (formData.phone) {
+          updateData.phone = formData.phone;
+        }
 
-      // Se o nome do destinatário foi fornecido e é diferente do nome atual, atualizar
-      if (formData.recipientName && formData.recipientName !== user.name) {
-        updateData.name = formData.recipientName;
-      }
+        // Se o nome do destinatário foi fornecido e é diferente do nome atual, atualizar
+        if (formData.recipientName && formData.recipientName !== user.name) {
+          updateData.name = formData.recipientName;
+        }
 
-      const updatedUser = await customerAPI.updateProfile(updateData);
-      
-      // Atualizar store local com os dados retornados do servidor
-      const currentUser = useAppStore.getState().user;
-      if (updatedUser && currentUser) {
-        useAppStore.getState().setUser({
-          ...currentUser,
-          ...updatedUser,
+        const updatedUser = await customerAPI.updateProfile(updateData);
+        
+        // Atualizar store local com os dados retornados do servidor
+        const currentUser = useAppStore.getState().user;
+        if (updatedUser && currentUser) {
+          useAppStore.getState().setUser({
+            ...currentUser,
+            ...updatedUser,
+          });
+        } else if (currentUser) {
+          // Fallback: atualizar apenas os campos que enviamos
+          useAppStore.getState().setUser({
+            ...currentUser,
+            ...updateData,
+          });
+        }
+        
+        // Recarregar lista de endereços após atualizar
+        await loadAddresses();
+        
+        setIsDialogOpen(false);
+        setEditingAddress(null);
+        resetForm();
+        
+        // Feedback visual de sucesso
+        toast.success("Endereço atualizado com sucesso!", {
+          description: "As alterações foram salvas.",
         });
-      } else if (currentUser) {
-        // Fallback: atualizar apenas os campos que enviamos
-        useAppStore.getState().setUser({
-          ...currentUser,
-          ...updateData,
+      } else if (editingAddress && !editingAddress.isFromUserProfile) {
+        // Se estiver editando um endereço de entrega, atualizar o endereço de entrega
+        const addressId = editingAddress.id;
+        const updateData: any = {
+          name: formData.name,
+          recipientName: formData.recipientName,
+          phone: formData.phone,
+          address: formData.address,
+          number: formData.number,
+          neighborhood: formData.neighborhood,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          isDefault: formData.isDefault,
+          cpf: formData.cpf || editingAddress.cpf || "",
+        };
+
+        if (formData.complement) {
+          updateData.complement = formData.complement;
+        }
+
+        await customerAPI.updateShippingAddress(addressId, updateData);
+        
+        // Fechar modal primeiro para melhor UX
+        setIsDialogOpen(false);
+        setEditingAddress(null);
+        resetForm();
+        
+        // Recarregar lista de endereços após atualizar
+        await loadAddresses();
+        
+        // Feedback visual de sucesso
+        toast.success("Endereço atualizado com sucesso!", {
+          description: "As alterações foram salvas.",
+        });
+      } else {
+        // Se não estiver editando, criar um novo endereço de entrega
+        // Validar campos obrigatórios
+        if (!formData.name || !formData.recipientName || !formData.phone || !formData.cpf ||
+            !formData.address || !formData.number || !formData.neighborhood || 
+            !formData.city || !formData.state || !formData.zipCode) {
+          toast.error("Por favor, preencha todos os campos obrigatórios.");
+          return;
+        }
+
+        const addressData: any = {
+          name: formData.name,
+          recipientName: formData.recipientName,
+          phone: formData.phone,
+          cpf: formData.cpf,
+          address: formData.address,
+          number: formData.number,
+          neighborhood: formData.neighborhood,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          isDefault: formData.isDefault,
+        };
+
+        if (formData.complement) {
+          addressData.complement = formData.complement;
+        }
+
+        await customerAPI.createShippingAddress(addressData);
+        
+        // Recarregar lista de endereços após criar
+        await loadAddresses();
+        
+        setIsDialogOpen(false);
+        setEditingAddress(null);
+        resetForm();
+        
+        // Feedback visual de sucesso
+        toast.success("Endereço criado com sucesso!", {
+          description: "O novo endereço foi adicionado.",
         });
       }
-      
-      // Recarregar lista de endereços após atualizar
-      await loadAddresses();
-      
-      setIsDialogOpen(false);
-      setEditingAddress(null);
-      resetForm();
-      
-      // Feedback visual de sucesso
-      toast.success("Endereço atualizado com sucesso!", {
-        description: "As alterações foram salvas.",
-      });
     } catch (error: any) {
       console.error("Erro ao salvar endereço:", error);
       const errorMessage = error?.response?.data?.message || error?.message || "Erro desconhecido";
@@ -240,11 +322,39 @@ export function AddressSection() {
       }
       return;
     }
+
+    // Deletar endereço de entrega
+    const confirmed = await showConfirm("Deseja realmente excluir este endereço?");
+    if (confirmed) {
+      try {
+        await customerAPI.deleteShippingAddress(id);
+        await loadAddresses();
+        toast.success("Endereço excluído com sucesso!");
+      } catch (error: any) {
+        console.error("Erro ao excluir endereço:", error);
+        const errorMessage = error?.response?.data?.message || error?.message || "Erro desconhecido";
+        toast.error("Erro ao excluir endereço", {
+          description: errorMessage,
+        });
+      }
+    }
   };
 
   const handleSetDefault = async (id: string) => {
-    // Como só temos um endereço (do perfil), ele já é o padrão
-    // Esta função não é mais necessária, mas mantida para compatibilidade
+    try {
+      await customerAPI.setDefaultShippingAddress(id);
+      
+      // Recarregar do servidor para garantir sincronização
+      await loadAddresses();
+      
+      toast.success("Endereço definido como padrão!");
+    } catch (error: any) {
+      console.error("Erro ao definir endereço padrão:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Erro desconhecido";
+      toast.error("Erro ao definir endereço padrão", {
+        description: errorMessage,
+      });
+    }
   };
 
   const resetForm = () => {
@@ -271,9 +381,59 @@ export function AddressSection() {
     return `${cleaned.slice(0, 5)}-${cleaned.slice(5, 8)}`;
   };
 
-  const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const fetchAddressByCEP = async (cep: string) => {
+    // Remove formatação do CEP
+    const cleanCEP = cep.replace(/\D/g, "");
+    
+    // Verifica se tem 8 dígitos
+    if (cleanCEP.length !== 8) {
+      return;
+    }
+
+    setLoadingCEP(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        toast.error("CEP não encontrado", {
+          description: "Por favor, verifique o CEP digitado.",
+        });
+        return;
+      }
+
+      // Preencher os campos com os dados retornados
+      setFormData(prev => ({
+        ...prev,
+        address: data.logradouro || prev.address,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.localidade || prev.city,
+        state: data.uf || prev.state,
+        zipCode: formatZipCode(cleanCEP),
+      }));
+
+      toast.success("Endereço encontrado!", {
+        description: "Os dados foram preenchidos automaticamente.",
+      });
+    } catch (error) {
+      console.error("Erro ao buscar CEP:", error);
+      toast.error("Erro ao buscar CEP", {
+        description: "Não foi possível buscar o endereço. Tente novamente.",
+      });
+    } finally {
+      setLoadingCEP(false);
+    }
+  };
+
+  const handleZipCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatZipCode(e.target.value);
     setFormData({ ...formData, zipCode: formatted });
+    
+    // Buscar endereço quando o CEP estiver completo (8 dígitos)
+    const cleanCEP = formatted.replace(/\D/g, "");
+    if (cleanCEP.length === 8 && !editingAddress) {
+      await fetchAddressByCEP(formatted);
+    }
   };
 
   return (
@@ -341,6 +501,7 @@ export function AddressSection() {
                   onChange={(e) => setFormData({ ...formData, recipientName: e.target.value })}
                   placeholder="Nome completo do destinatário"
                   required
+                  disabled={!!editingAddress}
                 />
               </div>
 
@@ -353,17 +514,45 @@ export function AddressSection() {
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="(11) 99999-9999"
                     required
+                    disabled={!!editingAddress}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cpf">CPF (Opcional)</Label>
+                  <Label htmlFor="cpf">CPF</Label>
                   <Input
                     id="cpf"
                     value={formData.cpf}
                     onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
                     placeholder="000.000.000-00"
+                    required
+                    disabled={!!editingAddress}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="zipCode">CEP</Label>
+                <div className="relative">
+                  <Input
+                    id="zipCode"
+                    value={formData.zipCode}
+                    onChange={handleZipCodeChange}
+                    placeholder="00000-000"
+                    maxLength={9}
+                    required
+                    className={loadingCEP ? "pr-10" : ""}
+                  />
+                  {loadingCEP && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#3e2626] border-t-transparent"></div>
+                    </div>
+                  )}
+                </div>
+                {!editingAddress && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Digite o CEP para preencher automaticamente o endereço
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -464,18 +653,6 @@ export function AddressSection() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="zipCode">CEP</Label>
-                <Input
-                  id="zipCode"
-                  value={formData.zipCode}
-                  onChange={handleZipCodeChange}
-                  placeholder="00000-000"
-                  maxLength={9}
-                  required
-                />
-              </div>
-
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -543,11 +720,6 @@ export function AddressSection() {
                       {address.isDefault && (
                         <Badge className="bg-[#3e2626] text-white hover:bg-[#5a3a3a]">
                           Padrão
-                        </Badge>
-                      )}
-                      {address.isFromUserProfile && (
-                        <Badge variant="secondary" className="bg-blue-500 text-white hover:bg-blue-600">
-                          Do Perfil
                         </Badge>
                       )}
                     </div>
@@ -618,8 +790,8 @@ export function AddressSection() {
                     </div>
                   </div>
 
-                  {/* Botão definir como padrão (se não for padrão e não for do perfil) */}
-                  {!address.isDefault && !address.isFromUserProfile && (
+                  {/* Botão definir como padrão (se não for padrão) */}
+                  {!address.isDefault && (
                     <div className="pt-4 border-t border-gray-200">
                       <Button
                         variant="outline"

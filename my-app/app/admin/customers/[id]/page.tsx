@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { adminAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
@@ -32,7 +32,6 @@ export default function CustomerDetailPage() {
   
   const [customer, setCustomer] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [sales, setSales] = useState<any[]>([]);
 
   useEffect(() => {
     if (customerId) {
@@ -44,7 +43,7 @@ export default function CustomerDetailPage() {
     try {
       setIsLoading(true);
       
-      // Buscar dados do cliente
+      // Buscar dados do cliente (já inclui purchases)
       try {
         const customerData = await adminAPI.getCustomerById(customerId);
         setCustomer(customerData);
@@ -60,17 +59,6 @@ export default function CustomerDetailPage() {
         } catch (userError) {
           throw new Error('Cliente não encontrado');
         }
-      }
-
-      // Buscar vendas do cliente
-      try {
-        const salesData = await adminAPI.getSales();
-        const salesArray = Array.isArray(salesData) ? salesData : (salesData?.sales || salesData?.data || []);
-        const customerSales = salesArray.filter((sale: any) => sale.customerId === customerId);
-        setSales(customerSales);
-      } catch (error) {
-        console.error('Erro ao buscar vendas:', error);
-        setSales([]);
       }
     } catch (error: any) {
       console.error('Erro ao carregar dados do cliente:', error);
@@ -168,9 +156,21 @@ export default function CustomerDetailPage() {
     );
   }
 
+  // Usar purchases do customer se disponível, caso contrário usar array vazio
+  const sales = customer?.purchases || [];
+  
   const totalSpent = sales.reduce((sum, sale) => {
-    const amount = sale.totalAmount || sale.total || sale.totalValue || 0;
-    return sum + (Number(amount) || 0);
+    // Converter totalAmount (pode vir como Decimal do Prisma)
+    let amount = sale.totalAmount || sale.total || sale.totalValue || 0;
+    // Se for um objeto Decimal do Prisma, converter para número
+    if (typeof amount === 'object' && amount !== null && 'toNumber' in amount) {
+      amount = (amount as any).toNumber();
+    } else if (typeof amount === 'string') {
+      amount = parseFloat(amount) || 0;
+    } else {
+      amount = Number(amount) || 0;
+    }
+    return sum + amount;
   }, 0);
 
   return (
@@ -198,6 +198,9 @@ export default function CustomerDetailPage() {
         <CardHeader>
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16">
+              {customer.avatarUrl && (
+                <AvatarImage src={customer.avatarUrl} alt={customer.name} />
+              )}
               <AvatarFallback className="bg-[#3e2626] text-white text-xl">
                 {customer.name?.charAt(0)?.toUpperCase() || 'C'}
               </AvatarFallback>
@@ -354,7 +357,15 @@ export default function CustomerDetailPage() {
           ) : (
             <div className="space-y-4">
               {sales.map((sale: any) => {
-                const saleAmount = sale.totalAmount || sale.total || sale.totalValue || 0;
+                // Converter totalAmount (pode vir como Decimal do Prisma)
+                let saleAmount = sale.totalAmount || sale.total || sale.totalValue || 0;
+                if (typeof saleAmount === 'object' && saleAmount !== null && 'toNumber' in saleAmount) {
+                  saleAmount = (saleAmount as any).toNumber();
+                } else if (typeof saleAmount === 'string') {
+                  saleAmount = parseFloat(saleAmount) || 0;
+                } else {
+                  saleAmount = Number(saleAmount) || 0;
+                }
                 const saleStatus = sale.status || 'UNKNOWN';
                 
                 return (

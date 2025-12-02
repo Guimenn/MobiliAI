@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -210,6 +210,9 @@ export default function CustomersPage() {
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <Avatar className="h-12 w-12 flex-shrink-0">
+                      {customer.avatarUrl && (
+                        <AvatarImage src={customer.avatarUrl} alt={customer.name} />
+                      )}
                       <AvatarFallback className="bg-muted text-foreground">
                         {customer.name?.charAt(0)?.toUpperCase() || 'C'}
                       </AvatarFallback>
