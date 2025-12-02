@@ -51,7 +51,8 @@ interface BackendCoupon {
   maximumDiscount?: number;
   usageLimit?: number;
   usedCount: number;
-  userUsageCount?: number; // Quantas vezes o usuário específico usou
+  userUsageCount?: number; // Quantas vezes o usuário específico usou em vendas (apenas com saleId não nulo)
+  isRedeemed?: boolean; // Indica se o cupom foi resgatado mas ainda não usado
   isActive: boolean;
   validFrom: string;
   validUntil: string;
@@ -101,14 +102,16 @@ export default function CouponSection() {
           const validUntil = new Date(coupon.validUntil);
           const isExpired = validUntil < now;
           
-          // Determinar status: se expirou, é expired; caso contrário, verificar se foi usado pelo usuário
+          // Determinar status: se expirou, é expired; caso contrário, verificar se foi usado pelo usuário em vendas
           let status: CouponStatus = "active";
           if (isExpired) {
             status = "expired";
           } else if (coupon.userUsageCount !== undefined && coupon.userUsageCount > 0) {
-            // Se o usuário já usou o cupom pelo menos uma vez, marcar como usado
+            // Se o usuário já usou o cupom em vendas pelo menos uma vez, marcar como usado
+            // userUsageCount conta apenas usos em vendas (saleId não nulo), não resgates
             status = "used";
           }
+          // Se foi resgatado mas não usado (isRedeemed = true e userUsageCount = 0), mantém como "active"
 
           return {
             id: coupon.id,
@@ -229,16 +232,29 @@ export default function CouponSection() {
       return;
     }
 
+    const codeToRedeem = redeemCode.trim().toUpperCase();
+    console.log('🎫 Frontend: Tentando resgatar cupom:', codeToRedeem);
+
     try {
       setRedeeming(true);
-      await customerAPI.redeemCoupon(redeemCode.trim().toUpperCase());
+      
+      console.log('🎫 Frontend: Chamando API para resgatar cupom...');
+      const result = await customerAPI.redeemCoupon(codeToRedeem);
+      console.log('✅ Frontend: Cupom resgatado com sucesso na API:', result);
       
       toast.success("Cupom resgatado com sucesso!");
       setShowRedeemModal(false);
       setRedeemCode("");
       
       // Recarregar os cupons
+      console.log('🔄 Frontend: Recarregando lista de cupons...');
       const backendCoupons: BackendCoupon[] = await customerAPI.getCoupons();
+      console.log('📋 Frontend: Cupons recebidos do backend:', backendCoupons.length, backendCoupons.map(c => ({
+        code: c.code,
+        assignmentType: c.assignmentType,
+        id: c.id,
+      })));
+      
       const mappedCoupons: MappedCoupon[] = backendCoupons.map((coupon) => {
         const now = new Date();
         const validUntil = new Date(coupon.validUntil);
@@ -248,8 +264,11 @@ export default function CouponSection() {
         if (isExpired) {
           status = "expired";
         } else if (coupon.userUsageCount !== undefined && coupon.userUsageCount > 0) {
+          // Se o usuário já usou o cupom em vendas pelo menos uma vez, marcar como usado
+          // userUsageCount conta apenas usos em vendas (saleId não nulo), não resgates
           status = "used";
         }
+        // Se foi resgatado mas não usado (isRedeemed = true e userUsageCount = 0), mantém como "active"
 
         return {
           id: coupon.id,
@@ -267,9 +286,33 @@ export default function CouponSection() {
         };
       });
 
+      console.log('📋 Frontend: Cupons mapeados:', mappedCoupons.length, mappedCoupons.map(c => ({
+        code: c.code,
+        status: c.status,
+        id: c.id,
+      })));
+
       setCoupons(mappedCoupons);
+      
+      // Verificar se o cupom resgatado está na lista
+      const redeemedCouponInList = mappedCoupons.find(c => c.code === codeToRedeem);
+      if (redeemedCouponInList) {
+        console.log('✅ Frontend: Cupom resgatado está na lista!', redeemedCouponInList);
+      } else {
+        console.error('❌ Frontend: Cupom resgatado NÃO está na lista!', {
+          code: codeToRedeem,
+          totalCoupons: mappedCoupons.length,
+          allCodes: mappedCoupons.map(c => c.code),
+        });
+        toast.warning("Cupom resgatado, mas não apareceu na lista. Tente recarregar a página.");
+      }
     } catch (error: any) {
-      console.error("Erro ao resgatar cupom:", error);
+      console.error("❌ Frontend: Erro ao resgatar cupom:", error);
+      console.error("❌ Frontend: Detalhes do erro:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
       toast.error(error.response?.data?.message || error.message || "Não foi possível resgatar o cupom. Verifique se o código está correto.");
     } finally {
       setRedeeming(false);

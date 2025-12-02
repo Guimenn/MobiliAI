@@ -80,47 +80,52 @@ export default function TestIALandingPage() {
   const [trendCarrousel, setTrendCarrousel] = useState<TrendItem[]>([]);
   const [productShowcase, setProductShowcase] = useState<ProductItem[]>([]);
   
-  // Dados estáticos (podem ser movidos para o banco depois)
-  const differentiators = [
-    {
-      icon: <Cpu className="h-8 w-8" />,
-      title: 'IA de última geração',
-      description: 'Tecnologia avançada de processamento de imagens e reconhecimento de padrões.',
-    },
-    {
-      icon: <Zap className="h-8 w-8" />,
-      title: 'Resultados instantâneos',
-      description: 'Transformações em segundos, sem espera ou processamento demorado.',
-    },
-    {
-      icon: <Package className="h-8 w-8" />,
-      title: 'Integração completa',
-      description: 'Conectado diretamente com seu catálogo de produtos e estoque.',
-    },
-  ];
+   // Dados estáticos (podem ser movidos para o banco depois)
+   const differentiators = [
+     {
+       icon: <Cpu className="h-7 w-7" />,
+       title: 'IA que funciona na prática',
+       description: 'Processa imagens e identifica padrões automaticamente, sem complicação.',
+     },
+     {
+       icon: <Zap className="h-7 w-7" />,
+       title: 'Resultados rápidos',
+       description: 'Em poucos segundos você já vê o resultado final.',
+     },
+     {
+       icon: <Package className="h-7 w-7" />,
+       title: 'Integração com seu sistema',
+       description: 'Conecta direto com seu catálogo de produtos e estoque.',
+     },
+     {
+       icon: <ShieldCheck className="h-7 w-7" />,
+       title: 'Fácil de usar',
+       description: 'Interface simples e intuitiva. Qualquer pessoa da equipe consegue usar.',
+     },
+   ];
 
-  const timeline = [
-    {
-      step: '1',
-      title: 'Envie a foto',
-      description: 'Faça upload da imagem do ambiente que deseja transformar.',
-    },
-    {
-      step: '2',
-      title: 'Escolha a cor',
-      description: 'Selecione a paleta de cores da sua marca ou personalize.',
-    },
-    {
-      step: '3',
-      title: 'IA processa',
-      description: 'Nossa IA aplica as transformações automaticamente.',
-    },
-    {
-      step: '4',
-      title: 'Visualize e compartilhe',
-      description: 'Veja o resultado e compartilhe com seus clientes.',
-    },
-  ];
+   const timeline = [
+     {
+       step: '1',
+       title: 'Envie a foto',
+       description: 'Faça upload da imagem do ambiente que deseja transformar.',
+     },
+     {
+       step: '2',
+       title: 'Escolha a mobília',
+       description: 'Selecione a mobília que deseja usar no ambiente.',
+     },
+     {
+       step: '3',
+       title: 'A IA processa',
+       description: 'A IA aplica as transformações automaticamente.',
+     },
+     {
+       step: '4',
+       title: 'Visualize e compartilhe',
+       description: 'Veja o resultado e compartilhe com seus clientes.',
+     },
+   ];
 
   const impactPhrases = [
     {
@@ -246,7 +251,7 @@ export default function TestIALandingPage() {
     },
     {
       question: 'As renderizações ficam salvas onde?',
-      answer: 'Tudo fica centralizado no PintAi Studio com controle de permissões por loja e equipe.',
+      answer: 'Tudo fica centralizado no MobiliAI Studio com controle de permissões por loja e equipe.',
     },
     {
       question: 'Quais dispositivos são suportados?',
@@ -337,463 +342,288 @@ export default function TestIALandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f3ef] text-gray-900">
+    <div className="min-h-screen bg-white text-gray-900">
       <Header />
       <main className="overflow-hidden">
         {/* Hero */}
-        <section className="relative overflow-hidden min-h-[85vh] flex items-center pt-40 pb-24">
-          {/* Background Image */}
-          <div className="absolute inset-0 z-0">
-            <Image src="/hero-bg.png" alt="Ambiente decorado com IA" fill priority className="object-cover" />
-            <div className="absolute inset-0 bg-[#3e2626]/85 mix-blend-multiply" />
-            <div className="absolute inset-0 bg-linear-to-br from-[#3e2626]/85 via-[#4f3223]/75 to-[#8B4513]/60" />
-          </div>
+        <section className="relative overflow-hidden min-h-screen flex items-center pt-20 ">
+          {/* Background Image com efeitos dinâmicos */}
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-out z-0"
+            style={{ 
+              backgroundImage: 'url(/hero-bg.png)',
+              filter: 'sepia(40%) saturate(60%) brightness(0.5) contrast(1.1) hue-rotate(-10deg)',
+              WebkitFilter: 'sepia(40%) saturate(60%) brightness(0.5) contrast(1.1) hue-rotate(-10deg)',
+              transform: 'scale(1.1)'
+            }}
+          ></div>
+          
+          {/* Overlay gradiente marrom elegante */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#3e2626]/85 via-[#5a3a3a]/70 to-[#3e2626]/60"></div>
+          
+          {/* Overlay adicional para dar profundidade marrom */}
+          <div className="absolute inset-0 bg-[#3e2626]/30 mix-blend-multiply"></div>
+          
+          {/* Efeitos de luz animados com tons marrons */}
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#8B4513]/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#3e2626]/25 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          
+          {/* Grid pattern sutil com tons marrons */}
+          <div 
+            className="absolute inset-0 opacity-[0.08] z-0"
+            style={{
+              backgroundImage: `linear-gradient(rgba(139, 69, 19, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 69, 19, 0.15) 1px, transparent 1px)`,
+              backgroundSize: '50px 50px'
+            }}
+          ></div>
 
-          <div className="container relative z-10 mx-auto flex flex-col gap-20 px-4 lg:flex-row lg:items-center">
-            <div className="max-w-4xl text-white">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold tracking-wide backdrop-blur-sm mb-8"
-              >
-                <Sparkles className="h-4 w-4 text-[#F7C194]" />
-                <span className="text-white">Powered by MobiliAI</span>
-              </motion.div>
+          <div className="container relative z-10 mx-auto px-4 sm:px-6 lg:px-8 pt-5 pb-12">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[90vh]">
               
+              {/* LADO ESQUERDO - Conteúdo principal */}
+              <div className="text-white space-y-10 mt-10">
+               
+
+                {/* Título principal */}
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.2 }}
+                  className="space-y-4"
+                >
+                  <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold leading-[0.95] tracking-tight">
+                    <span className="block text-white drop-shadow-2xl">
+                      Visualize
+                    </span>
+                    <span className="block text-white drop-shadow-2xl">
+                      ambientes reais
+                    </span>
+                    <span className="block text-white drop-shadow-2xl mt-2 md:mt-3">
+                      <span className="text-white">com mobilias </span>
+                      <FlipWords
+                        words={[ 'personalizadas.', 'exclusivas.', 'únicas.']}
+                        duration={3000}
+                        className="text-[#C3A580]"
+                      />
+                    </span>
+                  </h1>
+                </motion.div>
+
+                {/* Botões */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.6 }}
+                  className="flex flex-col sm:flex-row gap-4 pt-4"
+                >
+                  <Link href="/IA-demo">
+                    <Button 
+                      size="lg"
+                      className="group relative bg-white text-[#3e2626] hover:bg-white/95 rounded-full px-10 py-7 text-base font-bold transition-all duration-300 shadow-[0_20px_60px_rgba(0,0,0,0.3)] hover:shadow-[0_25px_80px_rgba(0,0,0,0.4)] hover:scale-105 active:scale-95 overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                      <span className="relative flex items-center gap-3">
+                        <Rocket className="h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
+                        <span>EXPERIMENTAR AGORA</span>
+                        <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+                      </span>
+                    </Button>
+                  </Link>
+                  <Link href="/products">
+                    <Button 
+                      size="lg"
+                      variant="outline"
+                      className="group relative bg-transparent border-2 border-white/50 text-white hover:bg-white/10 hover:border-white/70 rounded-full px-10 py-7 text-base font-bold backdrop-blur-sm transition-all duration-300 hover:scale-105 active:scale-95"
+                    >
+                      <span className="flex items-center gap-3">
+                        <ImageIcon className="h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
+                        <span>VER CATÁLOGO</span>
+                      </span>
+                    </Button>
+                  </Link>
+                </motion.div>
+
+                {/* Métricas */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.7 }}
+                  className="grid grid-cols-3 gap-4 pt-6"
+                >
+                  {heroMetrics.map((metric) => (
+                    <div
+                      key={metric.label}
+                      className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm shadow-lg hover:bg-white/15 transition-all duration-300"
+                    >
+                      <p className="text-3xl md:text-4xl font-black text-white">{metric.value}</p>
+                      <p className="mt-1 text-[10px] md:text-xs font-semibold uppercase tracking-[0.3em] text-white/70">
+                        {metric.label}
+                      </p>
+                    </div>
+                  ))}
+                </motion.div>
+              </div>
+
+              {/* LADO DIREITO - Imagem destacada */}
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="mb-8"
-              >
-                <BlurText
-                  text="Visualize ambientes reais"
-                  delay={100}
-                  animateBy="words"
-                  direction="top"
-                  className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight text-white mb-4"
-                />
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight text-white">
-                    com a paleta
-                  </span>
-                  <FlipWords
-                    words={['da sua marca.', 'personalizada.', 'exclusiva.', 'única.']}
-                    duration={3000}
-                    className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.1] tracking-tight text-[#F7C194]"
-                  />
-                </div>
-              </motion.div>
-              
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, scale: 0.95, x: 30 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
                 transition={{ duration: 0.8, delay: 0.4 }}
-                className="text-lg sm:text-xl text-white/90 leading-relaxed max-w-2xl mb-12"
+                className="relative group w-full"
               >
-                Transforme fotos de clientes em minutos, substituindo cores de parede, mobiliário e iluminação com o
-                motor nano-banana AI. O mesmo tom, a mesma textura, bem na tela.
-              </motion.p>
-              
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.6 }}
-                className="flex flex-col gap-4 sm:flex-row sm:items-center"
-              >
-                <Link href="/IA-demo">
-                  <TextRevealButton
-                    text="Experimentar agora"
-                    icon={<Rocket className="h-6 w-6" />}
-                    className="h-16 rounded-full bg-white px-12 text-lg font-semibold text-[#3e2626] shadow-2xl hover:bg-white/95 hover:shadow-white/50 hover:text-brown-500"
-                  />
-                </Link>
-                <Link href="/products">
-                  <TextRevealButton
-                    text="Ver catálogo real"
-                    icon={<ImageIcon className="h-6 w-6" />}
-                    className="h-16 rounded-full border-2 border-white/70 bg-white/10 px-12 text-lg font-semibold text-white backdrop-blur-sm hover:bg-white/20 hover:border-white"
-                  />
-                </Link>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.7 }}
-                className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-              >
-                {heroMetrics.map((metric) => (
-                  <div
-                    key={metric.label}
-                    className="rounded-2xl border border-white/15 bg-white/5 p-5 backdrop-blur-sm shadow-lg"
-                  >
-                    <p className="text-4xl font-black text-white">{metric.value}</p>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.4em] text-white/70">
-                      {metric.label}
-                    </p>
-                    <p className="mt-3 text-sm text-white/80">{metric.description}</p>
+                <div className="relative bg-gradient-to-br from-white/15 h-[550px] via-white/10 to-white/5 backdrop-blur-2xl rounded-3xl p-5 md:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)] border-2 border-white/40 overflow-hidden transition-all duration-500 hover:shadow-[0_25px_80px_rgba(0,0,0,0.4)] hover:border-white/50 hover:scale-[1.01]">
+                  {/* Efeito de brilho animado no fundo */}
+                  <div className="absolute inset-0 opacity-30">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-out"></div>
                   </div>
-                ))}
+                  
+                  {/* Padrão decorativo sutil de fundo */}
+                  <div className="absolute inset-0 opacity-[0.08]" style={{
+                    backgroundImage: `radial-gradient(circle at 2px 2px, #ffffff 1px, transparent 0)`,
+                    backgroundSize: '20px 20px'
+                  }}></div>
+                  
+                  {/* Imagem principal */}
+                  <div className="relative h-full w-full rounded-2xl overflow-hidden">
+                    <Image
+                      src="/IAsection/ImagemIA3.png"
+                      alt="Visualização de quarto gerada pela IA"
+                      fill
+                      className="object-cover object-center transition-transform duration-700 group-hover:scale-110"
+                      sizes="(max-width: 1024px) 100vw, 500px"
+                      priority
+                    />
+                    <div className="absolute inset-0 bg-linear-to-t from-[#3e2626]/40 via-transparent to-transparent" />
+                  </div>
+                  
+                  {/* Badge na imagem */}
+                  <div className="absolute top-8 left-8 inline-flex items-center gap-2 rounded-full bg-[#3e2626]/90 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-white backdrop-blur-sm border border-white/20">
+                   
+                    IA aplicada
+                  </div>
+                </div>
+                
+                {/* Card flutuante com resultado */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.8 }}
+                  className="absolute -bottom-6 -right-6 hidden w-64 rounded-3xl bg-[#3e2626] p-5 shadow-2xl backdrop-blur-lg border border-white/10 md:block"
+                >
+                  <div className="relative h-32 overflow-hidden rounded-2xl mb-3">
+                    <Image 
+                      src="/IAsection/ImagemIA1.png" 
+                      alt="Renderização de sala pela IA" 
+                      fill 
+                      className="object-cover" 
+                      sizes="256px" 
+                    />
+                  </div>
+                  <p className="text-xs font-medium uppercase tracking-[0.3em] text-white/80 mb-1">Resultado em 12s</p>
+                  <p className="text-sm text-white/90 leading-snug">IA posicionou paleta e mobiliário da coleção Oslo automaticamente.</p>
+                </motion.div>
               </motion.div>
-              
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.8 }}
-                className="mt-6 text-sm text-white/70"
-              >
-                * Login necessário apenas para utilizar a experiência completa com IA.
-              </motion.p>
             </div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, x: 30 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-              className="relative w-full max-w-xl lg:max-w-lg"
-            >
-              <div className="relative h-[450px] lg:h-[550px] rounded-3xl border-2 border-white/30 bg-white/10 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.8)] backdrop-blur-xl overflow-hidden group">
-                <Image
-                  src="/IAsection/ImagemIA3.png"
-                  alt="Visualização de quarto gerada pela IA"
-                  fill
-                  className="object-cover object-center transition-transform duration-700 group-hover:scale-110"
-                  sizes="(max-width: 1024px) 100vw, 500px"
-                  priority
-                />
-                <div className="absolute inset-0 bg-linear-to-t from-[#3e2626]/20 to-transparent" />
-              </div>
-              
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.8 }}
-                className="absolute -bottom-10 -right-8 hidden w-56 rounded-3xl border border-white/30 bg-white/10 p-4 shadow-2xl backdrop-blur-lg md:block"
-              >
-                <div className="relative h-28 overflow-hidden rounded-2xl">
-                  <Image src="/IAsection/ImagemIA1.png" alt="Renderização de sala pela IA" fill className="object-cover" sizes="190px" />
-                </div>
-                <p className="mt-3 text-xs font-medium uppercase tracking-[0.3em] text-white/80">Resultado em 12s</p>
-                <p className="text-sm text-white">IA posicionou paleta e mobiliário da coleção Oslo automaticamente.</p>
-              </motion.div>
-            </motion.div>
           </div>
         </section>
 
-        {/* Immersive studio */}
-        <section className="relative overflow-hidden bg-[#150d0a] py-24 text-white">
-          <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-linear-to-br from-[#150d0a] via-[#3e2626] to-[#8B4513]/70 opacity-90" />
-            <div className="absolute -left-32 top-1/4 h-72 w-72 rounded-full bg-[#F7C194]/20 blur-[140px]" />
-            <div className="absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-[#C07A45]/20 blur-[140px]" />
-          </div>
-
-          <div className="container relative z-10 mx-auto grid gap-12 px-4 lg:grid-cols-2 lg:items-center">
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="relative"
-            >
-              <div className="rounded-[40px] border border-white/10 bg-white/5 p-6 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.8)] backdrop-blur">
-                <div className="relative h-[420px] overflow-hidden rounded-[28px] border border-white/10 bg-white/5">
-                  <Image
-                    src="/IAsection/ImagemIA4.png"
-                    alt="Console do estúdio de IA"
-                    fill
-                    className="object-cover object-center"
-                    sizes="(max-width: 1024px) 100vw, 500px"
-                  />
-                  <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/15 bg-white/10 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.4em] text-white/70">Studio vivo</p>
-                    <p className="mt-2 text-lg font-semibold">Equipe Oslo · Render aprovado · 21:04</p>
-                    <p className="text-sm text-white/70">3 cores aplicadas · Kit Essencial + Selador premium</p>
-                  </div>
-                </div>
-              </div>
-              <div className="absolute -bottom-10 left-1/2 hidden w-64 -translate-x-1/2 rounded-3xl border border-white/10 bg-white/10 p-4 text-sm text-white/80 backdrop-blur-xl md:block">
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/60">Live preview</p>
-                <p className="mt-2">Atualize elementos do ambiente em tempo real e compartilhe com o cliente em segundos.</p>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8, delay: 0.15 }}
-            >
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-white/80">
-                Studio IA em destaque
-              </span>
-              <h2 className="mt-6 text-4xl font-black leading-tight sm:text-5xl">
-                Um showroom imersivo que vive dentro do seu navegador.
-              </h2>
-              <p className="mt-4 text-lg text-white/80">
-                Replique a experiência física da sua loja com painéis 3D, playlists de cores e storytelling guiado pela IA.
-                Cada render pode virar campanha, catálogo ou treinamento em instantes.
-              </p>
-
-              <div className="mt-8 space-y-4">
-                {immersiveHighlights.map((item) => (
-                  <div key={item.title} className="flex items-start gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white">
-                      {item.icon}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">{item.title}</h3>
-                      <p className="text-sm text-white/80">{item.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-10 flex flex-wrap gap-4">
-                <Link href="/IA-demo">
-                  <Button className="h-12 rounded-full bg-white px-8 text-sm font-semibold uppercase tracking-[0.3em] text-[#3e2626] hover:bg-white/90">
-                    Abrir estúdio agora
-                  </Button>
-                </Link>
-                <Link href="/contact">
-                  <Button
-                    variant="outline"
-                    className="h-12 rounded-full border-white/30 bg-transparent px-8 text-sm font-semibold uppercase tracking-[0.3em] text-white hover:bg-white/10"
-                  >
-                    Falar com especialistas
-                  </Button>
-                </Link>
-              </div>
-            </motion.div>
-          </div>
-        </section>
+       
 
         {/* Highlights */}
         <section className="relative overflow-hidden bg-white py-20">
-          {/* Gradiente superior para transição */}
-          <div className="absolute top-0 left-0 right-0 h-32 bg-linear-to-b from-[#3e2626]/10 via-[#3e2626]/5 to-transparent pointer-events-none z-10" />
-          
-          {/* Gradiente inferior para transição */}
-          <div className="absolute bottom-0 left-0 right-0 h-32 bg-linear-to-t from-white via-white/80 to-transparent pointer-events-none z-10" />
-          
-          <div className="container relative mx-auto grid items-center gap-12 px-4 md:grid-cols-[1.15fr,0.85fr] z-20">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-[#3e2626]/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.4em] text-[#3e2626]">
-                <Palette className="h-4 w-4" />
-                Paleta oficial PintAi
-              </span>
-              <h2 className="mt-6 text-4xl font-black leading-tight text-[#3e2626] sm:text-5xl">
-                Harmonia entre tecnologia e o DNA visual da sua loja.
-              </h2>
-              <p className="mt-6 text-lg text-[#4f3a2f]/80">
-                Utilizamos a mesma cartela cromática das suas coleções para sugerir combinações que vendem. A IA entende
-                textura, iluminação e materiais, garantindo uma prévia fiel ao produto final.
-              </p>
-              <div className="mt-10 space-y-4">
-                {[
-                  {
-                    icon: <Lightbulb className="h-5 w-5" />,
-                    title: 'Sugestões inteligentes de paleta',
-                    description: 'Combinações automáticas baseadas em estilos e histórico de vendas.',
-                  },
-                  {
-                    icon: <CheckCircle2 className="h-5 w-5" />,
-                    title: 'Sem retrabalho de edição',
-                    description: 'A IA recorta e aplica móveis respeitando sombras e perspectiva.',
-                  },
-                  {
-                    icon: <Star className="h-5 w-5" />,
-                    title: 'Moodboards prontos para aprovação',
-                    description: 'Renderizamos peças reais com acabamento fotográfico em segundos.',
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.title}
-                    className="flex items-start gap-4 rounded-2xl border border-[#3e2626]/15 bg-[#f7f1eb] px-5 py-4 shadow-sm"
-                  >
-                    <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl bg-[#3e2626]/10 text-[#3e2626]">
-                      {item.icon}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-[#3e2626]">{item.title}</h3>
-                      <p className="text-sm text-[#4f3a2f]/75">{item.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="relative h-[420px] overflow-hidden rounded-3xl border border-[#3e2626]/15 bg-[#3e2626]/5 shadow-[0_30px_70px_-45px_rgba(62,38,38,0.9)]">
-              <Image
-                src="/IAsection/ImagemIA2.png"
-                alt="Transformação de sala com IA"
-                fill
-                className="object-cover object-center"
-                sizes="(max-width: 768px) 100vw, 420px"
-              />
-              <div className="absolute left-6 top-6 rounded-full border border-white/40 bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.4em] text-white/90 backdrop-blur">
-                IA aplicada
-              </div>
-              <div className="absolute bottom-0 w-full bg-linear-to-t from-[#3e2626]/80 via-[#3e2626]/30 to-transparent p-6 text-sm text-white/90">
-                Substituímos o sofá, adicionamos luminária e harmonizamos com tapete terracota.
-            </div>
-          </div>
-        </div>
-      </section>
-
-        {/* Use cases */}
-        <section className="relative overflow-hidden bg-[#fdf7f1] py-24">
-          <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-linear-to-b from-white via-transparent to-[#f7f3ef]" />
-            <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-[#F7C194]/20 to-transparent blur-3xl opacity-40" />
-          </div>
-
-          <div className="container relative z-10 mx-auto px-4">
-            <div className="text-center max-w-3xl mx-auto">
-              <span className="inline-flex items-center gap-2 rounded-full bg-[#3e2626]/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/80">
-                Fluxos preferidos das lojas
-              </span>
-              <h2 className="mt-6 text-4xl font-black text-[#3e2626] sm:text-5xl">Escolha o modo ideal para cada operação.</h2>
-              <p className="mt-4 text-lg text-[#4f3a2f]/75">
-                Personalize a jornada conforme o canal: atendimento físico, parceiros externos ou autoatendimento digital.
-              </p>
-            </div>
-
-            <div className="mt-14 grid gap-10 lg:grid-cols-[360px,1fr]">
-              <div className="space-y-4">
-                {useCaseTabs.map((useCase, idx) => (
-                  <button
-                    key={useCase.title}
-                    type="button"
-                    aria-pressed={activeUseCase === idx}
-                    onClick={() => setActiveUseCase(idx)}
-                    className={`w-full rounded-3xl border p-5 text-left transition-all ${
-                      activeUseCase === idx
-                        ? 'border-[#3e2626]/40 bg-white shadow-xl shadow-[#3e2626]/10'
-                        : 'border-[#3e2626]/10 bg-transparent hover:border-[#3e2626]/30'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/70">
-                          {useCase.badge}
-                        </p>
-                        <p className="mt-2 text-lg font-bold text-[#3e2626]">{useCase.title}</p>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-[#C07A45]" />
-                    </div>
-                    <p className="mt-3 text-sm text-[#4f3a2f]/70">{useCase.description}</p>
-                  </button>
-                ))}
-              </div>
-
-              <motion.div
-                key={useCaseTabs[activeUseCase].title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="grid gap-8 lg:grid-cols-[1.1fr,0.9fr] lg:items-center"
-              >
-                <div className="rounded-3xl border border-[#3e2626]/10 bg-white p-8 shadow-xl">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-[#3e2626]/5 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/80">
-                    {useCaseTabs[activeUseCase].badge}
-                  </span>
-                  <h3 className="mt-4 text-3xl font-black text-[#3e2626]">{useCaseTabs[activeUseCase].title}</h3>
-                  <p className="mt-3 text-base text-[#4f3a2f]/75">{useCaseTabs[activeUseCase].description}</p>
-                  <ul className="mt-6 space-y-3 text-sm text-[#4f3a2f]/80">
-                    {useCaseTabs[activeUseCase].bullets.map((bullet) => (
-                      <li key={bullet} className="flex items-start gap-2">
-                        <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#C07A45]" />
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="mt-8 flex flex-wrap gap-4">
-                    <Link href={useCaseTabs[activeUseCase].ctaHref}>
-                      <Button className="h-11 rounded-full bg-[#3e2626] px-8 text-sm font-semibold text-white hover:bg-[#2a1a13]">
-                        {useCaseTabs[activeUseCase].ctaLabel}
-                      </Button>
-                    </Link>
-                    <Link href={useCaseTabs[activeUseCase].secondaryHref}>
-                      <Button
-                        variant="ghost"
-                        className="h-11 rounded-full border border-[#3e2626]/15 bg-white px-8 text-sm font-semibold text-[#3e2626]"
-                      >
-                        {useCaseTabs[activeUseCase].secondaryLabel}
-                      </Button>
-                    </Link>
-                  </div>
+          <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+              {/* Lado esquerdo - Texto e features */}
+              <div className="space-y-8">
+                <div>
+                  <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight text-[#3e2626] mb-4 tracking-tight">
+                    A tecnologia que entende o que você precisa
+                  </h2>
+                  <p className="text-base md:text-lg text-[#4f3a2f]/80 leading-relaxed font-light">
+                    Usamos as mesmas cores do seu catálogo. A IA analisa textura e iluminação para mostrar como fica na prática.
+                  </p>
                 </div>
 
-                <div className="relative h-[360px] rounded-3xl border border-[#3e2626]/15 bg-[#3e2626]/5 shadow-2xl overflow-hidden">
+                <div className="space-y-5 pt-4">
+                  {[
+                    {
+                      icon: <Lightbulb className="h-5 w-5" />,
+                      title: 'Paletas que combinam',
+                      description: 'Sugestões baseadas no que já vende na sua loja e no estilo do cliente.',
+                    },
+                    {
+                      icon: <CheckCircle2 className="h-5 w-5" />,
+                      title: 'Sem precisar editar depois',
+                      description: 'A IA ajusta sombras e perspectiva automaticamente. Você só aprova.',
+                    },
+                    {
+                      icon: <Star className="h-5 w-5" />,
+                      title: 'Moodboards prontos',
+                      description: 'Renderizações realistas em poucos segundos, prontas para mostrar ao cliente.',
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.title}
+                      className="flex items-start gap-4 p-5 rounded-2xl border border-[#3e2626]/10 bg-white hover:bg-gray-50/50 transition-colors duration-200"
+                    >
+                      <div className="flex-shrink-0 flex h-11 w-11 items-center justify-center rounded-xl bg-[#3e2626]/5 text-[#3e2626] mt-0.5">
+                        {item.icon}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-medium text-[#3e2626] mb-1.5">
+                          {item.title}
+                        </h3>
+                        <p className="text-sm text-[#4f3a2f]/70 leading-relaxed font-light">
+                          {item.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lado direito - Imagem */}
+              <div className="relative">
+                <div className="relative h-[480px] lg:h-[560px] rounded-2xl overflow-hidden shadow-lg">
                   <Image
-                    src={useCaseTabs[activeUseCase].image}
-                    alt={useCaseTabs[activeUseCase].title}
+                    src="/IAsection/ImagemIA2.png"
+                    alt="Sala transformada com IA"
                     fill
                     className="object-cover object-center"
-                    sizes="(max-width: 1024px) 100vw, 420px"
+                    sizes="(max-width: 1024px) 100vw, 560px"
                   />
-                  <div className="absolute inset-x-6 bottom-6 rounded-2xl bg-white/85 p-4 text-[#3e2626] shadow-lg">
-                    <p className="text-xs font-semibold uppercase tracking-[0.35em]">Painel sincronizado</p>
-                    <p className="mt-2 text-sm">
-                      {useCaseTabs[activeUseCase].title} · Fluxo automatizado · {activeUseCase + 1}
-                      /{useCaseTabs.length}
+                  
+                  {/* Overlay sutil */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#3e2626]/70 via-transparent to-transparent"></div>
+                  
+                  {/* Badge simples */}
+                  <div className="absolute top-5 left-5 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-[#3e2626]">
+                   
+                    IA aplicada
+                  </div>
+                  
+                  {/* Texto na parte inferior */}
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <p className="text-sm md:text-base text-white leading-relaxed font-light max-w-md">
+                      Troquei o sofá, coloquei uma luminária e combinei com tapete terracota. Ficou assim.
                     </p>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Feature grid */}
-        <section className="relative overflow-hidden bg-[#efe3d9] py-20">
-          {/* Gradiente superior para transição */}
-          <div className="absolute top-0 left-0 right-0 h-32 bg-linear-to-b from-white via-white/80 to-transparent pointer-events-none z-10" />
-          
-          {/* Gradiente inferior para transição */}
-          <div className="absolute bottom-0 left-0 right-0 h-32 bg-linear-to-t from-[#efe3d9] via-[#efe3d9]/80 to-transparent pointer-events-none z-10" />
-          
-          <div className="container relative mx-auto px-4 z-20">
-            <div className="text-center">
-              <h2 className="text-3xl font-black uppercase tracking-[0.35em] text-[#3e2626]/70 sm:text-4xl">
-                Recursos exclusivos
-            </h2>
-              <p className="mt-4 text-lg text-[#4f3a2f]/75">
-                Tudo o que você precisa para encantar o cliente antes mesmo da obra começar.
-            </p>
-          </div>
+      
 
-            <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {features.map((feature, index) => (
-                <div
-                  key={feature.title}
-                onMouseEnter={() => setHoveredFeature(index)}
-                onMouseLeave={() => setHoveredFeature(null)}
-                  className="group relative overflow-hidden rounded-3xl border border-[#3e2626]/10 bg-white/90 p-6 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:shadow-xl"
-              >
-                  <div
-                    className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br ${feature.gradient} text-white shadow-lg transition duration-500 ${
-                      hoveredFeature === index ? 'scale-105 rotate-2' : ''
-                    }`}
-                  >
-                    {feature.icon}
-                  </div>
-                  <h3 className="mt-6 text-xl font-semibold text-[#3e2626]">{feature.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-[#4f3a2f]/75">{feature.description}</p>
-                </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        
+
+       
 
         {/* Transformation gallery */}
         <section className="relative overflow-hidden bg-white py-20">
           {/* Gradiente superior para transição */}
-          <div className="absolute top-0 left-0 right-0 h-32 bg-linear-to-b from-[#efe3d9] via-[#efe3d9]/80 to-transparent pointer-events-none z-10" />
+          <div className="absolute top-0 left-0 right-0 h-32 bg-linear-to-b from-gray-100 via-gray-100/80 to-transparent pointer-events-none z-10" />
           
           {/* Gradiente inferior para transição */}
           <div className="absolute bottom-0 left-0 right-0 h-32 bg-linear-to-t from-white via-white/80 to-transparent pointer-events-none z-10" />
@@ -806,17 +636,14 @@ export default function TestIALandingPage() {
                   Cada render abaixo foi gerado com imagens reais do nosso banco e móveis do catálogo oficial.
             </p>
           </div>
-              <div className="inline-flex items-center rounded-full border border-[#3e2626]/20 bg-[#3e2626]/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/80">
-                <Sparkles className="mr-2 h-4 w-4" />
-                nano-banana inside
-              </div>
+              
             </div>
 
             <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
               {transformationGallery.length > 0 ? transformationGallery.map((item) => (
                 <div
                   key={item.title}
-                  className="group relative h-72 overflow-hidden rounded-3xl border border-[#3e2626]/10 bg-[#f7f3ef] shadow-sm"
+                  className="group relative h-72 overflow-hidden rounded-3xl border border-[#3e2626]/10 bg-white shadow-sm"
                 >
                   <Image
                     src={item.src}
@@ -831,7 +658,7 @@ export default function TestIALandingPage() {
                     <p className="mt-2 text-xs text-white/80">{item.description}</p>
                   </div>
                 </div>
-              )) : (
+              )              ) : (
                 <div className="col-span-full text-center py-12 text-[#4f3a2f]/60">
                   Carregando transformações...
                 </div>
@@ -841,12 +668,12 @@ export default function TestIALandingPage() {
         </section>
 
         {/* Reference moodboards */}
-        <section className="relative overflow-hidden bg-[#efe7e0] py-20">
+        <section className="relative overflow-hidden bg-gray-50 py-20">
           {/* Gradiente superior para transição */}
           <div className="absolute top-0 left-0 right-0 h-32 bg-linear-to-b from-white via-white/80 to-transparent pointer-events-none z-10" />
           
           {/* Gradiente inferior para transição */}
-          <div className="absolute bottom-0 left-0 right-0 h-32 bg-linear-to-t from-[#efe7e0] via-[#efe7e0]/80 to-transparent pointer-events-none z-10" />
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-linear-to-t from-gray-50 via-gray-50/80 to-transparent pointer-events-none z-10" />
           
           <div className="container relative mx-auto flex flex-col gap-12 px-4 lg:flex-row z-20">
             <div className="lg:w-[45%]">
@@ -902,15 +729,7 @@ export default function TestIALandingPage() {
                     <p className="text-sm leading-relaxed text-[#4f3a2f]/75">
                       {referenceMoodboards[referenceIndex].description}
                     </p>
-                    <div className="rounded-2xl bg-[#3e2626]/5 p-5 text-[#3e2626]">
-                      <Quote className="mb-3 h-6 w-6 text-[#C07A45]" />
-                      <p className="text-sm italic text-[#3e2626]/90">
-                        {referenceMoodboards[referenceIndex].quote}
-                      </p>
-                      <p className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-[#3e2626]/70">
-                        {referenceMoodboards[referenceIndex].author}
-                      </p>
-                    </div>
+                    
                   </div>
                 </div>
               ) : (
@@ -922,137 +741,156 @@ export default function TestIALandingPage() {
           </div>
         </section>
 
-        {/* Recursos e Fluxo com componentes Shadcn */}
-        <section className="relative overflow-hidden bg-linear-to-b from-white via-[#fefbf8] to-[#f7f3ef] py-32">
-          {/* Gradiente superior para transição */}
-          <div className="absolute top-0 left-0 right-0 h-32 bg-linear-to-b from-[#efe7e0] via-[#efe7e0]/80 to-transparent pointer-events-none z-10" />
-          
-          {/* Gradiente inferior para transição */}
-          <div className="absolute bottom-0 left-0 right-0 h-32 bg-linear-to-t from-[#f7f3ef] via-[#f7f3ef]/80 to-transparent pointer-events-none z-10" />
-          
-          <div className="container relative mx-auto px-4 z-20">
-            {/* Header */}
-            <motion.div 
-              className="text-center mb-20"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-            >
-              <div className="mb-6">
-                <BlurText
-                  text="Por que escolher PintAi"
-                  delay={100}
-                  animateBy="words"
-                  direction="top"
-                  className="text-4xl md:text-5xl font-black text-[#3e2626]"
-                />
+         {/* Immersive studio */}
+         <section className="relative overflow-hidden bg-[#3e2626] py-20 text-white">
+          <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+              {/* Imagem */}
+              <div className="relative">
+                <div className="relative h-[450px] lg:h-[520px] rounded-2xl overflow-hidden shadow-xl">
+                  <Image
+                    src="/IAsection/ImagemIA4.png"
+                    alt="Console do estúdio de IA"
+                    fill
+                    className="object-cover object-center"
+                    sizes="(max-width: 1024px) 100vw, 520px"
+                  />
+                  
+                  {/* Overlay sutil */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#3e2626]/60 via-transparent to-transparent"></div>
+                  
+                 
+                </div>
               </div>
-              <p className="text-lg text-[#4f3a2f]/70 max-w-2xl mx-auto">
-                Tecnologia de IA avançada que transforma a forma como você trabalha com decoração e design.
-              </p>
-            </motion.div>
 
-            {/* Grid de recursos com 3D Cards */}
-            <div className="grid md:grid-cols-3 gap-8 mb-20">
-              {differentiators.map((item, idx) => (
-                <CardContainer
-                  key={item.title}
-                  containerClassName="py-0"
-                >
-                  <CardBody className="w-full h-full">
-                    <CardItem
-                      translateZ="30"
-                      className="w-full h-full"
+              {/* Conteúdo */}
+              <div className="space-y-8">
+                <div>
+                  <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-4 tracking-tight">
+                    Seu showroom dentro do navegador
+                  </h2>
+                  <p className="text-base md:text-lg text-white/80 leading-relaxed font-light">
+                    A mesma experiência da loja física, mas no computador. Teste cores, monte ambientes e compartilhe com o cliente na hora.
+                  </p>
+                </div>
+
+                <div className="space-y-4 pt-2">
+                  {immersiveHighlights.map((item) => (
+                    <div key={item.title} className="flex items-start gap-4 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors">
+                      <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white mt-0.5">
+                        {item.icon}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-medium mb-1">{item.title}</h3>
+                        <p className="text-sm text-white/75 leading-relaxed font-light">{item.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-3 pt-4">
+                  <Link href="/IA-demo">
+                    <Button className="h-11 rounded-full bg-white px-6 text-sm font-medium text-[#3e2626] hover:bg-white/95">
+                      Abrir estúdio
+                    </Button>
+                  </Link>
+                  <Link href="/contact">
+                    <Button
+                      variant="outline"
+                      className="h-11 rounded-full border-white/30 bg-transparent px-6 text-sm font-medium text-white hover:bg-white/10"
                     >
-                      <motion.div
-                        className="relative w-full h-full min-h-[280px] rounded-3xl bg-white/95 backdrop-blur-sm p-8 shadow-xl border-2 border-[#3e2626]/10 hover:border-[#C07A45]/50 transition-all duration-500 group"
-                        initial={{ opacity: 0, y: 50 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: idx * 0.15 }}
-                        whileHover={{ y: -8 }}
-                      >
-                        {/* Ícone com Sparkles */}
-                        <div className="relative mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-[#3e2626] to-[#8B4513] text-white shadow-lg">
-                          {item.icon}
-                        </div>
-                        
-                        <h3 className="text-xl font-bold text-[#3e2626] mb-3">
-                          {item.title}
-                        </h3>
-                        <p className="text-sm text-[#4f3a2f]/70 leading-relaxed">
-                          {item.description}
-                        </p>
-                        
-                        {/* Barra decorativa */}
-                        <motion.div
-                          className="mt-4 h-1 w-0 bg-linear-to-r from-[#C07A45] to-[#F7C194] rounded-full group-hover:w-full transition-all duration-500"
-                        />
-                        
-                        {/* Efeito de brilho */}
-                        <motion.div
-                          className="absolute inset-0 rounded-3xl bg-linear-to-br from-[#C07A45]/10 to-[#8B4513]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                        />
-                      </motion.div>
-                    </CardItem>
-                  </CardBody>
-                </CardContainer>
-              ))}
+                      Falar com especialistas
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
-
-            {/* Timeline */}
-            <motion.div
-              className="mt-16"
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-            >
-              <div className="text-center mb-12">
-                <h3 className="text-3xl font-black text-[#3e2626] mb-4">
-                  Como funciona
-                </h3>
-                <p className="text-lg text-[#4f3a2f]/70">
-                  Quatro passos simples para resultados incríveis
-                </p>
-              </div>
-              
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {timeline.map((item, idx) => (
-                  <motion.div
-                    key={item.step}
-                    className="relative rounded-3xl bg-white/95 backdrop-blur-sm p-6 shadow-lg border-2 border-[#3e2626]/10 hover:border-[#C07A45]/50 transition-all duration-500 group"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: idx * 0.1 }}
-                    whileHover={{ y: -8 }}
-                  >
-                    {/* Número do passo */}
-                    <div className="absolute -top-4 -left-4 flex h-12 w-12 items-center justify-center rounded-full bg-linear-to-br from-[#3e2626] to-[#8B4513] text-xl font-black text-white shadow-xl border-4 border-white">
-                      {item.step}
-                    </div>
-                    
-                    <div className="mt-4">
-                      <h4 className="text-lg font-bold text-[#3e2626] mb-2">
-                        {item.title}
-                      </h4>
-                      <p className="text-sm text-[#4f3a2f]/70 leading-relaxed">
-                        {item.description}
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
           </div>
         </section>
+
+         {/* Recursos e Fluxo */}
+         <section className="relative overflow-hidden bg-gray-50 py-20">
+           <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
+             <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+               {/* Lado esquerdo - Por que usar */}
+               <div>
+                 <div className="mb-8">
+                   <h2 className="text-2xl md:text-3xl font-bold text-[#3e2626] mb-2">
+                     Por que usar MobiliAI
+                   </h2>
+                   <p className="text-sm text-[#4f3a2f]/70">
+                     Ferramentas que facilitam o trabalho no dia a dia da sua loja.
+                   </p>
+                 </div>
+
+                 <div className="space-y-4">
+                   {differentiators.map((item) => (
+                     <div
+                       key={item.title}
+                       className="bg-white p-5 rounded-xl border border-[#3e2626]/10"
+                     >
+                       <div className="flex items-start gap-4">
+                         <div className="flex-shrink-0 flex h-11 w-11 items-center justify-center rounded-lg bg-[#3e2626]/5 text-[#3e2626]">
+                           {item.icon}
+                         </div>
+                         
+                         <div className="flex-1">
+                           <h3 className="text-base font-medium text-[#3e2626] mb-1.5">
+                             {item.title}
+                           </h3>
+                           <p className="text-sm text-[#4f3a2f]/70 leading-relaxed">
+                             {item.description}
+                           </p>
+                         </div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+
+               {/* Lado direito - Como funciona */}
+               <div>
+                 <div className="mb-8">
+                   <h2 className="text-2xl md:text-3xl font-bold text-[#3e2626] mb-2">
+                     Como funciona
+                   </h2>
+                   <p className="text-sm text-[#4f3a2f]/70">
+                     Quatro passos simples para começar
+                   </p>
+                 </div>
+                 
+                 <div className="space-y-4">
+                   {timeline.map((item) => (
+                     <div
+                       key={item.step}
+                       className="bg-white p-5 rounded-xl border border-[#3e2626]/10"
+                     >
+                       <div className="flex items-start gap-4">
+                         <div className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-lg bg-[#3e2626] text-sm font-medium text-white">
+                           {item.step}
+                         </div>
+                         
+                         <div className="flex-1">
+                           <h4 className="text-base font-medium text-[#3e2626] mb-1.5">
+                             {item.title}
+                           </h4>
+                           <p className="text-sm text-[#4f3a2f]/70 leading-relaxed">
+                             {item.description}
+                           </p>
+                         </div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+             </div>
+           </div>
+         </section>
 
         {/* Trend carousel + Impact phrases */}
         <section className="relative overflow-hidden bg-white py-20">
           {/* Gradiente superior para transição */}
-          <div className="absolute top-0 left-0 right-0 h-32 bg-linear-to-b from-[#f7f3ef] via-[#f7f3ef]/80 to-transparent pointer-events-none z-10" />
+          <div className="absolute top-0 left-0 right-0 h-32 bg-linear-to-b from-gray-100 via-gray-100/80 to-transparent pointer-events-none z-10" />
           
           {/* Gradiente inferior para transição */}
           <div className="absolute bottom-0 left-0 right-0 h-32 bg-linear-to-t from-white via-white/80 to-transparent pointer-events-none z-10" />
@@ -1061,7 +899,7 @@ export default function TestIALandingPage() {
             <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <span className="inline-flex items-center gap-2 rounded-full bg-[#3e2626]/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/80">
-                  Radar PintAi
+                  Radar MobiliAI
                 </span>
                 <h2 className="mt-4 text-4xl font-black text-[#3e2626]">
                   Tendências para aplicar agora nas suas campanhas.
@@ -1094,7 +932,7 @@ export default function TestIALandingPage() {
                 {trendCarrousel.length > 0 ? trendCarrousel.map((slide, idx) => (
                   <div
                     key={slide.title}
-                    className={`rounded-3xl border border-[#3e2626]/15 bg-[#fdf7f1] p-6 transition-all duration-500 ${
+                    className={`rounded-3xl border border-[#3e2626]/15 bg-white p-6 transition-all duration-500 ${
                       idx === trendIndex ? 'shadow-xl scale-[1.02]' : 'opacity-60 scale-95'
                     }`}
                   >
@@ -1150,87 +988,6 @@ export default function TestIALandingPage() {
         </div>
       </section>
 
-        {/* Assistant + FAQ */}
-        <section className="relative overflow-hidden bg-[#efe3d9] py-24">
-          <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-linear-to-b from-white via-transparent to-[#f7f3ef]" />
-            <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-[#F7C194]/30 blur-[120px]" />
-          </div>
-          <div className="container relative z-10 mx-auto grid gap-12 px-4 lg:grid-cols-2">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="rounded-[32px] border border-[#3e2626]/15 bg-white p-8 shadow-xl"
-            >
-              <span className="inline-flex items-center gap-2 rounded-full bg-[#3e2626]/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-[#3e2626]/80">
-                Assistente virtual PintAi
-              </span>
-              <h2 className="mt-6 text-4xl font-black text-[#3e2626]">
-                Consultoria por IA que fala a mesma língua da sua equipe.
-              </h2>
-              <p className="mt-4 text-lg text-[#4f3a2f]/75">
-                Combine prompts guiados, roteiros de venda e recomendações de kits em um único chat com contexto do cliente.
-              </p>
-
-              <div className="mt-8 space-y-4">
-                {assistantHighlights.map((item) => (
-                  <div key={item.title} className="flex items-start gap-4 rounded-3xl border border-[#3e2626]/10 bg-[#fdf7f1] p-5">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3e2626]/10 text-[#3e2626]">
-                      {item.icon}
-                    </div>
-                    <div>
-                      <p className="text-base font-semibold text-[#3e2626]">{item.title}</p>
-                      <p className="text-sm text-[#4f3a2f]/75">{item.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-10 flex flex-wrap gap-4">
-                <Link href="/customer">
-                  <Button className="h-11 rounded-full bg-[#3e2626] px-8 text-sm font-semibold text-white hover:bg-[#2a1a13]">
-                    Iniciar conversa guiada
-                  </Button>
-                </Link>
-                <Link href="/faq">
-                  <Button
-                    variant="outline"
-                    className="h-11 rounded-full border-[#3e2626]/30 bg-transparent px-8 text-sm font-semibold text-[#3e2626]"
-                  >
-                    Ver tutorial em vídeo
-                  </Button>
-                </Link>
-              </div>
-            </motion.div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.5em] text-[#3e2626]/60">FAQ rápido</p>
-              <h3 className="mt-4 text-3xl font-black text-[#3e2626]">Tudo pronto para lançar em qualquer loja.</h3>
-              <div className="mt-8 space-y-4">
-                {faqItems.map((faq, idx) => (
-                  <motion.div
-                    key={faq.question}
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.4, delay: idx * 0.05 }}
-                    className="rounded-3xl border border-[#3e2626]/10 bg-white p-6 shadow-sm hover:shadow-lg transition"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-lg font-semibold text-[#3e2626]">{faq.question}</p>
-                        <p className="mt-2 text-sm text-[#4f3a2f]/75">{faq.answer}</p>
-                      </div>
-                      <span className="text-2xl font-black text-[#F7C194]">{String(idx + 1).padStart(2, '0')}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
 
         {/* Product showcase */}
         <section className="relative overflow-hidden bg-[#3e2626] py-32">
@@ -1250,7 +1007,7 @@ export default function TestIALandingPage() {
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
             >
-              <div className="mb-6">
+              <div className="mb-14 pt-14 text-center mx-auto">
                 <BlurText
                   text="Coleções reais, renders reais"
                   delay={100}
@@ -1259,7 +1016,7 @@ export default function TestIALandingPage() {
                   className="text-5xl md:text-6xl font-black text-white"
                 />
               </div>
-              <p className="text-xl text-white/80 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-xl text-white/80 max-w-3xl mx-auto text-center leading-relaxed">
                 As imagens abaixo vêm do nosso banco de produtos. Use-as para gerar moodboards, vitrines virtuais e
                 campanhas personalizadas.
               </p>
@@ -1278,151 +1035,63 @@ export default function TestIALandingPage() {
                     const isFirstPass = idx < productShowcase.length * 2;
                     const itemIndex = idx % productShowcase.length;
                     
+                    // Mapeamento de categorias para nomes legíveis
+                    const categoryNames: Record<string, string> = {
+                      'SOFA': 'Sofá',
+                      'MESA_CENTRO': 'Mesa de centro',
+                      'POLTRONA': 'Poltrona',
+                      'LUMINARIA': 'Luminária',
+                      'ESTANTE': 'Estante',
+                      'CADEIRA': 'Cadeira',
+                      'ARMARIO': 'Armário',
+                      'CAMA': 'Cama',
+                      'QUADRO': 'Quadro',
+                    };
+                    
+                    const displayCategory = categoryNames[product.category] || product.category;
+                    
                     return (
                       <MarqueeItem 
                         key={`${product.name}-${idx}`} 
-                        className="w-[400px]"
+                        className="w-[380px]"
                       >
-                        <motion.div
-                          className="relative h-[500px] rounded-3xl bg-white overflow-hidden shadow-2xl group cursor-pointer"
-                          initial={{ 
-                            opacity: 0, 
-                            x: -150, 
-                            scale: 0.7,
-                            filter: "blur(10px)"
-                          }}
-                          animate={isFirstPass ? { 
-                            opacity: 1, 
-                            x: 0, 
-                            scale: 1,
-                            filter: "blur(0px)",
-                            transition: {
-                              duration: 1.2,
-                              ease: [0.16, 1, 0.3, 1],
-                              delay: itemIndex * 0.15
-                            }
-                          } : {
-                            opacity: 1,
-                            x: 0,
-                            scale: 1,
-                            filter: "blur(0px)"
-                          }}
-                          whileHover={{ y: -10, scale: 1.02 }}
-                        >
+                        <div className="relative h-[480px] rounded-2xl bg-white overflow-hidden shadow-lg border border-white/10 group cursor-pointer hover:shadow-xl transition-shadow">
                           {/* Imagem */}
-                          <div className="relative h-[60%] bg-linear-to-br from-[#f7f3ef] to-white">
-                            <motion.div
-                              initial={{ scale: 0.8, opacity: 0 }}
-                              animate={isFirstPass ? {
-                                scale: 1,
-                                opacity: 1,
-                                transition: {
-                                  delay: itemIndex * 0.15 + 0.3,
-                                  duration: 0.8,
-                                  ease: [0.16, 1, 0.3, 1]
-                                }
-                              } : {
-                                scale: 1,
-                                opacity: 1
-                              }}
-                            >
-                              <Image
-                                src={product.src}
-                                alt={product.name}
-                                fill
-                                className="object-contain p-8"
-                                sizes="400px"
-                              />
-                            </motion.div>
+                          <div className="relative h-[55%] bg-gray-50">
+                            <Image
+                              src={product.src}
+                              alt={product.name}
+                              fill
+                              className="object-cover"
+                              sizes="380px"
+                            />
                             
                             {/* Badge */}
-                            <motion.div 
-                              className="absolute top-4 left-4 inline-flex items-center gap-2 rounded-full bg-[#3e2626] px-4 py-2 text-xs font-bold uppercase tracking-[0.3em] text-white shadow-lg"
-                              initial={{ scale: 0, rotate: -180, opacity: 0 }}
-                              animate={isFirstPass ? {
-                                scale: 1, 
-                                rotate: 0,
-                                opacity: 1,
-                                transition: {
-                                  delay: itemIndex * 0.15 + 0.5,
-                                  type: "spring",
-                                  stiffness: 200,
-                                  damping: 15
-                                }
-                              } : {
-                                scale: 1,
-                                rotate: 0,
-                                opacity: 1
-                              }}
-                            >
-                              <Star className="h-3.5 w-3.5 text-[#C07A45]" />
-                              {product.category}
-                            </motion.div>
+                            <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-[#3e2626] px-3 py-1.5 text-xs font-medium text-white">
+                              <Star className="h-3 w-3 text-[#C07A45]" />
+                              {displayCategory}
+                            </div>
                           </div>
                           
                           {/* Conteúdo */}
-                          <div className="p-6 bg-white">
-                            <motion.h3 
-                              className="text-2xl font-bold text-[#3e2626] mb-2"
-                              initial={{ opacity: 0, y: 30 }}
-                              animate={isFirstPass ? {
-                                opacity: 1, 
-                                y: 0,
-                                transition: {
-                                  delay: itemIndex * 0.15 + 0.6,
-                                  duration: 0.6,
-                                  ease: [0.16, 1, 0.3, 1]
-                                }
-                              } : {
-                                opacity: 1,
-                                y: 0
-                              }}
-                            >
+                          <div className="p-5 bg-white">
+                            <h3 className="text-lg font-medium text-[#3e2626] mb-2">
                               {product.name}
-                            </motion.h3>
-                            <motion.p 
-                              className="text-sm text-[#4f3a2f]/70 leading-relaxed mb-4"
-                              initial={{ opacity: 0 }}
-                              animate={isFirstPass ? {
-                                opacity: 1,
-                                transition: {
-                                  delay: itemIndex * 0.15 + 0.7,
-                                  duration: 0.5
-                                }
-                              } : {
-                                opacity: 1
-                              }}
-                            >
+                            </h3>
+                            <p className="text-sm text-[#4f3a2f]/70 leading-relaxed mb-4 line-clamp-2">
                               {product.description}
-                            </motion.p>
+                            </p>
                             
-                            {/* Botão */}
-                            <motion.div
-                              className="inline-flex items-center gap-2 text-[#C07A45] font-semibold"
-                              whileHover={{ x: 5 }}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={isFirstPass ? {
-                                opacity: 1,
-                                x: 0,
-                                transition: {
-                                  delay: itemIndex * 0.15 + 0.8,
-                                  duration: 0.5
-                                }
-                              } : {
-                                opacity: 1,
-                                x: 0
-                              }}
+                            {/* Link */}
+                            <Link 
+                              href="/products" 
+                              className="inline-flex items-center gap-2 text-sm font-medium text-[#C07A45] hover:text-[#8B4513] transition-colors group/link"
                             >
-                              <span className="text-sm">Explorar coleção</span>
-                              <ArrowRight className="h-4 w-4" />
-                            </motion.div>
+                              <span>Explorar coleção</span>
+                              <ArrowRight className="h-4 w-4 group-hover/link:translate-x-1 transition-transform" />
+                            </Link>
                           </div>
-                          
-                          {/* Overlay no hover */}
-                          <motion.div
-                            className="absolute inset-0 bg-linear-to-t from-[#C07A45]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                          />
-                        </motion.div>
+                        </div>
                       </MarqueeItem>
                     );
                   }) : (

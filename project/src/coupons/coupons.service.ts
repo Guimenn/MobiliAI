@@ -324,11 +324,13 @@ export class CouponsService {
     }
 
     // Verificar limite de uso por cliente (se fornecido)
+    // Contar apenas usos em vendas, não resgates
     if (userId && coupon.usageLimit) {
       const userUsageCount = await this.prisma.couponUsage.count({
         where: {
           couponId: coupon.id,
           userId: userId,
+          saleId: { not: null }, // Apenas usos em vendas, não resgates
         },
       });
 
@@ -1025,11 +1027,12 @@ export class CouponsService {
           return { coupon, isValid: true };
         }
         
-        // Contar quantas vezes este cliente específico usou o cupom
+        // Contar quantas vezes este cliente específico usou o cupom em vendas (não resgates)
         const userUsageCount = await this.prisma.couponUsage.count({
           where: {
             couponId: coupon.id,
             userId: customerId,
+            saleId: { not: null }, // Apenas usos em vendas, não resgates
           },
         });
         
@@ -1052,22 +1055,33 @@ export class CouponsService {
         .filter(check => check.isValid)
         .map(check => check.coupon)
         .map(async (coupon) => {
-          // Verificar se o usuário já usou este cupom
+          // Contar apenas os usos em vendas (saleId não nulo), não os resgates
           const userUsageCount = await this.prisma.couponUsage.count({
             where: {
               couponId: coupon.id,
               userId: customerId,
+              saleId: { not: null }, // Apenas usos em vendas, não resgates
+            },
+          });
+
+          // Verificar se foi resgatado (tem registro com saleId null)
+          const isRedeemed = await this.prisma.couponUsage.findFirst({
+            where: {
+              couponId: coupon.id,
+              userId: customerId,
+              saleId: null, // Resgatado mas não usado
             },
           });
 
           return {
             coupon,
             userUsageCount,
+            isRedeemed: !!isRedeemed,
           };
         })
     );
 
-    const filteredCoupons = couponsWithUsage.map(({ coupon, userUsageCount }) => ({
+    const filteredCoupons = couponsWithUsage.map(({ coupon, userUsageCount, isRedeemed }) => ({
       id: coupon.id,
       code: coupon.code,
       description: coupon.description,
@@ -1077,7 +1091,8 @@ export class CouponsService {
       maximumDiscount: coupon.maximumDiscount ? Number(coupon.maximumDiscount) : undefined,
       usageLimit: coupon.usageLimit,
       usedCount: coupon._count.couponUsages,
-      userUsageCount, // Quantas vezes o usuário específico usou
+      userUsageCount, // Quantas vezes o usuário específico usou em vendas (apenas com saleId não nulo)
+      isRedeemed, // Indica se o cupom foi resgatado mas ainda não usado
       isActive: coupon.isActive,
       validFrom: coupon.validFrom.toISOString(),
       validUntil: coupon.validUntil.toISOString(),
@@ -1105,44 +1120,64 @@ export class CouponsService {
     
     // Buscar cupons EXCLUSIVE que foram resgatados pelo usuário
     // IMPORTANTE: Cupons EXCLUSIVE só aparecem se o usuário os resgatou (tem CouponUsage com saleId null)
-    // Primeiro, buscar os IDs dos cupons que foram resgatados pelo usuário
-    const redeemedCouponUsages = await this.prisma.couponUsage.findMany({
+    // Primeiro, buscar TODOS os IDs dos cupons que foram resgatados pelo usuário
+    // Não aplicar filtros de validade aqui - vamos buscar todos os resgates primeiro
+    const allRedeemedUsages = await this.prisma.couponUsage.findMany({
       where: {
         userId: customerId,
         saleId: null, // Apenas resgates (não usados em vendas ainda)
-        coupon: {
-          OR: [
-            { assignmentType: CouponAssignmentType.EXCLUSIVE },
-            { assignmentType: null } // Tratar NULL como EXCLUSIVE
-          ],
-          isActive: true,
-          validFrom: { lte: now },
-          validUntil: { gte: now }
-        }
       },
       select: {
         couponId: true
-      },
-      distinct: ['couponId']
+      }
     });
 
-    const redeemedCouponIds = redeemedCouponUsages.map(usage => usage.couponId);
+    // Obter IDs únicos de cupons resgatados
+    const uniqueRedeemedCouponIds = [...new Set(allRedeemedUsages.map(usage => usage.couponId))];
+    
+    console.log('🎫 Todos os cupons resgatados encontrados (IDs únicos):', uniqueRedeemedCouponIds.length, uniqueRedeemedCouponIds);
+
+    // Buscar os cupons e filtrar apenas os EXCLUSIVE
+    const allRedeemedCoupons = uniqueRedeemedCouponIds.length > 0 ? await this.prisma.coupon.findMany({
+      where: {
+        id: {
+          in: uniqueRedeemedCouponIds
+        }
+      },
+      select: {
+        id: true,
+        assignmentType: true,
+        isActive: true,
+      }
+    }) : [];
+
+    // Filtrar apenas cupons EXCLUSIVE (ou NULL tratado como EXCLUSIVE)
+    const exclusiveRedeemedCoupons = allRedeemedCoupons.filter(coupon => {
+      const assignmentType = coupon.assignmentType;
+      return !assignmentType || assignmentType === CouponAssignmentType.EXCLUSIVE;
+    });
+
+    const redeemedCouponIds = exclusiveRedeemedCoupons.map(coupon => coupon.id);
     
     console.log('🎫 Cupons EXCLUSIVE resgatados encontrados (IDs):', redeemedCouponIds.length, redeemedCouponIds);
+    console.log('🎫 Detalhes dos cupons EXCLUSIVE resgatados:', exclusiveRedeemedCoupons.map(c => ({
+      couponId: c.id,
+      assignmentType: c.assignmentType,
+      isActive: c.isActive
+    })));
 
     // Agora buscar os cupons EXCLUSIVE que foram realmente resgatados
+    // Já filtramos os exclusivos antes, então apenas buscar por ID, validade e isActive
     const redeemedExclusiveCoupons = redeemedCouponIds.length > 0 ? await this.prisma.coupon.findMany({
       where: {
         id: {
           in: redeemedCouponIds
         },
         isActive: true,
+        // Verificar validade para mostrar apenas cupons que ainda podem ser usados
         validFrom: { lte: now },
         validUntil: { gte: now },
-        OR: [
-          { assignmentType: CouponAssignmentType.EXCLUSIVE },
-          { assignmentType: null } // Tratar NULL como EXCLUSIVE
-        ]
+        // Não precisa filtrar por assignmentType aqui - já filtramos antes
       },
       include: {
         _count: {
@@ -1165,22 +1200,34 @@ export class CouponsService {
     // Processar cupons EXCLUSIVE resgatados
     const exclusiveCouponsWithUsage = await Promise.all(
       redeemedExclusiveCoupons.map(async (coupon) => {
+        // Contar apenas os usos em vendas (saleId não nulo), não os resgates
         const userUsageCount = await this.prisma.couponUsage.count({
           where: {
             couponId: coupon.id,
             userId: customerId,
+            saleId: { not: null }, // Apenas usos em vendas, não resgates
+          },
+        });
+
+        // Verificar se foi resgatado (tem registro com saleId null)
+        const isRedeemed = await this.prisma.couponUsage.findFirst({
+          where: {
+            couponId: coupon.id,
+            userId: customerId,
+            saleId: null, // Resgatado mas não usado
           },
         });
 
         return {
           coupon,
           userUsageCount,
+          isRedeemed: !!isRedeemed,
         };
       })
     );
 
     // Adicionar cupons EXCLUSIVE resgatados à lista
-    const exclusiveCoupons = exclusiveCouponsWithUsage.map(({ coupon, userUsageCount }) => ({
+    const exclusiveCoupons = exclusiveCouponsWithUsage.map(({ coupon, userUsageCount, isRedeemed }) => ({
       id: coupon.id,
       code: coupon.code,
       description: coupon.description,
@@ -1190,7 +1237,8 @@ export class CouponsService {
       maximumDiscount: coupon.maximumDiscount ? Number(coupon.maximumDiscount) : undefined,
       usageLimit: coupon.usageLimit,
       usedCount: coupon._count.couponUsages,
-      userUsageCount,
+      userUsageCount, // Quantas vezes o usuário específico usou em vendas (apenas com saleId não nulo)
+      isRedeemed: !!isRedeemed, // Indica se o cupom foi resgatado mas ainda não usado
       isActive: coupon.isActive,
       validFrom: coupon.validFrom.toISOString(),
       validUntil: coupon.validUntil.toISOString(),
@@ -1427,20 +1475,33 @@ export class CouponsService {
   }
 
   async redeemCouponForCustomer(customerId: string, code: string) {
+    console.log('🎫 INÍCIO redeemCouponForCustomer:', { customerId, code });
     const now = new Date();
     const codeUpper = code.toUpperCase().trim();
+    console.log('🎫 Código processado:', codeUpper);
 
     // Buscar o cupom pelo código
     const coupon = await this.prisma.coupon.findUnique({
       where: { code: codeUpper },
     });
 
+    console.log('🎫 Cupom encontrado:', coupon ? {
+      id: coupon.id,
+      code: coupon.code,
+      assignmentType: coupon.assignmentType,
+      isActive: coupon.isActive,
+      validFrom: coupon.validFrom,
+      validUntil: coupon.validUntil,
+    } : 'NÃO ENCONTRADO');
+
     if (!coupon) {
+      console.error('❌ Cupom não encontrado:', codeUpper);
       throw new NotFoundException('Cupom não encontrado');
     }
 
     // Verificar se o cupom está ativo
     if (!coupon.isActive) {
+      console.error('❌ Cupom inativo:', coupon.code);
       throw new BadRequestException('Este cupom não está mais ativo');
     }
 
@@ -1448,36 +1509,60 @@ export class CouponsService {
     const validFrom = new Date(coupon.validFrom);
     const validUntil = new Date(coupon.validUntil);
 
+    console.log('🎫 Verificando validade:', {
+      now: now.toISOString(),
+      validFrom: validFrom.toISOString(),
+      validUntil: validUntil.toISOString(),
+      isBeforeValidFrom: now < validFrom,
+      isAfterValidUntil: now > validUntil,
+    });
+
     if (now < validFrom) {
+      console.error('❌ Cupom ainda não está válido:', coupon.code);
       throw new BadRequestException('Este cupom ainda não está válido');
     }
 
     if (now > validUntil) {
+      console.error('❌ Cupom expirado:', coupon.code);
       throw new BadRequestException('Este cupom expirou');
     }
 
     // Verificar se é um cupom EXCLUSIVE (ou null, que é tratado como EXCLUSIVE)
     // Cupons ALL_ACCOUNTS e NEW_ACCOUNTS_ONLY já aparecem automaticamente na lista
     const isExclusive = !coupon.assignmentType || coupon.assignmentType === CouponAssignmentType.EXCLUSIVE;
+    console.log('🎫 Verificando tipo de cupom:', {
+      assignmentType: coupon.assignmentType,
+      isExclusive,
+    });
 
     if (!isExclusive) {
+      console.error('❌ Cupom não é exclusivo:', coupon.code, coupon.assignmentType);
       throw new BadRequestException('Este cupom já está disponível na sua conta');
     }
 
-    // Verificar limite de uso por usuário
+    // Verificar limite de uso por usuário (contar apenas usos em vendas, não resgates)
     const userUsageCount = await this.prisma.couponUsage.count({
       where: {
         couponId: coupon.id,
         userId: customerId,
+        saleId: { not: null }, // Apenas usos em vendas, não resgates
       },
     });
 
+    console.log('🎫 Verificando limite de uso:', {
+      userUsageCount,
+      usageLimit: coupon.usageLimit,
+      usedCount: coupon.usedCount,
+    });
+
     if (coupon.usageLimit && userUsageCount >= coupon.usageLimit) {
+      console.error('❌ Limite de uso atingido:', coupon.code);
       throw new BadRequestException('Você já atingiu o limite de uso deste cupom');
     }
 
     // Verificar limite geral de uso
     if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+      console.error('❌ Limite geral de uso atingido:', coupon.code);
       throw new BadRequestException('Este cupom atingiu o limite de uso geral');
     }
 
@@ -1490,12 +1575,18 @@ export class CouponsService {
       },
     });
 
+    console.log('🎫 Verificando se já foi resgatado:', {
+      alreadyRedeemed: !!alreadyRedeemed,
+    });
+
     if (alreadyRedeemed) {
+      console.error('❌ Cupom já foi resgatado:', coupon.code);
       throw new BadRequestException('Você já resgatou este cupom');
     }
 
     // Criar registro de resgate (CouponUsage sem saleId indica que foi resgatado mas ainda não usado)
-    await this.prisma.couponUsage.create({
+    console.log('🎫 Criando registro de resgate...');
+    const couponUsage = await this.prisma.couponUsage.create({
       data: {
         couponId: coupon.id,
         userId: customerId,
@@ -1503,9 +1594,16 @@ export class CouponsService {
       },
     });
 
+    console.log('✅ Registro de resgate criado:', {
+      id: couponUsage.id,
+      couponId: couponUsage.couponId,
+      userId: couponUsage.userId,
+      saleId: couponUsage.saleId,
+    });
+
     // Cupom válido e foi resgatado com sucesso
     // Retornar informações do cupom
-    return {
+    const result = {
       message: 'Cupom resgatado com sucesso!',
       coupon: {
         id: coupon.id,
@@ -1521,6 +1619,9 @@ export class CouponsService {
         couponType: coupon.couponType,
       },
     };
+
+    console.log('✅ Cupom resgatado com sucesso!', result);
+    return result;
   }
 }
 

@@ -133,7 +133,7 @@ export default function CustomerOrdersPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white page-with-fixed-header">
       <Header />
       
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">

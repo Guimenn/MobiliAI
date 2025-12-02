@@ -26,7 +26,7 @@ export default function CTA() {
           <div className="absolute inset-0 opacity-10 z-0">
             <Image src="/hero-bg.png" alt="" fill className="object-cover" />
           </div>
-          <div className="relative mx-auto max-w-4xl px-4 text-center">
+          <div className="relative mx-auto max-w-4xl px-4 text-center z-99">
             <h2 className="text-4xl font-black leading-tight sm:text-5xl">
               Transforme o atendimento em uma experiência memorável.
           </h2>
