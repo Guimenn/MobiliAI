@@ -79,6 +79,8 @@ export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const categoriesScrollRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
 
   // Estado inicial via URL
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
@@ -401,7 +403,7 @@ export default function ProductsPage() {
     }
   };
 
-  // Funções para o carrossel de categorias
+  // Funções para o carrossel de categorias - Mouse
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     setIsDragging(true);
     if (categoriesScrollRef.current) {
@@ -424,6 +426,40 @@ export default function ProductsPage() {
 
   const handleMouseLeave = () => {
     setIsDragging(false);
+  };
+
+  // Funções para o carrossel de categorias - Touch (Mobile)
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const touch = e.touches[0];
+    touchStartX.current = touch.pageX;
+    touchStartY.current = touch.pageY;
+    setIsDragging(true);
+    if (categoriesScrollRef.current) {
+      setStartX(touch.pageX - categoriesScrollRef.current.offsetLeft);
+      setScrollLeft(categoriesScrollRef.current.scrollLeft);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isDragging || !categoriesScrollRef.current) return;
+    
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.pageX - touchStartX.current);
+    const deltaY = Math.abs(touch.pageY - touchStartY.current);
+    
+    // Só prevenir o scroll padrão se o movimento horizontal for maior que o vertical
+    if (deltaX > deltaY && deltaX > 10) {
+      e.preventDefault();
+      const x = touch.pageX - categoriesScrollRef.current.offsetLeft;
+      const walk = (x - startX) * 2;
+      categoriesScrollRef.current.scrollLeft = scrollLeft - walk;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    touchStartX.current = 0;
+    touchStartY.current = 0;
   };
 
   // Função para obter a localização formatada
@@ -919,8 +955,11 @@ export default function ProductsPage() {
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseLeave}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
               className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-0 sm:ml-3 py-3 sm:py-4 gap-2 sm:gap-0"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
             >
               {categories.map((cat) => {
                 const Icon = categoryIcons[cat] || Package;
