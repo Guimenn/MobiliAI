@@ -84,6 +84,8 @@ export default function Header() {
     
     // Verifica se está na home page
     const isHomePage = pathname === '/';
+    // Verifica se está na página de produtos
+    const isProductsPage = pathname === '/products';
     
     // Estados locais para favoritos e carrinho
     const [favoritesCount, setFavoritesCount] = useState(0);
@@ -703,14 +705,16 @@ export default function Header() {
           <div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8 h-30">
           <div className="flex justify-between items-center py-3 sm:py-4 relative">
             {/* Logo */}
-            <div className="flex items-center flex-shrink-0">
+            <div className={`flex items-center flex-shrink-0 transition-all duration-300 ${
+              searchOpen ? 'opacity-0 scale-0 pointer-events-none md:opacity-100 md:scale-100 md:pointer-events-auto' : 'opacity-100 scale-100'
+            }`}>
               <Link href="/" className="flex items-center flex-shrink-0">
                 <img
                   src="/logotipos/11.svg"
                   alt="MobiliAI"
                   width={100}
                   height={40}
-                  className={`h-12 sm:h-16 md:h-24 w-auto max-w-none transition-all duration-300 ${
+                  className={`h-24 sm:h-24 md:h-24 w-auto max-w-none transition-all duration-300 ${
                     isHomePage ? '' : 'brightness-0 invert drop-shadow-lg'
                   }`}
                 />
@@ -718,15 +722,16 @@ export default function Header() {
             </div>
 
             {/* Barra de Pesquisa quando aberta - expande da direita até perto do logo */}
-            {searchOpen && (
+            {searchOpen && !isProductsPage && (
               <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex items-center justify-between px-2 sm:px-4 z-50" ref={searchRef}>
-                <div className="w-16 sm:w-24 md:w-48 flex-shrink-0"></div> {/* Espaço para o logo - menor em mobile */}
-                <div className={`flex-1 max-w-3xl ${
+                {/* No mobile, não deixar espaço para logo e ícones - barra ocupa tudo */}
+                <div className="hidden md:block w-24 md:w-48 flex-shrink-0"></div>
+                <div className={`w-full md:flex-1 md:max-w-3xl ${
                   isHomePage 
                     ? 'bg-white/10 backdrop-blur-sm border-2 border-white/30' 
                     : 'bg-white/95 backdrop-blur-md border-2 border-white/30 shadow-lg'
-                } rounded-xl px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3 transition-all duration-500 ease-in-out relative ${searchClosing ? 'opacity-0 scale-x-0 origin-right' : searchOpening ? 'opacity-100 scale-x-100 origin-right animate-in slide-in-from-right' : 'opacity-100 scale-x-100'}`}>
-                  <Search className={`h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${isHomePage ? 'text-white/60' : 'text-gray-400'}`} />
+                } rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 transition-all duration-500 ease-in-out relative ${searchClosing ? 'opacity-0 scale-x-0 origin-right' : searchOpening ? 'opacity-100 scale-x-100 origin-right animate-in slide-in-from-right' : 'opacity-100 scale-x-100'}`}>
+                  <Search className={`h-5 w-5 sm:h-5 sm:w-5 flex-shrink-0 ${isHomePage ? 'text-white/60' : 'text-gray-400'}`} />
                   <form onSubmit={handleSearch} className="flex-1 flex items-center relative min-w-0">
                     <input
                       ref={searchInputRef}
@@ -740,7 +745,7 @@ export default function Header() {
                           setShowAutocomplete(true);
                         }
                       }}
-                      className={`bg-transparent focus:outline-none flex-1 text-sm sm:text-base min-w-0 ${
+                      className={`bg-transparent focus:outline-none flex-1 text-base sm:text-base min-w-0 ${
                         isHomePage 
                           ? 'text-white placeholder:text-white/60' 
                           : 'text-gray-900 placeholder:text-gray-400'
@@ -781,48 +786,51 @@ export default function Header() {
                   
                   <button 
                     onClick={handleCloseSearch}
-                    className={`transition-colors flex-shrink-0 p-1 ${
+                    className={`transition-colors flex-shrink-0 p-1.5 ${
                       isHomePage 
                         ? 'text-white/60 hover:text-white' 
                         : 'text-gray-400 hover:text-gray-600'
                     }`}
                   >
-                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <X className="h-5 w-5 sm:h-5 sm:w-5" />
                   </button>
                 </div>
-                <div className="w-12 sm:w-20 md:w-64 flex-shrink-0"></div> {/* Espaço para os ícones da direita - menor em mobile */}
+                {/* No mobile, não deixar espaço para ícones - barra ocupa tudo */}
+                <div className="hidden md:block w-20 md:w-64 flex-shrink-0"></div>
               </div>
             )}
 
             {/* Right Side Icons */}
             <div className="flex items-center space-x-2 sm:space-x-4 md:space-x-6">
-               {/* Search Icon with Animation */}
-               <div className="relative search-icon-container">
-                 <button 
-                   onClick={handleOpenSearch}
-                   className={`p-1.5 sm:p-2 transition-all duration-500 ${
-                     searchOpen 
-                       ? 'opacity-0 scale-0 pointer-events-none' 
-                       : 'opacity-100 scale-100 pointer-events-auto'
-                   } ${
-                     isHomePage 
-                       ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
-                       : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
-                   }`}
-                 >
-                   <Search className="h-5 w-5 sm:h-6 sm:w-6" />
-                 </button>
-               </div>
+               {/* Search Icon with Animation - esconder na página de produtos */}
+               {!isProductsPage && (
+                 <div className="relative search-icon-container">
+                   <button 
+                     onClick={handleOpenSearch}
+                     className={`p-1.5 sm:p-2 transition-all duration-500 ${
+                       searchOpen 
+                         ? 'opacity-0 scale-0 pointer-events-none' 
+                         : 'opacity-100 scale-100 pointer-events-auto'
+                     } ${
+                       isHomePage 
+                         ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
+                         : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
+                     }`}
+                   >
+                     <Search className="h-5 w-5 sm:h-6 sm:w-6" />
+                   </button>
+                 </div>
+               )}
                {/* Favorites Icon */}
                <button 
                  onClick={goToFavorites}
-                 className={`p-1.5 sm:p-2 transition-colors relative ${
+                 className={`p-2.5 sm:p-2 transition-colors relative ${
                    isHomePage 
                      ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
                      : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
                  }`}
                >
-                 <Heart className="h-5 w-5 sm:h-6 sm:w-6" />
+                 <Heart className="h-6 w-6 sm:h-6 sm:w-6" />
                  {favoritesCount > 0 && (
                    <span 
                      className="absolute top-0 right-0 text-white text-xs font-bold pointer-events-none"
@@ -843,13 +851,13 @@ export default function Header() {
                  <button 
                   ref={notificationsButtonRef}
                   onClick={handleNotificationsClick}
-                  className={`p-1.5 sm:p-2 transition-colors relative ${
+                  className={`p-2.5 sm:p-2 transition-colors relative ${
                     isHomePage 
                       ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
                       : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
                   }`}
                 >
-                   <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+                   <Bell className="h-6 w-6 sm:h-6 sm:w-6" />
                    {unreadCount > 0 && (
                      <span 
                        className="absolute top-0 right-0 text-white text-xs font-bold pointer-events-none"
@@ -954,13 +962,13 @@ export default function Header() {
                <div className="relative user-dropdown-container" ref={userDropdownRef}>
                  <button 
                    onClick={handleUserClick}
-                   className={`p-1.5 sm:p-2 transition-colors ${
+                   className={`p-2.5 sm:p-2 transition-colors ${
                      isHomePage 
                        ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
                        : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
                    }`}
                  >
-                   <User className="h-5 w-5 sm:h-6 sm:w-6" />
+                   <User className="h-6 w-6 sm:h-6 sm:w-6" />
                  </button>
                 
                 {/* Dropdown - Diferente para usuário autenticado vs não autenticado */}
@@ -1090,13 +1098,13 @@ export default function Header() {
                {/* Cart Icon */}
                <button 
                  onClick={handleCartClick}
-                 className={`p-1.5 sm:p-2 transition-colors relative ${
+                 className={`p-2.5 sm:p-2 transition-colors relative ${
                    isHomePage 
                      ? 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm rounded-full' 
                      : 'text-white hover:text-white/90 hover:bg-white/15 backdrop-blur-sm rounded-full'
                  }`}
                >
-                 <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
+                 <ShoppingCart className="h-6 w-6 sm:h-6 sm:w-6" />
                  {cartItemsCount > 0 && (
                    <span 
                      className="absolute top-0 right-0 text-white text-xs font-bold pointer-events-none"

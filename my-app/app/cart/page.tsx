@@ -239,29 +239,52 @@ export default function CartPage() {
   // Função para obter o preço atual com desconto (se houver oferta relâmpago configurada)
   const getCurrentPrice = (product: any): number => {
     const originalPrice = Number(product.price);
-    
-    // Se houver oferta relâmpago configurada, calcular preço com desconto
-    if (product.isFlashSale) {
-      // Se tem flashSaleDiscountPercent, calcular preço
-      if (product.flashSaleDiscountPercent && product.flashSaleDiscountPercent > 0) {
-        const discount = (originalPrice * product.flashSaleDiscountPercent) / 100;
-        return originalPrice - discount;
-      }
-      // Se tem flashSalePrice, usar ele
-      if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
-        return Number(product.flashSalePrice);
+    const now = new Date();
+
+    // Prioridade para oferta relâmpago - verificar se está realmente ativa
+    if (product.isFlashSale && product.flashSaleStartDate && product.flashSaleEndDate) {
+      try {
+        const flashStart = new Date(product.flashSaleStartDate);
+        const flashEnd = new Date(product.flashSaleEndDate);
+        
+        // Verificar se a oferta relâmpago está ativa (já começou e ainda não expirou)
+        if (now >= flashStart && now <= flashEnd) {
+          // Se tem flashSalePrice, usar ele
+          if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+            return Number(product.flashSalePrice);
+          }
+          // Se não tem flashSalePrice mas tem flashSaleDiscountPercent, calcular
+          if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && originalPrice) {
+            const discount = (originalPrice * Number(product.flashSaleDiscountPercent)) / 100;
+            return originalPrice - discount;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar oferta relâmpago:', error);
+        // Continuar com outras verificações se houver erro
       }
     }
     
-    // Se houver oferta normal ativa
-    if (product.isOnSale && product.salePrice) {
-      const now = new Date();
-      if (product.saleStartDate && product.saleEndDate) {
-        const start = new Date(product.saleStartDate);
-        const end = new Date(product.saleEndDate);
-        if (now >= start && now <= end) {
-          return Number(product.salePrice);
+    // Depois verificar oferta normal - apenas se estiver ativa
+    if (product.isOnSale && product.saleStartDate && product.saleEndDate) {
+      try {
+        const saleStart = new Date(product.saleStartDate);
+        const saleEnd = new Date(product.saleEndDate);
+        
+        if (now >= saleStart && now <= saleEnd) {
+          // Se tem salePrice, usar ele
+          if (product.salePrice !== undefined && product.salePrice !== null) {
+            return Number(product.salePrice);
+          }
+          // Se não tem salePrice mas tem saleDiscountPercent, calcular
+          if (product.saleDiscountPercent !== undefined && product.saleDiscountPercent !== null && originalPrice) {
+            const discount = (originalPrice * Number(product.saleDiscountPercent)) / 100;
+            return originalPrice - discount;
+          }
         }
+      } catch (error) {
+        console.error('Erro ao verificar oferta normal:', error);
+        // Continuar com preço original se houver erro
       }
     }
     

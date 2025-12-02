@@ -39,47 +39,69 @@ export default function ClientProviders({ children }: { children: React.ReactNod
             sessionStorage.setItem(cartLoadedKey, 'true');
             
             if (cartData?.items && cartData.items.length > 0) {
-              const cartItems = cartData.items.map((item: any) => ({
-                id: item.id,
-                product: {
-                  id: item.product.id,
-                  name: item.product.name,
-                  description: item.product.description,
-                  category: item.product.category?.toLowerCase() || 'sofa',
-                  price: Number(item.product.price),
-                  stock: item.product.stock || 0,
-                  imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl,
-                  imageUrls: item.product.imageUrls || [],
-                  colorName: item.product.colorName,
-                  colorHex: item.product.colorHex,
-                  brand: item.product.brand,
-                  storeId: item.product.storeId || item.product.store?.id || '',
-                  storeName: item.product.store?.name,
-                  storeAddress: item.product.store?.address,
-                  store: item.product.store ? {
-                    id: item.product.store.id,
-                    name: item.product.store.name,
-                    address: item.product.store.address,
-                    zipCode: item.product.store.zipCode,
-                    city: item.product.store.city,
-                    state: item.product.store.state,
-                  } : undefined,
-                  storeInventory: item.product.storeInventory ? item.product.storeInventory.map((inv: any) => ({
-                    storeId: inv.storeId,
-                    quantity: inv.quantity,
-                    store: inv.store ? {
-                      id: inv.store.id,
-                      name: inv.store.name,
-                      address: inv.store.address,
-                      zipCode: inv.store.zipCode,
-                      city: inv.store.city,
-                      state: inv.store.state,
-                      isActive: inv.store.isActive,
+              // Obter carrinho atual para preservar dados locais dos produtos
+              const currentCart = useAppStore.getState().cart;
+              
+              const cartItems = cartData.items.map((item: any) => {
+                // Tentar encontrar produto correspondente no carrinho local para preservar dados
+                const localItem = currentCart.find(ci => ci.product.id === item.product.id);
+                const localProduct = localItem?.product;
+
+                // Mesclar dados do backend com dados locais, preservando campos de oferta relâmpago
+                return {
+                  id: item.id,
+                  product: {
+                    id: item.product.id,
+                    name: item.product.name,
+                    description: item.product.description,
+                    category: item.product.category?.toLowerCase() || 'sofa',
+                    price: Number(item.product.price),
+                    stock: item.product.stock || 0,
+                    imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl,
+                    imageUrls: item.product.imageUrls || [],
+                    colorName: item.product.colorName,
+                    colorHex: item.product.colorHex,
+                    brand: item.product.brand,
+                    // Campos de Oferta Normal - usar dados do backend se disponíveis, senão preservar do local
+                    isOnSale: item.product.isOnSale !== undefined ? item.product.isOnSale : (localProduct?.isOnSale || false),
+                    salePrice: item.product.salePrice ? Number(item.product.salePrice) : localProduct?.salePrice,
+                    saleDiscountPercent: item.product.saleDiscountPercent ? Number(item.product.saleDiscountPercent) : localProduct?.saleDiscountPercent,
+                    saleStartDate: item.product.saleStartDate || localProduct?.saleStartDate,
+                    saleEndDate: item.product.saleEndDate || localProduct?.saleEndDate,
+                    // Campos de Oferta Relâmpago - priorizar dados locais se existirem, senão usar do backend
+                    isFlashSale: localProduct?.isFlashSale !== undefined ? localProduct.isFlashSale : (item.product.isFlashSale !== undefined ? item.product.isFlashSale : false),
+                    flashSalePrice: localProduct?.flashSalePrice !== undefined ? localProduct.flashSalePrice : (item.product.flashSalePrice ? Number(item.product.flashSalePrice) : undefined),
+                    flashSaleDiscountPercent: localProduct?.flashSaleDiscountPercent !== undefined ? localProduct.flashSaleDiscountPercent : (item.product.flashSaleDiscountPercent ? Number(item.product.flashSaleDiscountPercent) : undefined),
+                    flashSaleStartDate: localProduct?.flashSaleStartDate || item.product.flashSaleStartDate || undefined,
+                    flashSaleEndDate: localProduct?.flashSaleEndDate || item.product.flashSaleEndDate || undefined,
+                    storeId: item.product.storeId || item.product.store?.id || '',
+                    storeName: item.product.store?.name,
+                    storeAddress: item.product.store?.address,
+                    store: item.product.store ? {
+                      id: item.product.store.id,
+                      name: item.product.store.name,
+                      address: item.product.store.address,
+                      zipCode: item.product.store.zipCode,
+                      city: item.product.store.city,
+                      state: item.product.store.state,
                     } : undefined,
-                  })) : undefined,
-                },
-                quantity: item.quantity,
-              }));
+                    storeInventory: item.product.storeInventory ? item.product.storeInventory.map((inv: any) => ({
+                      storeId: inv.storeId,
+                      quantity: inv.quantity,
+                      store: inv.store ? {
+                        id: inv.store.id,
+                        name: inv.store.name,
+                        address: inv.store.address,
+                        zipCode: inv.store.zipCode,
+                        city: inv.store.city,
+                        state: inv.store.state,
+                        isActive: inv.store.isActive,
+                      } : undefined,
+                    })) : undefined,
+                  },
+                  quantity: item.quantity,
+                };
+              });
               
               const cartTotal = cartItems.reduce(
                 (total: number, item: any) => total + (Number(item.product.price) * item.quantity),

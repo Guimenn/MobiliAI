@@ -840,22 +840,22 @@ export default function HomePage() {
     const isLarge = position === 0; // mantém o layout: primeiro card maior, demais quadrados
     if (isLarge) {
       return (
-        <div className="w-full md:w-[400px] flex-shrink-0 relative">
-          <div className={`aspect-[6/9] rounded-2xl shadow-xl relative overflow-hidden`}>
+        <div className="w-[280px] sm:w-[300px] md:w-[350px] lg:w-[400px] flex-shrink-0 relative">
+          <div className={`aspect-[6/9] rounded-xl sm:rounded-2xl shadow-xl relative overflow-hidden`}>
             {/* Imagem de fundo */}
             <div 
-              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110 sm:scale-105 md:scale-100"
               style={{ backgroundImage: `url(${slide.image})` }}
             ></div>
             {/* Overlay gradiente para melhor legibilidade */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
             
             {/* overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-6">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4 sm:p-5 md:p-6">
               <div className="text-white">
-                <div className="text-sm text-white/70 mb-1">{slide.number}</div>
-                <div className="text-lg font-bold mb-1">{slide.title}</div>
-                <div className="text-sm text-white/80">{slide.subtitle}</div>
+                <div className="text-xs sm:text-sm text-white/70 mb-1">{slide.number}</div>
+                <div className="text-base sm:text-lg font-bold mb-1">{slide.title}</div>
+                <div className="text-xs sm:text-sm text-white/80">{slide.subtitle}</div>
               </div>
             </div>
            
@@ -866,56 +866,56 @@ export default function HomePage() {
 
   // small card (quadrado)
   return (
-    <div className="w-full md:w-[350px] flex-shrink-0 relative">
-      <div className={`aspect-[4/5] rounded-2xl shadow-xl relative overflow-hidden`}>
+    <div className="w-[220px] sm:w-[250px] md:w-[300px] lg:w-[350px] flex-shrink-0 relative">
+      <div className={`aspect-[4/5] rounded-xl sm:rounded-2xl shadow-xl relative overflow-hidden`}>
         {/* Imagem de fundo */}
         <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110 sm:scale-105 md:scale-100"
           style={{ backgroundImage: `url(${slide.image})` }}
         ></div>
         {/* Overlay gradiente para melhor legibilidade */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
         
         {/* overlay */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-6">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4 sm:p-5 md:p-6">
           <div className="text-white">
-            <div className="text-sm text-white/70 mb-1">{slide.number}</div>
-            <div className="text-lg font-bold mb-1">{slide.title}</div>
-            <div className="text-sm text-white/80">{slide.subtitle}</div>
+            <div className="text-xs sm:text-sm text-white/70 mb-1">{slide.number}</div>
+            <div className="text-base sm:text-lg font-bold mb-1">{slide.title}</div>
+            <div className="text-xs sm:text-sm text-white/80">{slide.subtitle}</div>
           </div>
         </div>
       </div>
       
-      {/* Navigation Below Card 2 */}
+      {/* Navigation Below Card 2 - apenas no desktop */}
       {position === 1 && (
-        <div className="flex items-center justify-between mt-4">
+        <div className="hidden sm:flex items-center justify-between mt-3 sm:mt-4 w-full">
           {/* Dots */}
-          <div className="flex space-x-2">
+          <div className="flex space-x-1.5 sm:space-x-2">
             {slides.map((_, idx) => (
               <button
                 key={idx}
                 aria-label={`Ir para slide ${idx + 1}`}
                 onClick={() => setCarouselIndex(idx)}
-                className={`${idx === carouselIndex ? 'w-3 h-3 bg-[#3e2626]' : 'w-2 h-2 bg-gray-300'} rounded-full transition-all`}
+                className={`${idx === carouselIndex ? 'w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#3e2626]' : 'w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-300'} rounded-full transition-all`}
               />
             ))}
           </div>
 
           {/* Arrows */}
-          <div className="flex space-x-2">
+          <div className="flex space-x-1.5 sm:space-x-2">
             <button 
               onClick={goPrev} 
               disabled={isAnimating}
-              className="w-8 h-8 bg-gray-200 hover:bg-[#3e2626] hover:text-white rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-7 h-7 sm:w-8 sm:h-8 bg-gray-200 hover:bg-[#3e2626] hover:text-white rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform duration-300" />
+              <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:-translate-x-0.5 transition-transform duration-300" />
             </button>
             <button 
               onClick={goNext} 
               disabled={isAnimating}
-              className="w-8 h-8 bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform duration-300" />
+              <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:translate-x-0.5 transition-transform duration-300" />
             </button>
           </div>
         </div>
@@ -930,7 +930,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen ">
       {/* Main Hero Section - Design Ultra Moderno e Apelativo */}
-      <div className="relative min-h-screen flex items-center overflow-hidden">
+      <div className="relative min-h-screen flex items-center overflow-hidden pt-32 sm:pt-36 md:pt-40 lg:pt-44">
         {/* Background Image com efeitos dinâmicos */}
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-out"
@@ -965,67 +965,67 @@ export default function HomePage() {
         <Header />
 
         {/* Content Container - Layout mais compacto e impactante */}
-        <div className="relative z-10 w-full container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[90vh]">
+        <div className="relative z-10 w-full container mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 md:pt-8 pb-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-start lg:items-center min-h-[90vh]">
             
             {/* LADO ESQUERDO - Conteúdo focado em experiência */}
-            <div className="text-white space-y-10 mt-10 animate-in fade-in slide-in-from-left duration-1000">
+            <div className="text-white space-y-6 sm:space-y-8 lg:space-y-10 mt-6 sm:mt-8 lg:mt-10 animate-in fade-in slide-in-from-left duration-1000">
 
               {/* Título principal */}
-              <div className="space-y-4">
-                <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold leading-[0.95] tracking-tight">
+              <div className="space-y-3 sm:space-y-4">
+                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-[0.95] tracking-tight">
                   <span className="block text-white drop-shadow-2xl">
                     Não é só
                   </span>
                   <span className="block text-white drop-shadow-2xl">
                     mobília.
                   </span>
-                  <span className="block text-white drop-shadow-2xl mt-2 md:mt-3">
+                  <span className="block text-white drop-shadow-2xl mt-1 sm:mt-2 md:mt-3">
                     <span className="">É</span> experiência.
                   </span>
                 </h1>
               </div>
 
               {/* Descrição focada em experiência */}
-              <div className="space-y-3 max-w-lg">
-                <p className="text-lg md:text-xl text-white/85 leading-relaxed font-light">
+              <div className="space-y-2 sm:space-y-3 max-w-lg">
+                <p className="text-base sm:text-lg md:text-xl text-white/85 leading-relaxed font-light">
                   Transforme seu ambiente com nossa tecnologia de visualização. Veja como cada peça se encaixa perfeitamente no seu espaço antes de decidir.
                 </p>
-                <div className="flex items-center gap-6 text-sm text-white/70 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm text-white/70 pt-1 sm:pt-2">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-white/60" />
+                    <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white/60" />
                     <span>Visualização instantânea</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-white/60" />
+                    <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white/60" />
                     <span>Resultados precisos</span>
                   </div>
                 </div>
               </div>
 
               {/* Botões */}
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4">
                 <Button 
                   onClick={() => router.push('/IA')}
                   size="lg"
-                  className="group relative bg-white text-[#3e2626] hover:bg-white/95 rounded-full px-10 py-7 text-base font-bold transition-all duration-300 shadow-[0_20px_60px_rgba(0,0,0,0.3)] hover:shadow-[0_25px_80px_rgba(0,0,0,0.4)] hover:scale-105 active:scale-95 overflow-hidden"
+                  className="group relative bg-white text-[#3e2626] hover:bg-white/95 rounded-full px-6 sm:px-8 md:px-10 py-5 sm:py-6 md:py-7 text-sm sm:text-base font-bold transition-all duration-300 shadow-[0_20px_60px_rgba(0,0,0,0.3)] hover:shadow-[0_25px_80px_rgba(0,0,0,0.4)] hover:scale-105 active:scale-95 overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                  <span className="relative flex items-center gap-3">
-                    <Camera className="h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
-                    <span>EXPERIMENTAR</span>
-                    <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+                  <span className="relative flex items-center gap-2 sm:gap-3">
+                    <Camera className="h-4 w-4 sm:h-5 sm:w-5 group-hover:scale-110 transition-transform duration-300" />
+                    <span className="text-xs sm:text-base">EXPERIMENTAR</span>
+                    <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform duration-300" />
                   </span>
                 </Button>
                 <Button 
                   onClick={() => router.push('/products')}
                   size="lg"
                   variant="outline"
-                  className="group relative bg-transparent border-2 border-white/50 text-white hover:bg-white/10 hover:border-white/70 rounded-full px-10 py-7 text-base font-bold backdrop-blur-sm transition-all duration-300 hover:scale-105 active:scale-95"
+                  className="group relative bg-transparent border-2 border-white/50 text-white hover:bg-white/10 hover:border-white/70 rounded-full px-6 sm:px-8 md:px-10 py-5 sm:py-6 md:py-7 text-sm sm:text-base font-bold backdrop-blur-sm transition-all duration-300 hover:scale-105 active:scale-95"
                 >
-                  <span className="flex items-center gap-3">
-                    <Eye className="h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
-                    <span>EXPLORAR PRODUTOS</span>
+                  <span className="flex items-center gap-2 sm:gap-3">
+                    <Eye className="h-4 w-4 sm:h-5 sm:w-5 group-hover:scale-110 transition-transform duration-300" />
+                    <span className="text-xs sm:text-base">EXPLORAR PRODUTOS</span>
                   </span>
                 </Button>
               </div>
@@ -1041,8 +1041,8 @@ export default function HomePage() {
               });
               return flashOfferActive && specialOfferProduct;
             })() && (
-              <div className="relative group w-full animate-in fade-in slide-in-from-right duration-700">
-                <div className="relative bg-gradient-to-br from-white/15 h-[550px] via-white/10 to-white/5 backdrop-blur-2xl rounded-3xl p-5 md:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)] border-2 border-white/40 overflow-hidden transition-all duration-500 hover:shadow-[0_25px_80px_rgba(0,0,0,0.4)] hover:border-white/50 hover:scale-[1.01]">
+              <div className="relative group w-full animate-in fade-in slide-in-from-right duration-700 mt-8 lg:mt-0">
+                <div className="relative bg-gradient-to-br from-white/15 min-h-[500px] md:h-[550px] via-white/10 to-white/5 backdrop-blur-2xl rounded-3xl p-4 sm:p-5 md:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)] border-2 border-white/40 overflow-hidden transition-all duration-500 hover:shadow-[0_25px_80px_rgba(0,0,0,0.4)] hover:border-white/50 hover:scale-[1.01]">
                   {/* Efeito de brilho animado no fundo */}
                   <div className="absolute inset-0 opacity-30">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-out"></div>
@@ -1058,29 +1058,29 @@ export default function HomePage() {
                   <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/20 rounded-full blur-3xl animate-pulse"></div>
                   
                   {/* Badge Oferta Relâmpago */}
-                  <div className="relative z-10 flex items-center gap-3 mb-5">
-                    <div className="relative overflow-hidden bg-gradient-to-r from-[#3e2626] to-[#2a1f1f] text-white rounded-full px-4 py-2 flex items-center gap-2 shadow-[0_4px_15px_rgba(62,38,38,0.5)] group/badge hover:shadow-[0_6px_20px_rgba(62,38,38,0.7)] transition-all duration-300">
-                      <Zap className="h-4 w-4 fill-white animate-pulse" />
-                      <span className="text-xs font-semibold tracking-wider">Oferta Relâmpago</span>
+                  <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-4 sm:mb-5">
+                    <div className="relative overflow-hidden bg-gradient-to-r from-[#3e2626] to-[#2a1f1f] text-white rounded-full px-3 sm:px-4 py-1.5 sm:py-2 flex items-center gap-1.5 sm:gap-2 shadow-[0_4px_15px_rgba(62,38,38,0.5)] group/badge hover:shadow-[0_6px_20px_rgba(62,38,38,0.7)] transition-all duration-300">
+                      <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-white animate-pulse" />
+                      <span className="text-[10px] sm:text-xs font-semibold tracking-wider">Oferta Relâmpago</span>
                     </div>
-                    <div className="relative bg-[#3e2626] text-white rounded-full px-4 py-2 flex items-center gap-2  animate-pulse">
-                      <Clock className="h-3.5 w-3.5 relative z-10" />
-                      <span className="text-xs font-bold tabular-nums relative z-10">{formatTime(offerSecondsLeft)}</span>
+                    <div className="relative bg-[#3e2626] text-white rounded-full px-3 sm:px-4 py-1.5 sm:py-2 flex items-center gap-1.5 sm:gap-2 animate-pulse">
+                      <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 relative z-10" />
+                      <span className="text-[10px] sm:text-xs font-bold tabular-nums relative z-10">{formatTime(offerSecondsLeft)}</span>
                     </div>
                   </div>
 
                   {/* Layout: Imagem à esquerda, Conteúdo à direita */}
-                  <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                     {/* Imagem do Produto - Formato Quadrado à Esquerda */}
                     {specialOfferProduct.imageUrl && (
-                      <div className="relative w-full h-[430px] rounded-2xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 group/image shadow-xl">
+                      <div className="relative w-full h-[250px] sm:h-[300px] md:h-[430px] rounded-2xl overflow-hidden bg-[#3e2626] group/image shadow-xl">
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent z-10"></div>
                         <Image
                           src={specialOfferProduct.imageUrl}
                           alt={specialOfferProduct.name}
                           width={300}
                           height={300}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover/image:scale-110"
+                          className="w-full h-full object-cover scale-[1.05] sm:scale-[1.03] md:scale-100 transition-transform duration-700 group-hover/image:scale-110"
                           unoptimized
                         />
                         
@@ -1088,9 +1088,9 @@ export default function HomePage() {
                         {(() => {
                           const discountPercent = getFlashSaleDiscountPercent(specialOfferProduct);
                           return discountPercent > 0 ? (
-                            <div className="absolute top-4 right-4 bg-gradient-to-br from-[#3e2626] to-[#2a1f1f] text-white rounded-xl px-4 py-3 shadow-[0_8px_25px_rgba(62,38,38,0.6)] z-20 transform hover:scale-110 transition-transform duration-300">
-                              <div className="text-2xl font-black leading-none">{discountPercent}%</div>
-                              <div className="text-[9px] font-bold uppercase tracking-widest mt-0.5">OFF</div>
+                            <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-gradient-to-br from-[#3e2626] to-[#2a1f1f] text-white rounded-lg sm:rounded-xl px-2 sm:px-4 py-1.5 sm:py-3 shadow-[0_8px_25px_rgba(62,38,38,0.6)] z-20 transform hover:scale-110 transition-transform duration-300">
+                              <div className="text-lg sm:text-2xl font-black leading-none">{discountPercent}%</div>
+                              <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5">OFF</div>
                             </div>
                           ) : null;
                         })()}
@@ -1101,12 +1101,12 @@ export default function HomePage() {
                     )}
 
                     {/* Informações do Produto - À Direita */}
-                    <div className="flex flex-col justify-between space-y-4">
+                    <div className="flex flex-col justify-between space-y-3 sm:space-y-4">
                       <div>
-                        <h3 className="text-xl md:text-4xl font-medium text-white leading-tight tracking-[0.05em] mb-3 drop-shadow-lg">
+                        <h3 className="text-lg sm:text-xl md:text-4xl font-medium text-white leading-tight tracking-[0.05em] mb-2 sm:mb-3 drop-shadow-lg">
                           {specialOfferProduct.name}
                         </h3>
-                        <p className="text-sm md:text-base text-white/80 font-light tracking-wide mb-3">  
+                        <p className="text-xs sm:text-sm md:text-base text-white/80 font-light tracking-wide mb-2 sm:mb-3 line-clamp-2 sm:line-clamp-none">  
                         {specialOfferProduct.description}
                         </p>
                         
@@ -1117,21 +1117,21 @@ export default function HomePage() {
                           const savings = originalPrice - salePrice;
                           
                           return (
-                            <div className="space-y-2">
-                              <div className="text-xs text-white/80 font-light tracking-wide">Por apenas</div>
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-lg font-medium text-white/90">R$</span>
-                                <span className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
+                            <div className="space-y-1.5 sm:space-y-2">
+                              <div className="text-[10px] sm:text-xs text-white/80 font-light tracking-wide">Por apenas</div>
+                              <div className="flex items-baseline gap-1.5 sm:gap-2">
+                                <span className="text-sm sm:text-lg font-medium text-white/90">R$</span>
+                                <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
                                   {salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                 </span>
                               </div>
                               {originalPrice > salePrice && (
-                                <div className="flex items-center gap-3 flex-wrap pt-1">
-                                  <span className="text-sm text-white/50 line-through font-light">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 pt-1">
+                                  <span className="text-xs sm:text-sm text-white/50 line-through font-light">
                                     R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                   </span>
                                   {savings > 0 && (
-                                    <span className="text-xs bg-[#3e2626] text-white px-3 py-1.5 rounded-full font-semibold border border-white backdrop-blur-sm shadow-lg">
+                                    <span className="text-[10px] sm:text-xs bg-[#3e2626] text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-full font-semibold border border-white backdrop-blur-sm shadow-lg inline-block w-fit">
                                       Economize R$ {savings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                     </span>
                                   )}
@@ -1142,22 +1142,22 @@ export default function HomePage() {
                         })()}
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-2 sm:space-y-3">
                         {/* Botão de Ação melhorado */}
                         <Button 
                           onClick={() => addToCart(specialOfferProduct.id)}
-                          className="relative w-full bg-gradient-to-r from-white to-white/95 text-[#3e2626] hover:from-white hover:to-white rounded-full px-6 py-4 text-sm font-semibold tracking-wide transition-all duration-300 shadow-[0_8px_25px_rgba(255,255,255,0.3)] hover:shadow-[0_12px_35px_rgba(255,255,255,0.4)] hover:scale-[1.03] active:scale-[0.97] group/button overflow-hidden"
+                          className="relative w-full bg-gradient-to-r from-white to-white/95 text-[#3e2626] hover:from-white hover:to-white rounded-full px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold tracking-wide transition-all duration-300 shadow-[0_8px_25px_rgba(255,255,255,0.3)] hover:shadow-[0_12px_35px_rgba(255,255,255,0.4)] hover:scale-[1.03] active:scale-[0.97] group/button overflow-hidden"
                         >
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 translate-x-[-100%] group-hover/button:translate-x-[200%] transition-transform duration-700"></div>
-                          <span className="flex items-center justify-center gap-2 relative z-10">
-                            <ShoppingCart className="h-4 w-4 group-hover/button:scale-110 transition-transform duration-300" />
-                            Adicionar ao Carrinho
+                          <span className="flex items-center justify-center gap-1.5 sm:gap-2 relative z-10">
+                            <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover/button:scale-110 transition-transform duration-300" />
+                            <span className="text-xs sm:text-sm">Adicionar ao Carrinho</span>
                           </span>
                         </Button>
                         
                         {/* Garantia melhorada */}
-                        <div className="flex items-center justify-center gap-2 text-xs text-white/70 font-light">
-                          <Shield className="h-3.5 w-3.5 text-white/80" />
+                        <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-white/70 font-light">
+                          <Shield className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white/80" />
                           <span>Compra segura e garantida</span>
                         </div>
                       </div>
@@ -1165,8 +1165,8 @@ export default function HomePage() {
                   </div>
                   
                   {/* Decoração flutuante */}
-                  <div className="absolute top-8 right-8 w-24 h-24 bg-white/5 rounded-full blur-2xl"></div>
-                  <div className="absolute bottom-8 left-8 w-16 h-16 bg-white/5 rounded-full blur-xl"></div>
+                  <div className="absolute top-8 right-8 w-24 h-24 bg-white/5 rounded-full blur-2xl hidden sm:block"></div>
+                  <div className="absolute bottom-8 left-8 w-16 h-16 bg-white/5 rounded-full blur-xl hidden sm:block"></div>
                 </div>
               </div>
             )}
@@ -1177,19 +1177,19 @@ export default function HomePage() {
      
 
       {/* Categories Section */}
-      <section id="categories-anchor" className="pt-20 md:pt-24 pb-20 bg-gradient-to-br from-gray-50 to-white">
-        <div className="container mx-auto  mt-10">
+      <section id="categories-anchor" className="pt-12 sm:pt-16 md:pt-20 lg:pt-24 pb-12 sm:pb-16 md:pb-20 bg-gradient-to-br from-gray-50 to-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 mt-6 sm:mt-8 md:mt-10">
          
 
           {/* Grid Layout Customizado - 6 colunas x 5 linhas */}
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-6 h-[800px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6 auto-rows-fr min-h-[600px] md:min-h-[800px]">
             
             {/* Sofá - 3x2 (colunas 1-3, linhas 1-2) */}
-            <Link href={`/products?category=${categories[0].id}`} className="md:col-span-3 md:row-span-2 relative z-0">
-              <div className="group relative h-full bg-gradient-to-br from-[#3e2626] via-[#8B4513] to-[#A0522D] rounded-3xl overflow-hidden cursor-pointer shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.02]">
+            <Link href={`/products?category=${categories[0].id}`} className="sm:col-span-2 md:col-span-3 lg:col-span-3 md:row-span-2 relative z-0 min-h-[300px] sm:min-h-[400px] md:min-h-[500px]">
+              <div className="group relative h-full bg-gradient-to-br from-[#3e2626] via-[#8B4513] to-[#A0522D] rounded-2xl sm:rounded-3xl overflow-hidden cursor-pointer shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.02]">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[1.79]"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[2.2] sm:scale-[2] md:scale-[1.79]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[0].id]})` }}
                 ></div>
                 {/* Background Pattern */}
@@ -1202,13 +1202,13 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none"></div>
                 
                 {/* Conteúdo Principal */}
-                <div className="relative z-10 p-8 h-full flex flex-col justify-between pointer-events-auto">
+                <div className="relative z-10 p-4 sm:p-6 md:p-8 h-full flex flex-col justify-between pointer-events-auto">
                   <div>
-                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
-                      <h3 className="text-4xl md:text-5xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                    <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
+                      <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-light text-black mb-1 sm:mb-2 leading-tight tracking-[0.08em]">
                         {categories[0].name}
                       </h3>
-                      <p className="text-sm text-black font-light tracking-[0.02em]">
+                      <p className="text-xs sm:text-sm text-black font-light tracking-[0.02em]">
                         {categories[0].description}
                       </p>
                     </div>
@@ -1225,22 +1225,22 @@ export default function HomePage() {
             </Link>
 
             {/* Poltrona - 2x2 (colunas 4-5, linhas 1-2) */}
-            <Link href={`/products?category=${categories[5].id}`} className="md:col-span-2 md:row-span-2 relative z-0">
+            <Link href={`/products?category=${categories[5].id}`} className="sm:col-span-1 md:col-span-2 lg:col-span-2 md:row-span-2 relative z-0 min-h-[300px] sm:min-h-[400px] md:min-h-[500px]">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.4]"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.8] sm:scale-[1.6] md:scale-[1.4]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[5].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[5].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-6 h-full flex flex-col justify-start pointer-events-auto">
+                <div className="relative z-10 p-4 sm:p-5 md:p-6 h-full flex flex-col justify-start pointer-events-auto">
                   <div>
-                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
-                      <h4 className="text-2xl md:text-3xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                    <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
+                      <h4 className="text-xl sm:text-2xl md:text-3xl font-light text-black mb-1 sm:mb-2 leading-tight tracking-[0.08em]">
                         {categories[5].name}
                       </h4>
-                      <p className="text-sm text-black  tracking-[0.02em]">
+                      <p className="text-xs sm:text-sm text-black tracking-[0.02em]">
                         {categories[5].description}
                       </p>
                     </div>
@@ -1259,22 +1259,22 @@ export default function HomePage() {
             </Link>
 
             {/* Cadeiras - 1x2 (coluna 6, linhas 1-2) */}
-            <Link href={`/products?category=${categories[2].id}`} className="md:col-span-1 md:row-span-2 relative z-0">
+            <Link href={`/products?category=${categories[2].id}`} className="sm:col-span-1 md:col-span-1 lg:col-span-1 md:row-span-2 relative z-0 min-h-[250px] sm:min-h-[300px] md:min-h-[500px]">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1]"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.4] sm:scale-[1.2] md:scale-[1]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[2].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[2].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex flex-col justify-end items-center pointer-events-auto">
+                <div className="relative z-10 p-3 sm:p-4 h-full flex flex-col justify-end items-center pointer-events-auto">
                   <div className="text-center">
-                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
-                      <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                    <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-base sm:text-lg md:text-xl font-light text-black mb-1 sm:mb-2 leading-tight tracking-[0.08em]">
                         {categories[2].name}
                       </h4>
-                      <p className="text-xs text-black  tracking-[0.02em]">
+                      <p className="text-[10px] sm:text-xs text-black tracking-[0.02em]">
                         {categories[2].description}
                       </p>
                     </div>
@@ -1292,22 +1292,22 @@ export default function HomePage() {
             </Link>
 
             {/* Mesa - 2x2 (colunas 1-2, linhas 3-4) */}
-            <Link href={`/products?category=${categories[1].id}`} className="md:col-span-2 md:row-span-2 relative z-0">
+            <Link href={`/products?category=${categories[1].id}`} className="sm:col-span-1 md:col-span-2 lg:col-span-2 md:row-span-2 relative z-0 min-h-[250px] sm:min-h-[300px] md:min-h-[400px]">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.36]"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.7] sm:scale-[1.5] md:scale-[1.36]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[1].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[1].gradient} opacity-5 group-hover:opacity-15 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-6 h-full flex flex-col justify-start pointer-events-auto">
+                <div className="relative z-10 p-4 sm:p-5 md:p-6 h-full flex flex-col justify-start pointer-events-auto">
                   <div>
-                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
-                      <h4 className="text-2xl md:text-3xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                    <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-xl sm:text-2xl md:text-3xl font-light text-black mb-1 sm:mb-2 leading-tight tracking-[0.08em]">
                         {categories[1].name}
                       </h4>
-                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                      <p className="text-[10px] sm:text-xs text-black font-light tracking-[0.02em]">
                         {categories[1].description}
                       </p>
                     </div>
@@ -1325,22 +1325,22 @@ export default function HomePage() {
             </Link>
 
             {/* Estante - 2x1 (colunas 3-4, linha 3) */}
-            <Link href={`/products?category=${categories[4].id}`} className="md:col-span-2 md:row-span-1 relative z-0">
+            <Link href={`/products?category=${categories[4].id}`} className="sm:col-span-2 md:col-span-2 lg:col-span-2 md:row-span-1 relative z-0 min-h-[200px] sm:min-h-[250px]">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[1.85]"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[2.2] sm:scale-[2] md:scale-[1.85]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[4].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[4].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex flex-col justify-end pointer-events-auto">
+                <div className="relative z-10 p-3 sm:p-4 h-full flex flex-col justify-end pointer-events-auto">
                   <div className="text-left">
-                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
-                      <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                    <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-base sm:text-lg md:text-xl font-light text-black mb-1 sm:mb-2 leading-tight tracking-[0.08em]">
                         {categories[4].name}
                       </h4>
-                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                      <p className="text-[10px] sm:text-xs text-black font-light tracking-[0.02em]">
                         {categories[4].description}
                       </p>
                     </div>
@@ -1359,22 +1359,22 @@ export default function HomePage() {
             </Link>
 
             {/* Quadro - 2x1 (coluna 6, linha 3) */}
-            <Link href={`/products?category=${categories[6].id}`} className="md:col-span-2 md:row-span-1 relative z-0">
+            <Link href={`/products?category=${categories[6].id}`} className="sm:col-span-2 md:col-span-2 lg:col-span-2 md:row-span-1 relative z-0 min-h-[200px] sm:min-h-[250px]">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.8]"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[2.2] sm:scale-[2] md:scale-[1.8]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[6].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[6].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex flex-col justify-end pointer-events-auto">
+                <div className="relative z-10 p-3 sm:p-4 h-full flex flex-col justify-end pointer-events-auto">
                   <div className="text-left">
-                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
-                      <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                    <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg backdrop-blur-[1px] bg-white/10">
+                      <h4 className="text-base sm:text-lg md:text-xl font-light text-black mb-1 sm:mb-2 leading-tight tracking-[0.08em]">
                         {categories[6].name}
                       </h4>
-                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                      <p className="text-[10px] sm:text-xs text-black font-light tracking-[0.02em]">
                         {categories[6].description}
                       </p>
                     </div>
@@ -1395,22 +1395,22 @@ export default function HomePage() {
            
 
             {/* Luminária - 2x1 (colunas 3-4, linha 4) */}
-            <Link href={`/products?category=${categories[7].id}`} className="md:col-span-2 md:row-span-1 relative z-0">
+            <Link href={`/products?category=${categories[7].id}`} className="sm:col-span-2 md:col-span-2 lg:col-span-2 md:row-span-1 relative z-0 min-h-[200px] sm:min-h-[250px]">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[1.8]"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-bottom scale-[2.2] sm:scale-[2] md:scale-[1.8]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[7].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[7].gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-4 h-full flex flex-col justify-end pointer-events-auto">
+                <div className="relative z-10 p-3 sm:p-4 h-full flex flex-col justify-end pointer-events-auto">
                   <div className="text-left">
-                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
-                      <h4 className="text-lg md:text-xl font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                    <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-base sm:text-lg md:text-xl font-light text-black mb-1 sm:mb-2 leading-tight tracking-[0.08em]">
                         {categories[7].name}
                       </h4>
-                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                      <p className="text-[10px] sm:text-xs text-black font-light tracking-[0.02em]">
                         {categories[7].description}
                       </p>
                     </div>
@@ -1429,22 +1429,22 @@ export default function HomePage() {
             </Link>
 
             {/* Mesa de centro - 1x1 (coluna 6, linha 4) */}
-            <Link href={`/products?category=${categories[8].id}`} className="md:col-span-1 md:row-span-1 relative z-0">
+            <Link href={`/products?category=${categories[8].id}`} className="sm:col-span-1 md:col-span-1 lg:col-span-1 md:row-span-1 relative z-0 min-h-[200px] sm:min-h-[250px]">
               <div className="group relative h-full bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
                 {/* Background Image */}
                 <div
-                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.4]"
+                  className="absolute inset-0 bg-no-repeat bg-cover bg-center scale-[1.8] sm:scale-[1.6] md:scale-[1.4]"
                   style={{ backgroundImage: `url(${categoryBackgrounds[categories[8].id]})` }}
                 ></div>
                 <div className={`absolute inset-0 bg-gradient-to-br ${categories[8].gradient} opacity-5 group-hover:opacity-8 transition-opacity duration-300 pointer-events-none`}></div>
                 
-                <div className="relative z-10 p-3 h-full flex flex-col justify-end items-center pointer-events-auto">
+                <div className="relative z-10 p-2 sm:p-3 h-full flex flex-col justify-end items-center pointer-events-auto">
                   <div className="text-center">
-                    <div className="inline-block px-4 py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
-                      <h4 className="text-base md:text-lg font-light text-black mb-2 leading-tight tracking-[0.08em]">
+                    <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg backdrop-blur-[1px] bg-white/15">
+                      <h4 className="text-sm sm:text-base md:text-lg font-light text-black mb-1 sm:mb-2 leading-tight tracking-[0.08em]">
                         {categories[8].name}
                       </h4>
-                      <p className="text-xs text-black font-light tracking-[0.02em]">
+                      <p className="text-[10px] sm:text-xs text-black font-light tracking-[0.02em]">
                         {categories[8].description}
                       </p>
                     </div>
@@ -1463,12 +1463,12 @@ export default function HomePage() {
             </Link>
 
             {/* Card "Ver Todos os Produtos" - 1x1 (coluna 6, linha 5) */}
-            <Link href="/products" className="md:col-span-1 md:row-span-1">
+            <Link href="/products" className="sm:col-span-1 md:col-span-1 lg:col-span-1 md:row-span-1 min-h-[200px] sm:min-h-[250px]">
               <div className="group relative h-full bg-gradient-to-br from-[#3e2626] to-[#2a1f1f] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] border border-[#3e2626]/20">
                 <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50 group-hover:opacity-80 transition-opacity duration-300"></div>
                 
                 <div className="relative z-10 h-full flex items-center justify-center">
-                  <ArrowRight className="h-8 w-8 text-white group-hover:translate-x-2 transition-all duration-300 group-hover:scale-110" />
+                  <ArrowRight className="h-6 w-6 sm:h-8 sm:w-8 text-white group-hover:translate-x-2 transition-all duration-300 group-hover:scale-110" />
                 </div>
                 
                  {/* Efeito de brilho animado */}
@@ -1488,33 +1488,45 @@ export default function HomePage() {
      
 
       {/* AI Section */}
-      <section className="py-20 bg-gradient-to-br from-white to-gray-50">
-        <div className="container mx-auto gap-12">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center ">
+      <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-br from-white to-gray-50">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 gap-8 sm:gap-10 md:gap-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 sm:gap-10 md:gap-12 items-center">
             {/* Left Side - Text Content */}
-            <div className="lg:col-span-1 space-y-8 ">
+            <div className="lg:col-span-1 space-y-6 sm:space-y-8">
               <div>
-                <h2 className="text-3xl md:text-5xl font-bold text-[#3e2626] mb-6 leading-tight">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#3e2626] mb-4 sm:mb-6 leading-tight">
                   <span className="block">Nossa IA</span>
                   <span className="block">Inovadora</span>
                 </h2>
-                <p className="text-xl text-gray-600 leading-relaxed">
+                <p className="text-base sm:text-lg md:text-xl text-gray-600 leading-relaxed">
                   Transforme qualquer ambiente com nossa inteligência artificial que visualiza cores e móveis em tempo real
                 </p>
               </div>
               
-              <button className="group bg-[#3e2626] text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-[#2a1f1f] transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-3">
+              <button className="group bg-[#3e2626] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold text-sm sm:text-base md:text-lg hover:bg-[#2a1f1f] transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2 sm:space-x-3">
                 <span>Experimentar IA</span>
-                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+                <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform duration-300" />
               </button>
             </div>
 
             {/* Right Side - Carousel */}
-            <div className="lg:col-span-2 ">
-              <div className="relative">
-                <div className="relative overflow-hidden ">
+            <div className="lg:col-span-2 w-full">
+              <div className="relative w-full">
+                {/* Mobile: Scroll horizontal com todos os slides */}
+                <div className="block sm:hidden relative overflow-x-auto overflow-y-visible scrollbar-hide -mx-4 px-4 snap-x snap-mandatory">
+                  <div className="flex space-x-3 items-start w-max">
+                    {slides.map((slide, idx) => (
+                      <div key={idx} className="flex-shrink-0 snap-center">
+                        {renderSlide(slide, idx === 0 ? 0 : 1)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Desktop: Carousel animado */}
+                <div className="hidden sm:block relative overflow-hidden">
                   <div 
-                    className="flex space-x-4 items-start transition-all duration-700 ease-in-out"
+                    className="flex space-x-3 sm:space-x-4 items-start transition-all duration-700 ease-in-out"
                     style={{
                       transform: `translateX(${isAnimating ? (animationDirection === 'right' ? '-30px' : '30px') : '0px'})` 
                     }}
@@ -1540,7 +1552,6 @@ export default function HomePage() {
                       );
                     })}
                   </div>
-                        
                 </div>
               </div>
             </div>
@@ -1550,55 +1561,55 @@ export default function HomePage() {
 
 
       {/* Experiência Boutique Section */}
-      <section className="relative overflow-hidden bg-[#3e2626] py-28 text-white">
+      <section className="relative overflow-hidden bg-[#3e2626] py-12 sm:py-16 md:py-20 lg:py-28 text-white">
        
         <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-16 lg:grid-cols-5">
-            <div className="space-y-8 lg:col-span-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white bg-[#3e2626] backdrop-blur-sm px-6 py-2 text-xs font-light uppercase tracking-[0.4em] text-white">
+          <div className="grid gap-8 sm:gap-12 md:gap-16 lg:grid-cols-5">
+            <div className="space-y-6 sm:space-y-8 lg:col-span-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white bg-[#3e2626] backdrop-blur-sm px-4 sm:px-6 py-1.5 sm:py-2 text-[10px] sm:text-xs font-light uppercase tracking-[0.3em] sm:tracking-[0.4em] text-white">
                 experiência boutique
               </span>
-              <h2 className="text-3xl md:text-5xl font-light leading-tight tracking-[0.08em] text-white">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-light leading-tight tracking-[0.08em] text-white">
                 Curadoria feita à mão para ambientes que contam histórias únicas.
               </h2>
-              <p className="text-lg leading-relaxed text-white/80 font-light tracking-[0.02em]">
+              <p className="text-sm sm:text-base md:text-lg leading-relaxed text-white/80 font-light tracking-[0.02em]">
                 Unimos leitura sensorial, inteligência artificial e olhar autoral para transformar fotografias reais em cenas que você consegue sentir. Cada projeto nasce de conversas profundas, referências afetivas e uma seleção criteriosa de materiais.
               </p>
-              <div className="space-y-4 text-sm text-white/70 font-light">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
-                    <Sparkles className="h-5 w-5 text-white" />
+              <div className="space-y-3 sm:space-y-4 text-xs sm:text-sm text-white/70 font-light">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="mt-0.5 flex-shrink-0">
+                    <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
                   <span className="leading-relaxed">Paletas desenvolvidas com artistas convidados e dados de iluminação do ambiente.</span>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
-                    <Brush className="h-5 w-5 text-white" />
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="mt-0.5 flex-shrink-0">
+                    <Brush className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
                   <span className="leading-relaxed">Texturas físicas enviadas para aprovação tátil antes da produção final.</span>
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-3 grid gap-6 sm:grid-cols-2">
+            <div className="lg:col-span-3 grid gap-4 sm:gap-6 sm:grid-cols-2">
               {boutiqueHighlights.map((item) => {
                 const Icon = item.icon;
                 return (
                   <div
                     key={item.title}
-                      className="group relative overflow-hidden rounded-3xl border border-white bg-[#3e2626] backdrop-blur-sm p-8 shadow-[0_24px_70px_rgba(62,38,38,0.4)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_32px_80px_rgba(62,38,38,0.6)] hover:border-white"
+                      className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white bg-[#3e2626] backdrop-blur-sm p-5 sm:p-6 md:p-8 shadow-[0_24px_70px_rgba(62,38,38,0.4)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_32px_80px_rgba(62,38,38,0.6)] hover:border-white"
                     >
                     {/* Efeito de brilho no hover */}
                     <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/0 group-hover:from-white/10 group-hover:to-white/5 transition-all duration-500"></div>
                     
                     <div className="relative z-10">
-                      <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-white/30 to-white/20 border border-white/30 text-white mb-6 group-hover:scale-110 transition-transform duration-300">
-                        <Icon className="h-6 w-6" />
+                      <div className="inline-flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-gradient-to-br from-white/30 to-white/20 border border-white/30 text-white mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
+                        <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
-                      <div className="space-y-3">
-                        <h3 className="text-lg font-light text-white tracking-[0.08em]">{item.title}</h3>
-                        <p className="text-sm leading-relaxed text-white/70 font-light tracking-[0.02em]">{item.description}</p>
+                      <div className="space-y-2 sm:space-y-3">
+                        <h3 className="text-base sm:text-lg font-light text-white tracking-[0.08em]">{item.title}</h3>
+                        <p className="text-xs sm:text-sm leading-relaxed text-white/70 font-light tracking-[0.02em]">{item.description}</p>
                       </div>
-                      <span className="mt-6 inline-flex text-xs font-light uppercase tracking-[0.35em] text-white">
+                      <span className="mt-4 sm:mt-6 inline-flex text-[10px] sm:text-xs font-light uppercase tracking-[0.3em] sm:tracking-[0.35em] text-white">
                         {item.badge}
                       </span>
                     </div>
@@ -1612,19 +1623,19 @@ export default function HomePage() {
 
 
       {/* Featured Products Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="container mx-auto">
+      <section className="py-12 sm:py-16 md:py-20 bg-gray-50">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header with Navigation */}
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-16">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-8 sm:mb-12 md:mb-16">
             {/* Left Side - Title and Categories */}
             <div className="flex-1">
               {/* Title Section */}
-              <div className="mb-8 ml-5">
-                <div className="inline-flex items-center space-x-3 mb-4">
-                  <div className="w-12 h-1 bg-[#3e2626] rounded-full"></div>
-                  <span className="text-sm font-medium text-[#3e2626] tracking-wider uppercase">Coleção Premium</span>
+              <div className="mb-6 sm:mb-8 ml-0 sm:ml-5">
+                <div className="inline-flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
+                  <div className="w-8 sm:w-12 h-0.5 sm:h-1 bg-[#3e2626] rounded-full"></div>
+                  <span className="text-xs sm:text-sm font-medium text-[#3e2626] tracking-wider uppercase">Coleção Premium</span>
                 </div>
-                <h2 className="text-3xl md:text-5xl lg:text-5xl font-bold text-[#3e2626] leading-tight">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#3e2626] leading-tight">
                   <span className="block">Móveis em Destaque</span>
                   <span className="block text-[#3e2626]">Para Sua Casa</span>
                 </h2>
@@ -1632,11 +1643,11 @@ export default function HomePage() {
               </div>
               
               {/* Category Navigation - Modern Pills */}
-              <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
                 <Button 
                   variant="ghost" 
                   onClick={() => handleCategoryChange('Todos')}
-                  className={`px-6 py-3 font-medium transition-all duration-300 text-base rounded-full relative group ${
+                  className={`px-4 sm:px-6 py-2 sm:py-3 font-medium transition-all duration-300 text-sm sm:text-base rounded-full relative group ${
                     selectedCategory === 'Todos' 
                       ? 'bg-[#3e2626] text-white shadow-lg' 
                       : 'text-[#3e2626] hover:bg-[#3e2626]/10 hover:text-[#3e2626]'
@@ -1649,7 +1660,7 @@ export default function HomePage() {
                     key={category}
                     variant="ghost" 
                     onClick={() => handleCategoryChange(category)}
-                    className={`px-6 py-3 font-medium transition-all duration-300 text-base rounded-full relative group ${
+                    className={`px-4 sm:px-6 py-2 sm:py-3 font-medium transition-all duration-300 text-sm sm:text-base rounded-full relative group ${
                       selectedCategory.toLowerCase() === category.toLowerCase() 
                         ? 'bg-[#3e2626] text-white shadow-lg' 
                         : 'text-[#3e2626] hover:bg-[#3e2626]/10 hover:text-[#3e2626]'
@@ -1664,32 +1675,33 @@ export default function HomePage() {
                   <Button 
                     variant="outline" 
                     onClick={() => handleCategoryChange('Todos')}
-                    className="border-[#3e2626]/30 text-[#3e2626] hover:border-[#3e2626] hover:bg-[#3e2626] hover:text-white px-4 py-3 text-sm font-medium transition-all duration-300 rounded-full ml-2"
+                    className="border-[#3e2626]/30 text-[#3e2626] hover:border-[#3e2626] hover:bg-[#3e2626] hover:text-white px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium transition-all duration-300 rounded-full ml-0 sm:ml-2"
                   >
-                    <X className="h-4 w-4 mr-2" />
-                    Limpar Filtro
+                    <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Limpar Filtro</span>
+                    <span className="sm:hidden">Limpar</span>
                   </Button>
                 )}
               </div>
             </div>
 
             {/* Right Side - View All Button */}
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-end mt-8 lg:mt-0 space-y-4 lg:space-y-0 lg:space-x-4">
-              <div className="flex items-center space-x-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-end mt-6 sm:mt-8 lg:mt-0 space-y-3 sm:space-y-4 lg:space-y-0 lg:space-x-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                 {/* Filter Indicator */}
                 {selectedCategory !== 'Todos' && (
-                  <div className="flex items-center space-x-3 bg-white/80 backdrop-blur-sm px-4 py-3 rounded-full shadow-lg border border-[#3e2626]/20">
-                    <div className="w-2 h-2 bg-[#3e2626] rounded-full"></div>
-                    <span className="text-sm text-gray-700">
+                  <div className="flex items-center space-x-2 sm:space-x-3 bg-white/80 backdrop-blur-sm px-3 sm:px-4 py-2 sm:py-3 rounded-full shadow-lg border border-[#3e2626]/20">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-[#3e2626] rounded-full"></div>
+                    <span className="text-xs sm:text-sm text-gray-700">
                       Filtro: <span className="font-semibold text-[#3e2626]">{selectedCategory}</span>
                     </span>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => handleCategoryChange('Todos')}
-                      className="h-6 w-6 p-0 hover:bg-[#3e2626]/10 rounded-full"
+                      className="h-5 w-5 sm:h-6 sm:w-6 p-0 hover:bg-[#3e2626]/10 rounded-full"
                     >
-                      <X className="h-4 w-4 text-gray-500" />
+                      <X className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
                     </Button>
                   </div>
                 )}
@@ -1697,10 +1709,10 @@ export default function HomePage() {
                 <Button 
                   size="lg" 
                   onClick={() => router.push('/products')}
-                  className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-8 py-4 rounded-full font-semibold text-lg shadow-md hover:shadow-lg transition-all duration-300 flex items-center space-x-3 group"
+                  className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold text-sm sm:text-base md:text-lg shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 sm:space-x-3 group"
                 >
                   <span>Ver Todos os Produtos</span>
-                  <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+                  <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform duration-300" />
                 </Button>
               </div>
             </div>
@@ -1767,15 +1779,15 @@ export default function HomePage() {
 
           {/* Enhanced Pagination */}
           {!productsLoading && !productsError && totalPages > 1 && (
-            <div className="flex flex-col items-center justify-center mt-16 space-y-6">
+            <div className="flex flex-col items-center justify-center mt-8 sm:mt-12 md:mt-16 space-y-4 sm:space-y-6">
               {/* Pagination Info */}
               <div className="text-center">
-                <div className="inline-flex items-center space-x-2 bg-white/80 backdrop-blur-sm px-6 py-3 rounded-full shadow-lg border border-[#3e2626]/20">
-                  <div className="w-2 h-2 bg-[#3e2626] rounded-full"></div>
-                  <p className="text-sm text-gray-700">
+                <div className="inline-flex items-center space-x-2 bg-white/80 backdrop-blur-sm px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-lg border border-[#3e2626]/20">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-[#3e2626] rounded-full"></div>
+                  <p className="text-xs sm:text-sm text-gray-700">
                     Mostrando <span className="font-semibold text-[#3e2626]">{startIndex + 1}-{Math.min(endIndex, totalFilteredProducts)}</span> de <span className="font-semibold text-[#3e2626]">{totalFilteredProducts}</span> produtos
                     {selectedCategory !== 'Todos' && (
-                      <span className="block text-xs mt-1 text-gray-500">
+                      <span className="block text-[10px] sm:text-xs mt-1 text-gray-500">
                         na categoria <span className="font-medium text-[#3e2626]">{selectedCategory}</span>
                       </span>
                     )}
@@ -1784,28 +1796,29 @@ export default function HomePage() {
               </div>
 
               {/* Pagination Controls */}
-              <div className="flex items-center space-x-3">
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
                 {/* Previous Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-3 border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-medium transition-all duration-300"
+                  className="px-3 sm:px-4 py-2 sm:py-3 border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-medium transition-all duration-300 text-xs sm:text-sm"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Anterior
+                  <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Anterior</span>
+                  <span className="sm:hidden">Ant</span>
                 </Button>
 
                 {/* Page Numbers */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1 sm:space-x-2">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                     <Button
                       key={page}
                       variant={currentPage === page ? "default" : "outline"}
                       size="sm"
                       onClick={() => setCurrentPage(page)}
-                      className={`w-12 h-12 rounded-full font-semibold transition-all duration-300 ${
+                      className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full font-semibold transition-all duration-300 text-xs sm:text-base ${
                         currentPage === page
                           ? 'bg-[#3e2626] text-white shadow-lg hover:shadow-xl'
                           : 'border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white hover:border-[#3e2626]'
@@ -1822,10 +1835,11 @@ export default function HomePage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className="px-4 py-3 border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-medium transition-all duration-300"
+                  className="px-3 sm:px-4 py-2 sm:py-3 border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-medium transition-all duration-300 text-xs sm:text-sm"
                 >
-                  Próxima
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  <span className="hidden sm:inline">Próxima</span>
+                  <span className="sm:hidden">Próx</span>
+                  <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
                 </Button>
               </div>
 

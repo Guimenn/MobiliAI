@@ -112,6 +112,18 @@ export class CustomerCartService {
             colorName: true,
             colorHex: true,
             storeId: true,
+            // Campos de Oferta Normal
+            isOnSale: true,
+            salePrice: true,
+            saleDiscountPercent: true,
+            saleStartDate: true,
+            saleEndDate: true,
+            // Campos de Oferta Relâmpago
+            isFlashSale: true,
+            flashSalePrice: true,
+            flashSaleDiscountPercent: true,
+            flashSaleStartDate: true,
+            flashSaleEndDate: true,
             store: {
               select: {
                 id: true,
@@ -234,12 +246,94 @@ export class CustomerCartService {
     return { message: 'Carrinho limpo' };
   }
 
+  // ==================== FUNÇÃO AUXILIAR PARA CALCULAR PREÇO ATUAL ====================
+  
+  /**
+   * Calcula o preço atual do produto considerando ofertas relâmpago e ofertas normais
+   */
+  private calculateCurrentPrice(product: any): number {
+    const originalPrice = Number(product.price);
+    const now = new Date();
+
+    // Prioridade para oferta relâmpago - verificar se está ativa
+    if (product.isFlashSale && product.flashSaleStartDate && product.flashSaleEndDate) {
+      try {
+        const flashStart = new Date(product.flashSaleStartDate);
+        const flashEnd = new Date(product.flashSaleEndDate);
+        
+        // Verificar se a oferta relâmpago está ativa (já começou e ainda não expirou)
+        if (now >= flashStart && now <= flashEnd) {
+          // Se tem flashSalePrice, usar ele
+          if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+            return Number(product.flashSalePrice);
+          }
+          // Se não tem flashSalePrice mas tem flashSaleDiscountPercent, calcular
+          if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && originalPrice) {
+            const discount = (originalPrice * Number(product.flashSaleDiscountPercent)) / 100;
+            return originalPrice - discount;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar oferta relâmpago:', error);
+        // Continuar com outras verificações se houver erro
+      }
+    }
+
+    // Depois verificar oferta normal - apenas se estiver ativa
+    if (product.isOnSale && product.saleStartDate && product.saleEndDate) {
+      try {
+        const saleStart = new Date(product.saleStartDate);
+        const saleEnd = new Date(product.saleEndDate);
+        
+        if (now >= saleStart && now <= saleEnd) {
+          // Se tem salePrice, usar ele
+          if (product.salePrice !== undefined && product.salePrice !== null) {
+            return Number(product.salePrice);
+          }
+          // Se não tem salePrice mas tem saleDiscountPercent, calcular
+          if (product.saleDiscountPercent !== undefined && product.saleDiscountPercent !== null && originalPrice) {
+            const discount = (originalPrice * Number(product.saleDiscountPercent)) / 100;
+            return originalPrice - discount;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar oferta normal:', error);
+        // Continuar com preço original se houver erro
+      }
+    }
+
+    return originalPrice;
+  }
+
   // ==================== VALIDAÇÃO DO CARRINHO ====================
 
   async validateCart(customerId: string) {
     const cartItems = await this.prisma.cartItem.findMany({
       where: { customerId },
-      include: { product: true }
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            stock: true,
+            isAvailable: true,
+            costPrice: true,
+            // Campos de Oferta Normal
+            isOnSale: true,
+            salePrice: true,
+            saleDiscountPercent: true,
+            saleStartDate: true,
+            saleEndDate: true,
+            // Campos de Oferta Relâmpago
+            isFlashSale: true,
+            flashSalePrice: true,
+            flashSaleDiscountPercent: true,
+            flashSaleStartDate: true,
+            flashSaleEndDate: true,
+          }
+        }
+      }
     });
 
     const issues = [];
@@ -258,12 +352,18 @@ export class CustomerCartService {
       }
     }
 
+    // Calcular totalPrice usando preços com desconto de ofertas
+    const totalPrice = validItems.reduce((sum, item) => {
+      const currentPrice = this.calculateCurrentPrice(item.product);
+      return sum + (currentPrice * item.quantity);
+    }, 0);
+
     return {
       valid: issues.length === 0,
       issues,
       validItems,
       totalItems: validItems.length,
-      totalPrice: validItems.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0)
+      totalPrice
     };
   }
 
@@ -369,16 +469,71 @@ export class CustomerCartService {
       }
     }
     
-    // Calcular total incluindo custos adicionais
-    const subtotal = validation.totalPrice;
     const shippingCost = additionalCosts?.shippingCost || 0;
     const insuranceCost = additionalCosts?.insuranceCost || 0;
     const tax = additionalCosts?.tax || 0;
     const manualDiscount = additionalCosts?.discount || 0;
     const discount = couponDiscount + manualDiscount;
-    const totalAmount = subtotal + shippingCost + insuranceCost + tax - discount;
     
     const isOnlineOrder = !!shippingInfo;
+    
+    // Buscar produtos atualizados do banco antes de criar a venda para garantir dados de oferta relâmpago atualizados
+    const itemsData = await Promise.all(validation.validItems.map(async (item) => {
+      // Buscar produto novamente do banco para garantir dados atualizados (incluindo oferta relâmpago)
+      const freshProduct = await this.prisma.product.findUnique({
+        where: { id: item.productId },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          costPrice: true,
+          isOnSale: true,
+          salePrice: true,
+          saleDiscountPercent: true,
+          saleStartDate: true,
+          saleEndDate: true,
+          isFlashSale: true,
+          flashSalePrice: true,
+          flashSaleDiscountPercent: true,
+          flashSaleStartDate: true,
+          flashSaleEndDate: true,
+        }
+      });
+      
+      // Usar produto atualizado do banco se disponível, senão usar o da validação
+      const productToUse = freshProduct || item.product;
+      
+      // Usar preço atual considerando ofertas relâmpago e ofertas normais
+      const unitPrice = this.calculateCurrentPrice(productToUse);
+      const costPrice = productToUse.costPrice ? Number(productToUse.costPrice) : null;
+      const totalPrice = unitPrice * item.quantity;
+      const profit = costPrice !== null ? (unitPrice - costPrice) * item.quantity : null;
+      
+      return {
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: unitPrice,
+        totalPrice: totalPrice,
+        costPrice: costPrice,
+        profit: profit,
+      };
+    }));
+    
+    // Recalcular subtotal usando os preços atualizados dos produtos buscados do banco
+    const subtotal = itemsData.reduce((sum, item) => sum + item.totalPrice, 0);
+    
+    // Preparar itens para criar na venda (sem propriedades extras)
+    const itemsToCreate = itemsData.map(item => ({
+      product: { connect: { id: item.productId } },
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+      costPrice: item.costPrice,
+      profit: item.profit,
+    }));
+    
+    // Calcular total incluindo custos adicionais
+    const totalAmount = subtotal + shippingCost + insuranceCost + tax - discount;
     
     // Criar venda com retry para garantir que seja criada mesmo se houver problemas de conexão
     const sale = await this.prisma.executeWithRetry(async () => {
@@ -401,21 +556,7 @@ export class CustomerCartService {
           shippingPhone: shippingInfo?.phone,
           notes: additionalCosts?.notes,
           items: {
-            create: validation.validItems.map(item => {
-              const unitPrice = Number(item.product.price);
-              const costPrice = item.product.costPrice ? Number(item.product.costPrice) : null;
-              const totalPrice = unitPrice * item.quantity;
-              const profit = costPrice !== null ? (unitPrice - costPrice) * item.quantity : null;
-              
-              return {
-                product: { connect: { id: item.productId } },
-                quantity: item.quantity,
-                unitPrice: unitPrice,
-                totalPrice: totalPrice,
-                costPrice: costPrice,
-                profit: profit
-              };
-            })
+            create: itemsToCreate
           }
         },
         include: {

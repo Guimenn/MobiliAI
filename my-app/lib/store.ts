@@ -314,48 +314,70 @@ export const useAppStore = create<AppState>()(
               
               // Sempre atualizar o carrinho, mesmo se estiver vazio (para limpar carrinho local se necessário)
               if (cartData?.items && cartData.items.length > 0) {
+                // Obter carrinho atual para preservar dados locais dos produtos
+                const currentCart = get().cart;
+                
                 // Converter os itens do backend para o formato do store
-                const cartItems: CartItem[] = cartData.items.map((item: any) => ({
-                  id: item.id, // ID do cartItem no backend
-                  product: {
-                    id: item.product.id,
-                    name: item.product.name,
-                    description: item.product.description,
-                    category: item.product.category?.toLowerCase() || 'sofa',
-                    price: Number(item.product.price),
-                    stock: item.product.stock || 0,
-                    imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl,
-                    imageUrls: item.product.imageUrls || [],
-                    colorName: item.product.colorName,
-                    colorHex: item.product.colorHex,
-                    brand: item.product.brand,
-                    storeId: item.product.storeId || item.product.store?.id || '',
-                    storeName: item.product.store?.name,
-                    storeAddress: item.product.store?.address,
-                    store: item.product.store ? {
-                      id: item.product.store.id,
-                      name: item.product.store.name,
-                      address: item.product.store.address,
-                      zipCode: item.product.store.zipCode,
-                      city: item.product.store.city,
-                      state: item.product.store.state,
-                    } : undefined,
-                    storeInventory: item.product.storeInventory ? item.product.storeInventory.map((inv: any) => ({
-                      storeId: inv.storeId,
-                      quantity: inv.quantity,
-                      store: inv.store ? {
-                        id: inv.store.id,
-                        name: inv.store.name,
-                        address: inv.store.address,
-                        zipCode: inv.store.zipCode,
-                        city: inv.store.city,
-                        state: inv.store.state,
-                        isActive: inv.store.isActive,
+                const cartItems: CartItem[] = cartData.items.map((item: any) => {
+                  // Tentar encontrar produto correspondente no carrinho local para preservar dados
+                  const localItem = currentCart.find(ci => ci.product.id === item.product.id);
+                  const localProduct = localItem?.product;
+
+                  // Mesclar dados do backend com dados locais, preservando campos de oferta relâmpago
+                  return {
+                    id: item.id, // ID do cartItem no backend
+                    product: {
+                      id: item.product.id,
+                      name: item.product.name,
+                      description: item.product.description,
+                      category: item.product.category?.toLowerCase() || 'sofa',
+                      price: Number(item.product.price),
+                      stock: item.product.stock || 0,
+                      imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl,
+                      imageUrls: item.product.imageUrls || [],
+                      colorName: item.product.colorName,
+                      colorHex: item.product.colorHex,
+                      brand: item.product.brand,
+                      // Campos de Oferta Normal - usar dados do backend se disponíveis, senão preservar do local
+                      isOnSale: item.product.isOnSale !== undefined ? item.product.isOnSale : (localProduct?.isOnSale || false),
+                      salePrice: item.product.salePrice ? Number(item.product.salePrice) : localProduct?.salePrice,
+                      saleDiscountPercent: item.product.saleDiscountPercent ? Number(item.product.saleDiscountPercent) : localProduct?.saleDiscountPercent,
+                      saleStartDate: item.product.saleStartDate || localProduct?.saleStartDate,
+                      saleEndDate: item.product.saleEndDate || localProduct?.saleEndDate,
+                      // Campos de Oferta Relâmpago - priorizar dados locais se existirem, senão usar do backend
+                      isFlashSale: localProduct?.isFlashSale !== undefined ? localProduct.isFlashSale : (item.product.isFlashSale !== undefined ? item.product.isFlashSale : false),
+                      flashSalePrice: localProduct?.flashSalePrice !== undefined ? localProduct.flashSalePrice : (item.product.flashSalePrice ? Number(item.product.flashSalePrice) : undefined),
+                      flashSaleDiscountPercent: localProduct?.flashSaleDiscountPercent !== undefined ? localProduct.flashSaleDiscountPercent : (item.product.flashSaleDiscountPercent ? Number(item.product.flashSaleDiscountPercent) : undefined),
+                      flashSaleStartDate: localProduct?.flashSaleStartDate || item.product.flashSaleStartDate || undefined,
+                      flashSaleEndDate: localProduct?.flashSaleEndDate || item.product.flashSaleEndDate || undefined,
+                      storeId: item.product.storeId || item.product.store?.id || '',
+                      storeName: item.product.store?.name,
+                      storeAddress: item.product.store?.address,
+                      store: item.product.store ? {
+                        id: item.product.store.id,
+                        name: item.product.store.name,
+                        address: item.product.store.address,
+                        zipCode: item.product.store.zipCode,
+                        city: item.product.store.city,
+                        state: item.product.store.state,
                       } : undefined,
-                    })) : undefined,
-                  },
-                  quantity: item.quantity,
-                }));
+                      storeInventory: item.product.storeInventory ? item.product.storeInventory.map((inv: any) => ({
+                        storeId: inv.storeId,
+                        quantity: inv.quantity,
+                        store: inv.store ? {
+                          id: inv.store.id,
+                          name: inv.store.name,
+                          address: inv.store.address,
+                          zipCode: inv.store.zipCode,
+                          city: inv.store.city,
+                          state: inv.store.state,
+                          isActive: inv.store.isActive,
+                        } : undefined,
+                      })) : undefined,
+                    },
+                    quantity: item.quantity,
+                  };
+                });
                 
                 const cartTotal = cartItems.reduce(
                   (total, item) => total + (Number(item.product.price) * item.quantity),
@@ -516,10 +538,17 @@ export const useAppStore = create<AppState>()(
             // Busca carrinho completo do backend para sincronizar
             const cartData = await customerAPI.getCart();
             const backendItems = cartData?.items || [];
+            
+            // Obter carrinho atual para preservar dados locais dos produtos
+            const currentCart = get().cart;
 
-            const cartItems: CartItem[] = backendItems.map((item: any) => ({
-              id: item.id,
-              product: {
+            const cartItems: CartItem[] = backendItems.map((item: any) => {
+              // Tentar encontrar produto correspondente no carrinho local para preservar dados
+              const localItem = currentCart.find(ci => ci.product.id === item.product.id);
+              const localProduct = localItem?.product;
+
+              // Mesclar dados do backend com dados locais, preservando campos de oferta relâmpago
+              const mergedProduct = {
                 id: item.product.id,
                 name: item.product.name,
                 description: item.product.description,
@@ -531,6 +560,18 @@ export const useAppStore = create<AppState>()(
                 colorName: item.product.colorName,
                 colorHex: item.product.colorHex,
                 brand: item.product.brand,
+                // Campos de Oferta Normal - usar dados do backend se disponíveis, senão preservar do local
+                isOnSale: item.product.isOnSale !== undefined ? item.product.isOnSale : (localProduct?.isOnSale || false),
+                salePrice: item.product.salePrice ? Number(item.product.salePrice) : localProduct?.salePrice,
+                saleDiscountPercent: item.product.saleDiscountPercent ? Number(item.product.saleDiscountPercent) : localProduct?.saleDiscountPercent,
+                saleStartDate: item.product.saleStartDate || localProduct?.saleStartDate,
+                saleEndDate: item.product.saleEndDate || localProduct?.saleEndDate,
+                // Campos de Oferta Relâmpago - SEMPRE preservar dados locais se existirem, mesmo que backend não tenha
+                isFlashSale: localProduct?.isFlashSale !== undefined && localProduct?.isFlashSale !== null ? localProduct.isFlashSale : (item.product.isFlashSale !== undefined && item.product.isFlashSale !== null ? item.product.isFlashSale : false),
+                flashSalePrice: localProduct?.flashSalePrice !== undefined && localProduct?.flashSalePrice !== null ? localProduct.flashSalePrice : (item.product.flashSalePrice !== undefined && item.product.flashSalePrice !== null ? Number(item.product.flashSalePrice) : undefined),
+                flashSaleDiscountPercent: localProduct?.flashSaleDiscountPercent !== undefined && localProduct?.flashSaleDiscountPercent !== null ? localProduct.flashSaleDiscountPercent : (item.product.flashSaleDiscountPercent !== undefined && item.product.flashSaleDiscountPercent !== null ? Number(item.product.flashSaleDiscountPercent) : undefined),
+                flashSaleStartDate: localProduct?.flashSaleStartDate || item.product.flashSaleStartDate || undefined,
+                flashSaleEndDate: localProduct?.flashSaleEndDate || item.product.flashSaleEndDate || undefined,
                 storeId: item.product.storeId || item.product.store?.id || '',
                 storeName: item.product.store?.name,
                 storeAddress: item.product.store?.address,
@@ -555,9 +596,14 @@ export const useAppStore = create<AppState>()(
                     isActive: inv.store.isActive,
                   } : undefined,
                 })) : undefined,
-              },
-              quantity: item.quantity,
-            }));
+              };
+
+              return {
+                id: item.id,
+                product: mergedProduct,
+                quantity: item.quantity,
+              };
+            });
 
             const cartTotal = cartItems.reduce(
               (total, item) => total + (Number(item.product.price) * item.quantity),
@@ -628,47 +674,69 @@ export const useAppStore = create<AppState>()(
           const updatedCartData = await customerAPI.getCart();
           const updatedBackendItems = updatedCartData?.items || [];
 
-          const cartItems: CartItem[] = updatedBackendItems.map((item: any) => ({
-            id: item.id,
-            product: {
-              id: item.product.id,
-              name: item.product.name,
-              description: item.product.description,
-              category: item.product.category?.toLowerCase() || 'sofa',
-              price: Number(item.product.price),
-              stock: item.product.stock || 0,
-              imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl,
-              imageUrls: item.product.imageUrls || [],
-              colorName: item.product.colorName,
-              colorHex: item.product.colorHex,
-              brand: item.product.brand,
-              storeId: item.product.storeId || item.product.store?.id || '',
-              storeName: item.product.store?.name,
-              storeAddress: item.product.store?.address,
-              store: item.product.store ? {
-                id: item.product.store.id,
-                name: item.product.store.name,
-                address: item.product.store.address,
-                zipCode: item.product.store.zipCode,
-                city: item.product.store.city,
-                state: item.product.store.state,
-              } : undefined,
-              storeInventory: item.product.storeInventory ? item.product.storeInventory.map((inv: any) => ({
-                storeId: inv.storeId,
-                quantity: inv.quantity,
-                store: inv.store ? {
-                  id: inv.store.id,
-                  name: inv.store.name,
-                  address: inv.store.address,
-                  zipCode: inv.store.zipCode,
-                  city: inv.store.city,
-                  state: inv.store.state,
-                  isActive: inv.store.isActive,
+          // Obter carrinho atual para preservar dados locais dos produtos
+          const currentCart = get().cart;
+          
+          const cartItems: CartItem[] = updatedBackendItems.map((item: any) => {
+            // Tentar encontrar produto correspondente no carrinho local para preservar dados
+            const localItem = currentCart.find(ci => ci.product.id === item.product.id);
+            const localProduct = localItem?.product;
+
+            // Mesclar dados do backend com dados locais, preservando campos de oferta relâmpago
+            return {
+              id: item.id,
+              product: {
+                id: item.product.id,
+                name: item.product.name,
+                description: item.product.description,
+                category: item.product.category?.toLowerCase() || 'sofa',
+                price: Number(item.product.price),
+                stock: item.product.stock || 0,
+                imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl,
+                imageUrls: item.product.imageUrls || [],
+                colorName: item.product.colorName,
+                colorHex: item.product.colorHex,
+                brand: item.product.brand,
+                // Campos de Oferta Normal - usar dados do backend se disponíveis, senão preservar do local
+                isOnSale: item.product.isOnSale !== undefined ? item.product.isOnSale : (localProduct?.isOnSale || false),
+                salePrice: item.product.salePrice ? Number(item.product.salePrice) : localProduct?.salePrice,
+                saleDiscountPercent: item.product.saleDiscountPercent ? Number(item.product.saleDiscountPercent) : localProduct?.saleDiscountPercent,
+                saleStartDate: item.product.saleStartDate || localProduct?.saleStartDate,
+                saleEndDate: item.product.saleEndDate || localProduct?.saleEndDate,
+                // Campos de Oferta Relâmpago - SEMPRE preservar dados locais se existirem, mesmo que backend não tenha
+                isFlashSale: localProduct?.isFlashSale !== undefined && localProduct?.isFlashSale !== null ? localProduct.isFlashSale : (item.product.isFlashSale !== undefined && item.product.isFlashSale !== null ? item.product.isFlashSale : false),
+                flashSalePrice: localProduct?.flashSalePrice !== undefined && localProduct?.flashSalePrice !== null ? localProduct.flashSalePrice : (item.product.flashSalePrice !== undefined && item.product.flashSalePrice !== null ? Number(item.product.flashSalePrice) : undefined),
+                flashSaleDiscountPercent: localProduct?.flashSaleDiscountPercent !== undefined && localProduct?.flashSaleDiscountPercent !== null ? localProduct.flashSaleDiscountPercent : (item.product.flashSaleDiscountPercent !== undefined && item.product.flashSaleDiscountPercent !== null ? Number(item.product.flashSaleDiscountPercent) : undefined),
+                flashSaleStartDate: localProduct?.flashSaleStartDate || item.product.flashSaleStartDate || undefined,
+                flashSaleEndDate: localProduct?.flashSaleEndDate || item.product.flashSaleEndDate || undefined,
+                storeId: item.product.storeId || item.product.store?.id || '',
+                storeName: item.product.store?.name,
+                storeAddress: item.product.store?.address,
+                store: item.product.store ? {
+                  id: item.product.store.id,
+                  name: item.product.store.name,
+                  address: item.product.store.address,
+                  zipCode: item.product.store.zipCode,
+                  city: item.product.store.city,
+                  state: item.product.store.state,
                 } : undefined,
-              })) : undefined,
-            },
-            quantity: item.quantity,
-          }));
+                storeInventory: item.product.storeInventory ? item.product.storeInventory.map((inv: any) => ({
+                  storeId: inv.storeId,
+                  quantity: inv.quantity,
+                  store: inv.store ? {
+                    id: inv.store.id,
+                    name: inv.store.name,
+                    address: inv.store.address,
+                    zipCode: inv.store.zipCode,
+                    city: inv.store.city,
+                    state: inv.store.state,
+                    isActive: inv.store.isActive,
+                  } : undefined,
+                })) : undefined,
+              },
+              quantity: item.quantity,
+            };
+          });
 
           const cartTotal = cartItems.reduce(
             (total, item) => total + (Number(item.product.price) * item.quantity),

@@ -30,6 +30,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { toast } from 'sonner';
 
 interface StoreInventoryProps {
   storeId: string;
@@ -96,7 +98,9 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
   const [isAddCatalogOpen, setIsAddCatalogOpen] = useState(false);
   const [searchGlobal, setSearchGlobal] = useState('');
   const [globalProducts, setGlobalProducts] = useState<any[]>([]);
-  const [selectedGlobal, setSelectedGlobal] = useState<any | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [isAddingProducts, setIsAddingProducts] = useState(false);
 
   // Carregar catálogo global ao abrir o modal e ao alterar a busca
   const loadGlobalProducts = async () => {
@@ -315,6 +319,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
               variant="outline"
               onClick={async () => {
                 setIsAddCatalogOpen(true);
+                setSelectedProducts(new Set());
                 await loadGlobalProducts();
               }}
               className="w-full sm:w-auto"
@@ -802,9 +807,9 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
       <Dialog open={isAddCatalogOpen} onOpenChange={setIsAddCatalogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto mx-4">
           <DialogHeader>
-            <DialogTitle>Adicionar Produto ao Catálogo</DialogTitle>
+            <DialogTitle>Adicionar Produtos ao Catálogo</DialogTitle>
             <DialogDescription>
-              Selecione um produto do catálogo global para vincular a esta loja.
+              Selecione um ou mais produtos do catálogo global para vincular a esta loja.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -816,6 +821,21 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
                 onChange={(e) => setSearchGlobal(e.target.value)}
               />
             </div>
+            {selectedProducts.size > 0 && (
+              <div className="bg-[#3e2626]/10 border border-[#3e2626]/20 rounded-lg p-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-900">
+                  {selectedProducts.size} produto{selectedProducts.size > 1 ? 's' : ''} selecionado{selectedProducts.size > 1 ? 's' : ''}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedProducts(new Set())}
+                  className="text-xs"
+                >
+                  Limpar seleção
+                </Button>
+              </div>
+            )}
             <div className="border rounded-lg max-h-64 overflow-y-auto">
               {globalProducts.length === 0 ? (
                 <div className="p-4 text-center text-gray-500">
@@ -823,45 +843,73 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {globalProducts.map((product) => (
-                    <div
-                      key={product.id}
-                      className={`p-3 cursor-pointer hover:bg-gray-50 ${
-                        selectedGlobal?.id === product.id ? 'bg-[#3e2626]/10 border-l-4 border-[#3e2626]' : ''
-                      }`}
-                      onClick={() => setSelectedGlobal(product)}
-                    >
-                      <div className="flex items-center gap-3">
-                        {(() => {
-                          const imageUrl = (product.imageUrls && product.imageUrls.length > 0) 
-                            ? product.imageUrls[0] 
-                            : product.imageUrl;
-                          return imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={product.name}
-                              className="w-12 h-12 rounded object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                              }}
-                            />
-                          ) : null;
-                        })()}
-                        <div className="hidden w-12 h-12 rounded bg-gray-100 flex items-center justify-center">
-                          <Package className="h-6 w-6 text-gray-400" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{product.name}</div>
-                          <div className="text-sm text-gray-500">
-                            {product.sku && `SKU: ${product.sku} • `}
-                            {product.brand && `${product.brand} • `}
-                            R$ {Number(product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  {globalProducts.map((product) => {
+                    const isSelected = selectedProducts.has(product.id);
+                    return (
+                      <div
+                        key={product.id}
+                        className={`p-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                          isSelected ? 'bg-[#3e2626]/10 border-l-4 border-[#3e2626]' : ''
+                        }`}
+                        onClick={(e) => {
+                          // Não selecionar quando clicar no checkbox
+                          if ((e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                            return;
+                          }
+                          const newSelected = new Set(selectedProducts);
+                          if (isSelected) {
+                            newSelected.delete(product.id);
+                          } else {
+                            newSelected.add(product.id);
+                          }
+                          setSelectedProducts(newSelected);
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              const newSelected = new Set(selectedProducts);
+                              if (checked) {
+                                newSelected.add(product.id);
+                              } else {
+                                newSelected.delete(product.id);
+                              }
+                              setSelectedProducts(newSelected);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          {(() => {
+                            const imageUrl = (product.imageUrls && product.imageUrls.length > 0) 
+                              ? product.imageUrls[0] 
+                              : product.imageUrl;
+                            return imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={product.name}
+                                className="w-12 h-12 rounded object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null;
+                          })()}
+                          <div className="hidden w-12 h-12 rounded bg-gray-100 flex items-center justify-center">
+                            <Package className="h-6 w-6 text-gray-400" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{product.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {product.sku && `SKU: ${product.sku} • `}
+                              {product.brand && `${product.brand} • `}
+                              R$ {Number(product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -869,31 +917,156 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setIsAddCatalogOpen(false);
-              setSelectedGlobal(null);
+              setSelectedProducts(new Set());
               setSearchGlobal('');
             }}>
               Cancelar
             </Button>
             <Button
-              onClick={async () => {
-                if (!selectedGlobal) return;
-                try {
-                  // Adiciona o produto ao catálogo da loja (atualiza storeId)
-                  await adminAPI.addProductToStoreCatalog(storeId, selectedGlobal.id);
-                  setIsAddCatalogOpen(false);
-                  setSelectedGlobal(null);
-                  setSearchGlobal('');
-                  await loadStoreProductsCount();
-                  await loadGlobalProducts(); // Recarregar lista para remover o produto adicionado
-                  alert('Produto adicionado ao catálogo com sucesso!');
-                } catch (e: any) {
-                  alert(e?.response?.data?.message || e?.message || 'Erro ao adicionar produto ao catálogo');
+              onClick={() => {
+                if (selectedProducts.size === 0) {
+                  toast.error('Nenhum produto selecionado', {
+                    description: 'Selecione pelo menos um produto para adicionar ao catálogo.',
+                  });
+                  return;
                 }
+                setIsConfirmDialogOpen(true);
               }}
-              disabled={!selectedGlobal}
+              disabled={selectedProducts.size === 0}
               className="bg-[#3e2626] hover:bg-[#2d1c1c] text-white"
             >
-              Adicionar ao Catálogo
+              Adicionar {selectedProducts.size > 0 ? `(${selectedProducts.size})` : ''} ao Catálogo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog */}
+      <Dialog 
+        open={isConfirmDialogOpen} 
+        onOpenChange={(open) => {
+          if (!isAddingProducts) {
+            setIsConfirmDialogOpen(open);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md mx-4">
+          <DialogHeader>
+            <DialogTitle>Confirmar Adição ao Catálogo</DialogTitle>
+            <DialogDescription>
+              Você está prestes a adicionar <strong>{selectedProducts.size}</strong> produto{selectedProducts.size > 1 ? 's' : ''} ao catálogo desta loja.
+              {selectedProducts.size > 1 && (
+                <span className="block mt-2 text-sm text-gray-600">
+                  Esta ação adicionará todos os produtos selecionados de uma vez.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-48 overflow-y-auto border rounded-lg p-3 space-y-2">
+            {Array.from(selectedProducts).map((productId) => {
+              const product = globalProducts.find(p => p.id === productId);
+              return product ? (
+                <div key={productId} className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <span className="text-gray-900">{product.name}</span>
+                </div>
+              ) : null;
+            })}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsConfirmDialogOpen(false)}
+              disabled={isAddingProducts}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (selectedProducts.size === 0) return;
+                
+                setIsAddingProducts(true);
+                const productIds = Array.from(selectedProducts);
+                const productNames = productIds
+                  .map(id => globalProducts.find(p => p.id === id)?.name)
+                  .filter(Boolean);
+                
+                let successCount = 0;
+                let errorCount = 0;
+                const errors: string[] = [];
+
+                try {
+                  // Adicionar produtos em lote
+                  for (const productId of productIds) {
+                    try {
+                      await adminAPI.addProductToStoreCatalog(storeId, productId);
+                      successCount++;
+                    } catch (e: any) {
+                      errorCount++;
+                      const productName = globalProducts.find(p => p.id === productId)?.name || 'Produto desconhecido';
+                      errors.push(`${productName}: ${e?.response?.data?.message || e?.message || 'Erro desconhecido'}`);
+                    }
+                  }
+
+                  // Recarregar dados
+                  await loadStoreProductsCount();
+                  await loadGlobalProducts();
+
+                  // Fechar diálogos
+                  setIsConfirmDialogOpen(false);
+                  setIsAddCatalogOpen(false);
+                  setSelectedProducts(new Set());
+                  setSearchGlobal('');
+
+                  // Mostrar resultado
+                  if (successCount > 0 && errorCount === 0) {
+                    toast.success(
+                      `${successCount} produto${successCount > 1 ? 's' : ''} adicionado${successCount > 1 ? 's' : ''} com sucesso!`,
+                      {
+                        description: productNames.slice(0, 3).join(', ') + (productNames.length > 3 ? '...' : ''),
+                        duration: 5000,
+                      }
+                    );
+                  } else if (successCount > 0 && errorCount > 0) {
+                    toast.warning(
+                      `${successCount} produto${successCount > 1 ? 's' : ''} adicionado${successCount > 1 ? 's' : ''}, ${errorCount} falhou${errorCount > 1 ? 'ram' : ''}`,
+                      {
+                        description: errors.slice(0, 2).join('; ') + (errors.length > 2 ? '...' : ''),
+                        duration: 7000,
+                      }
+                    );
+                  } else {
+                    toast.error(
+                      `Erro ao adicionar produtos`,
+                      {
+                        description: errors.slice(0, 2).join('; ') + (errors.length > 2 ? '...' : ''),
+                        duration: 7000,
+                      }
+                    );
+                  }
+                } catch (error: any) {
+                  toast.error('Erro ao processar produtos', {
+                    description: error?.message || 'Ocorreu um erro inesperado',
+                    duration: 5000,
+                  });
+                } finally {
+                  setIsAddingProducts(false);
+                }
+              }}
+              disabled={isAddingProducts}
+              className="bg-[#3e2626] hover:bg-[#2d1c1c] text-white"
+            >
+              {isAddingProducts ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Adicionando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Confirmar e Adicionar
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

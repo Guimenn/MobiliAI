@@ -48,7 +48,6 @@ import {
 import { customerAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import { showAlert } from '@/lib/alerts';
-import CTA from "@/components/ui/CTA"
 
 // Mapeamento de categorias para ícones
 const categoryIcons: Record<string, any> = {
@@ -80,6 +79,8 @@ export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const categoriesScrollRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
 
   // Estado inicial via URL
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
@@ -97,6 +98,9 @@ export default function ProductsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [hasMoved, setHasMoved] = useState(false);
+  
+  const dragThreshold = 10; // pixels - threshold para diferenciar clique de arrasto
   
   // Estados temporários para preço (não atualizam automaticamente)
   const [tempMinPrice, setTempMinPrice] = useState<string>(searchParams.get('min') || '');
@@ -250,6 +254,18 @@ export default function ProductsPage() {
     return false;
   }, []);
 
+  // Função para normalizar texto (remover acentos e caracteres especiais)
+  const normalizeText = useCallback((text: string): string => {
+    if (!text) return '';
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^\w\s]/g, '') // Remove caracteres especiais
+      .replace(/\s+/g, ' ') // Remove espaços múltiplos
+      .trim();
+  }, []);
+
   // Função para verificar se a oferta relâmpago está REALMENTE ativa (já começou)
   const isFlashSaleActuallyActive = useCallback((product: Product): boolean => {
     if (!product.isFlashSale || !product.flashSaleStartDate || !product.flashSaleEndDate) {
@@ -306,12 +322,45 @@ export default function ProductsPage() {
   }, [isFlashSaleActuallyActive]);
 
   const filteredProducts = useMemo(() => {
-    const term = debouncedTerm.trim().toLowerCase();
+    const normalizedTerm = normalizeText(debouncedTerm);
+    
     return products
       .filter((product) => {
-        const matchesSearch = !term ||
-          product.name.toLowerCase().includes(term) ||
-          (product.brand?.toLowerCase().includes(term) ?? false);
+        // Busca flexível: sem acentos, case-insensitive, busca parcial
+        let matchesSearch = true;
+        if (normalizedTerm) {
+          const normalizedProductName = normalizeText(product.name || '');
+          const normalizedBrand = normalizeText(product.brand || '');
+          const normalizedDescription = normalizeText(product.description || '');
+          
+          // Combinar todos os campos em um único texto para busca
+          const combinedText = `${normalizedProductName} ${normalizedBrand} ${normalizedDescription}`;
+          
+          // Dividir o termo de busca em palavras
+          const searchWords = normalizedTerm.split(' ').filter(word => word.length > 0);
+          
+          // Busca flexível:
+          // 1. Busca exata do termo completo
+          // 2. Busca por todas as palavras do termo (não precisam estar juntas)
+          // 3. Busca por palavras individuais (para encontrar mesmo com palavras extras no meio)
+          matchesSearch = 
+            combinedText.includes(normalizedTerm) || // Busca exata do termo completo
+            (searchWords.length > 0 && searchWords.every(word => // Todas as palavras devem estar presentes
+              word.length > 1 && (
+                combinedText.includes(word) ||
+                normalizedProductName.includes(word) ||
+                normalizedBrand.includes(word)
+              )
+            )) ||
+            searchWords.some(word => // Pelo menos uma palavra significativa deve estar presente
+              word.length > 2 && (
+                normalizedProductName.includes(word) ||
+                normalizedBrand.includes(word) ||
+                normalizedDescription.includes(word)
+              )
+            );
+        }
+        
         const matchesCategory = !selectedCategory || selectedCategory.toUpperCase() === 'ALL' || 
           product.category?.toString().toUpperCase() === selectedCategory.toUpperCase();
         const matchesColor = !selectedColor || product.color === selectedColor;
@@ -325,7 +374,7 @@ export default function ProductsPage() {
         }
         return matchesSearch && matchesCategory && matchesColor && matchesMin && matchesMax && matchesDiscount;
       });
-  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount, isSaleActive, getCurrentPrice]);
+  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount, isSaleActive, getCurrentPrice, normalizeText]);
 
   const sortedProducts = useMemo(() => {
     return [...filteredProducts].sort((a, b) => {
@@ -402,63 +451,86 @@ export default function ProductsPage() {
     }
   };
 
-  // Funções para o carrossel de categorias
+  // Funções para o carrossel de categorias - Mouse (desktop) - Arrasto manual
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!categoriesScrollRef.current) return;
     setIsDragging(true);
-    if (categoriesScrollRef.current) {
-      setStartX(e.pageX - categoriesScrollRef.current.offsetLeft);
-      setScrollLeft(categoriesScrollRef.current.scrollLeft);
-    }
+    setHasMoved(false);
+    setStartX(e.pageX);
+    setScrollLeft(categoriesScrollRef.current.scrollLeft);
+    categoriesScrollRef.current.style.cursor = 'grabbing';
+    categoriesScrollRef.current.style.userSelect = 'none';
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging || !categoriesScrollRef.current) return;
     e.preventDefault();
-    const x = e.pageX - categoriesScrollRef.current.offsetLeft;
-    const walk = (x - startX) * 2;
+    
+    const x = e.pageX;
+    const walk = (x - startX) * 1.5;
     categoriesScrollRef.current.scrollLeft = scrollLeft - walk;
+    
+    if (Math.abs(walk) > dragThreshold) {
+      setHasMoved(true);
+    }
   };
 
   const handleMouseUp = () => {
+    if (categoriesScrollRef.current) {
+      categoriesScrollRef.current.style.cursor = 'grab';
+      categoriesScrollRef.current.style.userSelect = '';
+    }
     setIsDragging(false);
+    setTimeout(() => setHasMoved(false), 200);
   };
 
   const handleMouseLeave = () => {
+    if (categoriesScrollRef.current) {
+      categoriesScrollRef.current.style.cursor = 'grab';
+      categoriesScrollRef.current.style.userSelect = '';
+    }
     setIsDragging(false);
+    setTimeout(() => setHasMoved(false), 200);
   };
 
-  // Função para obter a localização formatada completa
-  const getUserLocation = () => {
-    if (!user) return 'Localização não cadastrada';
-    
-    const parts: string[] = [];
-    
-    if (user.address) {
-      parts.push(user.address);
-    }
-    if (user.city && user.state) {
-      parts.push(`${user.city} - ${user.state}`);
-    } else if (user.city) {
-      parts.push(user.city);
-    } else if (user.state) {
-      parts.push(user.state);
-    }
-    if (user.zipCode) {
-      const formattedZip = user.zipCode.replace(/(\d{5})(\d{3})/, '$1-$2');
-      parts.push(`CEP ${formattedZip}`);
-    }
-    
-    return parts.length > 0 ? parts.join(', ') : 'Localização não cadastrada';
+  // Funções para o carrossel de categorias - Touch (Mobile) - Usa scroll nativo do navegador
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const touch = e.touches[0];
+    touchStartX.current = touch.pageX;
+    touchStartY.current = touch.pageY;
+    setHasMoved(false);
   };
-  
-  // Função auxiliar para obter endereço resumido (apenas cidade-estado)
-  const getUserLocationShort = () => {
-    if (!user) return 'Localização não cadastrada';
-    if (user.city && user.state) {
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!touchStartX.current || !touchStartY.current) return;
+    
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.pageX - touchStartX.current);
+    const deltaY = Math.abs(touch.pageY - touchStartY.current);
+    
+    // Se movimento horizontal > vertical e > threshold, é arrasto
+    if (deltaX > deltaY && deltaX > dragThreshold) {
+      setHasMoved(true);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    // Delay para permitir que o scroll termine antes de permitir clicks
+    setTimeout(() => {
+      setHasMoved(false);
+      touchStartX.current = 0;
+      touchStartY.current = 0;
+    }, 200);
+  };
+
+  // Função para obter a localização formatada
+  const getUserLocation = () => {
+    if (user?.city && user?.state) {
       return `${user.city} - ${user.state}`;
     }
-    if (user.city) return user.city;
-    if (user.state) return user.state;
+    if (user?.address) {
+      return user.address;
+    }
     return 'Localização não cadastrada';
   };
 
@@ -631,21 +703,68 @@ export default function ProductsPage() {
 
         {/* Título */}
         <div className="mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-2xl font-semibold text-brand-700 mb-1 sm:mb-2">
-            {searchTerm ? `Resultados para "${searchTerm}"` : 'Nossos Produtos'}
+          <h1 className="text-xl sm:text-2xl font-semibold mb-1 sm:mb-2">
+            {searchTerm ? (
+              <span className="text-[#3e2626] break-words whitespace-normal">
+                Resultados para "<span className="text-[#3e2626] font-semibold break-words">{searchTerm}</span>"
+              </span>
+            ) : (
+              <span className="text-brand-700">Nossos Produtos</span>
+            )}
           </h1>
           <p className="text-xs sm:text-sm text-gray-600">
             {filteredProducts.length} {filteredProducts.length === 1 ? 'produto encontrado' : 'produtos encontrados'}
           </p>
         </div>
 
-        {/* Seção Principal: Banner e Oferta Relâmpago */}
-          {!searchTerm && (() => {
+        {/* Seção Principal: Barra de Pesquisa, Banner e Oferta Relâmpago */}
+        <div className="mb-4 sm:mb-6">
+          {/* Barra de Pesquisa alinhada com o banner */}
+          <div className="mb-3 sm:mb-4">
+            <div className="relative max-w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[#3e2626]/60 z-10" />
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (searchTerm.trim()) {
+                    router.push(`/products?q=${encodeURIComponent(searchTerm.trim())}`);
+                  }
+                }}
+                className="w-full"
+              >
+                <Input
+                  type="text"
+                  placeholder="Pesquisar produtos..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setPage(1);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (searchTerm.trim()) {
+                        router.push(`/products?q=${encodeURIComponent(searchTerm.trim())}`);
+                      }
+                    }
+                  }}
+                  className="pl-10 pr-4 min-h-10 border-2 border-[#3e2626]/20 focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 rounded-lg font-medium text-sm w-full text-[#3e2626] placeholder:text-[#3e2626]/50 break-words whitespace-normal"
+                  style={{
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word',
+                  }}
+                />
+              </form>
+            </div>
+          </div>
+
+          {/* Banner e Oferta Relâmpago */}
+          {(() => {
             // Verificar se há oferta relâmpago REALMENTE ativa (já começou)
             const hasActiveFlashSale = specialOfferProduct && isFlashSaleActuallyActive(specialOfferProduct) && specialOfferProduct.isFlashSale;
             
             return (
-              <div className="mb-4 sm:mb-6 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
                 
                 {/* Card de Oferta Relâmpago - só mostra se houver oferta ativa */}
                 {hasActiveFlashSale && specialOfferProduct && (() => {
@@ -813,13 +932,13 @@ export default function ProductsPage() {
                         </div>
 
                         <div className="flex-1">
-                          <h3 className="text-2xl font-black text-brand-800 text-center">
+                          <h3 className="text-xl font-black text-brand-800">
                             Confira Nossos{' '}
                             <span className="text-brand-700">
                               Produtos Mais Recentes
                             </span>
                           </h3>
-                          <p className="text-md lg:text-md text-brand-700/80 font-medium text-center">
+                          <p className="text-lg lg:text-sm text-brand-700/80 font-medium">
                             Descubra as últimas novidades em móveis e decoração
                           </p>
                         </div>
@@ -875,25 +994,13 @@ export default function ProductsPage() {
               </div>
             );
           })()}
-
-        {/* Ordenação */}
-        <div className="flex items-center justify-end mt-4 sm:mt-6 mb-4 sm:mb-6">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
-            className="border-2 border-brand-200 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
-          >
-            <option value="name">Ordenar por: Mais relevantes</option>
-            <option value="price">Menor preço</option>
-            <option value="stock">Maior estoque</option>
-          </select>
         </div>
 
         {/* Seção de Localização e Categorias */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mt-4 sm:mt-6 mb-6 sm:mb-8">
           {/* Localização do Usuário */}
           <div className="flex-shrink-0 lg:w-80">
-            <div className="bg-white border border-[#3e2626]/10 rounded-xl w-[350px] mt-7 p-5 shadow-sm hover:shadow-md transition-shadow ">
+            <div className="bg-white border border-[#3e2626]/10 rounded-xl w-[350px] mt-7 p-5 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-start gap-3">
                 <div className="bg-gradient-to-br from-[#3e2626] to-[#2d1a1a] rounded-full p-2 flex-shrink-0 shadow-sm">
                   <MapPin className="h-4 w-4 text-white" />
@@ -912,7 +1019,7 @@ export default function ProductsPage() {
                         </div>
                       ) : (
                         <p className="text-sm font-semibold text-[#3e2626]">
-                          {getUserLocationShort()}
+                          {getUserLocation()}
                         </p>
                       )}
                     </>
@@ -946,16 +1053,27 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Carrossel de Categorias e Ordenação */}
-          <div className="flex-1 flex flex-col">
+          {/* Carrossel de Categorias */}
+          <div className="flex-1 min-w-0">
             <div
               ref={categoriesScrollRef}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseLeave}
-              className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-0 sm:ml-3 py-3 sm:py-4 gap-2 sm:gap-0"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              className="flex overflow-x-auto overflow-y-visible scrollbar-hide cursor-grab active:cursor-grabbing ml-0 sm:ml-3 py-3 sm:py-4 gap-5 sm:gap-6 lg:gap-8"
+              style={{ 
+                scrollbarWidth: 'none', 
+                msOverflowStyle: 'none',
+                WebkitOverflowScrolling: 'touch',
+                scrollBehavior: 'smooth',
+                scrollSnapType: 'x mandatory',
+                touchAction: 'pan-x',
+                overscrollBehaviorX: 'contain'
+              }}
             >
               {categories.map((cat) => {
                 const Icon = categoryIcons[cat] || Package;
@@ -967,12 +1085,21 @@ export default function ProductsPage() {
                 return (
                   <button
                     key={cat}
-                    onClick={() => {
+                    onClick={(e) => {
+                      // Prevenir clique se houve movimento (arrasto)
+                      if (hasMoved) {
+                        e.preventDefault();
+                        return;
+                      }
                       // Se a categoria já está selecionada, desseleciona (volta para 'all')
                       // Caso contrário, seleciona a categoria clicada
                       setSelectedCategory(isSelected ? 'all' : cat);
                     }}
-                    className="flex flex-col items-center justify-center gap-3 whitespace-nowrap flex-1 min-w-0 px-2 py-2 rounded-xl transition-all duration-200"
+                    onTouchStart={(e) => {
+                      // Permitir que o touch event prossiga para o container
+                      e.stopPropagation();
+                    }}
+                    className="flex flex-col items-center justify-center gap-3 whitespace-nowrap flex-shrink-0 min-w-[80px] sm:min-w-[100px] px-3 sm:px-4 py-2 rounded-xl transition-all duration-200 snap-center select-none"
                   >
                     <div className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] flex items-center justify-center transition-all duration-200 ${
                       isSelected
@@ -1000,7 +1127,7 @@ export default function ProductsPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
-                className="border-2 border-brand-200 rounded-lg px-4 py-2 text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors"
+                className="border-2 border-brand-200 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors flex-shrink-0"
               >
                 <option value="name">Ordenar por: Mais relevantes</option>
                 <option value="price">Menor preço</option>
