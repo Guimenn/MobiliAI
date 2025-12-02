@@ -189,12 +189,24 @@
 }
 
 .animate-scroll-banner {
-  animation: scroll-banner-right 15s linear infinite;
+  animation: scroll-banner-right 20s linear infinite;
   will-change: transform;
+  /* Melhor performance no mobile */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
 }
 
 .animate-scroll-banner:hover {
   animation-play-state: paused;
+}
+
+/* Velocidade mais rápida no mobile para melhor experiência */
+@media (max-width: 640px) {
+  .animate-scroll-banner {
+    animation: scroll-banner-right 18s linear infinite;
+  }
 }
 
 /* Animação shimmer para efeito de brilho */

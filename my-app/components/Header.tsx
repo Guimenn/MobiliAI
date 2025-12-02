@@ -590,111 +590,111 @@ export default function Header() {
                 : 'bg-[#3e2626] border-b border-[#2a1f1f] shadow-md'
         }`}>
           {/* Fita de Benefícios estilo SHEIN com Animação */}
-          <div className="bg-[#f5f5f0] border-b border-gray-200 py-1.5 overflow-hidden relative w-full">
+          <div className="bg-[#f5f5f0] border-b border-gray-200 py-1.5 sm:py-2 md:py-2.5 overflow-hidden relative w-full">
             <div className="flex items-center animate-scroll-banner" style={{ width: '200%' }}>
               {/* Primeira cópia (visível inicialmente) */}
-              <div className="flex items-center space-x-8 px-8 sm:px-12 lg:px-16 flex-shrink-0" style={{ width: '50%' }}>
-                {/* Seção 1: Venda na MobiliAI */}
-                <div className="flex items-center space-x-3 flex-shrink-0">
+              <div className="flex items-center justify-center space-x-3 sm:space-x-5 md:space-x-8 px-3 sm:px-6 md:px-8 lg:px-12 flex-shrink-0" style={{ width: '50%' }}>
+                {/* Seção 1: Frete Grátis */}
+                <div className="flex items-center space-x-1.5 sm:space-x-2.5 md:space-x-3 flex-shrink-0">
                   <div className="flex-shrink-0">
-                    <Store className="h-3.5 w-3.5 text-[#3e2626]" />
+                    <Truck className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-[#3e2626]" />
                   </div>
                   <div className="text-left">
-                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
-                      VENDA NA MOBILIAI
-                    </p>
-                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
-                      CADASTRE-SE AGORA
-                    </p>
-                  </div>
-                </div>
-
-                {/* Divisor */}
-                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
-
-                {/* Seção 2: Frete Grátis */}
-                <div className="flex items-center space-x-3 flex-shrink-0">
-                  <div className="flex-shrink-0">
-                    <Truck className="h-3.5 w-3.5 text-[#3e2626]" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                    <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm font-bold text-[#3e2626] leading-[1.1] whitespace-nowrap">
                       FRETE GRÁTIS
                     </p>
-                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                    <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-[#5a3a3a] font-normal leading-[1.1] whitespace-nowrap">
                       VEJA CONDIÇÕES
                     </p>
                   </div>
                 </div>
 
                 {/* Divisor */}
-                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+                <div className="h-4 sm:h-5 md:h-7 w-px bg-gray-300 flex-shrink-0"></div>
 
-                {/* Seção 3: Devolução Grátis */}
-                <div className="flex items-center space-x-3 flex-shrink-0">
+                {/* Seção 2: Devolução */}
+                <div className="flex items-center space-x-1.5 sm:space-x-2.5 md:space-x-3 flex-shrink-0">
                   <div className="flex-shrink-0">
-                    <RotateCw className="h-3.5 w-3.5 text-[#3e2626]" />
+                    <RotateCw className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-[#3e2626]" />
                   </div>
                   <div className="text-left">
-                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
-                      DEVOLUÇÃO GRÁTIS
+                    <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm font-bold text-[#3e2626] leading-[1.1] whitespace-nowrap">
+                      DEVOLUÇÃO
                     </p>
-                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
-                      CONFIRA POLÍTICA DE DEVOLUÇÃO
+                    <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-[#5a3a3a] font-normal leading-[1.1] whitespace-nowrap">
+                      CONFIRA POLÍTICAS
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-4 sm:h-5 md:h-7 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 3: Monte sua MobiliAI */}
+                <div className="flex items-center space-x-1.5 sm:space-x-2.5 md:space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm font-bold text-[#3e2626] leading-[1.1] whitespace-nowrap">
+                      MONTE SUA MOBILIAI
+                    </p>
+                    <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-[#5a3a3a] font-normal leading-[1.1] whitespace-nowrap">
+                      CONFIRA POLÍTICAS DE MONTAGEM
                     </p>
                   </div>
                 </div>
               </div>
 
               {/* Segunda cópia (para loop infinito) */}
-              <div className="flex items-center space-x-8 px-8 sm:px-12 lg:px-16 flex-shrink-0" style={{ width: '50%' }}>
-                {/* Seção 1: Venda na MobiliAI */}
-                <div className="flex items-center space-x-3 flex-shrink-0">
+              <div className="flex items-center justify-center space-x-3 sm:space-x-5 md:space-x-8 px-3 sm:px-6 md:px-8 lg:px-12 flex-shrink-0" style={{ width: '50%' }}>
+                {/* Seção 1: Frete Grátis */}
+                <div className="flex items-center space-x-1.5 sm:space-x-2.5 md:space-x-3 flex-shrink-0">
                   <div className="flex-shrink-0">
-                    <Store className="h-3.5 w-3.5 text-[#3e2626]" />
+                    <Truck className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-[#3e2626]" />
                   </div>
                   <div className="text-left">
-                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
-                      VENDA NA MOBILIAI
-                    </p>
-                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
-                      CADASTRE-SE AGORA
-                    </p>
-                  </div>
-                </div>
-
-                {/* Divisor */}
-                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
-
-                {/* Seção 2: Frete Grátis */}
-                <div className="flex items-center space-x-3 flex-shrink-0">
-                  <div className="flex-shrink-0">
-                    <Truck className="h-3.5 w-3.5 text-[#3e2626]" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
+                    <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm font-bold text-[#3e2626] leading-[1.1] whitespace-nowrap">
                       FRETE GRÁTIS
                     </p>
-                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
+                    <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-[#5a3a3a] font-normal leading-[1.1] whitespace-nowrap">
                       VEJA CONDIÇÕES
                     </p>
                   </div>
                 </div>
 
                 {/* Divisor */}
-                <div className="h-6 w-px bg-gray-300 flex-shrink-0"></div>
+                <div className="h-4 sm:h-5 md:h-7 w-px bg-gray-300 flex-shrink-0"></div>
 
-                {/* Seção 3: Devolução Grátis */}
-                <div className="flex items-center space-x-3 flex-shrink-0">
+                {/* Seção 2: Devolução */}
+                <div className="flex items-center space-x-1.5 sm:space-x-2.5 md:space-x-3 flex-shrink-0">
                   <div className="flex-shrink-0">
-                    <RotateCw className="h-3.5 w-3.5 text-[#3e2626]" />
+                    <RotateCw className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-[#3e2626]" />
                   </div>
                   <div className="text-left">
-                    <p className="text-xs font-bold text-[#3e2626] leading-tight whitespace-nowrap">
-                      DEVOLUÇÃO GRÁTIS
+                    <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm font-bold text-[#3e2626] leading-[1.1] whitespace-nowrap">
+                      DEVOLUÇÃO
                     </p>
-                    <p className="text-[10px] text-[#5a3a3a] font-normal leading-tight whitespace-nowrap">
-                      CONFIRA POLÍTICA DE DEVOLUÇÃO
+                    <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-[#5a3a3a] font-normal leading-[1.1] whitespace-nowrap">
+                      CONFIRA POLÍTICAS
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisor */}
+                <div className="h-4 sm:h-5 md:h-7 w-px bg-gray-300 flex-shrink-0"></div>
+
+                {/* Seção 3: Monte sua MobiliAI */}
+                <div className="flex items-center space-x-1.5 sm:space-x-2.5 md:space-x-3 flex-shrink-0">
+                  <div className="flex-shrink-0">
+                    <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-[#3e2626]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm font-bold text-[#3e2626] leading-[1.1] whitespace-nowrap">
+                      MONTE SUA MOBILIAI
+                    </p>
+                    <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-[#5a3a3a] font-normal leading-[1.1] whitespace-nowrap">
+                      CONFIRA POLÍTICAS DE MONTAGEM
                     </p>
                   </div>
                 </div>

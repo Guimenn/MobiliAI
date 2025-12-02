@@ -930,7 +930,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen ">
       {/* Main Hero Section - Design Ultra Moderno e Apelativo */}
-      <div className="relative min-h-screen flex items-center overflow-hidden pt-32 sm:pt-36 md:pt-40 lg:pt-44">
+      <div className="relative min-h-screen flex items-center overflow-hidden pt-50 lg:pt-20">
         {/* Background Image com efeitos dinâmicos */}
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-out"
