@@ -1,14 +1,17 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Clipboard, Check, Ticket, Calendar, Percent, ShoppingCart, ArrowRight, Truck, Users, Gift, Plus, X } from "lucide-react";
+import { Ticket, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { customerAPI } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
+import CouponCard from "@/components/CouponCard";
 
 type FilterOption = "ativos" | "frete" | "expirados" | "todos";
+
+type CouponStatus = "active" | "used" | "expired";
 
 const filterLabels: Record<FilterOption, string> = {
   ativos: "Disponíveis",
@@ -72,6 +75,7 @@ interface MappedCoupon {
   discountType: "percentage" | "fixed";
   discountValue: number;
   minimumPurchase?: number;
+  maximumDiscount?: number;
   expiresAt: string;
   status: CouponStatus;
   usageLimit?: number;
@@ -120,6 +124,7 @@ export default function CouponSection() {
             discountType: coupon.discountType === "PERCENTAGE" ? "percentage" : "fixed",
             discountValue: coupon.discountValue,
             minimumPurchase: coupon.minimumPurchase,
+            maximumDiscount: coupon.maximumDiscount,
             expiresAt: coupon.validUntil,
             status,
             usageLimit: coupon.usageLimit,
@@ -205,25 +210,29 @@ export default function CouponSection() {
     return { activeCount, freteCount, expiredCount };
   }, [coupons]);
 
-  const handleCopyCode = async (coupon: MappedCoupon) => {
+  const handleCopyCode = async (code: string) => {
     try {
-      await navigator.clipboard.writeText(coupon.code);
-      setCopiedCouponId(coupon.id);
-      toast.success(`Cupom ${coupon.code} copiado!`);
-      setTimeout(() => setCopiedCouponId((prev) => (prev === coupon.id ? null : prev)), 2000);
+      await navigator.clipboard.writeText(code);
+      const coupon = coupons.find(c => c.code === code);
+      if (coupon) {
+        setCopiedCouponId(coupon.id);
+        toast.success(`Cupom ${code} copiado!`);
+        setTimeout(() => setCopiedCouponId((prev) => (prev === coupon.id ? null : prev)), 2000);
+      }
     } catch (error) {
       toast.error("Não foi possível copiar o cupom.");
     }
   };
 
-  const handleMarkAsUsed = (coupon: MappedCoupon) => {
-    if (coupon.status !== "active") {
+  const handleMarkAsUsed = (code: string) => {
+    const coupon = coupons.find(c => c.code === code);
+    if (!coupon || coupon.status !== "active") {
       toast.error("Somente cupons ativos podem ser usados.");
       return;
     }
 
     // Redirecionar para a página de produtos para usar o cupom
-    window.location.href = `/products?coupon=${coupon.code}`;
+    window.location.href = `/products?coupon=${code}`;
   };
 
   const handleRedeemCoupon = async () => {
@@ -277,6 +286,7 @@ export default function CouponSection() {
           discountType: coupon.discountType === "PERCENTAGE" ? "percentage" : "fixed",
           discountValue: coupon.discountValue,
           minimumPurchase: coupon.minimumPurchase,
+          maximumDiscount: coupon.maximumDiscount,
           expiresAt: coupon.validUntil,
           status,
           usageLimit: coupon.usageLimit,
@@ -401,114 +411,21 @@ export default function CouponSection() {
                                   coupon.code?.toLowerCase().includes("frete");
 
             return (
-              <div
+              <CouponCard
                 key={coupon.id}
-                className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-white"
-              >
-                <div className="bg-gray-50 border-b border-gray-200 px-5 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${statusStyles[effectiveStatus]}`}>
-                      {statusLabels[effectiveStatus]}
-                    </span>
-                    {isFreteCoupon && (
-                      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-[#3e2626]/10 text-[#3e2626] border border-[#3e2626]/20 flex items-center gap-1.5">
-                        <Truck className="h-3 w-3" />
-                        Frete Grátis
-                      </span>
-                    )}
-                    {coupon.category && (
-                      <span className="text-xs font-medium text-[#3e2626] bg-[#3e2626]/10 px-2 py-1 rounded-full">
-                        {coupon.category}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Calendar className="h-4 w-4" />
-                    {isExpired ? "Expirado" : `Expira em ${formatDate(coupon.expiresAt)}`}
-                  </div>
-                </div>
-
-                <div className="px-5 py-4 grid gap-4 md:grid-cols-[auto,1fr,auto] items-center">
-                  <div className="h-16 w-16 rounded-xl flex items-center justify-center bg-[#3e2626]/10 text-[#3e2626]">
-                    {isFreteCoupon ? (
-                      <Truck className="h-8 w-8" />
-                    ) : coupon.discountType === "percentage" ? (
-                      <Percent className="h-8 w-8" />
-                    ) : (
-                      <Gift className="h-8 w-8" />
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-xl font-bold text-gray-900">{coupon.code}</h3>
-                        {coupon.discountType === "percentage" && (
-                          <span className="text-2xl font-bold text-[#3e2626]">
-                            {coupon.discountValue}%
-                          </span>
-                        )}
-                      </div>
-                      {coupon.description && (
-                        <p className="text-sm text-gray-600">{coupon.description}</p>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
-                      <span>
-                        {coupon.discountType === "percentage"
-                          ? `${coupon.discountValue}% off`
-                          : `Desconto de ${formatCurrency(coupon.discountValue)}`
-                        }
-                      </span>
-                      {coupon.minimumPurchase && (
-                        <span className="flex items-center gap-1">
-                          <ShoppingCart className="h-3.5 w-3.5" />
-                          Pedido mínimo: {formatCurrency(coupon.minimumPurchase)}
-                        </span>
-                      )}
-                      {coupon.usageLimit && (
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3.5 w-3.5" />
-                          Limite: {coupon.usageLimit}x por cliente
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-stretch gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="justify-center border-dashed border-2 border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white transition-colors"
-                      onClick={() => handleCopyCode(coupon)}
-                    >
-                      {copiedCouponId === coupon.id ? (
-                        <>
-                          <Check className="h-4 w-4 mr-2" />
-                          Copiado!
-                        </>
-                      ) : (
-                        <>
-                          <Clipboard className="h-4 w-4 mr-2" />
-                          Copiar código
-                        </>
-                      )}
-                    </Button>
-                    {showMarkUsed && (
-                      <Button
-                        type="button"
-                        onClick={() => handleMarkAsUsed(coupon)}
-                        className="bg-[#3e2626] hover:bg-[#5a3a3a] text-white"
-                      >
-                        Usar agora
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
+                coupon={{
+                  ...coupon,
+                  discountType: coupon.discountType === "percentage" ? "percentage" : "fixed",
+                }}
+                onCopy={handleCopyCode}
+                onUse={handleMarkAsUsed}
+                copiedCode={copiedCouponId === coupon.id ? coupon.code : null}
+                showCopyButton={true}
+                showUseButton={showMarkUsed}
+                formatCurrency={formatCurrency}
+                formatDate={formatDate}
+                statusLabels={statusLabels}
+              />
             );
           })
         )}
