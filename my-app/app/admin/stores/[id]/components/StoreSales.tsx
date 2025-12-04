@@ -229,7 +229,7 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
         <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center">
@@ -237,7 +237,7 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
                 <DollarSign className="h-4 w-4 text-green-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
                   R$ {salesStats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs sm:text-sm text-gray-500">Receita Total</p>
@@ -253,7 +253,7 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
                 <TrendingUp className="h-4 w-4 text-emerald-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-600 truncate">
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-600">
                   R$ {salesStats.totalProfit?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0.00'}
                 </p>
                 <p className="text-xs sm:text-sm text-gray-500">Lucro Total</p>
@@ -283,7 +283,7 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
                 <TrendingUp className="h-4 w-4 text-purple-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
                   R$ {salesStats.averageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs sm:text-sm text-gray-500">Ticket Médio</p>

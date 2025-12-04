@@ -728,6 +728,11 @@ export const adminAPI = {
     return response.data;
   },
 
+  promoteEmployee: async (employeeId: string, promotionData: { newPosition?: string; newSalary?: number }) => {
+    const response = await api.post(`/admin/employees/${employeeId}/promote`, promotionData);
+    return response.data;
+  },
+
   deleteEmployee: async (employeeId: string) => {
     const response = await api.delete(`/admin/employees/${employeeId}`);
     return response.data;

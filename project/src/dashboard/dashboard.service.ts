@@ -1,47 +1,66 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SaleStatus } from '@prisma/client';
 
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
   async getStoreOverview(storeId: string) {
-    // Buscar dados básicos da loja
-    const store = await this.prisma.store.findUnique({
-      where: { id: storeId }
-    });
+    // Buscar dados básicos e estatísticas em paralelo
+    const [store, totalEmployees, salesAggregate, timeClocks] = await Promise.all([
+      this.prisma.store.findUnique({
+        where: { id: storeId }
+      }),
+      this.prisma.user.count({
+        where: { storeId }
+      }),
+      this.prisma.sale.aggregate({
+        where: {
+          storeId,
+          status: {
+            in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED]
+          }
+        },
+        _sum: {
+          totalAmount: true
+        }
+      }),
+      this.prisma.timeClock.findMany({
+        where: {
+          employee: { storeId },
+          createdAt: {
+            gte: new Date(new Date().setMonth(new Date().getMonth() - 6))
+          }
+        }
+      })
+    ]);
 
     if (!store) {
       throw new Error('Loja não encontrada');
     }
 
-    // Buscar funcionários da loja
-    const users = await this.prisma.user.findMany({
-      where: { storeId }
-    });
-
-    // Buscar pontos dos últimos 6 meses
-    const timeClocks = await this.prisma.timeClock.findMany({
-      where: {
-        employee: { storeId },
-        createdAt: {
-          gte: new Date(new Date().setMonth(new Date().getMonth() - 6))
-        }
-      }
-    });
-
-    // Calcular estatísticas
-    const totalEmployees = users.length;
     const totalTimeClocks = timeClocks.length;
-    
-    // Calcular vendas (0 se não houver dados reais)
-    const totalSales = 0; // TODO: Implementar vendas reais
-    
-    // Calcular taxa de presença baseada nos pontos reais
-    const attendanceRate = totalTimeClocks > 0 ? Math.min(100, Math.floor((totalTimeClocks / (totalEmployees * 30)) * 100)) : 0;
-    
-    // Calcular horas médias baseadas nos pontos reais
-    const averageHours = totalTimeClocks > 0 ? Math.floor(totalTimeClocks / totalEmployees) : 0;
+
+    const totalSales = Number(salesAggregate._sum.totalAmount ?? 0);
+
+    // Taxa de presença aproximada: pontos / (funcionários * 30 dias)
+    const attendanceRate =
+      totalEmployees > 0 && totalTimeClocks > 0
+        ? Math.min(
+            100,
+            Math.floor((totalTimeClocks / (totalEmployees * 30)) * 100)
+          )
+        : 0;
+
+    // Horas médias por funcionário (usando campo totalHours quando disponível)
+    let averageHours = 0;
+    if (totalEmployees > 0 && timeClocks.length > 0) {
+      const totalHours = timeClocks.reduce((sum, tc: any) => {
+        return sum + Number(tc.totalHours ?? 0);
+      }, 0);
+      averageHours = totalHours > 0 ? Math.round(totalHours / totalEmployees) : 0;
+    }
 
     return {
       totalSales,
@@ -54,13 +73,60 @@ export class DashboardService {
   }
 
   async getStoreSales(storeId: string) {
-    // TODO: Implementar vendas reais baseadas em dados do banco
-    // Por enquanto retorna dados zerados
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-    const salesData = months.map(month => ({
-      name: month,
-      vendas: 0,
-      clientes: 0
+    // Vendas reais dos últimos 6 meses agrupadas por mês
+    const now = new Date();
+    const sixMonthsAgo = new Date(now);
+    sixMonthsAgo.setMonth(now.getMonth() - 5);
+    sixMonthsAgo.setDate(1);
+
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        storeId,
+        createdAt: {
+          gte: sixMonthsAgo
+        },
+        status: {
+          in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED]
+        }
+      },
+      select: {
+        createdAt: true,
+        totalAmount: true,
+        customerId: true
+      }
+    });
+
+    // Criar buckets mensais
+    const dataMap: Record<
+      string,
+      { name: string; vendas: number; clientes: Set<string> }
+    > = {};
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now);
+      d.setMonth(now.getMonth() - i);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const label = d.toLocaleString('pt-BR', { month: 'short' });
+      dataMap[key] = { name: label, vendas: 0, clientes: new Set() };
+    }
+
+    sales.forEach((sale) => {
+      const d = new Date(sale.createdAt);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!dataMap[key]) {
+        const label = d.toLocaleString('pt-BR', { month: 'short' });
+        dataMap[key] = { name: label, vendas: 0, clientes: new Set() };
+      }
+      dataMap[key].vendas += Number(sale.totalAmount ?? 0);
+      if (sale.customerId) {
+        dataMap[key].clientes.add(sale.customerId);
+      }
+    });
+
+    const salesData = Object.values(dataMap).map((m) => ({
+      name: m.name,
+      vendas: m.vendas,
+      clientes: m.clientes.size
     }));
 
     return salesData;
@@ -114,22 +180,60 @@ export class DashboardService {
       }
     });
 
-    // Calcular performance de cada funcionário
-    const employeePerformance = await Promise.all(employees.map(async (emp) => {
-      // Buscar pontos do funcionário no último mês
-      const timeClocks = await this.prisma.timeClock.findMany({
-        where: {
-          employeeId: emp.id,
-          createdAt: {
-            gte: new Date(new Date().setMonth(new Date().getMonth() - 1))
-          }
-        }
-      });
+    if (!employees.length) return [];
 
-      const totalTimeClocks = timeClocks.length;
-      const vendas = 0; // TODO: Implementar vendas reais por funcionário
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    // Buscar vendas por funcionário no último mês
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        storeId,
+        createdAt: {
+          gte: oneMonthAgo
+        },
+        status: {
+          in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED]
+        }
+      },
+      select: {
+        employeeId: true,
+        totalAmount: true
+      }
+    });
+
+    // Buscar pontos (timeClock) por funcionário no último mês
+    const timeClocks = await this.prisma.timeClock.findMany({
+      where: {
+        employee: { storeId },
+        createdAt: {
+          gte: oneMonthAgo
+        }
+      }
+    });
+
+    const salesMap = new Map<string, number>();
+    sales.forEach((s) => {
+      if (!s.employeeId) return;
+      const current = salesMap.get(s.employeeId) ?? 0;
+      salesMap.set(s.employeeId, current + Number(s.totalAmount ?? 0));
+    });
+
+    const clocksByEmployee = new Map<string, any[]>();
+    timeClocks.forEach((tc: any) => {
+      const list = clocksByEmployee.get(tc.employeeId) ?? [];
+      list.push(tc);
+      clocksByEmployee.set(tc.employeeId, list);
+    });
+
+    const employeePerformance = employees.map((emp) => {
+      const empClocks = clocksByEmployee.get(emp.id) ?? [];
+      const totalTimeClocks = empClocks.length;
+      const vendas = salesMap.get(emp.id) ?? 0;
       const pontos = totalTimeClocks * 2; // 2 pontos por ponto registrado
-      const atrasos = timeClocks.filter(tc => tc.minutesLate && tc.minutesLate > 0).length;
+      const atrasos = empClocks.filter(
+        (tc) => tc.minutesLate && tc.minutesLate > 0
+      ).length;
 
       return {
         name: emp.name,
@@ -138,7 +242,7 @@ export class DashboardService {
         atrasos,
         totalTimeClocks
       };
-    }));
+    });
 
     return employeePerformance;
   }

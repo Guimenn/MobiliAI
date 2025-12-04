@@ -203,7 +203,25 @@ export class AdminService {
   async getUserById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        city: true,
+        state: true,
+        zipCode: true,
+        cpf: true,
+        role: true,
+        isActive: true,
+        salary: true,
+        position: true,
+        hireDate: true,
+        createdAt: true,
+        updatedAt: true,
+        workingHours: true,
+        avatarUrl: true,
         store: { select: { id: true, name: true, address: true } },
         sales: {
           take: 5,
@@ -327,6 +345,9 @@ export class AdminService {
     isActive?: boolean;
     workingHours?: any;
     avatarUrl?: string;
+    salary?: number;
+    position?: string;
+    hireDate?: string;
   }) {
     const user = await this.prisma.user.findUnique({
       where: { id }
@@ -356,10 +377,30 @@ export class AdminService {
       }
     }
 
+    console.log('💰 [AdminService] Dados que serão salvos no banco:', JSON.stringify(userData, null, 2));
+
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: userData,
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        city: true,
+        state: true,
+        zipCode: true,
+        cpf: true,
+        role: true,
+        isActive: true,
+        salary: true,
+        position: true,
+        hireDate: true,
+        createdAt: true,
+        updatedAt: true,
+        workingHours: true,
+        avatarUrl: true,
         store: { select: { id: true, name: true } }
       }
     });
@@ -1526,6 +1567,9 @@ export class AdminService {
         address: true,
         role: true,
         isActive: true,
+        salary: true,
+        position: true,
+        hireDate: true,
         createdAt: true
       }
     });
@@ -1545,6 +1589,7 @@ export class AdminService {
     storeId: string;
     department?: string;
     position?: string;
+    salary?: number;
     hireDate?: string;
     emergencyContact?: string;
     emergencyPhone?: string;
@@ -1568,24 +1613,33 @@ export class AdminService {
     const { password, ...userData } = employeeData;
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const { storeId, department, position, hireDate, emergencyContact, emergencyPhone, notes, ...restUserData } = userData;
+    const { storeId, department, position, salary, hireDate, emergencyContact, emergencyPhone, notes, ...restUserData } = userData;
     
     console.log('🔍 Dados filtrados para criação:', {
       ...restUserData,
       password: '[HASHED]',
       isActive: userData.isActive ?? true,
-      storeId
+      storeId,
+      position,
+      salary,
+      hireDate: hireDate ? new Date(hireDate) : undefined
     });
     
+    const createData: any = {
+      ...restUserData,
+      password: hashedPassword,
+      isActive: userData.isActive ?? true,
+      store: {
+        connect: { id: storeId }
+      }
+    };
+
+    if (position) createData.position = position;
+    if (salary !== undefined && salary !== null) createData.salary = salary;
+    if (hireDate) createData.hireDate = new Date(hireDate);
+    
     return this.prisma.user.create({
-      data: {
-        ...restUserData,
-        password: hashedPassword,
-        isActive: userData.isActive ?? true,
-        store: {
-          connect: { id: storeId }
-        }
-      },
+      data: createData,
       select: {
         id: true,
         name: true,
@@ -1598,15 +1652,30 @@ export class AdminService {
         cpf: true,
         role: true,
         isActive: true,
+        salary: true,
+        position: true,
+        hireDate: true,
         createdAt: true
       }
     });
   }
 
   async updateEmployee(employeeId: string, employeeData: any) {
+    const updateData: any = { ...employeeData };
+    
+    // Converter salary para Decimal se fornecido
+    if (updateData.salary !== undefined && updateData.salary !== null) {
+      updateData.salary = updateData.salary;
+    }
+    
+    // Converter hireDate para Date se fornecido
+    if (updateData.hireDate && typeof updateData.hireDate === 'string') {
+      updateData.hireDate = new Date(updateData.hireDate);
+    }
+    
     return this.prisma.user.update({
       where: { id: employeeId },
-      data: employeeData,
+      data: updateData,
       select: {
         id: true,
         name: true,
@@ -1615,6 +1684,56 @@ export class AdminService {
         address: true,
         role: true,
         isActive: true,
+        salary: true,
+        position: true,
+        hireDate: true,
+        createdAt: true
+      }
+    });
+  }
+
+  async promoteEmployee(employeeId: string, promotionData: { newPosition?: string; newSalary?: number; effectiveDate?: string }) {
+    const employee = await this.prisma.user.findUnique({
+      where: { id: employeeId }
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Funcionário não encontrado');
+    }
+
+    const updateData: any = {};
+    
+    // Mapear novo cargo (apenas Gerente ou Funcionário)
+    if (promotionData.newPosition) {
+      if (promotionData.newPosition === UserRole.STORE_MANAGER || promotionData.newPosition === 'STORE_MANAGER') {
+        updateData.role = UserRole.STORE_MANAGER;
+        updateData.position = 'Gerente';
+      } else {
+        // Padrão: Funcionário
+        updateData.role = UserRole.EMPLOYEE;
+        updateData.position = 'Funcionário';
+      }
+    }
+    
+    // Atualizar salário, se informado
+    if (promotionData.newSalary !== undefined && promotionData.newSalary !== null) {
+      updateData.salary = promotionData.newSalary;
+    }
+
+    return this.prisma.user.update({
+      where: { id: employeeId },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        role: true,
+        isActive: true,
+        salary: true,
+        position: true,
+        hireDate: true,
         createdAt: true
       }
     });

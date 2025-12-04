@@ -37,6 +37,7 @@ interface Employee {
   isActive: boolean;
   department?: string;
   position?: string;
+  salary?: number | string;
   hireDate?: string;
   emergencyContact?: string;
   emergencyPhone?: string;
@@ -73,6 +74,7 @@ export default function EmployeePage() {
     zipCode: '',
     role: '',
     storeId: '',
+    salary: '',
     isActive: true,
     notes: ''
   });
@@ -142,6 +144,8 @@ export default function EmployeePage() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('📊 Dados do funcionário carregados:', data);
+        console.log('💰 Salário do funcionário:', data.salary);
         setEmployee(data);
         setFormData({
           name: data.name || '',
@@ -153,9 +157,15 @@ export default function EmployeePage() {
           zipCode: data.zipCode || '',
           role: data.role || '',
           storeId: data.storeId || data.store?.id || '',
+          salary: data.salary 
+            ? (typeof data.salary === 'string' ? data.salary : data.salary.toString())
+            : '',
           isActive: data.isActive ?? true,
           notes: data.notes || ''
         });
+        console.log('📝 FormData configurado com salário:', data.salary 
+          ? (typeof data.salary === 'string' ? data.salary : data.salary.toString())
+          : '');
         setWorkingHours(data.workingHours || null);
         
         // Buscar nome da loja se não vier no employee
@@ -193,6 +203,9 @@ export default function EmployeePage() {
       if (formData.address) employeeData.address = formData.address;
       if (formData.role) employeeData.role = formData.role;
       if (formData.storeId) employeeData.storeId = formData.storeId;
+      if (formData.salary && formData.salary !== '') {
+        employeeData.salary = parseFloat(formData.salary);
+      }
       if (formData.isActive !== undefined) employeeData.isActive = formData.isActive;
       if (workingHours) employeeData.workingHours = workingHours;
 
@@ -207,7 +220,20 @@ export default function EmployeePage() {
 
       if (response.ok) {
         const updatedEmployee = await response.json();
+        console.log('✅ Funcionário atualizado:', updatedEmployee);
         setEmployee(updatedEmployee);
+        
+        // Atualizar formData com os dados retornados
+        setFormData(prev => ({
+          ...prev,
+          salary: updatedEmployee.salary 
+            ? (typeof updatedEmployee.salary === 'string' ? updatedEmployee.salary : updatedEmployee.salary.toString())
+            : '',
+          phone: updatedEmployee.phone || prev.phone,
+          address: updatedEmployee.address || prev.address,
+          role: updatedEmployee.role || prev.role,
+          isActive: updatedEmployee.isActive ?? prev.isActive
+        }));
         
         // Atualizar nome da loja após salvar
         if (updatedEmployee.storeId) {
@@ -222,7 +248,8 @@ export default function EmployeePage() {
         setIsEditing(false);
         alert('Funcionário atualizado com sucesso!');
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ message: 'Erro desconhecido' }));
+        console.error('❌ Erro ao atualizar funcionário:', errorData);
         alert(`Erro: ${errorData.message || 'Erro desconhecido'}`);
       }
     } catch (error) {
@@ -474,6 +501,31 @@ export default function EmployeePage() {
                       <div className="font-medium">
                         {employee.store?.name || storeName || stores.find(s => s.id === employee.storeId)?.name || 'Não informado'}
                       </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="salary" className="font-semibold">Salário (R$)</Label>
+                    {isEditing ? (
+                      <Input
+                        id="salary"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.salary}
+                        onChange={(e) => handleInputChange('salary', e.target.value)}
+                        placeholder="0.00"
+                        className="text-lg font-medium"
+                      />
+                    ) : (
+                      <div className="font-semibold text-lg text-blue-600">
+                        {employee.salary 
+                          ? `R$ ${typeof employee.salary === 'string' ? parseFloat(employee.salary).toFixed(2).replace('.', ',') : employee.salary.toFixed(2).replace('.', ',')}`
+                          : <span className="text-gray-500">Não informado</span>}
+                      </div>
+                    )}
+                    {!isEditing && employee.salary && (
+                      <p className="text-xs text-gray-500">Clique em "Editar" para alterar o salário</p>
                     )}
                   </div>
 

@@ -30,7 +30,8 @@ import {
   Activity,
   Target,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  TrendingUp as PromoteIcon
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -64,6 +65,7 @@ import StoreInventory from './components/StoreInventory';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 import { X, Save } from 'lucide-react';
 import { Loader } from '@/components/ui/ai/loader';
@@ -99,27 +101,34 @@ export default function StoreDetailsPage() {
   const [showEditEmployeeModal, setShowEditEmployeeModal] = useState(false);
   const [showMedicalModal, setShowMedicalModal] = useState(false);
   const [showTerminationModal, setShowTerminationModal] = useState(false);
+  const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [isUpdatingEmployee, setIsUpdatingEmployee] = useState(false);
   const [isProcessingMedical, setIsProcessingMedical] = useState(false);
   const [isProcessingTermination, setIsProcessingTermination] = useState(false);
+  const [isProcessingPromotion, setIsProcessingPromotion] = useState(false);
+  const [promotionData, setPromotionData] = useState({ newPosition: '', newSalary: '' });
   const [isProcessingTimeClock, setIsProcessingTimeClock] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editFormData, setEditFormData] = useState<any>(null);
 
-  // Função para organizar funcionários por hierarquia
+  // Função para organizar funcionários por hierarquia (usando roles reais do sistema)
   const getHierarchyOrder = (role: string) => {
-    const hierarchy = {
-      'GERENTE': 1,
-      'SUPERVISOR': 2,
-      'VENDEDOR': 3,
-      'CAIXA': 4,
-      'ESTOQUISTA': 5,
-      'ATENDENTE': 6,
-      'AUXILIAR': 7
+    const hierarchy: Record<string, number> = {
+      ADMIN: 0,
+      STORE_MANAGER: 1,
+      EMPLOYEE: 2,
+      CASHIER: 3,
     };
-    return hierarchy[role as keyof typeof hierarchy] || 99;
+    return hierarchy[role] ?? 99;
+  };
+
+  // Texto amigável para exibir o cargo do funcionário
+  const getEmployeeDisplayRole = (employee: any) => {
+    if (employee.position) return employee.position;
+    if (employee.role === 'STORE_MANAGER') return 'Gerente';
+    return 'Funcionário';
   };
 
   const sortedEmployees = (employees || []).sort((a, b) => {
@@ -320,7 +329,7 @@ export default function StoreDetailsPage() {
       // Filtrar apenas os campos permitidos pelo DTO do backend
       const allowedFields = [
         'name', 'email', 'phone', 'address', 'city', 'state', 'zipCode', 
-        'role', 'isActive', 'cpf', 'workingHours'
+        'role', 'isActive', 'cpf', 'workingHours', 'salary', 'position', 'hireDate'
       ];
       
       const filteredData: any = {};
@@ -418,6 +427,23 @@ export default function StoreDetailsPage() {
       console.error('Erro ao processar demissão:', error);
     } finally {
       setIsProcessingTermination(false);
+    }
+  };
+
+  const handlePromotion = async (promotionData: { newPosition?: string; newSalary?: number }) => {
+    try {
+      setIsProcessingPromotion(true);
+      await adminAPI.promoteEmployee(selectedEmployee.id, promotionData);
+              alert('Funcionário promovido com sucesso!');
+      setShowPromotionModal(false);
+      setSelectedEmployee(null);
+      setPromotionData({ newPosition: '', newSalary: '' });
+      await loadEmployees();
+    } catch (error: any) {
+      console.error('Erro ao promover funcionário:', error);
+      alert(`Erro ao promover funcionário: ${error.message || 'Tente novamente.'}`);
+    } finally {
+      setIsProcessingPromotion(false);
     }
   };
 
@@ -879,8 +905,8 @@ export default function StoreDetailsPage() {
                 </CardHeader>
                 <CardContent>
                   <ChartContainer config={{
-                    vendas: { label: "Vendas", color: "hsl(var(--chart-1))" },
-                    clientes: { label: "Clientes", color: "hsl(var(--chart-2))" }
+                    vendas: { label: "Vendas", color: "#3e2626" },
+                    clientes: { label: "Clientes", color: "#8B4513" }
                   }}>
                     <LineChart data={dashboardData.salesData}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -891,9 +917,9 @@ export default function StoreDetailsPage() {
                       <Line 
                         type="monotone" 
                         dataKey="vendas" 
-                        stroke="var(--color-vendas)" 
+                        stroke="#3e2626" 
                         strokeWidth={2}
-                        dot={{ fill: "var(--color-vendas)" }}
+                        dot={{ fill: "#3e2626" }}
                       />
                     </LineChart>
                   </ChartContainer>
@@ -908,8 +934,8 @@ export default function StoreDetailsPage() {
                 </CardHeader>
                 <CardContent>
                   <ChartContainer config={{
-                    presenca: { label: "Presença", color: "hsl(var(--chart-1))" },
-                    atrasos: { label: "Atrasos", color: "hsl(var(--chart-2))" }
+                    presenca: { label: "Presença", color: "#3e2626" },
+                    atrasos: { label: "Atrasos", color: "#8B4513" }
                   }}>
                     <BarChart data={dashboardData.attendanceData}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -917,8 +943,8 @@ export default function StoreDetailsPage() {
                       <YAxis />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <ChartLegend content={<ChartLegendContent />} />
-                      <Bar dataKey="presenca" fill="var(--color-presenca)" />
-                      <Bar dataKey="atrasos" fill="var(--color-atrasos)" />
+                      <Bar dataKey="presenca" fill="#3e2626" />
+                      <Bar dataKey="atrasos" fill="#8B4513" />
                     </BarChart>
                   </ChartContainer>
                 </CardContent>
@@ -933,8 +959,8 @@ export default function StoreDetailsPage() {
               </CardHeader>
               <CardContent>
                 <ChartContainer config={{
-                  vendas: { label: "Vendas", color: "hsl(var(--chart-1))" },
-                  pontos: { label: "Pontos", color: "hsl(var(--chart-2))" }
+                  vendas: { label: "Vendas", color: "#3e2626" },
+                  pontos: { label: "Pontos", color: "#8B4513" }
                 }}>
                   <BarChart data={dashboardData.employeePerformance}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -942,7 +968,7 @@ export default function StoreDetailsPage() {
                     <YAxis />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <ChartLegend content={<ChartLegendContent />} />
-                    <Bar dataKey="vendas" fill="var(--color-vendas)" />
+                    <Bar dataKey="vendas" fill="#3e2626" />
                   </BarChart>
                 </ChartContainer>
               </CardContent>
@@ -1212,6 +1238,7 @@ export default function StoreDetailsPage() {
                         <TableRow>
                           <TableHead>Funcionário</TableHead>
                           <TableHead>Cargo</TableHead>
+                          <TableHead>Salário</TableHead>
                           <TableHead>Contato</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Admissão</TableHead>
@@ -1235,17 +1262,23 @@ export default function StoreDetailsPage() {
                         </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className={
-                                employee.role === 'GERENTE' ? 'bg-red-50 text-red-700 border-red-200' :
-                                employee.role === 'SUPERVISOR' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                employee.role === 'VENDEDOR' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                employee.role === 'CAIXA' ? 'bg-green-50 text-green-700 border-green-200' :
-                                employee.role === 'ESTOQUISTA' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                                employee.role === 'ATENDENTE' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                                'bg-gray-50 text-gray-700 border-gray-200'
-                              }>
-                                {employee.role}
+                              <Badge
+                                variant="outline"
+                                className={
+                                  employee.role === 'STORE_MANAGER'
+                                    ? 'bg-red-50 text-red-700 border-red-200'
+                                    : 'bg-gray-50 text-gray-700 border-gray-200'
+                                }
+                              >
+                                {getEmployeeDisplayRole(employee)}
                               </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm font-medium text-gray-900">
+                                {employee.salary 
+                                  ? `R$ ${typeof employee.salary === 'string' ? parseFloat(employee.salary).toFixed(2) : employee.salary.toFixed(2)}`
+                                  : 'Não informado'}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="text-sm">
@@ -1319,7 +1352,67 @@ export default function StoreDetailsPage() {
                             <Button 
                               variant="outline" 
                               size="sm"
-                                  onClick={() => router.push(`/admin/stores/${storeId}/termination?employeeId=${employee.id}`)}
+                              onClick={() => {
+                                // Definir funcionário selecionado e preencher dados padrão de promoção
+                                setSelectedEmployee(employee);
+
+                                // Mapear role atual para novo cargo (apenas Gerente ou Funcionário)
+                                const currentRole =
+                                  employee.role === 'STORE_MANAGER'
+                                    ? 'STORE_MANAGER'
+                                    : 'EMPLOYEE';
+
+                                // Salário atual (se existir)
+                                const currentSalary = employee.salary
+                                  ? (typeof employee.salary === 'string'
+                                      ? parseFloat(employee.salary)
+                                      : employee.salary)
+                                  : 0;
+
+                                setPromotionData({
+                                  newPosition: currentRole,
+                                  newSalary: currentSalary > 0 ? currentSalary.toString() : ''
+                                });
+
+                                setShowPromotionModal(true);
+                              }}
+                              title="Promover funcionário"
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <PromoteIcon className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={async () => {
+                                // Carregar dados completos do funcionário antes de abrir o modal
+                                try {
+                                  const response = await fetch(`http://localhost:3001/api/admin/users/${employee.id}`, {
+                                    headers: {
+                                      'Authorization': `Bearer ${token}`,
+                                      'Content-Type': 'application/json'
+                                    }
+                                  });
+                                  
+                                  if (response.ok) {
+                                    const fullEmployeeData = await response.json();
+                                    console.log('💰 Funcionário carregado para demissão:', fullEmployeeData);
+                                    setSelectedEmployee(fullEmployeeData);
+                                    setShowTerminationModal(true);
+                                  } else {
+                                    // Se der erro, usar os dados que já temos
+                                    console.warn('⚠️ Erro ao carregar dados completos, usando dados da lista');
+                                    setSelectedEmployee(employee);
+                                    setShowTerminationModal(true);
+                                  }
+                                } catch (error) {
+                                  console.error('Erro ao carregar dados do funcionário:', error);
+                                  // Se der erro, usar os dados que já temos
+                                  setSelectedEmployee(employee);
+                                  setShowTerminationModal(true);
+                                }
+                              }}
                               title="Processar demissão"
                               className="text-red-600 hover:text-red-700"
                             >
@@ -1613,6 +1706,149 @@ export default function StoreDetailsPage() {
         employee={selectedEmployee}
         isLoading={isProcessingTermination}
       />
+
+      {/* Modal de Promoção */}
+      {showPromotionModal && selectedEmployee && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="relative w-full max-w-md mx-3 rounded-xl bg-white shadow-xl border border-gray-200">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white rounded-t-xl">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+                Promover Funcionário
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setShowPromotionModal(false);
+                  setSelectedEmployee(null);
+                  setPromotionData({ newPosition: '', newSalary: '' });
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="px-4 pt-3 pb-2 bg-gray-50 border-b border-gray-200 space-y-1">
+              <p className="text-xs sm:text-sm text-gray-800">
+                <span className="font-semibold">Funcionário:</span> {selectedEmployee.name}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-700">
+                <span className="font-semibold">Cargo atual:</span>{' '}
+                {selectedEmployee.role === 'STORE_MANAGER' ? 'Gerente' : 'Funcionário'}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-700">
+                <span className="font-semibold">Salário atual:</span>{' '}
+                {selectedEmployee.salary
+                  ? `R$ ${
+                      typeof selectedEmployee.salary === 'string'
+                        ? parseFloat(selectedEmployee.salary).toFixed(2).replace('.', ',')
+                        : selectedEmployee.salary.toFixed(2).replace('.', ',')
+                    }`
+                  : 'Não informado'}
+              </p>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!promotionData.newPosition || !promotionData.newSalary) {
+                  alert('Por favor, preencha todos os campos obrigatórios.');
+                  return;
+                }
+                handlePromotion({
+                  newPosition: promotionData.newPosition,
+                  newSalary: parseFloat(promotionData.newSalary)
+                });
+              }}
+              className="px-4 py-4 space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="newPosition" className="text-sm font-medium text-gray-800">
+                  Novo Cargo *
+                </Label>
+                <Select 
+                  value={promotionData.newPosition} 
+                  onValueChange={(value) => setPromotionData(prev => ({ ...prev, newPosition: value }))}
+                >
+                  <SelectTrigger id="newPosition">
+                    <SelectValue placeholder="Selecione o novo cargo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="STORE_MANAGER">Gerente</SelectItem>
+                    <SelectItem value="EMPLOYEE">Funcionário</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newSalary" className="text-sm font-medium text-gray-800">
+                  Novo Salário (R$) *
+                </Label>
+                <Select 
+                  value={promotionData.newSalary} 
+                  onValueChange={(value) => setPromotionData(prev => ({ ...prev, newSalary: value }))}
+                >
+                  <SelectTrigger id="newSalary">
+                    <SelectValue placeholder="Selecione o novo salário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1200">R$ 1.200,00</SelectItem>
+                    <SelectItem value="1500">R$ 1.500,00</SelectItem>
+                    <SelectItem value="1800">R$ 1.800,00</SelectItem>
+                    <SelectItem value="2000">R$ 2.000,00</SelectItem>
+                    <SelectItem value="2500">R$ 2.500,00</SelectItem>
+                    <SelectItem value="3000">R$ 3.000,00</SelectItem>
+                    <SelectItem value="3500">R$ 3.500,00</SelectItem>
+                    <SelectItem value="4000">R$ 4.000,00</SelectItem>
+                    <SelectItem value="4500">R$ 4.500,00</SelectItem>
+                    <SelectItem value="5000">R$ 5.000,00</SelectItem>
+                    <SelectItem value="6000">R$ 6.000,00</SelectItem>
+                    <SelectItem value="7000">R$ 7.000,00</SelectItem>
+                    <SelectItem value="8000">R$ 8.000,00</SelectItem>
+                    <SelectItem value="10000">R$ 10.000,00</SelectItem>
+                    <SelectItem value="12000">R$ 12.000,00</SelectItem>
+                    <SelectItem value="15000">R$ 15.000,00</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100 mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowPromotionModal(false);
+                    setSelectedEmployee(null);
+                    setPromotionData({ newPosition: '', newSalary: '' });
+                  }}
+                  disabled={isProcessingPromotion}
+                  className="border-gray-300"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                  disabled={isProcessingPromotion}
+                >
+                  {isProcessingPromotion ? (
+                    <>
+                      <Loader size={16} className="mr-2" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <PromoteIcon className="h-4 w-4 mr-2" />
+                      Promover
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Edição de Loja - Overlay Fullscreen */}
       {isEditModalOpen && editFormData && (

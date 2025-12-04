@@ -157,6 +157,28 @@ export const adminAPI = {
     return response.json();
   },
 
+  promoteEmployee: async (employeeId: string, promotionData: { newPosition?: string; newSalary?: number }) => {
+    const token = useAppStore.getState().token || localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.');
+    }
+    const response = await fetch(`${API_BASE_URL}/admin/employees/${employeeId}/promote`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(promotionData)
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(error.message || `Erro ao promover funcionário: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
   updateEmployee: async (employeeId: string, data: any) => {
     const token = useAppStore.getState().token || localStorage.getItem('token');
     if (!token) {
