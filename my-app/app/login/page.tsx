@@ -32,6 +32,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [loginStep, setLoginStep] = useState<'email' | 'password' | 'userInfo' | 'processing' | 'complete' | 'forgotPassword' | 'resetCode' | 'resetPassword'>('email');
+  const [passwordAttempts, setPasswordAttempts] = useState(0);
   const redirectPath = searchParams.get('redirect') || null;
   const messageParam = searchParams.get('message') || null;
   const [credentials, setCredentials] = useState({ 
@@ -279,6 +280,7 @@ export default function LoginPage() {
         if (emailCheck.exists) {
           // Resetar estado de mostrar senha
           setShowPassword(false);
+          setPasswordAttempts(0);
           setLoginStep('password');
           simulateTyping('Agora digite sua senha:', 1000);
         } else {
@@ -661,23 +663,25 @@ export default function LoginPage() {
         }, 2500);
       } catch (error: unknown) {
         console.error('Erro no login:', error);
-        
+
+        // Incrementar tentativas de senha
+        const nextAttempts = passwordAttempts + 1;
+        setPasswordAttempts(nextAttempts);
+
         // Determinar o tipo de erro e mostrar mensagem apropriada
         let errorMessage = '';
         let needsEmailReset = false;
-        
+
         if ((error as any)?.response?.data?.message) {
           const backendMessage = (error as any).response.data.message;
           // Traduzir mensagens técnicas para mensagens mais amigáveis
           if (backendMessage.toLowerCase().includes('unauthorized') || backendMessage === 'Unauthorized') {
             errorMessage = '❌ Email ou senha incorretos. Verifique suas credenciais e tente novamente.';
-            needsEmailReset = true;
           } else if (backendMessage.includes('Email não encontrado')) {
             errorMessage = '❌ Este email não está cadastrado em nosso sistema.';
             needsEmailReset = true;
           } else if (backendMessage.includes('Senha incorreta') || backendMessage.toLowerCase().includes('senha')) {
             errorMessage = '❌ A senha informada está incorreta. Por favor, verifique e tente novamente.';
-            needsEmailReset = true;
           } else if (backendMessage.includes('Usuário inativo')) {
             errorMessage = '❌ Sua conta está desativada. Entre em contato com o suporte para reativar.';
             needsEmailReset = true;
@@ -691,7 +695,6 @@ export default function LoginPage() {
         } else if ((error as any)?.response?.status === 401) {
           // Erro genérico 401 - pode ser email ou senha
           errorMessage = '❌ Email ou senha incorretos. Verifique suas credenciais e tente novamente.';
-          needsEmailReset = true;
         } else if ((error as any)?.response?.status === 429) {
           errorMessage = '⚠️ Muitas tentativas de login. Aguarde alguns minutos antes de tentar novamente.';
           needsEmailReset = true;
@@ -702,24 +705,42 @@ export default function LoginPage() {
         
         // Mostrar mensagem de erro
         simulateTyping(errorMessage, 2000);
-        
-        // Se precisar resetar, voltar para o passo do email
-        if (needsEmailReset) {
+
+        // Regras de fluxo após erro de senha:
+        // - Até 3 tentativas: manter email e pedir senha novamente
+        // - A partir da 3ª tentativa: voltar para o passo do email
+        if (!needsEmailReset && nextAttempts < 3) {
+          const remaining = 3 - nextAttempts;
           setTimeout(() => {
-            simulateTyping('🔐 Por favor, digite seu email novamente para tentar fazer login:', 1500);
+            simulateTyping(
+              `Você ainda tem ${remaining} tentativa${remaining > 1 ? 's' : ''} para informar a senha correta.`,
+              1500
+            );
+            simulateTyping('Digite sua senha novamente:', 1500);
+            setLoginStep('password');
+            setShowPassword(false);
+          }, 2200);
+        } else {
+          // Forçar retorno para o email após 3 tentativas ou erros críticos
+          setTimeout(() => {
+            simulateTyping(
+              '🔐 Por segurança, precisamos que você informe seu email novamente para continuar o login.',
+              1500
+            );
             setLoginStep('email');
             setShowPassword(false);
-            setCredentials({ 
-              email: '', 
-              password: '', 
-              name: '', 
-              phone: '', 
+            setCredentials({
+              email: '',
+              password: '',
+              name: '',
+              phone: '',
               cpf: '',
-              address: '', 
-              city: '', 
-              state: '', 
-              zipCode: '' 
+              address: '',
+              city: '',
+              state: '',
+              zipCode: '',
             });
+            setPasswordAttempts(0);
           }, 2500);
         }
       }

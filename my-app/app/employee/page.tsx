@@ -376,11 +376,11 @@ export default function EmployeeDashboard() {
       icon: ShoppingCart,
     },
     {
-      name: 'Pedidos online',
-      description: 'Gerencie pedidos para retirada na loja.',
-      href: '/employee/orders-online',
-      indicator: 'Acompanhar entregas',
-      icon: Truck,
+      name: 'Catálogo de produtos',
+      description: 'Consulte e apresente os produtos da loja aos clientes.',
+      href: '/employee/products',
+      indicator: 'Visualizar catálogo',
+      icon: Package,
     },
     {
       name: 'Histórico de vendas',
@@ -457,7 +457,7 @@ export default function EmployeeDashboard() {
                 Bem-vindo ao seu painel de trabalho
               </h1>
               <p className="text-sm text-primary-foreground/80 lg:text-base">
-                Acompanhe suas vendas, registre seu ponto e gerencie pedidos online em tempo real.
+                Acompanhe suas vendas, registre seu ponto e consulte rapidamente o catálogo de produtos da loja.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">

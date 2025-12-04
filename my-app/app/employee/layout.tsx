@@ -68,6 +68,9 @@ function ProductsHeaderComponent({
             className="hidden items-center gap-3 rounded-2xl border border-border bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50 sm:flex"
           >
             <Avatar className="h-8 w-8">
+              {user?.avatarUrl && (
+                <AvatarImage src={user.avatarUrl} alt={user.name || 'Funcionário'} />
+              )}
               <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
                 {user?.name?.charAt(0)?.toUpperCase() || 'F'}
               </AvatarFallback>
@@ -278,6 +281,9 @@ export default function EmployeeLayout({
                 className="flex w-full items-center gap-3 rounded-2xl bg-muted/40 p-3 transition-colors hover:bg-muted/60"
               >
                 <Avatar className="h-10 w-10">
+                  {user?.avatarUrl && (
+                    <AvatarImage src={user.avatarUrl} alt={user.name || 'Funcionário'} />
+                  )}
                   <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
                     {user?.name?.charAt(0)?.toUpperCase() || 'F'}
                   </AvatarFallback>
