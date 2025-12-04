@@ -28,6 +28,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentModule } from './payment/payment.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { ShippingModule } from './shipping/shipping.module';
+import { MqttModule } from './mqtt/mqtt.module';
 
 
 @Module({
@@ -66,6 +67,7 @@ import { ShippingModule } from './shipping/shipping.module';
     PaymentModule,
     CouponsModule,
     ShippingModule,
+    MqttModule,
   ],
   controllers: [AppController],
   providers: [AppService, TimeClockService],
