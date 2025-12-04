@@ -208,6 +208,8 @@ interface AppState {
   // UI State
   isLoading: boolean;
   error: string | null;
+  // Guest cart metadata
+  guestCartLastUpdated?: number | null;
   
   // Actions
   setUser: (user: User | null) => void;
@@ -253,10 +255,15 @@ export const useAppStore = create<AppState>()(
       currentAnalysis: null,
       isLoading: false,
       error: null,
+      guestCartLastUpdated: null,
 
       // Auth actions
       setUser: (user) => {
         console.log('Store setUser called with:', user);
+        const wasAuthenticated = get().isAuthenticated;
+        const previousGuestCart = !wasAuthenticated ? get().cart : [];
+        const guestCartLastUpdated = get().guestCartLastUpdated ?? null;
+
         set({ user, isAuthenticated: !!user });
         
         // Se o usuário fez login, carregar o carrinho do backend (em background)
@@ -264,10 +271,7 @@ export const useAppStore = create<AppState>()(
         if (user && typeof window !== 'undefined') {
           const userRole = user.role?.toUpperCase();
           const isCustomer = userRole === 'CUSTOMER' || userRole === 'ADMIN';
-          
-          // Limpar carrinho local PRIMEIRO para evitar conflitos
-          set({ cart: [], cartTotal: 0 });
-          
+
           // Se não for customer/admin, não tentar carregar carrinho
           if (!isCustomer) {
             console.log(`ℹ️ Usuário com role ${userRole} não precisa de carrinho de customer, pulando carregamento.`);
@@ -306,8 +310,40 @@ export const useAppStore = create<AppState>()(
                 console.warn('⚠️ Token não disponível ainda, aguardando...');
                 await new Promise(resolve => setTimeout(resolve, 500));
               }
-              
+
               const { customerAPI } = await import('./api');
+
+              // ==================== MIGRAR CARRINHO DE CONVIDADO (ATÉ 30 MIN) ====================
+              let migratedGuestItems: CartItem[] = [];
+              if (previousGuestCart && previousGuestCart.length > 0 && guestCartLastUpdated) {
+                const diffMs = Date.now() - guestCartLastUpdated;
+                const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+                if (diffMs <= THIRTY_MINUTES_MS) {
+                  console.log('🛒 Migrando carrinho de convidado para conta autenticada...', {
+                    items: previousGuestCart.length,
+                    minutesAgo: Math.round(diffMs / 60000),
+                  });
+                  for (const item of previousGuestCart) {
+                    try {
+                      await customerAPI.addToCart(item.product.id, item.quantity);
+                      migratedGuestItems.push(item);
+                    } catch (migrateError: any) {
+                      console.error('❌ Erro ao migrar item do carrinho convidado:', {
+                        productId: item.product.id,
+                        error: migrateError?.message,
+                        status: migrateError?.response?.status,
+                      });
+                    }
+                  }
+                } else {
+                  console.log('⏱️ Carrinho de convidado expirado, não será migrado.');
+                }
+              }
+
+              // Limpar estado de carrinho convidado após tentativa de migração
+              set({ cart: [], cartTotal: 0, guestCartLastUpdated: null });
+
+              // ==================== BUSCAR CARRINHO DO BACKEND ====================
               const cartData = await customerAPI.getCart();
               
               console.log('📦 Dados do carrinho recebidos do backend:', cartData);
@@ -398,7 +434,7 @@ export const useAppStore = create<AppState>()(
                 status: error.response?.status
               });
               // Continuar mesmo se houver erro, mas manter carrinho vazio
-              set({ cart: [], cartTotal: 0 });
+              set({ cart: [], cartTotal: 0, guestCartLastUpdated: null });
             }
           })();
         } else if (!user) {
@@ -469,7 +505,7 @@ export const useAppStore = create<AppState>()(
             (total, item) => total + (Number(item.product.price) * item.quantity),
             0
           );
-          set({ cart: updatedCart, cartTotal });
+          set({ cart: updatedCart, cartTotal, guestCartLastUpdated: Date.now() });
           return;
         }
 

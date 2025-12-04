@@ -1,280 +1,269 @@
+'use client';
+
 import React from 'react';
-import styled from 'styled-components';
-
-const StyledWrapper = styled.div`
-  .loadingspinner {
-    --square: 26px;
-    --offset: 30px;
-    --duration: 2.4s;
-    --delay: 0.2s;
-    --timing-function: ease-in-out;
-    --in-duration: 0.4s;
-    --in-delay: 0.1s;
-    --in-timing-function: ease-out;
-
-    width: calc(3 * var(--offset) + var(--square));
-    height: calc(2 * var(--offset) + var(--square));
-    padding: 0px;
-    margin-left: auto;
-    margin-right: auto;
-    margin-top: 10px;
-    margin-bottom: 30px;
-    position: relative;
-  }
-
-  .loadingspinner div {
-    display: inline-block;
-    background: #3e2626;
-    border: none;
-    border-radius: 2px;
-    width: var(--square);
-    height: var(--square);
-    position: absolute;
-    padding: 0px;
-    margin: 0px;
-    font-size: 6pt;
-    color: black;
-  }
-
-  .loadingspinner #square1 {
-    left: calc(0 * var(--offset));
-    top: calc(0 * var(--offset));
-    animation: square1 var(--duration) var(--delay) var(--timing-function) infinite,
-      squarefadein var(--in-duration) calc(1 * var(--in-delay)) var(--in-timing-function) both;
-  }
-
-  .loadingspinner #square2 {
-    left: calc(0 * var(--offset));
-    top: calc(1 * var(--offset));
-    animation: square2 var(--duration) var(--delay) var(--timing-function) infinite,
-      squarefadein var(--in-duration) calc(1 * var(--in-delay)) var(--in-timing-function) both;
-  }
-
-  .loadingspinner #square3 {
-    left: calc(1 * var(--offset));
-    top: calc(1 * var(--offset));
-    animation: square3 var(--duration) var(--delay) var(--timing-function) infinite,
-      squarefadein var(--in-duration) calc(2 * var(--in-delay)) var(--in-timing-function) both;
-  }
-
-  .loadingspinner #square4 {
-    left: calc(2 * var(--offset));
-    top: calc(1 * var(--offset));
-    animation: square4 var(--duration) var(--delay) var(--timing-function) infinite,
-      squarefadein var(--in-duration) calc(3 * var(--in-delay)) var(--in-timing-function) both;
-  }
-
-  .loadingspinner #square5 {
-    left: calc(3 * var(--offset));
-    top: calc(1 * var(--offset));
-    animation: square5 var(--duration) var(--delay) var(--timing-function) infinite,
-      squarefadein var(--in-duration) calc(4 * var(--in-delay)) var(--in-timing-function) both;
-  }
-
-  @keyframes square1 {
-    0% {
-      left: calc(0 * var(--offset));
-      top: calc(0 * var(--offset));
-    }
-
-    8.333% {
-      left: calc(0 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    100% {
-      left: calc(0 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-  }
-
-  @keyframes square2 {
-    0% {
-      left: calc(0 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    8.333% {
-      left: calc(0 * var(--offset));
-      top: calc(2 * var(--offset));
-    }
-
-    16.67% {
-      left: calc(1 * var(--offset));
-      top: calc(2 * var(--offset));
-    }
-
-    25.00% {
-      left: calc(1 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    83.33% {
-      left: calc(1 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    91.67% {
-      left: calc(1 * var(--offset));
-      top: calc(0 * var(--offset));
-    }
-
-    100% {
-      left: calc(0 * var(--offset));
-      top: calc(0 * var(--offset));
-    }
-  }
-
-  @keyframes square3 {
-    0%,
-    100% {
-      left: calc(1 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    16.67% {
-      left: calc(1 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    25.00% {
-      left: calc(1 * var(--offset));
-      top: calc(0 * var(--offset));
-    }
-
-    33.33% {
-      left: calc(2 * var(--offset));
-      top: calc(0 * var(--offset));
-    }
-
-    41.67% {
-      left: calc(2 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    66.67% {
-      left: calc(2 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    75.00% {
-      left: calc(2 * var(--offset));
-      top: calc(2 * var(--offset));
-    }
-
-    83.33% {
-      left: calc(1 * var(--offset));
-      top: calc(2 * var(--offset));
-    }
-
-    91.67% {
-      left: calc(1 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-  }
-
-  @keyframes square4 {
-    0% {
-      left: calc(2 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    33.33% {
-      left: calc(2 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    41.67% {
-      left: calc(2 * var(--offset));
-      top: calc(2 * var(--offset));
-    }
-
-    50.00% {
-      left: calc(3 * var(--offset));
-      top: calc(2 * var(--offset));
-    }
-
-    58.33% {
-      left: calc(3 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    100% {
-      left: calc(3 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-  }
-
-  @keyframes square5 {
-    0% {
-      left: calc(3 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    50.00% {
-      left: calc(3 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    58.33% {
-      left: calc(3 * var(--offset));
-      top: calc(0 * var(--offset));
-    }
-
-    66.67% {
-      left: calc(2 * var(--offset));
-      top: calc(0 * var(--offset));
-    }
-
-    75.00% {
-      left: calc(2 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-
-    100% {
-      left: calc(2 * var(--offset));
-      top: calc(1 * var(--offset));
-    }
-  }
-
-  @keyframes squarefadein {
-    0% {
-      transform: scale(0.75);
-      opacity: 0.0;
-    }
-
-    100% {
-      transform: scale(1.0);
-      opacity: 1.0;
-    }
-  }
-`;
+import { cn } from '@/lib/utils';
 
 export type LoaderProps = {
-  size?: number;
+  size?: number | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  variant?: 'default' | 'spinner' | 'dots' | 'pulse' | 'ring';
+  text?: string;
 };
 
-export const Loader = ({ className, size = 16 }: LoaderProps) => {
-  // Calcula o scale baseado no tamanho padrão (16px)
-  const scale = size / 16;
+const sizeMap = {
+  sm: 20,
+  md: 32,
+  lg: 48,
+  xl: 64,
+};
+
+export const Loader = ({ 
+  className, 
+  size = 'md',
+  variant = 'default',
+  text
+}: LoaderProps) => {
+  const numericSize = typeof size === 'number' ? size : sizeMap[size];
+  
+  const renderLoader = () => {
+    switch (variant) {
+      case 'spinner':
+        return <SpinnerLoader size={numericSize} />;
+      case 'dots':
+        return <DotsLoader size={numericSize} />;
+      case 'pulse':
+        return <PulseLoader size={numericSize} />;
+      case 'ring':
+        return <RingLoader size={numericSize} />;
+      default:
+        return <SpinnerLoader size={numericSize} />;
+    }
+  };
+
+  return (
+    <>
+      <LoaderStyles />
+      <div className={cn("flex flex-col items-center justify-center", className)}>
+        <div 
+          className="relative"
+          style={{ 
+            width: `${numericSize}px`,
+            height: `${numericSize}px`,
+          }}
+        >
+          {renderLoader()}
+        </div>
+        {text && (
+          <p className="mt-4 text-sm font-light text-muted-foreground tracking-wide">
+            {text}
+          </p>
+        )}
+      </div>
+    </>
+  );
+};
+
+// Componente para injetar os estilos CSS
+const LoaderStyles = () => (
+  <style dangerouslySetInnerHTML={{
+    __html: `
+      @keyframes loader-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes loader-dot-bounce {
+        0%, 80%, 100% {
+          transform: translateY(0);
+          opacity: 0.4;
+        }
+        40% {
+          transform: translateY(-12px);
+          opacity: 1;
+        }
+      }
+      @keyframes loader-pulse-ring {
+        0% {
+          transform: scale(0.8);
+          opacity: 0.6;
+        }
+        50% {
+          opacity: 0.2;
+        }
+        100% {
+          transform: scale(1.2);
+          opacity: 0;
+        }
+      }
+      @keyframes loader-pulse-core {
+        0%, 100% {
+          transform: scale(1);
+          opacity: 0.6;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 1;
+        }
+      }
+    `
+  }} />
+);
+
+// Spinner Loader - Elegante e minimalista
+const SpinnerLoader = ({ size }: { size: number }) => {
+  const strokeWidth = Math.max(2, size / 16);
+  const radius = (size - strokeWidth) / 2 - 4;
+  const circumference = 2 * Math.PI * radius;
+  const offset1 = circumference * 0.75;
+  const offset2 = circumference * 0.25;
   
   return (
-    <StyledWrapper 
-      className={className} 
-      style={{ 
-        display: 'inline-block',
-        transform: `scale(${scale})`,
-        transformOrigin: 'center center'
-      }}
-    >
-      <div className="loadingspinner">
-        <div id="square1" />
-        <div id="square2" />
-        <div id="square3" />
-        <div id="square4" />
-        <div id="square5" />
-      </div>
-    </StyledWrapper>
+    <div className="relative w-full h-full flex items-center justify-center">
+      <svg
+        className="animate-spin"
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        style={{ animation: 'loader-spin 1s linear infinite' }}
+      >
+        <defs>
+          <linearGradient id="spinner-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="hsl(var(--primary))" />
+            <stop offset="50%" stopColor="hsl(var(--muted-foreground))" />
+            <stop offset="100%" stopColor="hsl(var(--primary))" />
+          </linearGradient>
+        </defs>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="url(#spinner-gradient)"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset1}
+          className="opacity-60"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--primary))"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset2}
+          className="opacity-100"
+        />
+      </svg>
+    </div>
+  );
+};
+
+// Dots Loader - Três pontos elegantes
+const DotsLoader = ({ size }: { size: number }) => {
+  const dotSize = size / 5;
+  const bounceHeight = size / 4;
+  
+  const dotStyle = (delay: number, opacity: number): React.CSSProperties => ({
+    width: `${dotSize}px`,
+    height: `${dotSize}px`,
+    borderRadius: '50%',
+    backgroundColor: 'hsl(var(--primary))',
+    animation: 'loader-dot-bounce 1.4s ease-in-out infinite',
+    animationDelay: `${delay}s`,
+    opacity,
+  });
+  
+  return (
+    <div className="relative w-full h-full flex items-center justify-center gap-2">
+      <div style={dotStyle(0, 0.6)} />
+      <div style={dotStyle(0.2, 0.8)} />
+      <div style={dotStyle(0.4, 1)} />
+    </div>
+  );
+};
+
+// Pulse Loader - Anel pulsante elegante
+const PulseLoader = ({ size }: { size: number }) => {
+  const ringStyle1: React.CSSProperties = {
+    position: 'absolute',
+    width: `${size}px`,
+    height: `${size}px`,
+    borderRadius: '50%',
+    border: '2px solid hsl(var(--primary))',
+    opacity: 0.2,
+    animation: 'loader-pulse-ring 2s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+  };
+  
+  const ringStyle2: React.CSSProperties = {
+    position: 'absolute',
+    width: `${size * 0.7}px`,
+    height: `${size * 0.7}px`,
+    borderRadius: '50%',
+    border: '2px solid hsl(var(--primary))',
+    opacity: 0.4,
+    animation: 'loader-pulse-ring 2s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+    animationDelay: '0.5s',
+  };
+  
+  const coreStyle: React.CSSProperties = {
+    position: 'absolute',
+    width: `${size / 4}px`,
+    height: `${size / 4}px`,
+    borderRadius: '50%',
+    backgroundColor: 'hsl(var(--primary))',
+    opacity: 0.6,
+    animation: 'loader-pulse-core 1.5s ease-in-out infinite',
+  };
+  
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      <div style={ringStyle1} />
+      <div style={ringStyle2} />
+      <div style={coreStyle} />
+    </div>
+  );
+};
+
+// Ring Loader - Anel rotativo minimalista
+const RingLoader = ({ size }: { size: number }) => {
+  const strokeWidth = Math.max(2, size / 12);
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * 0.7;
+  
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      <svg
+        width={size}
+        height={size}
+        className="animate-spin"
+        style={{ animation: 'loader-spin 1.2s linear infinite' }}
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--muted))"
+          strokeWidth={strokeWidth}
+          className="opacity-20"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--primary))"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="opacity-100"
+        />
+      </svg>
+    </div>
   );
 };

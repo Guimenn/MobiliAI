@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { adminAPI, salesAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { 
@@ -43,13 +44,21 @@ export default function ReportsPage() {
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [dailyReports, setDailyReports] = useState<any[]>([]);
   const [viewType, setViewType] = useState<ViewType>('daily');
-  const [filterMode, setFilterMode] = useState<FilterMode>('auto');
   const [specificDate, setSpecificDate] = useState<string>('');
   const [dateRangeStart, setDateRangeStart] = useState<string>('');
   const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
+  const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
+  
+  // Determinar filterMode automaticamente baseado nas datas
+  const filterMode: FilterMode = (specificDate || (dateRangeStart && dateRangeEnd)) ? 'specific' : 'auto';
+  // Cache para evitar buscar tudo de novo ao trocar tipo de visualização/filtros
+  const [allSalesCache, setAllSalesCache] = useState<any[] | null>(null);
+  const [savedReportsCache, setSavedReportsCache] = useState<any[] | null>(null);
 
   useEffect(() => {
-    loadReportsData();
+    // Ao trocar tipo de visualização/filtros, reaproveitar dados em cache
+    // e apenas recalcular períodos, sem necessariamente refazer todas as requisições.
+    loadReportsData(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewType, filterMode, specificDate, dateRangeStart, dateRangeEnd]);
 
@@ -58,7 +67,8 @@ export default function ReportsPage() {
     if (viewType === 'daily' && filterMode === 'auto') {
       // Atualizar a cada 30 segundos para o dia de hoje
       const interval = setInterval(() => {
-        loadReportsData();
+        // Força recarregar pois podem ter entrado novas vendas
+        loadReportsData(true);
       }, 30000); // 30 segundos
 
       return () => clearInterval(interval);
@@ -219,12 +229,49 @@ export default function ReportsPage() {
     }
   };
 
+  // Utilitário para obter uma data "local" a partir de period/createdAt
+  // evitando problemas de timezone com strings no formato YYYY-MM-DD.
+  const getReportLocalDate = (report: any): Date => {
+    const { period, createdAt } = report || {};
+
+    if (period) {
+      if (typeof period === 'string') {
+        // Se for apenas data (YYYY-MM-DD), parse manual para manter como data local
+        const match = period.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (match) {
+          const year = Number(match[1]);
+          const month = Number(match[2]) - 1;
+          const day = Number(match[3]);
+          return new Date(year, month, day);
+        }
+      }
+
+      const d = new Date(period);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
+    if (createdAt) {
+      const d = new Date(createdAt);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
+    // Fallback: hoje normalizado
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  };
+
+  // Função helper para parsear string de data YYYY-MM-DD para Date local (evita problemas de timezone)
+  const parseLocalDate = (dateString: string): Date => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   // Função para agrupar relatórios por período e pegar apenas o mais recente de cada período
   const groupReportsByPeriod = (reports: any[], type: ViewType): any[] => {
     const periodMap = new Map<string, any>();
     
     reports.forEach((report) => {
-      const reportDate = new Date(report.period || report.createdAt);
+      const reportDate = getReportLocalDate(report);
       const periodKey = getPeriodKey(reportDate, type);
       
       // Se não existe relatório para este período, ou se este é mais recente, usar este
@@ -232,8 +279,8 @@ export default function ReportsPage() {
         periodMap.set(periodKey, report);
       } else {
         const existingReport = periodMap.get(periodKey);
-        const existingDate = new Date(existingReport.period || existingReport.createdAt);
-        const currentDate = new Date(report.period || report.createdAt);
+        const existingDate = getReportLocalDate(existingReport);
+        const currentDate = getReportLocalDate(report);
         
         // Se o relatório atual é mais recente, substituir
         if (currentDate > existingDate) {
@@ -246,24 +293,45 @@ export default function ReportsPage() {
   };
 
   // Função para gerar relatório dinamicamente baseado nas vendas do período
-  const generateReportFromSales = async (startDate: Date, endDate: Date, periodKey: string, type: ViewType): Promise<any> => {
+  // allSales (opcional) permite reutilizar o resultado de getSales para evitar múltiplas chamadas e melhorar performance
+  const generateReportFromSales = async (
+    startDate: Date,
+    endDate: Date,
+    periodKey: string,
+    type: ViewType,
+    allSales?: any[]
+  ): Promise<any> => {
     try {
-      // Buscar vendas do período usando a API
+      // Buscar vendas do período usando a API (ou lista já carregada)
       let periodSales: any[] = [];
-      
-      // Sempre tentar buscar todas as vendas primeiro como fallback mais confiável
+      let salesArray: any[] = [];
+
       try {
-        const allSales = await adminAPI.getSales();
-        const salesArray = Array.isArray(allSales) ? allSales : [];
-        
-        // Filtrar vendas do período
+        if (allSales && Array.isArray(allSales)) {
+          // Reutilizar vendas já carregadas (unificadas de todas as origens)
+          salesArray = allSales;
+        } else {
+          // Fallback: buscar todas as vendas usando o helper compartilhado
+          const fetchedFallback = await fetchSalesFallback();
+          salesArray = Array.isArray(fetchedFallback) ? fetchedFallback : [];
+        }
+
+        // Normalizar datas para comparação por DIA local (evita problemas de timezone)
+        const normalizedStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        const normalizedEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
         periodSales = salesArray.filter((sale: any) => {
           if (!sale || !sale.createdAt) return false;
-          const saleDate = new Date(sale.createdAt);
-          return isDateInRange(saleDate, startDate, endDate);
+          const rawSaleDate = new Date(sale.createdAt);
+          const saleLocalDate = new Date(
+            rawSaleDate.getFullYear(),
+            rawSaleDate.getMonth(),
+            rawSaleDate.getDate()
+          );
+          return isDateInRange(saleLocalDate, normalizedStart, normalizedEnd);
         });
-        
-        // Se não encontrou vendas, tentar a API específica por data
+
+        // Se não encontrou vendas, tentar a API específica por data (mantém compatibilidade)
         if (periodSales.length === 0) {
           try {
             const startDateStr = startDate.toISOString();
@@ -330,24 +398,47 @@ export default function ReportsPage() {
       const paymentMethodsData: any[] = [];
       
       if (periodSales.length > 0) {
-        // Agrupar vendas por data para o gráfico de receita por período
+        // Agrupar vendas por data ou hora para o gráfico de receita por período
         const salesMap = new Map<string, number>();
-        periodSales.forEach((sale: any) => {
-          const date = new Date(sale.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-          const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
-          const currentRevenue = salesMap.get(date) || 0;
-          salesMap.set(date, currentRevenue + Number(amount));
-        });
+        
+        if (type === 'daily') {
+          // Para visualização diária, agrupar por hora
+          periodSales.forEach((sale: any) => {
+            const saleDate = new Date(sale.createdAt);
+            const hour = saleDate.getHours();
+            const hourLabel = `${String(hour).padStart(2, '0')}:00`;
+            const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+            const currentRevenue = salesMap.get(hourLabel) || 0;
+            salesMap.set(hourLabel, currentRevenue + Number(amount));
+          });
 
-        // Converter para array e ordenar
-        salesByPeriodData.push(...Array.from(salesMap.entries())
-          .map(([date, revenue]) => ({ date, revenue }))
-          .sort((a, b) => {
-            const dateA = a.date.split('/').reverse().join('-');
-            const dateB = b.date.split('/').reverse().join('-');
-            return new Date(dateA).getTime() - new Date(dateB).getTime();
-          })
-          .slice(-7)); // Últimos 7 dias
+          // Converter para array e ordenar por hora
+          salesByPeriodData.push(...Array.from(salesMap.entries())
+            .map(([hour, revenue]) => ({ date: hour, revenue }))
+            .sort((a, b) => {
+              const hourA = parseInt(a.date.split(':')[0]);
+              const hourB = parseInt(b.date.split(':')[0]);
+              return hourA - hourB;
+            }));
+        } else {
+          // Para outros tipos, agrupar por data
+          periodSales.forEach((sale: any) => {
+            const date = new Date(sale.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+            const currentRevenue = salesMap.get(date) || 0;
+            salesMap.set(date, currentRevenue + Number(amount));
+          });
+
+          // Converter para array e ordenar
+          salesByPeriodData.push(...Array.from(salesMap.entries())
+            .map(([date, revenue]) => ({ date, revenue }))
+            .sort((a, b) => {
+              const dateA = a.date.split('/').reverse().join('-');
+              const dateB = b.date.split('/').reverse().join('-');
+              return new Date(dateA).getTime() - new Date(dateB).getTime();
+            })
+            .slice(-7)); // Últimos 7 dias
+        }
 
         // Agrupar produtos para o gráfico de top produtos
         const productsMap = new Map<string, { name: string; quantity: number; revenue: number }>();
@@ -548,13 +639,21 @@ export default function ReportsPage() {
     }
   };
 
-  const loadReportsData = async () => {
+  const loadReportsData = async (forceReload: boolean = false) => {
     try {
       setIsLoading(true);
       
-      // Buscar todos os relatórios
-      const savedReports = await adminAPI.getReports();
-      const reportsArray = Array.isArray(savedReports) ? savedReports : [];
+      // Buscar todos os relatórios, usando cache quando possível
+      let baseReports: any[] = [];
+      if (!forceReload && savedReportsCache && savedReportsCache.length > 0) {
+        baseReports = savedReportsCache;
+      } else {
+        const savedReports = await adminAPI.getReports();
+        baseReports = Array.isArray(savedReports) ? savedReports : [];
+        setSavedReportsCache(baseReports);
+      }
+
+      const reportsArray = [...baseReports];
 
       let filteredReports = [...reportsArray];
 
@@ -562,27 +661,158 @@ export default function ReportsPage() {
       if (filterMode === 'specific') {
         if (specificDate) {
           // Filtro por data específica
-          const targetDate = new Date(specificDate);
+          // Parsear data localmente para evitar problemas de timezone
+          const targetDate = parseLocalDate(specificDate);
           targetDate.setHours(0, 0, 0, 0);
           const endDate = new Date(targetDate);
           endDate.setHours(23, 59, 59, 999);
           
           filteredReports = filteredReports.filter((report) => {
-            const reportDate = new Date(report.period || report.createdAt);
-            reportDate.setHours(0, 0, 0, 0);
+            const reportDate = getReportLocalDate(report);
             return isDateInRange(reportDate, targetDate, endDate);
           });
+          
+          // Se não encontrou relatórios salvos, gerar um relatório virtual para essa data
+          if (filteredReports.length === 0) {
+            const key = getPeriodKey(targetDate, 'daily');
+            try {
+              // Carregar vendas apenas uma vez
+              const allSales = await fetchSalesFallback();
+              const virtualReport = await generateReportFromSales(targetDate, endDate, key, 'daily', allSales);
+              if (virtualReport) {
+                filteredReports = [virtualReport];
+              } else {
+                // Criar relatório vazio se não houver vendas
+                filteredReports = [{
+                  id: `empty-${key}`,
+                  name: `Relatório Diário - ${key}`,
+                  type: 'daily',
+                  period: key,
+                  status: 'completed',
+                  createdAt: new Date().toISOString(),
+                  data: {
+                    summary: {
+                      totalRevenue: 0,
+                      totalSales: 0,
+                      totalProfit: 0,
+                      averageTicket: 0,
+                      totalStores: 0,
+                      activeStores: 0,
+                    },
+                    stores: [],
+                    topProducts: [],
+                    topEmployees: [],
+                    paymentMethods: [],
+                    charts: {
+                      salesByPeriod: [],
+                      topProductsChart: [],
+                    },
+                  },
+                }];
+              }
+            } catch (error) {
+              console.error('Erro ao gerar relatório virtual para data específica:', error);
+            }
+          }
         } else if (dateRangeStart && dateRangeEnd) {
           // Filtro por período
-          const start = new Date(dateRangeStart);
+          // Parsear datas localmente para evitar problemas de timezone
+          const start = parseLocalDate(dateRangeStart);
           start.setHours(0, 0, 0, 0);
-          const end = new Date(dateRangeEnd);
+          const end = parseLocalDate(dateRangeEnd);
           end.setHours(23, 59, 59, 999);
           
           filteredReports = filteredReports.filter((report) => {
-            const reportDate = new Date(report.period || report.createdAt);
+            const reportDate = getReportLocalDate(report);
             return isDateInRange(reportDate, start, end);
           });
+          
+          // Determinar o tipo de agrupamento baseado no intervalo
+          const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          let groupingType: ViewType = 'daily';
+          if (diffDays > 365) {
+            groupingType = 'yearly';
+          } else if (diffDays > 31) {
+            groupingType = 'monthly';
+          } else if (diffDays > 7) {
+            groupingType = 'weekly';
+          }
+          
+          // Sempre gerar um relatório consolidado para o período inteiro
+          // Se encontrou relatórios salvos, verificar se algum já cobre o período completo
+          let hasConsolidatedReport = false;
+          if (filteredReports.length > 0) {
+            // Verificar se algum relatório salvo cobre exatamente o período
+            for (const report of filteredReports) {
+              const reportDate = getReportLocalDate(report);
+              const reportPeriodKey = getPeriodKey(reportDate, groupingType);
+              const expectedKey = getPeriodKey(start, groupingType);
+              if (reportPeriodKey === expectedKey) {
+                hasConsolidatedReport = true;
+                break;
+              }
+            }
+          }
+          
+          // Se não encontrou relatório consolidado, gerar um virtual
+          if (!hasConsolidatedReport) {
+            const key = getPeriodKey(start, groupingType);
+            try {
+              // Carregar vendas apenas uma vez
+              const allSales = await fetchSalesFallback();
+              const virtualReport = await generateReportFromSales(start, end, key, groupingType, allSales);
+              if (virtualReport) {
+                // Substituir os relatórios filtrados pelo consolidado
+                filteredReports = [virtualReport];
+              } else {
+                // Criar relatório vazio se não houver vendas
+                filteredReports = [{
+                  id: `empty-${key}`,
+                  name: `Relatório ${groupingType === 'daily' ? 'Diário' : groupingType === 'weekly' ? 'Semanal' : groupingType === 'monthly' ? 'Mensal' : 'Anual'} - ${key}`,
+                  type: groupingType,
+                  period: key,
+                  status: 'completed',
+                  createdAt: new Date().toISOString(),
+                  data: {
+                    summary: {
+                      totalRevenue: 0,
+                      totalSales: 0,
+                      totalProfit: 0,
+                      averageTicket: 0,
+                      totalStores: 0,
+                      activeStores: 0,
+                    },
+                    stores: [],
+                    topProducts: [],
+                    topEmployees: [],
+                    paymentMethods: [],
+                    charts: {
+                      salesByPeriod: [],
+                      topProductsChart: [],
+                    },
+                  },
+                }];
+              }
+            } catch (error) {
+              console.error('Erro ao gerar relatório virtual para período:', error);
+            }
+          } else {
+            // Se encontrou relatório consolidado, usar apenas ele
+            filteredReports = filteredReports.filter((report) => {
+              const reportDate = getReportLocalDate(report);
+              const reportPeriodKey = getPeriodKey(reportDate, groupingType);
+              const expectedKey = getPeriodKey(start, groupingType);
+              return reportPeriodKey === expectedKey;
+            });
+            // Se houver múltiplos, pegar o mais recente
+            if (filteredReports.length > 1) {
+              filteredReports = [filteredReports.sort((a, b) => {
+                const dateA = getReportLocalDate(a);
+                const dateB = getReportLocalDate(b);
+                return dateB.getTime() - dateA.getTime();
+              })[0]];
+            }
+          }
         } else {
           // Se não há filtro específico, não mostrar nada
           filteredReports = [];
@@ -605,7 +835,7 @@ export default function ReportsPage() {
         // Para cada período, manter apenas o relatório com maior receita
         const savedReportsByKey = new Map<string, any>();
         filteredReports.forEach(report => {
-          const reportDate = new Date(report.period || report.createdAt);
+          const reportDate = getReportLocalDate(report);
           const periodKey = getPeriodKey(reportDate, viewType);
           
           if (!savedReportsByKey.has(periodKey)) {
@@ -636,16 +866,16 @@ export default function ReportsPage() {
                 useCurrent = true;
               } else if (currentRevenue === existingRevenue) {
                 // Se a receita é igual, manter o mais recente
-                const existingDate = new Date(existing.period || existing.createdAt);
-                const currentDate = new Date(report.period || report.createdAt);
+                const existingDate = getReportLocalDate(existing);
+                const currentDate = getReportLocalDate(report);
                 if (currentDate > existingDate) {
                   useCurrent = true;
                 }
               }
             } catch (error) {
-              // Em caso de erro, manter o mais recente
-              const existingDate = new Date(existing.period || existing.createdAt);
-              const currentDate = new Date(report.period || report.createdAt);
+              // Em caso de erro, manter o mais recente usando datas locais
+              const existingDate = getReportLocalDate(existing);
+              const currentDate = getReportLocalDate(report);
               if (currentDate > existingDate) {
                 useCurrent = true;
               }
@@ -656,6 +886,22 @@ export default function ReportsPage() {
             }
           }
         });
+
+        // Carregar TODAS as vendas (PDV + online) apenas uma vez para melhorar performance,
+        // reutilizando cache sempre que possível.
+        let allSalesForAutoMode: any[] | undefined = undefined;
+        try {
+          if (!forceReload && allSalesCache && allSalesCache.length > 0) {
+            allSalesForAutoMode = allSalesCache;
+          } else {
+            const fetched = await fetchSalesFallback();
+            allSalesForAutoMode = Array.isArray(fetched) ? fetched : [];
+            setAllSalesCache(allSalesForAutoMode);
+          }
+        } catch (error) {
+          console.error('Erro ao buscar vendas para modo automático:', error);
+          allSalesForAutoMode = [];
+        }
 
         // Gerar relatórios para cada período esperado (em ordem sequencial)
         // Garantir que cada período tenha exatamente UM relatório
@@ -695,7 +941,7 @@ export default function ReportsPage() {
           // Especialmente para o dia de hoje
           let virtualReport: any = null;
           try {
-            virtualReport = await generateReportFromSales(start, end, key, viewType);
+            virtualReport = await generateReportFromSales(start, end, key, viewType, allSalesForAutoMode);
           } catch (error) {
             console.error(`Erro ao gerar relatório virtual para período ${key}:`, error);
           }
@@ -731,38 +977,45 @@ export default function ReportsPage() {
           } else if (savedReport) {
             finalReportsMap.set(key, savedReport);
           } else {
-            // Se não tem nenhum relatório, criar um relatório vazio para manter a sequência
-            // Mas apenas se for o dia de hoje ou se houver necessidade de mostrar todos os períodos
-            if (isToday) {
-              // Para o dia de hoje, sempre criar um relatório mesmo sem dados
-              const emptyReport = {
-                id: `empty-${key}`,
-                name: `Relatório ${viewType === 'daily' ? 'Diário' : viewType === 'weekly' ? 'Semanal' : viewType === 'monthly' ? 'Mensal' : 'Anual'} - ${key}`,
-                type: viewType,
-                period: key,
-                status: 'completed',
-                createdAt: new Date().toISOString(),
-                data: {
-                  summary: {
-                    totalRevenue: 0,
-                    totalSales: 0,
-                    totalProfit: 0,
-                    averageTicket: 0,
-                    totalStores: 0,
-                    activeStores: 0
-                  },
-                  stores: [],
-                  topProducts: [],
-                  topEmployees: [],
-                  paymentMethods: [],
-                  charts: {
-                    salesByPeriod: [],
-                    topProductsChart: []
-                  }
+            // Se não tem NENHUM relatório (salvo nem virtual), ainda assim
+            // queremos manter a sequência de períodos no modo automático.
+            // Isso garante que dias/semanas/meses sem vendas apareçam com
+            // receita/vendas zeradas na grade de "Relatórios Recentes".
+            const emptyReport = {
+              id: `empty-${key}`,
+              name: `Relatório ${
+                viewType === 'daily'
+                  ? 'Diário'
+                  : viewType === 'weekly'
+                    ? 'Semanal'
+                    : viewType === 'monthly'
+                      ? 'Mensal'
+                      : 'Anual'
+              } - ${key}`,
+              type: viewType,
+              period: key,
+              status: 'completed',
+              createdAt: new Date().toISOString(),
+              data: {
+                summary: {
+                  totalRevenue: 0,
+                  totalSales: 0,
+                  totalProfit: 0,
+                  averageTicket: 0,
+                  totalStores: 0,
+                  activeStores: 0
+                },
+                stores: [],
+                topProducts: [],
+                topEmployees: [],
+                paymentMethods: [],
+                charts: {
+                  salesByPeriod: [],
+                  topProductsChart: []
                 }
-              };
-              finalReportsMap.set(key, emptyReport);
-            }
+              }
+            };
+            finalReportsMap.set(key, emptyReport);
           }
         }
         
@@ -799,8 +1052,8 @@ export default function ReportsPage() {
       if (filterMode === 'specific') {
       // Ordenar por data (mais recente primeiro)
         filteredReports = filteredReports.sort((a, b) => {
-          const dateA = new Date(a.period || a.createdAt);
-          const dateB = new Date(b.period || b.createdAt);
+          const dateA = getReportLocalDate(a);
+          const dateB = getReportLocalDate(b);
           return dateB.getTime() - dateA.getTime();
         });
         
@@ -809,8 +1062,9 @@ export default function ReportsPage() {
           // Determinar o tipo baseado no intervalo
           let groupingType: ViewType = 'daily';
           if (dateRangeStart && dateRangeEnd) {
-            const start = new Date(dateRangeStart);
-            const end = new Date(dateRangeEnd);
+            // Parsear datas localmente para evitar problemas de timezone
+            const start = parseLocalDate(dateRangeStart);
+            const end = parseLocalDate(dateRangeEnd);
             const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
             
             if (diffDays > 365) {
@@ -838,15 +1092,15 @@ export default function ReportsPage() {
 
       // Ordenação final por data do período (mais recente primeiro)
       const finalSortedReports = processedReports.sort((a, b) => {
-        const dateA = new Date(a.period || a.createdAt);
-        const dateB = new Date(b.period || b.createdAt);
+        const dateA = getReportLocalDate(a);
+        const dateB = getReportLocalDate(b);
         return dateB.getTime() - dateA.getTime();
       });
 
       // Deduplicação final baseada no periodKey para garantir unicidade
       const uniqueReportsMap = new Map<string, any>();
       finalSortedReports.forEach((report) => {
-        const reportDate = new Date(report.period || report.createdAt);
+        const reportDate = getReportLocalDate(report);
         const periodKey = getPeriodKey(reportDate, viewType);
         
         // Se já existe um relatório para este período, manter o mais recente
@@ -854,8 +1108,8 @@ export default function ReportsPage() {
           uniqueReportsMap.set(periodKey, report);
         } else {
           const existingReport = uniqueReportsMap.get(periodKey);
-          const existingDate = new Date(existingReport.period || existingReport.createdAt);
-          const currentDate = new Date(report.period || report.createdAt);
+          const existingDate = getReportLocalDate(existingReport);
+          const currentDate = getReportLocalDate(report);
           
           if (currentDate > existingDate) {
             uniqueReportsMap.set(periodKey, report);
@@ -863,12 +1117,82 @@ export default function ReportsPage() {
         }
       });
 
-      // Converter de volta para array e manter a ordem
-      const uniqueReports = Array.from(uniqueReportsMap.values()).sort((a, b) => {
-        const dateA = new Date(a.period || a.createdAt);
-        const dateB = new Date(b.period || b.createdAt);
+      // Converter de volta para array e manter a ordem base
+      let uniqueReports = Array.from(uniqueReportsMap.values()).sort((a, b) => {
+        const dateA = getReportLocalDate(a);
+        const dateB = getReportLocalDate(b);
         return dateB.getTime() - dateA.getTime();
       });
+
+      // GARANTIR sempre 7 dias contínuos no modo automático diário,
+      // mesmo que não haja vendas/relatórios em alguns dias.
+      if (filterMode === 'auto' && viewType === 'daily') {
+        const maxReports = getMaxReports('daily');
+
+        // Mapa rápido por chave diária (YYYY-MM-DD)
+        const reportsByDayKey = new Map<string, any>();
+        uniqueReports.forEach((report) => {
+          const reportDate = getReportLocalDate(report);
+          const key = getPeriodKey(reportDate, 'daily');
+          if (!reportsByDayKey.has(key)) {
+            reportsByDayKey.set(key, report);
+          }
+        });
+
+        // Data local "hoje" normalizada
+        const now = new Date();
+        const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        const filledDailyReports: any[] = [];
+
+        for (let i = 0; i < maxReports; i++) {
+          const day = new Date(todayLocal);
+          day.setDate(day.getDate() - i);
+          const key = getPeriodKey(day, 'daily'); // YYYY-MM-DD
+
+          let reportForDay = reportsByDayKey.get(key);
+
+          // Se não existir relatório para esse dia, criar um "vazio"
+          if (!reportForDay) {
+            reportForDay = {
+              id: `auto-empty-${key}`,
+              name: `Relatório Diário - ${key}`,
+              type: 'daily',
+              period: key,
+              status: 'completed',
+              createdAt: new Date().toISOString(),
+              data: {
+                summary: {
+                  totalRevenue: 0,
+                  totalSales: 0,
+                  totalProfit: 0,
+                  averageTicket: 0,
+                  totalStores: 0,
+                  activeStores: 0,
+                },
+                stores: [],
+                topProducts: [],
+                topEmployees: [],
+                paymentMethods: [],
+                charts: {
+                  salesByPeriod: [],
+                  topProductsChart: [],
+                },
+              },
+            };
+          }
+
+          filledDailyReports.push(reportForDay);
+        }
+
+        // Já está na ordem [hoje, ontem, ...]; se quiser manter a
+        // ordenação descendente por data, podemos garantir aqui:
+        uniqueReports = filledDailyReports.sort((a, b) => {
+          const dateA = getReportLocalDate(a);
+          const dateB = getReportLocalDate(b);
+          return dateB.getTime() - dateA.getTime();
+        });
+      }
 
       setDailyReports(uniqueReports);
 
@@ -908,27 +1232,51 @@ export default function ReportsPage() {
   };
 
   const processSalesByPeriod = (sales: any[]) => {
-    // Agrupar vendas por data
+    // Agrupar vendas por data ou hora dependendo do tipo de visualização
     const salesMap = new Map();
     
-    sales.forEach(sale => {
-      const date = new Date(sale.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      const currentRevenue = salesMap.get(date) || 0;
-      salesMap.set(date, currentRevenue + Number(sale.totalAmount));
-    });
+    if (viewType === 'daily') {
+      // Para visualização diária, agrupar por hora
+      sales.forEach(sale => {
+        const saleDate = new Date(sale.createdAt);
+        const hour = saleDate.getHours();
+        const hourLabel = `${String(hour).padStart(2, '0')}:00`;
+        const currentRevenue = salesMap.get(hourLabel) || 0;
+        salesMap.set(hourLabel, currentRevenue + Number(sale.totalAmount));
+      });
 
-    // Converter para array e ordenar por data
-    const sortedSales = Array.from(salesMap.entries())
-      .map(([date, revenue]) => ({ date, revenue }))
-      .sort((a, b) => {
-        const dateA = a.date.split('/').reverse().join('-');
-        const dateB = b.date.split('/').reverse().join('-');
-        return new Date(dateA).getTime() - new Date(dateB).getTime();
-      })
-      .slice(-7); // Últimos 7 dias
+      // Converter para array e ordenar por hora
+      const sortedSales = Array.from(salesMap.entries())
+        .map(([hour, revenue]) => ({ date: hour, revenue }))
+        .sort((a, b) => {
+          const hourA = parseInt(a.date.split(':')[0]);
+          const hourB = parseInt(b.date.split(':')[0]);
+          return hourA - hourB;
+        });
 
-    setSalesByPeriod(sortedSales);
-    return sortedSales;
+      setSalesByPeriod(sortedSales);
+      return sortedSales;
+    } else {
+      // Para outros tipos, agrupar por data
+      sales.forEach(sale => {
+        const date = new Date(sale.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const currentRevenue = salesMap.get(date) || 0;
+        salesMap.set(date, currentRevenue + Number(sale.totalAmount));
+      });
+
+      // Converter para array e ordenar por data
+      const sortedSales = Array.from(salesMap.entries())
+        .map(([date, revenue]) => ({ date, revenue }))
+        .sort((a, b) => {
+          const dateA = a.date.split('/').reverse().join('-');
+          const dateB = b.date.split('/').reverse().join('-');
+          return new Date(dateA).getTime() - new Date(dateB).getTime();
+        })
+        .slice(-7); // Últimos 7 dias
+
+      setSalesByPeriod(sortedSales);
+      return sortedSales;
+    }
   };
 
   const processTopProducts = (sales: any[]) => {
@@ -1040,7 +1388,25 @@ export default function ReportsPage() {
     // Processar gráficos ANTES de definir currentReport para que apareçam imediatamente
     if (reportData.charts) {
       if (reportData.charts.salesByPeriod && Array.isArray(reportData.charts.salesByPeriod) && reportData.charts.salesByPeriod.length > 0) {
-        setSalesByPeriod(reportData.charts.salesByPeriod);
+        // Se for visualização diária, sempre reprocessar por hora se houver vendas disponíveis
+        if (viewType === 'daily') {
+          if (reportData.sales && Array.isArray(reportData.sales) && reportData.sales.length > 0) {
+            // Reprocessar por hora para garantir formato correto
+            processSalesByPeriod(reportData.sales);
+          } else {
+            // Se não há vendas, verificar se os dados salvos estão no formato de hora
+            const firstItem = reportData.charts.salesByPeriod[0];
+            const isHourFormat = firstItem?.date && firstItem.date.includes(':') && !firstItem.date.includes('/');
+            if (!isHourFormat) {
+              // Se não está no formato de hora, limpar para forçar reprocessamento
+              setSalesByPeriod([]);
+            } else {
+              setSalesByPeriod(reportData.charts.salesByPeriod);
+            }
+          }
+        } else {
+          setSalesByPeriod(reportData.charts.salesByPeriod);
+        }
       } else {
         setSalesByPeriod([]);
       }
@@ -1057,9 +1423,35 @@ export default function ReportsPage() {
       processSalesByPeriod(reportData.sales);
       processTopProducts(reportData.sales);
     } else {
-      // Inicializar vazios imediatamente
-      setSalesByPeriod([]);
-      setTopProducts([]);
+      // Se for visualização diária e não há vendas, mas há período no relatório, tentar buscar vendas
+      if (viewType === 'daily' && processedReport.period) {
+        // Tentar buscar vendas do período do relatório de forma assíncrona
+        const reportDate = getReportLocalDate(processedReport);
+        const dayStart = new Date(reportDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(reportDate);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        fetchSalesFallback().then((allSales) => {
+          const daySales = allSales.filter((sale: any) => {
+            if (!sale || !sale.createdAt) return false;
+            const saleDate = new Date(sale.createdAt);
+            const saleLocalDate = new Date(saleDate.getFullYear(), saleDate.getMonth(), saleDate.getDate());
+            return saleLocalDate.getTime() === reportDate.getTime();
+          });
+          if (daySales.length > 0) {
+            processSalesByPeriod(daySales);
+          } else {
+            setSalesByPeriod([]);
+          }
+        }).catch(() => {
+          setSalesByPeriod([]);
+        });
+      } else {
+        // Inicializar vazios imediatamente
+        setSalesByPeriod([]);
+        setTopProducts([]);
+      }
     }
 
     // Definir currentReport DEPOIS de processar os gráficos para que tudo apareça junto
@@ -1080,12 +1472,44 @@ export default function ReportsPage() {
     }
   };
 
+  // Helper centralizado para buscar TODAS as vendas (PDV + online) e unificar
   const fetchSalesFallback = async () => {
     try {
-      const sales = await adminAPI.getSales();
-      return Array.isArray(sales) ? sales : [];
+      // Buscar vendas de ambas as fontes em paralelo
+      const [adminSalesRaw, coreSalesRaw] = await Promise.allSettled([
+        adminAPI.getSales(),     // /admin/sales (tipicamente vendas "admin/online")
+        salesAPI.getAll(),       // /sales (PDV, caixa, etc.)
+      ]);
+
+      const adminSales =
+        adminSalesRaw.status === 'fulfilled' && Array.isArray(adminSalesRaw.value)
+          ? adminSalesRaw.value
+          : [];
+
+      const coreSales =
+        coreSalesRaw.status === 'fulfilled' && Array.isArray(coreSalesRaw.value)
+          ? coreSalesRaw.value
+          : [];
+
+      // Unificar e remover duplicados por id/saleNumber
+      const mergedMap = new Map<string, any>();
+      const all = [...adminSales, ...coreSales];
+
+      all.forEach((sale: any) => {
+        if (!sale) return;
+        const key =
+          sale.id ||
+          sale.saleId ||
+          sale.saleNumber ||
+          `${sale.storeId || 'store'}-${sale.createdAt || ''}-${sale.totalAmount || sale.total || 0}`;
+        if (!mergedMap.has(key)) {
+          mergedMap.set(key, sale);
+        }
+      });
+
+      return Array.from(mergedMap.values());
     } catch (error) {
-      console.error('Erro ao buscar vendas para fallback:', error);
+      console.error('Erro ao buscar vendas para fallback/unificado:', error);
       return [];
     }
   };
@@ -1243,7 +1667,7 @@ export default function ReportsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="viewType">Tipo de Visualização</Label>
                     <Select value={viewType} onValueChange={(value) => setViewType(value as ViewType)}>
@@ -1260,82 +1684,145 @@ export default function ReportsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="filterMode">Modo de Filtro</Label>
-                    <Select value={filterMode} onValueChange={(value) => {
-                      setFilterMode(value as FilterMode);
-                      if (value === 'auto') {
-                        setSpecificDate('');
-                        setDateRangeStart('');
-                        setDateRangeEnd('');
-                      }
-                    }}>
-                      <SelectTrigger id="filterMode">
-                        <SelectValue placeholder="Selecione o modo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Automático</SelectItem>
-                        <SelectItem value="specific">Data/Período Específico</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {filterMode === 'specific' && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="specificDate">Data Específica</Label>
-                        <Input
-                          id="specificDate"
-                          type="date"
-                          value={specificDate}
-                          onChange={(e) => {
-                            setSpecificDate(e.target.value);
-                            if (e.target.value) {
-                              setDateRangeStart('');
-                              setDateRangeEnd('');
-                            }
+                    <Label>Filtro de Data</Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsDateDialogOpen(true)}
+                        className={`justify-start ${filterMode === 'specific' ? 'flex-1' : 'w-full'}`}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {filterMode === 'specific' 
+                          ? (specificDate 
+                              ? `Data: ${parseLocalDate(specificDate).toLocaleDateString('pt-BR')}`
+                              : dateRangeStart && dateRangeEnd
+                                ? `${parseLocalDate(dateRangeStart).toLocaleDateString('pt-BR')} - ${parseLocalDate(dateRangeEnd).toLocaleDateString('pt-BR')}`
+                                : 'Definir data específica')
+                          : 'Definir data específica'}
+                      </Button>
+                      {filterMode === 'specific' && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSpecificDate('');
+                            setDateRangeStart('');
+                            setDateRangeEnd('');
                           }}
-                          placeholder="Selecione uma data"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Período (ou deixe a data acima vazia)</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <Label htmlFor="dateRangeStart" className="text-xs">De</Label>
-                            <Input
-                              id="dateRangeStart"
-                              type="date"
-                              value={dateRangeStart}
-                              onChange={(e) => {
-                                setDateRangeStart(e.target.value);
-                                if (e.target.value) {
-                                  setSpecificDate('');
-                                }
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="dateRangeEnd" className="text-xs">Até</Label>
-                            <Input
-                              id="dateRangeEnd"
-                              type="date"
-                              value={dateRangeEnd}
-                              onChange={(e) => {
-                                setDateRangeEnd(e.target.value);
-                                if (e.target.value) {
-                                  setSpecificDate('');
-                                }
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                          className="text-red-600 hover:text-red-700 whitespace-nowrap"
+                        >
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Dialog para seleção de data/período */}
+            <Dialog open={isDateDialogOpen} onOpenChange={setIsDateDialogOpen}>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Definir Data Específica</DialogTitle>
+                  <DialogDescription>
+                    Escolha uma data específica ou um período para filtrar os relatórios
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-6 py-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dialogSpecificDate">Data Específica</Label>
+                      <Input
+                        id="dialogSpecificDate"
+                        type="date"
+                        value={specificDate}
+                        onChange={(e) => {
+                          setSpecificDate(e.target.value);
+                          if (e.target.value) {
+                            setDateRangeStart('');
+                            setDateRangeEnd('');
+                          }
+                        }}
+                      />
+                      <p className="text-xs text-gray-500">
+                        Selecione uma data única para ver o relatório desse dia
+                      </p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">
+                          Ou
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Período</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="dialogDateRangeStart" className="text-sm">Data Inicial</Label>
+                          <Input
+                            id="dialogDateRangeStart"
+                            type="date"
+                            value={dateRangeStart}
+                            onChange={(e) => {
+                              setDateRangeStart(e.target.value);
+                              if (e.target.value) {
+                                setSpecificDate('');
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="dialogDateRangeEnd" className="text-sm">Data Final</Label>
+                          <Input
+                            id="dialogDateRangeEnd"
+                            type="date"
+                            value={dateRangeEnd}
+                            onChange={(e) => {
+                              setDateRangeEnd(e.target.value);
+                              if (e.target.value) {
+                                setSpecificDate('');
+                              }
+                            }}
+                            min={dateRangeStart}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Selecione um período para ver relatórios de um intervalo de datas
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSpecificDate('');
+                      setDateRangeStart('');
+                      setDateRangeEnd('');
+                      setIsDateDialogOpen(false);
+                    }}
+                  >
+                    Limpar
+                  </Button>
+                  <Button
+                    onClick={() => setIsDateDialogOpen(false)}
+                    className="bg-[#3e2626] hover:bg-[#2d1c1c] text-white"
+                  >
+                    Aplicar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             <Card className="border-0 shadow-sm">
               <CardHeader>
@@ -1349,24 +1836,29 @@ export default function ReportsPage() {
                   {filterMode === 'auto'
                     ? `Acesse rapidamente os relatórios gerados nos últimos ${getMaxReports(viewType)} ${viewType === 'daily' ? 'dias' : viewType === 'weekly' ? 'semanas' : viewType === 'monthly' ? 'meses' : 'anos'}`
                     : specificDate 
-                      ? `Relatórios da data: ${new Date(specificDate).toLocaleDateString('pt-BR')}`
+                      ? `Relatórios da data: ${parseLocalDate(specificDate).toLocaleDateString('pt-BR')}`
                       : dateRangeStart && dateRangeEnd
-                        ? `Relatórios do período: ${new Date(dateRangeStart).toLocaleDateString('pt-BR')} até ${new Date(dateRangeEnd).toLocaleDateString('pt-BR')}`
+                        ? `Relatórios do período: ${parseLocalDate(dateRangeStart).toLocaleDateString('pt-BR')} até ${parseLocalDate(dateRangeEnd).toLocaleDateString('pt-BR')}`
                         : 'Acesse os relatórios filtrados'
                   }
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {dailyReports.length > 0 ? (
+                {isLoading ? (
+                  <div className="py-10 flex flex-col items-center justify-center gap-3">
+                    <Loader size={28} className="text-[#3e2626]" />
+                    <p className="text-sm text-gray-500">Atualizando relatórios...</p>
+                  </div>
+                ) : dailyReports.length > 0 ? (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {dailyReports.map((report) => {
                       const summary = getReportSummary(report);
-                      const reportDate = new Date(report.period || report.createdAt);
+                      const reportDate = getReportLocalDate(report);
                       const reportPeriodKey = getPeriodKey(reportDate, viewType);
                       
                       // Comparar por periodKey e id para garantir que o relatório correto está ativo
                       const currentReportPeriodKey = currentReport 
-                        ? getPeriodKey(new Date(currentReport.period || currentReport.createdAt), viewType)
+                        ? getPeriodKey(getReportLocalDate(currentReport), viewType)
                         : null;
                       const isActive = currentReport && (
                         currentReport.id === report.id || 
@@ -1407,41 +1899,57 @@ export default function ReportsPage() {
                           periodLabel = reportDate.getFullYear().toString();
                         }
                       } else {
-                        // No modo específico, determinar o tipo baseado na data do relatório
-                        // Verificar se é diário, semanal, mensal ou anual
-                        const reportType = report.type || 'daily';
-                        periodType = reportType === 'daily' ? 'diário' : reportType === 'weekly' ? 'semanal' : reportType === 'monthly' ? 'mensal' : 'anual';
-                        
-                        if (reportType === 'daily') {
+                        // No modo específico, se for um período (dateRangeStart e dateRangeEnd), mostrar o período completo
+                        if (dateRangeStart && dateRangeEnd) {
+                          const startDate = parseLocalDate(dateRangeStart);
+                          const endDate = parseLocalDate(dateRangeEnd);
+                          periodType = 'período';
+                          periodLabel = `${startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })} - ${endDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+                        } else if (specificDate) {
+                          // Se for data específica, mostrar apenas a data
+                          const reportType = report.type || 'daily';
+                          periodType = reportType === 'daily' ? 'diário' : reportType === 'weekly' ? 'semanal' : reportType === 'monthly' ? 'mensal' : 'anual';
                           periodLabel = reportDate.toLocaleDateString('pt-BR', {
                             day: '2-digit',
                             month: 'short',
                             year: 'numeric',
                           });
-                        } else if (reportType === 'weekly') {
-                          const weekStart = new Date(reportDate);
-                          const dayOfWeek = weekStart.getDay();
-                          const diff = weekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-                          weekStart.setDate(diff);
-                          weekStart.setHours(0, 0, 0, 0);
-                          const weekEnd = new Date(weekStart);
-                          weekEnd.setDate(weekEnd.getDate() + 6);
-                          weekEnd.setHours(23, 59, 59, 999);
-                          periodLabel = `${weekStart.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${weekEnd.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`;
-                        } else if (reportType === 'monthly') {
-                          const monthStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
-                          periodLabel = monthStart.toLocaleDateString('pt-BR', {
-                            month: 'long',
-                            year: 'numeric'
-                          });
-                        } else if (reportType === 'yearly') {
-                        periodLabel = reportDate.getFullYear().toString();
-                      } else {
-                        periodLabel = reportDate.toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        });
+                        } else {
+                          // Fallback: determinar o tipo baseado na data do relatório
+                          const reportType = report.type || 'daily';
+                          periodType = reportType === 'daily' ? 'diário' : reportType === 'weekly' ? 'semanal' : reportType === 'monthly' ? 'mensal' : 'anual';
+                          
+                          if (reportType === 'daily') {
+                            periodLabel = reportDate.toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            });
+                          } else if (reportType === 'weekly') {
+                            const weekStart = new Date(reportDate);
+                            const dayOfWeek = weekStart.getDay();
+                            const diff = weekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+                            weekStart.setDate(diff);
+                            weekStart.setHours(0, 0, 0, 0);
+                            const weekEnd = new Date(weekStart);
+                            weekEnd.setDate(weekEnd.getDate() + 6);
+                            weekEnd.setHours(23, 59, 59, 999);
+                            periodLabel = `${weekStart.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${weekEnd.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+                          } else if (reportType === 'monthly') {
+                            const monthStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+                            periodLabel = monthStart.toLocaleDateString('pt-BR', {
+                              month: 'long',
+                              year: 'numeric'
+                            });
+                          } else if (reportType === 'yearly') {
+                            periodLabel = reportDate.getFullYear().toString();
+                          } else {
+                            periodLabel = reportDate.toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            });
+                          }
                         }
                       }
                       
@@ -1505,9 +2013,9 @@ export default function ReportsPage() {
                     <p className="text-sm text-gray-500 mb-4 max-w-md mx-auto">
                       {filterMode === 'specific' 
                         ? (specificDate 
-                            ? `Não há relatórios para a data ${new Date(specificDate).toLocaleDateString('pt-BR')}. Tente selecionar outra data ou período.`
+                            ? `Não há relatórios para a data ${parseLocalDate(specificDate).toLocaleDateString('pt-BR')}. Tente selecionar outra data ou período.`
                             : dateRangeStart && dateRangeEnd
-                              ? `Não há relatórios para o período de ${new Date(dateRangeStart).toLocaleDateString('pt-BR')} até ${new Date(dateRangeEnd).toLocaleDateString('pt-BR')}. Tente selecionar outro período.`
+                              ? `Não há relatórios para o período de ${parseLocalDate(dateRangeStart).toLocaleDateString('pt-BR')} até ${parseLocalDate(dateRangeEnd).toLocaleDateString('pt-BR')}. Tente selecionar outro período.`
                               : 'Selecione uma data específica ou um período para filtrar os relatórios.')
                         : `Não há relatórios ${viewType === 'daily' ? 'diários' : viewType === 'weekly' ? 'semanais' : viewType === 'monthly' ? 'mensais' : 'anuais'} disponíveis nos últimos ${getMaxReports(viewType)} ${viewType === 'daily' ? 'dias' : viewType === 'weekly' ? 'semanas' : viewType === 'monthly' ? 'meses' : 'anos'}.`
                       }
@@ -1527,7 +2035,7 @@ export default function ReportsPage() {
               </Card>
 
             {/* Cards de Resumo Geral - Estilo Horizon */}
-            {currentReport && (() => {
+            {currentReport && !isLoading && (() => {
               // Calcular summary se não existir ou estiver vazio
               const summary = currentReport.data?.summary || calculateSummaryFromData(currentReport) || {};
               
@@ -1607,12 +2115,16 @@ export default function ReportsPage() {
             })()}
 
             {/* Gráficos Modernos */}
-            {currentReport && (
+            {currentReport && !isLoading && (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <Card className="bg-white border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold text-gray-900">Receita por Período</CardTitle>
-                  <CardDescription className="text-sm text-gray-600">Últimos 7 dias de receita</CardDescription>
+                  <CardDescription className="text-sm text-gray-600">
+                    {viewType === 'daily' 
+                      ? 'Receita por hora do dia'
+                      : 'Últimos 7 dias de receita'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {salesByPeriod.length === 0 ? (
@@ -1627,7 +2139,7 @@ export default function ReportsPage() {
                           dataKey="date" 
                           stroke="#6b7280"
                           style={{ fontSize: '12px' }}
-                          label={{ value: 'Data', position: 'insideBottom', offset: -5 }}
+                          label={{ value: viewType === 'daily' ? 'Hora' : 'Data', position: 'insideBottom', offset: -5 }}
                         />
                         <YAxis 
                           stroke="#6b7280"
@@ -1643,7 +2155,17 @@ export default function ReportsPage() {
                             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                           }}
                           formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Receita']}
-                          labelFormatter={(label) => `Data: ${label}`}
+                          labelFormatter={(label) => {
+                            if (viewType === 'daily') {
+                              // Se o label já está no formato de hora (contém ':'), usar diretamente
+                              if (label && label.includes(':') && !label.includes('/')) {
+                                return `Hora: ${label}`;
+                              }
+                              // Caso contrário, tentar formatar como hora
+                              return `Hora: ${label}`;
+                            }
+                            return `Data: ${label}`;
+                          }}
                         />
                         <Line 
                           type="monotone" 
@@ -1847,7 +2369,7 @@ export default function ReportsPage() {
             )}
 
             {/* Métricas de Pagamento */}
-            {currentReport && currentReport.data?.paymentMethods && currentReport.data.paymentMethods.length > 0 && (
+            {currentReport && !isLoading && currentReport.data?.paymentMethods && currentReport.data.paymentMethods.length > 0 && (
               <Card className="bg-white border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold text-gray-900">Métodos de Pagamento</CardTitle>
@@ -1875,7 +2397,7 @@ export default function ReportsPage() {
                     )}
 
                     {/* Performance por Loja */}
-            {currentReport.data?.stores && currentReport.data.stores.length > 0 && (
+            {currentReport && !isLoading && currentReport.data?.stores && currentReport.data.stores.length > 0 && (
               <Card className="bg-white border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold text-gray-900">Performance por Loja</CardTitle>
@@ -1931,6 +2453,7 @@ export default function ReportsPage() {
                     )}
 
             {/* Top Vendedores e Produtos */}
+            {!isLoading && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     {/* Top Vendedores */}
               {currentReport.data?.topEmployees && currentReport.data.topEmployees.length > 0 && (
@@ -2004,8 +2527,10 @@ export default function ReportsPage() {
                 </Card>
               )}
             </div>
+            )}
 
             {/* Métricas de Presença e Clientes */}
+            {!isLoading && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {/* Métricas de Presença */}
               {currentReport.data?.attendance && (
@@ -2059,6 +2584,7 @@ export default function ReportsPage() {
                 </Card>
                 )}
               </div>
+            )}
           </div>
         )}
       </div>
