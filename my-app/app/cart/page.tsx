@@ -297,13 +297,24 @@ export default function CartPage() {
     
     cart.forEach(item => {
       // Determinar qual loja usar para este produto
-      // Prioridade: 1) storeId direto com informações completas, 2) storeInventory com estoque, 3) primeira loja do storeInventory
+      // Nova prioridade:
+      // 1) Campos simples do produto (storeName/storeAddress) vindos do catálogo público
+      // 2) storeId direto com informações completas (`store`)
+      // 3) storeInventory com estoque
+      // 4) primeira loja do storeInventory
       let storeId: string = 'unknown';
       let storeName: string | undefined;
       let storeAddress: string | undefined;
 
-      // Tentar usar storeId direto se tiver informações completas
-      if (item.product.storeId && item.product.store?.name) {
+      // Prioridade 1: se o produto já traz `storeName`/`storeAddress` mapeados pelo frontend (uso público)
+      if (item.product.storeName) {
+        // Se não houver storeId definido, criar um id estável baseado na loja
+        storeId = item.product.storeId && item.product.storeId !== '' ? item.product.storeId : `public-${item.product.storeName}`;
+        storeName = item.product.storeName;
+        storeAddress = item.product.storeAddress;
+      }
+      // Prioridade 2: tentar usar storeId direto se tiver informações completas
+      else if (item.product.storeId && item.product.store?.name) {
         storeId = item.product.storeId;
         storeName = item.product.store.name;
         storeAddress = item.product.store.address;
@@ -519,6 +530,13 @@ export default function CartPage() {
       return;
     }
     
+    // Verificar autenticação antes de continuar
+    if (!isAuthenticated) {
+      showAlert('info', 'Faça login para continuar com a compra');
+      router.push('/login?redirect=/cart');
+      return;
+    }
+    
     // Salvar produtos selecionados no sessionStorage para a página de checkout
     if (typeof window !== 'undefined') {
       const selectedIds = Array.from(selectedProducts);
@@ -555,9 +573,22 @@ export default function CartPage() {
   };
 
   // Função para adicionar aos favoritos
-  const addToFavorites = (product: any) => {
-    // Aqui você integraria com o sistema de favoritos
-    showAlert('success', `${product.name} adicionado aos favoritos!`);
+  const addToFavorites = async (product: any) => {
+    // Se o usuário não estiver autenticado, apenas exibir mensagem de login
+    if (!isAuthenticated || !user) {
+      showAlert('error', 'Faça login para adicionar produtos aos favoritos.');
+      return;
+    }
+
+    try {
+      // Integração simples com o sistema de favoritos
+      const { customerAPI } = await import('@/lib/api');
+      await customerAPI.addToFavorites(product.id);
+      showAlert('success', `${product.name} adicionado aos favoritos!`);
+    } catch (error) {
+      console.error('Erro ao adicionar aos favoritos a partir do carrinho:', error);
+      showAlert('error', 'Não foi possível adicionar aos favoritos. Tente novamente.');
+    }
   };
 
   // Buscar produtos recomendados do banco de dados
@@ -1024,23 +1055,40 @@ export default function CartPage() {
                
                 
                 {/* Checkout Button */}
-                <Button 
-                  onClick={handleCheckout}
-                  disabled={isCheckingOut || selectedCartItems.length === 0}
-                  className="w-full bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white hover:from-[#2a1f1f] hover:to-[#3e2626] py-4 rounded-full font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isCheckingOut ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Processando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="h-5 w-5" />
-                      <span>Continuar</span>
-                    </>
+                <div className="w-full">
+                  <Button 
+                    onClick={handleCheckout}
+                    disabled={isCheckingOut || selectedCartItems.length === 0 || !isAuthenticated}
+                    className="w-full bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white hover:from-[#2a1f1f] hover:to-[#3e2626] py-4 rounded-full font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCheckingOut ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Processando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-5 w-5" />
+                        <span>Continuar</span>
+                      </>
+                    )}
+                  </Button>
+                  
+                  {/* Mensagem informativa quando desabilitado */}
+                  {!isAuthenticated && selectedCartItems.length > 0 && (
+                    <p className="mt-2 text-sm text-center text-amber-600 font-medium">
+                      <span className="inline-flex items-center gap-1">
+                        <span>⚠️</span>
+                        <span>Faça login para continuar com a compra</span>
+                      </span>
+                    </p>
                   )}
-                </Button>
+                  {selectedCartItems.length === 0 && (
+                    <p className="mt-2 text-sm text-center text-gray-500">
+                      Selecione pelo menos um produto para continuar
+                    </p>
+                  )}
+                </div>
                 
                 {/* Continue Shopping */}
                 <Button 

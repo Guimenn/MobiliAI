@@ -161,6 +161,14 @@ export const productsAPI = {
     return response.data;
   },
 
+  // Método público que não requer autenticação
+  getAllPublic: async (storeId?: string, limit: number = 1000) => {
+    const params: any = { limit: limit.toString() };
+    if (storeId) params.storeId = storeId;
+    const response = await api.get('/public/products', { params });
+    return response.data;
+  },
+
   getById: async (id: string) => {
     const response = await api.get(`/products/${id}`);
     return response.data;
@@ -1071,6 +1079,13 @@ export const customerAPI = {
   },
 
   addToFavorites: async (productId: string) => {
+    // Verificar autenticação antes de fazer a chamada usando isUserAuthenticated
+    const store = useAppStore.getState();
+    const isReallyAuthenticated = store.isUserAuthenticated();
+    if (!isReallyAuthenticated) {
+      throw new Error('Usuário não autenticado');
+    }
+    
     const response = await api.post('/customer/favorites/add', { productId });
     return response.data;
   },

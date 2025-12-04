@@ -55,7 +55,14 @@ export default function FavoriteTooltip({ productId, className = '' }: FavoriteT
     e.preventDefault();
     e.stopPropagation();
     
-    if (!isAuthenticated) {
+    // VERIFICAÇÃO CRÍTICA: Verificar token diretamente
+    const store = useAppStore.getState();
+    const hasToken = !!store.token;
+    const hasUser = !!store.user;
+    const isReallyAuthenticated = hasToken && hasUser && store.isAuthenticated;
+    
+    // Se não estiver autenticado, SEMPRE mostrar mensagem de erro e retornar
+    if (!isReallyAuthenticated || !isAuthenticated || !hasToken) {
       toast.error('Faça login para adicionar aos favoritos');
       return;
     }
@@ -65,24 +72,55 @@ export default function FavoriteTooltip({ productId, className = '' }: FavoriteT
     try {
       setIsLoading(true);
       
+      // Verificar novamente antes de fazer qualquer chamada
+      const currentStore = useAppStore.getState();
+      if (!currentStore.token || !currentStore.user || !currentStore.isAuthenticated) {
+        toast.error('Faça login para adicionar aos favoritos');
+        return;
+      }
+      
       if (isFavorite) {
         await customerAPI.removeFromFavorites(productId);
-        // Verificar novamente para garantir que foi removido
         const checkResponse = await customerAPI.checkFavorite(productId);
         setIsFavorite(checkResponse.isFavorite || false);
-        toast.success('Produto removido dos favoritos');
+        // Verificar novamente autenticação ANTES de mostrar mensagem
+        const finalCheck = useAppStore.getState();
+        if (!checkResponse.isFavorite && finalCheck.token && finalCheck.user && finalCheck.isAuthenticated) {
+          toast.success('Produto removido dos favoritos');
+        }
       } else {
         await customerAPI.addToFavorites(productId);
-        // Verificar novamente para garantir que foi adicionado
         const checkResponse = await customerAPI.checkFavorite(productId);
         setIsFavorite(checkResponse.isFavorite || false);
-        // Disparar evento para atualizar notificações imediatamente
-        window.dispatchEvent(new CustomEvent('notification:favorite-added'));
-        toast.success('Produto adicionado aos favoritos');
+        
+        // VERIFICAÇÃO FINAL ABSOLUTA: Verificar token, user E isAuthenticated antes de mostrar sucesso
+        const finalCheck = useAppStore.getState();
+        const canShowSuccess = finalCheck.token && 
+                               finalCheck.user && 
+                               finalCheck.isAuthenticated && 
+                               checkResponse.isFavorite;
+        
+        if (canShowSuccess) {
+          // Disparar evento para atualizar notificações imediatamente
+          window.dispatchEvent(new CustomEvent('notification:favorite-added'));
+          toast.success('Produto adicionado aos favoritos');
+        } else {
+          // Se não passou na verificação, mostrar erro
+          toast.error('Faça login para adicionar aos favoritos');
+        }
       }
     } catch (error: any) {
       console.error('Erro ao alternar favorito:', error);
-      toast.error(error?.response?.data?.message || 'Erro ao atualizar favoritos');
+      // SEMPRE mostrar erro de autenticação se não estiver autenticado
+      const errorCheck = useAppStore.getState();
+      if (!errorCheck.token || !errorCheck.user || 
+          error?.response?.status === 401 || 
+          error?.response?.status === 403 || 
+          error?.message === 'Usuário não autenticado') {
+        toast.error('Faça login para adicionar aos favoritos');
+      } else {
+        toast.error(error?.response?.data?.message || 'Erro ao atualizar favoritos');
+      }
       // Reverter estado em caso de erro
       setIsFavorite(!isFavorite);
     } finally {

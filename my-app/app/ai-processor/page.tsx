@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Upload, Camera, Palette, Download, RotateCcw, Eye, Check, Wand2, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
+import { Loader } from '@/components/ui/ai/loader';
 
 export default function AIProcessor() {
   const { setLoading, setError, isAuthenticated } = useAppStore();
@@ -343,8 +344,7 @@ export default function AIProcessor() {
             {/* Loading State */}
             {isProcessing && (
               <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                <p className="text-gray-600">Processando imagem... Isso pode levar alguns segundos.</p>
+                <Loader size="lg" variant="default" text="Processando imagem... Isso pode levar alguns segundos." />
               </div>
             )}
 

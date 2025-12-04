@@ -31,7 +31,7 @@ export default function CTA() {
               Transforme o atendimento em uma experiência memorável.
           </h2>
             <p className="mt-4 text-white/80">
-              Faça o upload de um ambiente agora e veja a IA aplicar a paleta da PintAi, sugerir produtos reais e gerar
+              Faça o upload de um ambiente agora e aplique móveis reais da MobiliAI, sugerir produtos reais e gerar
               imagens que vendem.
           </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

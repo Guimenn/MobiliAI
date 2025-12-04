@@ -811,28 +811,15 @@ export default function HomePage() {
   ];
 
   const [carouselIndex, setCarouselIndex] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [animationDirection, setAnimationDirection] = useState<'left' | 'right'>('right');
 
+  // Navegação simples, com loop infinito
   const goNext = () => {
-    if (isAnimating) return;
-    setIsAnimating(true);
-    setAnimationDirection('right');
-    setTimeout(() => {
-      setCarouselIndex((i) => (i + 1) % slides.length);
-      setTimeout(() => setIsAnimating(false), 150);
-    }, 400);
-  };
-  const goPrev = () => {
-    if (isAnimating) return;
-    setIsAnimating(true);
-    setAnimationDirection('left');
-    setTimeout(() => {
-      setCarouselIndex((i) => (i - 1 + slides.length) % slides.length);
-      setTimeout(() => setIsAnimating(false), 150);
-    }, 400);
+    setCarouselIndex((i) => (i + 1) % slides.length);
   };
 
+  const goPrev = () => {
+    setCarouselIndex((i) => (i - 1 + slides.length) % slides.length);
+  };
 
   const getVisibleIndex = (offset: number) => (carouselIndex + offset) % slides.length;
 
@@ -905,14 +892,12 @@ export default function HomePage() {
           <div className="flex space-x-1.5 sm:space-x-2">
             <button 
               onClick={goPrev} 
-              disabled={isAnimating}
               className="w-7 h-7 sm:w-8 sm:h-8 bg-gray-200 hover:bg-[#3e2626] hover:text-white rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:-translate-x-0.5 transition-transform duration-300" />
             </button>
             <button 
               onClick={goNext} 
-              disabled={isAnimating}
               className="w-7 h-7 sm:w-8 sm:h-8 bg-[#3e2626] text-white hover:bg-[#2a1f1f] rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:translate-x-0.5 transition-transform duration-300" />
@@ -1525,26 +1510,30 @@ export default function HomePage() {
                 
                 {/* Desktop: Carousel animado */}
                 <div className="hidden sm:block relative overflow-hidden">
-                  <div 
-                    className="flex space-x-3 sm:space-x-4 items-start transition-all duration-700 ease-in-out"
-                    style={{
-                      transform: `translateX(${isAnimating ? (animationDirection === 'right' ? '-30px' : '30px') : '0px'})` 
-                    }}
+                  <div
+                    className="flex space-x-3 sm:space-x-4 items-start gap-4"
                   >
                     {([0,1,2] as const).map((offset) => {
                       const isActive = offset === 0;
                       const slideData = slides[getVisibleIndex(offset)];
+
+                      // Animação suave por card: o ativo fica destacado,
+                      // os laterais ficam levemente deslocados e menores.
+                      const translateX = isActive ? 0 : offset === 1 ? 14 : -14;
+                      const translateY = isActive ? 0 : 6;
+                      const scale = isActive ? 1 : 0.95;
                       
                       return (
                         <div
                           key={`${carouselIndex}-${offset}`}
-                          className={`flex-shrink-0 transition-all duration-300 ease-out ${
+                          className={`flex-shrink-0 transition-all duration-500 ease-out ${
                             isActive 
-                              ? 'opacity-100 scale-100 transform translate-y-0' 
-                              : 'opacity-80 scale-95 transform translate-y-1'
+                              ? 'opacity-100' 
+                              : 'opacity-80'
                           }`}
                           style={{
-                            transitionDelay: `${offset * 100}ms`
+                            transform: `translateX(${translateX}px) translateY(${translateY}px) scale(${scale})`,
+                            transitionDelay: `${offset * 80}ms`,
                           }}
                         >
                           {renderSlide(slideData, offset)}

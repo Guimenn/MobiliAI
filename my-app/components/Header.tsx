@@ -169,10 +169,27 @@ export default function Header() {
             if (searchOpen && allProducts.length === 0) {
                 try {
                     setLoadingProducts(true);
-                    const products = await productsAPI.getAll();
-                    setAllProducts(products || []);
+                    // Usar rota pública se não estiver autenticado, senão usar rota autenticada
+                    let productsData;
+                    if (isAuthenticated) {
+                        productsData = await productsAPI.getAll();
+                        // A rota autenticada pode retornar array direto ou objeto com products
+                        setAllProducts(Array.isArray(productsData) ? productsData : (productsData?.products || []));
+                    } else {
+                        productsData = await productsAPI.getAllPublic();
+                        // A rota pública retorna { products: [...], pagination: {...} }
+                        setAllProducts(productsData?.products || []);
+                    }
                 } catch (error) {
                     console.error('Erro ao carregar produtos para autocomplete:', error);
+                    // Em caso de erro, tentar usar a rota pública como fallback
+                    try {
+                        const fallbackData = await productsAPI.getAllPublic();
+                        setAllProducts(fallbackData?.products || []);
+                    } catch (fallbackError) {
+                        console.error('Erro ao carregar produtos públicos (fallback):', fallbackError);
+                        setAllProducts([]);
+                    }
                 } finally {
                     setLoadingProducts(false);
                 }
@@ -182,7 +199,7 @@ export default function Header() {
         if (searchOpen) {
             loadProducts();
         }
-    }, [searchOpen, allProducts.length]);
+    }, [searchOpen, allProducts.length, isAuthenticated]);
 
     // Gerar sugestões de palavras (estilo Mercado Livre)
     useEffect(() => {

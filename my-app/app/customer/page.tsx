@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
+import { Loader } from '@/components/ui/ai/loader';
 
 export default function CustomerDashboard() {
   const { user, isAuthenticated } = useAppStore();
@@ -15,10 +16,9 @@ export default function CustomerDashboard() {
 
   // Mostrar loading enquanto redireciona
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
-        <p className="text-gray-600">Redirecionando para a loja...</p>
+        <Loader size="xl" variant="default" text="Redirecionando para a loja..." />
       </div>
     </div>
   );
