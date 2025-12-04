@@ -14,7 +14,6 @@ import {
   Store,
   Package,
   Navigation,
-  Loader2,
   CheckCircle2,
   AlertCircle,
   Route,
@@ -29,6 +28,7 @@ import { storesAPI, productsAPI } from '@/lib/api';
 import { env } from '@/lib/env';
 import { toast } from 'sonner';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface Store {
   id: string;
   name: string;
@@ -643,7 +643,7 @@ export default function StoresPage() {
         <Header />
         <div className="flex items-center justify-center py-32">
           <div className="text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-[#3e2626] mx-auto mb-4" />
+            <Loader size={48} className="text-[#3e2626] mx-auto mb-4" />
             <p className="text-gray-600">Carregando lojas...</p>
           </div>
         </div>
@@ -808,7 +808,7 @@ export default function StoresPage() {
                   {isGeocoding && (
                     <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
                       <div className="text-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-[#3e2626] mx-auto mb-2" />
+                        <Loader size={32} className="text-[#3e2626] mx-auto mb-2" />
                         <p className="text-sm text-gray-600">Carregando localizações...</p>
                       </div>
                     </div>

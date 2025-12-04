@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Loader } from '@/components/ui/ai/loader';
 
 interface HydrationBoundaryProps {
   children: React.ReactNode;
@@ -12,7 +13,7 @@ export default function HydrationBoundary({
   fallback = (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
+        <Loader size={48} className="mx-auto mb-4" />
         <p className="text-gray-600">Carregando...</p>
       </div>
     </div>

@@ -15,6 +15,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import {
   ArrowLeft,
+  ArrowRight,
   MapPin,
   Phone,
   Mail,
@@ -31,7 +32,6 @@ import {
   Lock,
   Radio,
   Search,
-  Loader2,
   ChevronLeft,
   ChevronRight,
   X,
@@ -52,7 +52,8 @@ import {
 import { customerAPI, authAPI, storesAPI, shippingAPI } from '@/lib/api';
 import { env } from '@/lib/env';
 import { showAlert, showConfirm } from '@/lib/alerts';
-import {
+
+import { Loader } from '@/components/ui/ai/loader';import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -60,6 +61,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import CouponCard from '@/components/CouponCard';
 
 interface ShippingAddress {
   name: string;
@@ -286,6 +288,7 @@ export default function CheckoutPage() {
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [customerCoupons, setCustomerCoupons] = useState<any[]>([]);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+  const [productNames, setProductNames] = useState<Record<string, string>>({});
 
   // Opções de entrega
   const [selectedShipping, setSelectedShipping] = useState<'standard' | 'express' | 'pickup'>('standard');
@@ -2051,6 +2054,47 @@ export default function CheckoutPage() {
           
           console.log('📋 Cupons processados:', coupons.length, coupons);
           setCustomerCoupons(coupons);
+          
+          // Buscar nomes dos produtos para cupons de produto específico
+          const productIdsToFetch = coupons
+            .filter((c: any) => c.applicableTo === 'PRODUCT' && c.productId && !c.product?.name)
+            .map((c: any) => String(c.productId).trim())
+            .filter((id: string, index: number, self: string[]) => self.indexOf(id) === index); // remover duplicados
+          
+          if (productIdsToFetch.length > 0) {
+            // Buscar produtos em paralelo
+            Promise.all(
+              productIdsToFetch.map(async (productId: string) => {
+                try {
+                  const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
+                  const response = await fetch(`${apiBaseUrl}/public/products/${productId}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                  
+                  if (response.ok) {
+                    const product = await response.json();
+                    if (product?.name) {
+                      return { productId, name: product.name };
+                    }
+                  }
+                } catch (error) {
+                  console.warn(`Erro ao buscar produto ${productId}:`, error);
+                }
+                return null;
+              })
+            ).then(results => {
+              const names: Record<string, string> = {};
+              results.forEach(result => {
+                if (result) {
+                  names[result.productId] = result.name;
+                }
+              });
+              if (Object.keys(names).length > 0) {
+                setProductNames(prev => ({ ...prev, ...names }));
+              }
+            });
+          }
         } else {
           const errorText = await response.text();
           console.warn('⚠️ Erro ao buscar cupons:', {
@@ -2331,6 +2375,11 @@ export default function CheckoutPage() {
     const unavailableCoupons: any[] = [];
     const availableCoupons: any[] = [];
 
+    // Garantir que coupons seja um array
+    if (!coupons || !Array.isArray(coupons)) {
+      return { shippingCoupons, unavailableCoupons, availableCoupons };
+    }
+
     console.log('🔍 Categorizando cupons:', coupons.length, coupons);
 
     // Obter loja selecionada ou loja do primeiro produto
@@ -2438,9 +2487,11 @@ export default function CheckoutPage() {
           
           if (!hasMatchingProduct) {
             isProductValid = false;
-            // Tentar buscar nome do produto (se disponível nos cupons retornados)
+            // Tentar buscar nome do produto de todas as fontes possíveis
             const couponProduct = coupon.product || null;
-            const productName = couponProduct?.name || 'produto específico';
+            const cartProduct = checkoutItems.find(item => String(item.product.id).trim() === couponProductId)?.product;
+            // Buscar também no estado de nomes de produtos
+            const productName = couponProduct?.name || cartProduct?.name || productNames[couponProductId] || 'produto específico';
             productReason = `Este cupom é válido apenas para o produto "${productName}"`;
           }
         }
@@ -2852,7 +2903,7 @@ export default function CheckoutPage() {
 
                     {isLoadingUserData ? (
                       <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+                        <Loader size={24} className="text-[#3e2626]" />
                       </div>
                     ) : (
                       <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
@@ -2920,7 +2971,7 @@ export default function CheckoutPage() {
                     >
                       {isLoadingUserData ? (
                         <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <Loader size={16} className="mr-2" />
                           Carregando...
                         </>
                       ) : (
@@ -3037,7 +3088,7 @@ export default function CheckoutPage() {
 
                   {isLoadingRecommended ? (
                     <div className="flex items-center justify-center py-12">
-                      <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+                      <Loader size={24} className="text-[#3e2626]" />
                       <span className="ml-2 text-gray-600">Carregando produtos...</span>
                     </div>
                   ) : recommendedProducts.length === 0 ? (
@@ -3339,7 +3390,7 @@ export default function CheckoutPage() {
                                   </Label>
                                   {isLoadingStores ? (
                                     <div className="flex items-center gap-2 text-sm text-gray-500">
-                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <Loader size={16} />
                                       Carregando lojas...
                                     </div>
                                   ) : stores && stores.length > 0 ? (
@@ -3778,63 +3829,65 @@ export default function CheckoutPage() {
             </Card>
 
             {/* Segurança de Pagamento (refinado) */}
-            <Card className="shadow-xl border border-gray-200">
-              <CardContent className="p-5">
-                <div className="space-y-6">
+            <Card className="shadow-lg border border-gray-200 bg-white">
+              <CardContent className="p-6">
+                <div className="space-y-0">
                   {/* Bloco 1: Segurança de Pagamento */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 ring-1 ring-emerald-200">
-                      <DollarSign className="h-5 w-5 text-emerald-600" />
+                  <div className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+                    <div className="w-12 h-12 rounded-full bg-[#3e2626] flex items-center justify-center shrink-0 shadow-sm">
+                      <DollarSign className="h-6 w-6 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-[#1f2937]">Segurança de Pagamento</h3>
-                      <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-[#3e2626] text-base mb-1.5">Segurança de Pagamento</h3>
+                      <p className="text-sm text-gray-600 leading-relaxed">
                         Suas informações são protegidas com criptografia e só são compartilhadas com provedores de pagamento confiáveis.
                       </p>
                     </div>
                   </div>
 
-                  <hr className="border-gray-200" />
+                  <hr className="border-gray-200 my-0" />
 
                   {/* Bloco 2: Segurança e Privacidade */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 ring-1 ring-emerald-200">
-                      <Lock className="h-5 w-5 text-emerald-600" />
+                  <div className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+                    <div className="w-12 h-12 rounded-full bg-[#3e2626] flex items-center justify-center shrink-0 shadow-sm">
+                      <Lock className="h-6 w-6 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-[#1f2937]">Segurança e Privacidade</h3>
-                      <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-[#3e2626] text-base mb-1.5">Segurança e Privacidade</h3>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-2">
                         O processador de pagamentos armazena os dados do seu cartão de forma criptografada. Não guardamos os dados reais do cartão.
                       </p>
-                      <a href="/privacy" className="inline-block text-sm text-[#3e2626] hover:underline mt-1">Saiba mais &gt;</a>
+                      <a href="/privacy" className="inline-flex items-center text-sm font-medium text-[#3e2626] hover:text-[#5a3a3a] transition-colors">
+                        Saiba mais <ArrowRight className="h-3 w-3 ml-1" />
+                      </a>
                     </div>
                   </div>
 
-                  <hr className="border-gray-200" />
+                  <hr className="border-gray-200 my-0" />
 
                   {/* Bloco 3: Garantia de entrega */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 ring-1 ring-emerald-200">
-                      <Truck className="h-5 w-5 text-emerald-600" />
+                  <div className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+                    <div className="w-12 h-12 rounded-full bg-[#3e2626] flex items-center justify-center shrink-0 shadow-sm">
+                      <Truck className="h-6 w-6 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-[#1f2937]">Garantia de entrega segura</h3>
-                      <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-[#3e2626] text-base mb-1.5">Garantia de entrega segura</h3>
+                      <p className="text-sm text-gray-600 leading-relaxed">
                         Troca ou reembolso gratuito para pacotes perdidos, devolvidos ou extraviados.
                       </p>
                     </div>
                   </div>
 
-                  <hr className="border-gray-200" />
+                  <hr className="border-gray-200 my-0" />
 
                   {/* Bloco 4: Suporte */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 ring-1 ring-emerald-200">
-                      <Headphones className="h-5 w-5 text-emerald-600" />
+                  <div className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+                    <div className="w-12 h-12 rounded-full bg-[#3e2626] flex items-center justify-center shrink-0 shadow-sm">
+                      <Headphones className="h-6 w-6 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-[#1f2937]">Suporte ao cliente</h3>
-                      <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-[#3e2626] text-base mb-1.5">Suporte ao cliente</h3>
+                      <p className="text-sm text-gray-600 leading-relaxed">
                         Fale com nossa equipe pelo site para qualquer dúvida relacionada ao seu pedido.
                       </p>
                     </div>
@@ -3943,7 +3996,7 @@ export default function CheckoutPage() {
                       className="border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
                     >
                       {isSearchingCep ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader size={16} />
                       ) : (
                         <Search className="h-4 w-4" />
                       )}
@@ -4036,7 +4089,7 @@ export default function CheckoutPage() {
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader size={16} className="mr-2" />
                   Salvando...
                 </>
               ) : (
@@ -4155,7 +4208,7 @@ export default function CheckoutPage() {
                       {isProcessingAI && (
                         <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm z-30">
                           <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-[#3e2626]/20">
-                            <Loader2 className="h-12 w-12 animate-spin text-[#C07A45]" />
+                            <Loader size={48} className="text-[#C07A45]" />
                             <p className="text-lg font-semibold text-[#3e2626]">Processando com nossa IA...</p>
                             <p className="text-sm text-[#4f3a2f]/70">Aguarde alguns segundos</p>
                           </div>
@@ -4267,7 +4320,7 @@ export default function CheckoutPage() {
                               >
                                 {isProcessingAI && pendingProduct?.id === item.product.id ? (
                                   <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader size={16} className="mr-2" />
                                     Processando...
                                   </>
                                 ) : isPlaced ? (
@@ -4323,7 +4376,7 @@ export default function CheckoutPage() {
 
           {isLoadingQuickView ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+              <Loader size={24} className="text-[#3e2626]" />
             </div>
           ) : quickViewProduct ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -4416,7 +4469,7 @@ export default function CheckoutPage() {
 
       {/* Modal de Cupons */}
       <Dialog open={showCouponModal} onOpenChange={setShowCouponModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-[#3e2626] flex items-center space-x-2">
               <Tag className="h-6 w-6" />
@@ -4455,13 +4508,28 @@ export default function CheckoutPage() {
             {/* Cupons atribuídos ao cliente */}
             {isLoadingCoupons ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+                <Loader size={24} className="text-[#3e2626]" />
                 <span className="ml-2 text-gray-600">Carregando cupons...</span>
               </div>
             ) : (
               <>
                 {(() => {
-                  const { shippingCoupons, unavailableCoupons, availableCoupons } = categorizeCoupons(customerCoupons);
+                  // Criar uma cópia dos cupons com nomes de produtos atualizados
+                  const couponsWithProductNames = (customerCoupons || []).map(coupon => {
+                    if (coupon.applicableTo === 'PRODUCT' && coupon.productId && !coupon.product?.name) {
+                      const productId = String(coupon.productId).trim();
+                      const productName = productNames[productId];
+                      if (productName) {
+                        return {
+                          ...coupon,
+                          product: { ...coupon.product, name: productName }
+                        };
+                      }
+                    }
+                    return coupon;
+                  });
+                  
+                  const { shippingCoupons, unavailableCoupons, availableCoupons } = categorizeCoupons(couponsWithProductNames);
                   
                   return (
                     <div className="space-y-6">
@@ -4473,89 +4541,19 @@ export default function CheckoutPage() {
                             <span>Cupons de Frete</span>
                           </h3>
                           <div className="space-y-4">
-                            {shippingCoupons.map((coupon) => {
-                              const discountValue = coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' 
-                                ? `${coupon.discountValue}%` 
-                                : `R$ ${Number(coupon.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-                              const validUntil = coupon.validUntil || coupon.expiresAt;
-                              
-                              return (
-                                <div
-                                  key={coupon.id || coupon.code}
-                                  className="relative bg-gray-100 border-2 border-[#3e2626]/50 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
-                                  style={{
-                                    clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
-                                    backgroundColor: 'rgba(62, 38, 38, 0.08)'
-                                  }}
-                                >
-                                  {/* Efeito de papel rasgado no topo */}
-                                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3e2626]/40 to-transparent opacity-50"></div>
-                                  
-                                  <div className="p-5">
-                                    <div className="flex items-start justify-between gap-4">
-                                      {/* Lado esquerdo - Informações principais */}
-                                      <div className="flex-1 space-y-3">
-                                        {/* Cabeçalho do cupom */}
-                                        <div className="flex items-center gap-3">
-                                          <div className="bg-[#3e2626] text-white px-3 py-1 rounded-md font-bold text-sm shadow-md">
-                                            {coupon.code}
-                                          </div>
-                                          <div className="flex-1">
-                                            <div className="text-2xl font-black text-[#3e2626]">
-                                              {discountValue}
-                                            </div>
-                                            <div className="text-xs text-[#5a3a3a] font-semibold uppercase tracking-wide">
-                                              Desconto no Frete
-                                            </div>
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Descrição */}
-                                        <div className="bg-white/60 backdrop-blur-sm rounded-md p-3 border border-[#3e2626]/20">
-                                          <p className="text-sm font-medium text-gray-800">
-                                            {coupon.description || 'Cupom de frete grátis'}
-                                          </p>
-                                        </div>
-                                        
-                                        {/* Informações adicionais */}
-                                        <div className="space-y-1.5 text-xs text-gray-700">
-                                          {validUntil && (
-                                            <div className="flex items-center gap-2">
-                                              <Calendar className="h-3.5 w-3.5 text-[#3e2626]" />
-                                              <span className="font-medium">
-                                                Válido até: <span className="text-[#3e2626]">{new Date(validUntil).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-                                              </span>
-                                            </div>
-                                          )}
-                                          {coupon.usageLimit && (
-                                            <div className="flex items-center gap-2">
-                                              <Users className="h-3.5 w-3.5 text-[#3e2626]" />
-                                              <span className="font-medium">
-                                                Limite: {coupon.usageLimit}x por cliente
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                      
-                                      {/* Lado direito - Botão de ação */}
-                                      <div className="flex flex-col items-center justify-center">
-                                        <Button
-                                          onClick={() => handleApplyCouponFromModal(coupon.code)}
-                                          className="bg-[#3e2626] text-white hover:bg-[#2a1f1f] font-bold px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
-                                        >
-                                          <Truck className="h-4 w-4 mr-2" />
-                                          Usar
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Linha pontilhada decorativa */}
-                                  <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#3e2626]/40 to-transparent"></div>
-                                </div>
-                              );
-                            })}
+                            {shippingCoupons.map((coupon) => (
+                              <CouponCard
+                                key={coupon.id || coupon.code}
+                                coupon={{
+                                  ...coupon,
+                                  id: coupon.id || coupon.code,
+                                  status: 'active' as const,
+                                }}
+                                onUse={handleApplyCouponFromModal}
+                                showCopyButton={false}
+                                showUseButton={true}
+                              />
+                            ))}
                           </div>
                         </div>
                       )}
@@ -4568,119 +4566,19 @@ export default function CheckoutPage() {
                             <span>Cupons Disponíveis</span>
                           </h3>
                           <div className="space-y-4">
-                            {availableCoupons.map((coupon) => {
-                              const discountValue = coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' 
-                                ? `${coupon.discountValue}%` 
-                                : `R$ ${Number(coupon.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-                              const validUntil = coupon.validUntil || coupon.expiresAt;
-                              const maxDiscount = coupon.maximumDiscount;
-                              
-                              return (
-                                <div
-                                  key={coupon.id || coupon.code}
-                                  className="relative bg-gray-100 border-2 border-[#3e2626]/50 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
-                                  style={{
-                                    clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
-                                    backgroundColor: 'rgba(62, 38, 38, 0.12)'
-                                  }}
-                                >
-                                  {/* Efeito de papel rasgado no topo */}
-                                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3e2626]/50 to-transparent opacity-50"></div>
-                                  
-                                  <div className="p-5">
-                                    <div className="flex items-start justify-between gap-4">
-                                      {/* Lado esquerdo - Informações principais */}
-                                      <div className="flex-1 space-y-3">
-                                        {/* Cabeçalho do cupom */}
-                                        <div className="flex items-center gap-3">
-                                          <div className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white px-3 py-1 rounded-md font-bold text-sm shadow-md">
-                                            {coupon.code}
-                                          </div>
-                                          <div className="flex-1">
-                                            <div className="text-3xl font-black text-[#3e2626]">
-                                              {discountValue}
-                                              {coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' ? (
-                                                <span className="text-lg ml-1">OFF</span>
-                                              ) : null}
-                                            </div>
-                                            <div className="text-xs text-[#5a3a3a] font-semibold uppercase tracking-wide">
-                                              Desconto Especial
-                                            </div>
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Descrição */}
-                                        <div className="bg-white/70 backdrop-blur-sm rounded-md p-3 border border-[#3e2626]/25">
-                                          <p className="text-sm font-medium text-gray-800">
-                                            {coupon.description || 'Cupom de desconto disponível'}
-                                          </p>
-                                        </div>
-                                        
-                                        {/* Informações adicionais */}
-                                        <div className="space-y-1.5 text-xs text-gray-700">
-                                          {coupon.minimumPurchase && (
-                                            <div className="flex items-center gap-2">
-                                              <ShoppingCart className="h-3.5 w-3.5 text-[#3e2626]" />
-                                              <span className="font-medium">
-                                                Compra mínima: <span className="text-[#3e2626] font-bold">R$ {Number(coupon.minimumPurchase).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                              </span>
-                                            </div>
-                                          )}
-                                          {maxDiscount && (coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage') && (
-                                            <div className="flex items-center gap-2">
-                                              <DollarSign className="h-3.5 w-3.5 text-[#3e2626]" />
-                                              <span className="font-medium">
-                                                Desconto máximo: <span className="text-[#3e2626] font-bold">R$ {Number(maxDiscount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                              </span>
-                                            </div>
-                                          )}
-                                          {validUntil && (
-                                            <div className="flex items-center gap-2">
-                                              <Calendar className="h-3.5 w-3.5 text-[#3e2626]" />
-                                              <span className="font-medium">
-                                                Válido até: <span className="text-[#3e2626]">{new Date(validUntil).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-                                              </span>
-                                            </div>
-                                          )}
-                                          {coupon.usageLimit && (
-                                            <div className="flex items-center gap-2">
-                                              <Users className="h-3.5 w-3.5 text-[#3e2626]" />
-                                              <span className="font-medium">
-                                                Limite: {coupon.usageLimit}x por cliente
-                                              </span>
-                                            </div>
-                                          )}
-                                          {coupon.applicableTo && coupon.applicableTo !== 'ALL' && (
-                                            <div className="flex items-center gap-2">
-                                              <Tag className="h-3.5 w-3.5 text-[#3e2626]" />
-                                              <span className="font-medium">
-                                                {coupon.applicableTo === 'CATEGORY' && coupon.categoryId ? `Válido para categoria: ${coupon.categoryId}` : null}
-                                                {coupon.applicableTo === 'PRODUCT' && coupon.productId ? 'Válido para produto específico' : null}
-                                                {coupon.applicableTo === 'STORE' && coupon.storeId ? 'Válido para loja específica' : null}
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                      
-                                      {/* Lado direito - Botão de ação */}
-                                      <div className="flex flex-col items-center justify-center">
-                                        <Button
-                                          onClick={() => handleApplyCouponFromModal(coupon.code)}
-                                          className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white hover:from-[#2a1f1f] hover:to-[#3e2626] font-bold px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
-                                        >
-                                          <CheckCircle className="h-4 w-4 mr-2" />
-                                          Usar
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Linha pontilhada decorativa */}
-                                  <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#3e2626]/50 to-transparent"></div>
-                                </div>
-                              );
-                            })}
+                            {availableCoupons.map((coupon) => (
+                              <CouponCard
+                                key={coupon.id || coupon.code}
+                                coupon={{
+                                  ...coupon,
+                                  id: coupon.id || coupon.code,
+                                  status: 'active' as const,
+                                }}
+                                onUse={handleApplyCouponFromModal}
+                                showCopyButton={false}
+                                showUseButton={true}
+                              />
+                            ))}
                           </div>
                         </div>
                       )}
@@ -4693,103 +4591,19 @@ export default function CheckoutPage() {
                             <span>Cupons Indisponíveis</span>
                           </h3>
                           <div className="space-y-4">
-                            {unavailableCoupons.map((coupon) => {
-                              const discountValue = coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' 
-                                ? `${coupon.discountValue}%` 
-                                : `R$ ${Number(coupon.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-                              const validUntil = coupon.validUntil || coupon.expiresAt;
-                              
-                              return (
-                                <div
-                                  key={coupon.id || coupon.code}
-                                  className="relative bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 border-2 border-[#3e2626]/20 rounded-lg overflow-hidden shadow-md opacity-75"
-                                  style={{
-                                    clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))'
-                                  }}
-                                >
-                                  {/* Efeito de papel rasgado no topo */}
-                                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3e2626]/20 to-transparent opacity-30"></div>
-                                  
-                                  <div className="p-5">
-                                    <div className="flex items-start justify-between gap-4">
-                                      {/* Lado esquerdo - Informações principais */}
-                                      <div className="flex-1 space-y-3">
-                                        {/* Cabeçalho do cupom */}
-                                        <div className="flex items-center gap-3">
-                                          <div className="bg-[#3e2626]/40 text-gray-700 px-3 py-1 rounded-md font-bold text-sm shadow-md">
-                                            {coupon.code}
-                                          </div>
-                                          <div className="flex-1">
-                                            <div className="text-2xl font-black text-gray-500 line-through">
-                                              {discountValue}
-                                              {coupon.discountType === 'PERCENTAGE' || coupon.discountType === 'percentage' ? (
-                                                <span className="text-lg ml-1">OFF</span>
-                                              ) : null}
-                                            </div>
-                                            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">
-                                              Cupom Indisponível
-                                            </div>
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Descrição */}
-                                        <div className="bg-white/50 backdrop-blur-sm rounded-md p-3 border border-[#3e2626]/10">
-                                          <p className="text-sm font-medium text-gray-600">
-                                            {coupon.description || 'Cupom indisponível'}
-                                          </p>
-                                        </div>
-                                        
-                                        {/* Informações adicionais */}
-                                        <div className="space-y-1.5 text-xs text-gray-600">
-                                          {coupon.minimumPurchase && (
-                                            <div className="flex items-center gap-2">
-                                              <ShoppingCart className="h-3.5 w-3.5 text-gray-400" />
-                                              <span className="font-medium">
-                                                Compra mínima: R$ {Number(coupon.minimumPurchase).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                              </span>
-                                            </div>
-                                          )}
-                                          {validUntil && (
-                                            <div className="flex items-center gap-2">
-                                              <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                                              <span className="font-medium">
-                                                Válido até: {new Date(validUntil).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                        
-                                        {/* Mostrar motivo da indisponibilidade */}
-                                        {coupon.unavailableReason && (
-                                          <div className="mt-3 p-3 bg-[#3e2626]/10 border-2 border-[#3e2626]/30 rounded-md">
-                                            <div className="flex items-start gap-2">
-                                              <Info className="h-4 w-4 text-[#5a3a3a] mt-0.5 flex-shrink-0" />
-                                              <p className="text-xs text-[#3e2626] font-semibold">
-                                                {coupon.unavailableReason}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                      
-                                      {/* Lado direito - Botão desabilitado */}
-                                      <div className="flex flex-col items-center justify-center">
-                                        <Button
-                                          disabled
-                                          className="bg-[#3e2626]/30 text-[#3e2626]/60 cursor-not-allowed font-bold px-6 py-3 rounded-lg shadow-sm"
-                                        >
-                                          <Lock className="h-4 w-4 mr-2" />
-                                          Indisponível
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Linha pontilhada decorativa */}
-                                  <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#3e2626]/20 to-transparent opacity-30"></div>
-                                </div>
-                              );
-                            })}
+                            {unavailableCoupons.map((coupon) => (
+                              <CouponCard
+                                key={coupon.id || coupon.code}
+                                coupon={{
+                                  ...coupon,
+                                  id: coupon.id || coupon.code,
+                                  status: 'unavailable' as const,
+                                }}
+                                unavailableReason={coupon.unavailableReason}
+                                showCopyButton={false}
+                                showUseButton={false}
+                              />
+                            ))}
                           </div>
                         </div>
                       )}

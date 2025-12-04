@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useAppStore } from '@/lib/store';
 import { adminAPI, authAPI } from '@/lib/api';
 import { ArrowLeft, User, Mail, Building2, Shield, Calendar, Phone } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 import { toast } from 'sonner';
 
 export default function ProfilePage() {
@@ -218,7 +219,7 @@ export default function ProfilePage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-primary/30 border-b-primary" />
+          <Loader size={48} className="mx-auto mb-4" />
           <p className="text-sm text-muted-foreground">Carregando perfil...</p>
         </div>
       </div>

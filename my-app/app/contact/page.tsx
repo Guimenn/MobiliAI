@@ -11,7 +11,6 @@ import {
   Send,
   MessageCircle,
   CheckCircle2,
-  Loader2,
   Instagram,
   Facebook,
   Twitter,
@@ -27,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
+import { Loader } from '@/components/ui/ai/loader';
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: '',
@@ -331,7 +331,7 @@ export default function ContactPage() {
                     >
                       {isSubmitting ? (
                         <>
-                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          <Loader size={20} className="mr-2" />
                           Enviando...
                         </>
                       ) : (

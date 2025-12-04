@@ -12,12 +12,12 @@ import {
   ArrowLeft,
   Copy,
   CheckCircle,
-  Loader2,
   RefreshCw,
   QrCode,
   Clock,
   AlertCircle,
 } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 import { customerAPI } from '@/lib/api';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -426,7 +426,7 @@ export default function PixPaymentPage() {
                 <Button onClick={handleRefresh} disabled={isCreatingPayment}>
                   {isCreatingPayment ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader size={16} className="mr-2" />
                       Tentando novamente...
                     </>
                   ) : (
@@ -582,7 +582,7 @@ export default function PixPaymentPage() {
                   >
                     {isCreatingPayment ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader size={16} className="mr-2" />
                         Atualizando...
                       </>
                     ) : (
@@ -645,7 +645,7 @@ export default function PixPaymentPage() {
               {isCheckingPayment && (
                 <div className="pt-4 border-t border-gray-200">
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader size={16} />
                     <span>Verificando pagamento...</span>
                   </div>
                 </div>
@@ -700,7 +700,7 @@ export default function PixPaymentPage() {
                 >
                   {isSimulatingPayment ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader size={16} className="mr-2" />
                       Simulando pagamento...
                     </>
                   ) : (

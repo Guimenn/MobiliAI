@@ -17,7 +17,6 @@ import {
   QrCode,
   Copy,
   CheckCircle,
-  Loader2,
   RefreshCw,
   Clock,
   AlertCircle,
@@ -27,6 +26,8 @@ import {
 } from 'lucide-react';
 import { env } from '@/lib/env';
 import { mqttAPI } from '@/lib/mqtt-api';
+import { Loader } from '@/components/ui/ai/loader';
+const stripePromise = loadStripe(env.STRIPE_PUBLISHABLE_KEY);
 
 interface PDVPaymentModalProps {
   open: boolean;
@@ -296,7 +297,7 @@ export default function PDVPaymentModal({
           <div className="space-y-6">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#3e2626] mb-4" />
+                <Loader size={32} className="text-[#3e2626] mb-4" />
                 <p className="text-gray-600">Gerando QR code PIX...</p>
               </div>
             ) : error ? (
@@ -378,7 +379,7 @@ export default function PDVPaymentModal({
 
                 {isCheckingPayment && (
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader size={16} />
                     <span>Verificando pagamento...</span>
                   </div>
                 )}
@@ -417,7 +418,7 @@ export default function PDVPaymentModal({
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader size={16} className="mr-2" />
                       Atualizando...
                     </>
                   ) : (
@@ -448,7 +449,7 @@ export default function PDVPaymentModal({
                 {!mqttConnected ? (
                   <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 w-full">
                     <div className="flex items-center space-x-2 text-yellow-800">
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader className="h-4 w-4 animate-spin" />
                       <span className="text-xs">Verificando conexão com o serviço MQTT...</span>
                     </div>
                   </div>

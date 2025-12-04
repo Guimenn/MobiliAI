@@ -10,7 +10,6 @@ import Footer from '@/components/Footer';
 import { env } from '@/lib/env';
 import {
   ArrowLeft,
-  Loader2,
   CreditCard,
   CheckCircle,
   AlertCircle,
@@ -20,6 +19,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import StripeCardForm from '@/components/StripeCardForm';
 
+import { Loader } from '@/components/ui/ai/loader';
 const stripePromise = loadStripe(env.STRIPE_PUBLISHABLE_KEY);
 
 export default function CardPaymentPage() {
@@ -247,7 +247,7 @@ export default function CardPaymentPage() {
                 </Elements>
               ) : (
                 <div className="text-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-[#3e2626] mx-auto mb-4" />
+                  <Loader size={32} className="text-[#3e2626] mx-auto mb-4" />
                   <p className="text-gray-600">Preparando formulário de pagamento...</p>
                 </div>
               )}

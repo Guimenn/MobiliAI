@@ -17,7 +17,6 @@ import {
   CreditCard,
   Banknote,
   QrCode,
-  Loader2,
   CheckCircle,
   X,
   Package,
@@ -30,6 +29,7 @@ import PDVPaymentModal from '@/components/PDVPaymentModal';
 import PDVPickupPage from '@/components/PDVPickupPage';
 import PDVProductsPage from '@/components/PDVProductsPage';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface Product {
   id: string;
   name: string;
@@ -617,7 +617,7 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
                   >
                     {isProcessingSale ? (
                       <>
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        <Loader size={20} className="mr-2" />
                         Processando...
                       </>
                     ) : (
@@ -930,7 +930,7 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
                 >
                   {isProcessingSale ? (
                     <>
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      <Loader size={20} className="mr-2" />
                       Processando...
                     </>
                   ) : (

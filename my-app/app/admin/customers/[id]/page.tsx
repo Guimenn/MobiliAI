@@ -23,6 +23,7 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 
 export default function CustomerDetailPage() {
   const router = useRouter();
@@ -129,7 +130,7 @@ export default function CustomerDetailPage() {
     return (
       <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/40">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-b-primary" />
+          <Loader size={40} className="mx-auto mb-4" />
           <p className="text-sm text-muted-foreground">Carregando dados do cliente...</p>
         </div>
       </div>

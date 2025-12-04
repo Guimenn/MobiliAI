@@ -9,15 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { customerAPI } from '@/lib/api';
-import {
+
+import { Loader } from '@/components/ui/ai/loader';import {
   CheckCircle,
   Package,
   Home,
   ShoppingCart,
   Mail,
-  Phone,
-  Loader2
-} from 'lucide-react';
+  Phone} from 'lucide-react';
 
 function CheckoutSuccessContent() {
   const router = useRouter();
@@ -94,7 +93,7 @@ function CheckoutSuccessContent() {
               Número do pedido: <span className="font-semibold text-[#3e2626]">
                 {isLoadingSale ? (
                   <span className="inline-flex items-center">
-                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    <Loader size={16} className="mr-1" />
                     Carregando...
                   </span>
                 ) : (
@@ -213,7 +212,7 @@ export default function CheckoutSuccessPage() {
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white page-with-fixed-header flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-[#3e2626] mx-auto mb-4" />
+          <Loader size={48} className="text-[#3e2626] mx-auto mb-4" />
           <p className="text-gray-600">Carregando...</p>
         </div>
       </div>

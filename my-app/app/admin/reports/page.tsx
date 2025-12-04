@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { adminAPI } from '@/lib/api';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { adminAPI, salesAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { 
   DollarSign, 
@@ -20,11 +23,16 @@ import {
   Clock,
   Trophy,
   Activity,
-  Loader2
+  Filter
 } from 'lucide-react';
+
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
+import { Loader } from '@/components/ui/ai/loader';
 const COLORS = ['#3e2626', '#6b4e3d', '#8b6f47', '#a67c52', '#c49a6a'];
+
+type ViewType = 'daily' | 'weekly' | 'monthly' | 'yearly';
+type FilterMode = 'auto' | 'specific';
 
 export default function ReportsPage() {
   const { token } = useAppStore();
@@ -34,24 +42,790 @@ export default function ReportsPage() {
   const [salesByPeriod, setSalesByPeriod] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [dailyReports, setDailyReports] = useState<any[]>([]);
+  const [viewType, setViewType] = useState<ViewType>('daily');
+  const [filterMode, setFilterMode] = useState<FilterMode>('auto');
+  const [specificDate, setSpecificDate] = useState<string>('');
+  const [dateRangeStart, setDateRangeStart] = useState<string>('');
+  const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
 
   useEffect(() => {
     loadReportsData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewType, filterMode, specificDate, dateRangeStart, dateRangeEnd]);
+
+  // Atualização automática para o dia de hoje no modo diário
+  useEffect(() => {
+    if (viewType === 'daily' && filterMode === 'auto') {
+      // Atualizar a cada 30 segundos para o dia de hoje
+      const interval = setInterval(() => {
+        loadReportsData();
+      }, 30000); // 30 segundos
+
+      return () => clearInterval(interval);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewType, filterMode]);
+
+  // Funções auxiliares para calcular períodos
+  const getPeriodStartDate = (type: ViewType, index: number): Date => {
+    // Usar data local para evitar problemas de timezone
+    const now = new Date();
+    const localDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (type) {
+      case 'daily':
+        const day = new Date(localDate);
+        day.setDate(day.getDate() - index);
+        return day;
+      case 'weekly':
+        const week = new Date(localDate);
+        week.setDate(week.getDate() - (index * 7));
+        // Começar na segunda-feira da semana
+        const dayOfWeek = week.getDay();
+        const diff = week.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        week.setDate(diff);
+        return week;
+      case 'monthly':
+        const month = new Date(localDate);
+        month.setMonth(month.getMonth() - index);
+        month.setDate(1);
+        return month;
+      case 'yearly':
+        const year = new Date(localDate);
+        year.setFullYear(year.getFullYear() - index);
+        year.setMonth(0, 1);
+        return year;
+    }
+  };
+
+  const getPeriodEndDate = (type: ViewType, index: number): Date => {
+    const start = getPeriodStartDate(type, index);
+    const end = new Date(start);
+    
+    switch (type) {
+      case 'daily':
+        // Para o dia de hoje (índice 0), usar a hora atual para atualização em tempo real
+        if (index === 0) {
+          return new Date(); // Hora atual
+        }
+        end.setHours(23, 59, 59, 999);
+        return end;
+      case 'weekly':
+        end.setDate(end.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+        return end;
+      case 'monthly':
+        end.setMonth(end.getMonth() + 1);
+        end.setDate(0);
+        end.setHours(23, 59, 59, 999);
+        return end;
+      case 'yearly':
+        end.setFullYear(end.getFullYear() + 1);
+        end.setDate(0);
+        end.setHours(23, 59, 59, 999);
+        return end;
+    }
+  };
+
+  const translatePaymentMethod = (method: string): string => {
+    const translations: Record<string, string> = {
+      'DEBIT_CARD': 'Cartão de Débito',
+      'DEBIT': 'Cartão de Débito',
+      'CREDIT_CARD': 'Cartão de Crédito',
+      'CREDIT': 'Cartão de Crédito',
+      'CASH': 'Dinheiro',
+      'PIX': 'PIX',
+      'BANK_TRANSFER': 'Transferência Bancária',
+      'TRANSFER': 'Transferência Bancária',
+      'OUTRO': 'Outro',
+      'OTHER': 'Outro'
+    };
+    
+    // Tentar tradução direta
+    if (translations[method]) {
+      return translations[method];
+    }
+    
+    // Se não encontrar, tentar com uppercase
+    const upperMethod = method.toUpperCase();
+    if (translations[upperMethod]) {
+      return translations[upperMethod];
+    }
+    
+    // Se ainda não encontrar, formatar o texto removendo underscores e capitalizando
+    return method
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const formatPeriodLabel = (type: ViewType, periodStart: Date, periodEnd: Date): string => {
+    switch (type) {
+      case 'daily':
+        return periodStart.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+      case 'weekly':
+        return `${periodStart.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${periodEnd.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+      case 'monthly':
+        return periodStart.toLocaleDateString('pt-BR', {
+          month: 'long',
+          year: 'numeric'
+        });
+      case 'yearly':
+        return periodStart.getFullYear().toString();
+    }
+  };
+
+  const getMaxReports = (type: ViewType): number => {
+    switch (type) {
+      case 'daily': return 7;
+      case 'weekly': return 4;
+      case 'monthly': return 12;
+      case 'yearly': return 6;
+    }
+  };
+
+  const isDateInRange = (date: Date, start: Date, end: Date): boolean => {
+    return date >= start && date <= end;
+  };
+
+  // Função para obter a chave única do período baseado no tipo
+  const getPeriodKey = (reportDate: Date, type: ViewType): string => {
+    // Criar uma cópia da data e normalizar para meia-noite local
+    const date = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
+    
+    switch (type) {
+      case 'daily':
+        // Chave: YYYY-MM-DD
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      case 'weekly':
+        // Chave: YYYY-MM-DD (data de início da semana - segunda-feira)
+        const weekStart = new Date(date);
+        const dayOfWeek = weekStart.getDay();
+        const diff = weekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        weekStart.setDate(diff);
+        return `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`;
+      case 'monthly':
+        // Chave: YYYY-MM
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      case 'yearly':
+        // Chave: YYYY
+        return `${date.getFullYear()}`;
+    }
+  };
+
+  // Função para agrupar relatórios por período e pegar apenas o mais recente de cada período
+  const groupReportsByPeriod = (reports: any[], type: ViewType): any[] => {
+    const periodMap = new Map<string, any>();
+    
+    reports.forEach((report) => {
+      const reportDate = new Date(report.period || report.createdAt);
+      const periodKey = getPeriodKey(reportDate, type);
+      
+      // Se não existe relatório para este período, ou se este é mais recente, usar este
+      if (!periodMap.has(periodKey)) {
+        periodMap.set(periodKey, report);
+      } else {
+        const existingReport = periodMap.get(periodKey);
+        const existingDate = new Date(existingReport.period || existingReport.createdAt);
+        const currentDate = new Date(report.period || report.createdAt);
+        
+        // Se o relatório atual é mais recente, substituir
+        if (currentDate > existingDate) {
+          periodMap.set(periodKey, report);
+        }
+      }
+    });
+    
+    return Array.from(periodMap.values());
+  };
+
+  // Função para gerar relatório dinamicamente baseado nas vendas do período
+  const generateReportFromSales = async (startDate: Date, endDate: Date, periodKey: string, type: ViewType): Promise<any> => {
+    try {
+      // Buscar vendas do período usando a API
+      let periodSales: any[] = [];
+      
+      // Sempre tentar buscar todas as vendas primeiro como fallback mais confiável
+      try {
+        const allSales = await adminAPI.getSales();
+        const salesArray = Array.isArray(allSales) ? allSales : [];
+        
+        // Filtrar vendas do período
+        periodSales = salesArray.filter((sale: any) => {
+          if (!sale || !sale.createdAt) return false;
+          const saleDate = new Date(sale.createdAt);
+          return isDateInRange(saleDate, startDate, endDate);
+        });
+        
+        // Se não encontrou vendas, tentar a API específica por data
+        if (periodSales.length === 0) {
+          try {
+            const startDateStr = startDate.toISOString();
+            const endDateStr = endDate.toISOString();
+            const apiSales = await salesAPI.getByDateRange(startDateStr, endDateStr);
+            if (Array.isArray(apiSales) && apiSales.length > 0) {
+              periodSales = apiSales;
+            }
+          } catch (apiError) {
+            // Ignorar erro da API específica, já temos o fallback
+            console.warn('Erro ao buscar vendas por API específica:', apiError);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar vendas:', error);
+        periodSales = [];
+      }
+
+      // Verificar se é o dia de hoje usando data local
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const periodStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      
+      const isToday = type === 'daily' && periodStart.getTime() === today.getTime();
+      
+      
+      // Para o dia de hoje, sempre retornar um relatório mesmo sem vendas
+      // Para outros períodos, retornar null se não houver vendas
+      if (periodSales.length === 0 && !isToday) {
+        return null;
+      }
+
+      // Calcular métricas
+      const totalRevenue = periodSales.reduce((sum: number, sale: any) => {
+        // Tentar diferentes campos possíveis para o valor total
+        const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+        return sum + Number(amount || 0);
+      }, 0);
+      const totalSales = periodSales.length;
+      const averageTicket = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+      // Calcular lucro total
+      let totalProfit = 0;
+      periodSales.forEach((sale: any) => {
+        if (sale.items && Array.isArray(sale.items)) {
+          sale.items.forEach((item: any) => {
+            if (item.profit !== null && item.profit !== undefined) {
+              totalProfit += Number(item.profit);
+            } else if (item.costPrice !== null && item.costPrice !== undefined && item.unitPrice && item.quantity) {
+              const unitPrice = Number(item.unitPrice);
+              const costPrice = Number(item.costPrice);
+              const quantity = Number(item.quantity);
+              totalProfit += (unitPrice - costPrice) * quantity;
+            }
+          });
+        }
+      });
+
+      // Processar TODOS os dados a partir das vendas ANTES de criar o relatório
+      const salesByPeriodData: any[] = [];
+      const topProductsData: any[] = [];
+      const storesData: any[] = [];
+      const topEmployeesData: any[] = [];
+      const paymentMethodsData: any[] = [];
+      
+      if (periodSales.length > 0) {
+        // Agrupar vendas por data para o gráfico de receita por período
+        const salesMap = new Map<string, number>();
+        periodSales.forEach((sale: any) => {
+          const date = new Date(sale.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+          const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+          const currentRevenue = salesMap.get(date) || 0;
+          salesMap.set(date, currentRevenue + Number(amount));
+        });
+
+        // Converter para array e ordenar
+        salesByPeriodData.push(...Array.from(salesMap.entries())
+          .map(([date, revenue]) => ({ date, revenue }))
+          .sort((a, b) => {
+            const dateA = a.date.split('/').reverse().join('-');
+            const dateB = b.date.split('/').reverse().join('-');
+            return new Date(dateA).getTime() - new Date(dateB).getTime();
+          })
+          .slice(-7)); // Últimos 7 dias
+
+        // Agrupar produtos para o gráfico de top produtos
+        const productsMap = new Map<string, { name: string; quantity: number; revenue: number }>();
+        periodSales.forEach((sale: any) => {
+          sale.items?.forEach((item: any) => {
+            const productName = item.product?.name || 'Produto sem nome';
+            const itemRevenue = Number(item.totalPrice || item.unitPrice * item.quantity || 0);
+            if (productsMap.has(productName)) {
+              const current = productsMap.get(productName);
+              if (current) {
+                productsMap.set(productName, {
+                  name: productName,
+                  quantity: current.quantity + (item.quantity || 0),
+                  revenue: current.revenue + itemRevenue
+                });
+              }
+            } else {
+              productsMap.set(productName, {
+                name: productName,
+                quantity: item.quantity || 0,
+                revenue: itemRevenue
+              });
+            }
+          });
+        });
+
+        // Converter para array, ordenar por receita e pegar top 5
+        topProductsData.push(...Array.from(productsMap.values())
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5));
+
+        // Agrupar vendas por LOJA
+        const storesMap = new Map<string, { 
+          id: string; 
+          name: string; 
+          totalRevenue: number; 
+          totalSales: number; 
+          totalProfit: number;
+        }>();
+        periodSales.forEach((sale: any) => {
+          const storeId = sale.storeId || sale.store?.id || 'unknown';
+          const storeName = sale.store?.name || 'Loja sem nome';
+          const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+          
+          // Calcular lucro da venda
+          let saleProfit = 0;
+          if (sale.items && Array.isArray(sale.items)) {
+            sale.items.forEach((item: any) => {
+              if (item.profit !== null && item.profit !== undefined) {
+                saleProfit += Number(item.profit);
+              } else if (item.costPrice !== null && item.costPrice !== undefined && item.unitPrice && item.quantity) {
+                const unitPrice = Number(item.unitPrice);
+                const costPrice = Number(item.costPrice);
+                const quantity = Number(item.quantity);
+                saleProfit += (unitPrice - costPrice) * quantity;
+              }
+            });
+          }
+          
+          if (storesMap.has(storeId)) {
+            const current = storesMap.get(storeId)!;
+            storesMap.set(storeId, {
+              id: storeId,
+              name: current.name,
+              totalRevenue: current.totalRevenue + Number(amount),
+              totalSales: current.totalSales + 1,
+              totalProfit: current.totalProfit + saleProfit
+            });
+          } else {
+            storesMap.set(storeId, {
+              id: storeId,
+              name: storeName,
+              totalRevenue: Number(amount),
+              totalSales: 1,
+              totalProfit: saleProfit
+            });
+          }
+        });
+
+        // Converter stores para array e calcular ticket médio
+        storesData.push(...Array.from(storesMap.values()).map(store => ({
+          ...store,
+          averageTicket: store.totalSales > 0 ? store.totalRevenue / store.totalSales : 0,
+          isActive: true
+        })).sort((a, b) => b.totalRevenue - a.totalRevenue));
+
+        // Agrupar vendas por VENDEDOR/EMPLOYEE
+        const employeesMap = new Map<string, { 
+          id: string; 
+          name: string; 
+          totalRevenue: number; 
+          totalSales: number; 
+        }>();
+        periodSales.forEach((sale: any) => {
+          const employeeId = sale.employeeId || sale.employee?.id || 'unknown';
+          const employeeName = sale.employee?.name || sale.employeeName || 'Vendedor sem nome';
+          const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+          
+          if (employeesMap.has(employeeId)) {
+            const current = employeesMap.get(employeeId)!;
+            employeesMap.set(employeeId, {
+              id: employeeId,
+              name: current.name,
+              totalRevenue: current.totalRevenue + Number(amount),
+              totalSales: current.totalSales + 1
+            });
+          } else {
+            employeesMap.set(employeeId, {
+              id: employeeId,
+              name: employeeName,
+              totalRevenue: Number(amount),
+              totalSales: 1
+            });
+          }
+        });
+
+        // Converter employees para array e ordenar por receita (top vendedores)
+        topEmployeesData.push(...Array.from(employeesMap.values())
+          .sort((a, b) => b.totalRevenue - a.totalRevenue)
+          .slice(0, 10)); // Top 10 vendedores
+
+        // Agrupar vendas por MÉTODO DE PAGAMENTO
+        const paymentMethodsMap = new Map<string, { 
+          method: string; 
+          count: number; 
+          total: number; 
+        }>();
+        periodSales.forEach((sale: any) => {
+          const method = sale.paymentMethod || sale.payment_method || 'OUTRO';
+          const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+          
+          if (paymentMethodsMap.has(method)) {
+            const current = paymentMethodsMap.get(method)!;
+            paymentMethodsMap.set(method, {
+              method,
+              count: current.count + 1,
+              total: current.total + Number(amount)
+            });
+          } else {
+            paymentMethodsMap.set(method, {
+              method,
+              count: 1,
+              total: Number(amount)
+            });
+          }
+        });
+
+        // Converter paymentMethods para array
+        paymentMethodsData.push(...Array.from(paymentMethodsMap.values())
+          .sort((a, b) => b.total - a.total));
+      }
+
+      // Criar relatório virtual
+      // Usar a chave do período como data do período (já está no formato correto)
+      // Para daily, a chave já é YYYY-MM-DD
+      let reportPeriod = periodKey;
+      
+      // Se não for daily, precisamos extrair a data do startDate
+      if (type !== 'daily') {
+        const reportDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        reportPeriod = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(reportDate.getDate()).padStart(2, '0')}`;
+      }
+      
+      // Usar periodKey como ID para garantir unicidade por período
+      const virtualReport = {
+        id: `virtual-${periodKey}`,
+        name: `Relatório ${type === 'daily' ? 'Diário' : type === 'weekly' ? 'Semanal' : type === 'monthly' ? 'Mensal' : 'Anual'} - ${periodKey}`,
+        type: type,
+        period: reportPeriod,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        data: {
+          summary: {
+            totalRevenue,
+            totalSales,
+            totalProfit,
+            averageTicket,
+            totalStores: storesData.length,
+            activeStores: storesData.filter(s => s.isActive).length
+          },
+          stores: storesData,
+          topProducts: topProductsData,
+          topEmployees: topEmployeesData,
+          paymentMethods: paymentMethodsData,
+          charts: {
+            salesByPeriod: salesByPeriodData,
+            topProductsChart: topProductsData
+          },
+          sales: periodSales // Incluir vendas para processamento posterior se necessário
+        }
+      };
+
+
+      return virtualReport;
+    } catch (error) {
+      console.error('Erro ao gerar relatório dinamicamente:', error);
+      return null;
+    }
+  };
 
   const loadReportsData = async () => {
     try {
       setIsLoading(true);
       
-      // Verificar se existe relatório do dia atual
+      // Buscar todos os relatórios
       const savedReports = await adminAPI.getReports();
       const reportsArray = Array.isArray(savedReports) ? savedReports : [];
 
-      const sortedDailyReports = [...reportsArray]
-        .filter((report) => report.type === 'daily')
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      let filteredReports = [...reportsArray];
 
-      const processedDailyReports = sortedDailyReports.slice(0, 7).map((report) => {
+      // Aplicar filtros
+      if (filterMode === 'specific') {
+        if (specificDate) {
+          // Filtro por data específica
+          const targetDate = new Date(specificDate);
+          targetDate.setHours(0, 0, 0, 0);
+          const endDate = new Date(targetDate);
+          endDate.setHours(23, 59, 59, 999);
+          
+          filteredReports = filteredReports.filter((report) => {
+            const reportDate = new Date(report.period || report.createdAt);
+            reportDate.setHours(0, 0, 0, 0);
+            return isDateInRange(reportDate, targetDate, endDate);
+          });
+        } else if (dateRangeStart && dateRangeEnd) {
+          // Filtro por período
+          const start = new Date(dateRangeStart);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(dateRangeEnd);
+          end.setHours(23, 59, 59, 999);
+          
+          filteredReports = filteredReports.filter((report) => {
+            const reportDate = new Date(report.period || report.createdAt);
+            return isDateInRange(reportDate, start, end);
+          });
+        } else {
+          // Se não há filtro específico, não mostrar nada
+          filteredReports = [];
+        }
+      } else {
+        // Modo automático - gerar relatórios para os períodos esperados
+        const maxReports = getMaxReports(viewType);
+        
+        // Criar lista de períodos esperados
+        const expectedPeriodRanges: { start: Date; end: Date; key: string }[] = [];
+        
+        for (let i = 0; i < maxReports; i++) {
+          const start = getPeriodStartDate(viewType, i);
+          const end = getPeriodEndDate(viewType, i);
+          const key = getPeriodKey(start, viewType);
+          expectedPeriodRanges.push({ start, end, key });
+        }
+        
+        // Agrupar TODOS os relatórios salvos por período (eliminar duplicatas)
+        // Para cada período, manter apenas o relatório com maior receita
+        const savedReportsByKey = new Map<string, any>();
+        filteredReports.forEach(report => {
+          const reportDate = new Date(report.period || report.createdAt);
+          const periodKey = getPeriodKey(reportDate, viewType);
+          
+          if (!savedReportsByKey.has(periodKey)) {
+            savedReportsByKey.set(periodKey, report);
+          } else {
+            const existing = savedReportsByKey.get(periodKey);
+            
+            // Comparar receitas para manter o melhor relatório
+            let existingRevenue = 0;
+            let currentRevenue = 0;
+            let useCurrent = false;
+            
+            try {
+              const existingData = typeof existing.data === 'string' 
+                ? JSON.parse(existing.data) 
+                : existing.data || {};
+              const existingSummary = existingData?.summary || calculateSummaryFromData(existing) || {};
+              existingRevenue = Number(existingSummary.totalRevenue || 0);
+              
+              const currentData = typeof report.data === 'string' 
+                ? JSON.parse(report.data) 
+                : report.data || {};
+              const currentSummary = currentData?.summary || calculateSummaryFromData(report) || {};
+              currentRevenue = Number(currentSummary.totalRevenue || 0);
+              
+              // Se a receita é maior, usar o atual
+              if (currentRevenue > existingRevenue) {
+                useCurrent = true;
+              } else if (currentRevenue === existingRevenue) {
+                // Se a receita é igual, manter o mais recente
+                const existingDate = new Date(existing.period || existing.createdAt);
+                const currentDate = new Date(report.period || report.createdAt);
+                if (currentDate > existingDate) {
+                  useCurrent = true;
+                }
+              }
+            } catch (error) {
+              // Em caso de erro, manter o mais recente
+              const existingDate = new Date(existing.period || existing.createdAt);
+              const currentDate = new Date(report.period || report.createdAt);
+              if (currentDate > existingDate) {
+                useCurrent = true;
+              }
+            }
+            
+            if (useCurrent) {
+              savedReportsByKey.set(periodKey, report);
+            }
+          }
+        });
+
+        // Gerar relatórios para cada período esperado (em ordem sequencial)
+        // Garantir que cada período tenha exatamente UM relatório
+        const finalReportsMap = new Map<string, any>();
+        
+        for (let i = 0; i < expectedPeriodRanges.length; i++) {
+          const { start, end, key } = expectedPeriodRanges[i];
+          const isToday = viewType === 'daily' && i === 0;
+          
+          // Buscar relatório salvo para este período pela chave exata
+          let savedReport = savedReportsByKey.get(key);
+          let savedReportKey = key;
+          
+          // Se não encontrou pela chave exata, tentar encontrar por range
+          if (!savedReport) {
+            for (const [savedKey, savedReportItem] of savedReportsByKey.entries()) {
+              const reportDateStr = savedReportItem.period || savedReportItem.createdAt;
+              const reportDate = new Date(reportDateStr);
+              const normalizedReportDate = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
+              const normalizedStart = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+              const normalizedEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+              
+              if (normalizedReportDate >= normalizedStart && normalizedReportDate <= normalizedEnd) {
+                savedReport = savedReportItem;
+                savedReportKey = savedKey;
+                break;
+              }
+            }
+          }
+          
+          // Remover da lista para evitar duplicatas (se encontrou)
+          if (savedReport) {
+            savedReportsByKey.delete(savedReportKey);
+          }
+          
+          // Sempre gerar relatório virtual para garantir dados atualizados
+          // Especialmente para o dia de hoje
+          let virtualReport: any = null;
+          try {
+            virtualReport = await generateReportFromSales(start, end, key, viewType);
+          } catch (error) {
+            console.error(`Erro ao gerar relatório virtual para período ${key}:`, error);
+          }
+          
+          // Decidir qual relatório usar
+          if (virtualReport && savedReport) {
+            // Comparar receitas
+            try {
+              const savedData = typeof savedReport.data === 'string' 
+                ? JSON.parse(savedReport.data) 
+                : savedReport.data || {};
+              const savedSummary = savedData?.summary || calculateSummaryFromData(savedReport) || {};
+              const savedRevenue = Number(savedSummary.totalRevenue || 0);
+              
+              const virtualData = typeof virtualReport.data === 'string' 
+                ? JSON.parse(virtualReport.data) 
+                : virtualReport.data || {};
+              const virtualSummary = virtualData?.summary || calculateSummaryFromData(virtualReport) || {};
+              const virtualRevenue = Number(virtualSummary.totalRevenue || 0);
+              
+              // Usar o que tem maior receita, ou virtual se for hoje
+              if (isToday || virtualRevenue >= savedRevenue) {
+                finalReportsMap.set(key, virtualReport);
+              } else {
+                finalReportsMap.set(key, savedReport);
+              }
+            } catch (error) {
+              // Em caso de erro, preferir virtual
+              finalReportsMap.set(key, virtualReport || savedReport);
+            }
+          } else if (virtualReport) {
+            finalReportsMap.set(key, virtualReport);
+          } else if (savedReport) {
+            finalReportsMap.set(key, savedReport);
+          } else {
+            // Se não tem nenhum relatório, criar um relatório vazio para manter a sequência
+            // Mas apenas se for o dia de hoje ou se houver necessidade de mostrar todos os períodos
+            if (isToday) {
+              // Para o dia de hoje, sempre criar um relatório mesmo sem dados
+              const emptyReport = {
+                id: `empty-${key}`,
+                name: `Relatório ${viewType === 'daily' ? 'Diário' : viewType === 'weekly' ? 'Semanal' : viewType === 'monthly' ? 'Mensal' : 'Anual'} - ${key}`,
+                type: viewType,
+                period: key,
+                status: 'completed',
+                createdAt: new Date().toISOString(),
+                data: {
+                  summary: {
+                    totalRevenue: 0,
+                    totalSales: 0,
+                    totalProfit: 0,
+                    averageTicket: 0,
+                    totalStores: 0,
+                    activeStores: 0
+                  },
+                  stores: [],
+                  topProducts: [],
+                  topEmployees: [],
+                  paymentMethods: [],
+                  charts: {
+                    salesByPeriod: [],
+                    topProductsChart: []
+                  }
+                }
+              };
+              finalReportsMap.set(key, emptyReport);
+            }
+          }
+        }
+        
+        // Garantir que temos exatamente os períodos esperados na ordem correta
+        const orderedReports: any[] = [];
+        const addedKeys = new Set<string>();
+        
+        for (let i = 0; i < expectedPeriodRanges.length; i++) {
+          const { key } = expectedPeriodRanges[i];
+          const report = finalReportsMap.get(key);
+          if (report && !addedKeys.has(key)) {
+            orderedReports.push(report);
+            addedKeys.add(key);
+          }
+        }
+        
+        // Se ainda faltam períodos, adicionar os que estão no map mas não na ordem esperada
+        for (const [key, report] of finalReportsMap.entries()) {
+          if (!addedKeys.has(key)) {
+            orderedReports.push(report);
+            addedKeys.add(key);
+          }
+        }
+        
+        // Ordenar por data (mais recente primeiro)
+        filteredReports = orderedReports.sort((a, b) => {
+          const dateA = new Date(a.period || a.createdAt);
+          const dateB = new Date(b.period || b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        });
+      }
+
+      // Para modo específico, também ordenar e agrupar se necessário
+      if (filterMode === 'specific') {
+      // Ordenar por data (mais recente primeiro)
+        filteredReports = filteredReports.sort((a, b) => {
+          const dateA = new Date(a.period || a.createdAt);
+          const dateB = new Date(b.period || b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        });
+        
+        // Se há múltiplos relatórios para o mesmo período, agrupar
+        if (specificDate || (dateRangeStart && dateRangeEnd)) {
+          // Determinar o tipo baseado no intervalo
+          let groupingType: ViewType = 'daily';
+          if (dateRangeStart && dateRangeEnd) {
+            const start = new Date(dateRangeStart);
+            const end = new Date(dateRangeEnd);
+            const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays > 365) {
+              groupingType = 'yearly';
+            } else if (diffDays > 31) {
+              groupingType = 'monthly';
+            } else if (diffDays > 7) {
+              groupingType = 'weekly';
+            }
+          }
+          filteredReports = groupReportsByPeriod(filteredReports, groupingType);
+        }
+      }
+
+      const processedReports = filteredReports.map((report) => {
         if (typeof report.data === 'string') {
           try {
             return { ...report, data: JSON.parse(report.data) };
@@ -62,33 +836,68 @@ export default function ReportsPage() {
         return report;
       });
 
-      setDailyReports(processedDailyReports);
+      // Ordenação final por data do período (mais recente primeiro)
+      const finalSortedReports = processedReports.sort((a, b) => {
+        const dateA = new Date(a.period || a.createdAt);
+        const dateB = new Date(b.period || b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
 
-      const today = new Date().toISOString().split('T')[0];
-      let currentReport = reportsArray.find((r: any) => r.period === today && r.type === 'daily');
-      
-      // Se não houver relatório do dia atual, gerar automaticamente
-      if (!currentReport) {
-        try {
-          const generatedReport = await adminAPI.generateDailyReport();
-          currentReport = generatedReport;
-        } catch (error) {
-          console.error('Erro ao gerar relatório automaticamente:', error);
-          // Se falhar ao gerar, usar o relatório mais recente se houver
-          if (reportsArray.length > 0) {
-            currentReport = reportsArray.sort((a: any, b: any) => 
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            )[0];
+      // Deduplicação final baseada no periodKey para garantir unicidade
+      const uniqueReportsMap = new Map<string, any>();
+      finalSortedReports.forEach((report) => {
+        const reportDate = new Date(report.period || report.createdAt);
+        const periodKey = getPeriodKey(reportDate, viewType);
+        
+        // Se já existe um relatório para este período, manter o mais recente
+        if (!uniqueReportsMap.has(periodKey)) {
+          uniqueReportsMap.set(periodKey, report);
+        } else {
+          const existingReport = uniqueReportsMap.get(periodKey);
+          const existingDate = new Date(existingReport.period || existingReport.createdAt);
+          const currentDate = new Date(report.period || report.createdAt);
+          
+          if (currentDate > existingDate) {
+            uniqueReportsMap.set(periodKey, report);
           }
         }
-      }
+      });
 
-      if (currentReport) {
-        await hydrateReport(currentReport);
+      // Converter de volta para array e manter a ordem
+      const uniqueReports = Array.from(uniqueReportsMap.values()).sort((a, b) => {
+        const dateA = new Date(a.period || a.createdAt);
+        const dateB = new Date(b.period || b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      setDailyReports(uniqueReports);
+
+      // Atualizar o relatório atual
+      if (finalSortedReports.length > 0) {
+        // Se há relatórios filtrados, verificar se o atual ainda está na lista
+        if (currentReport) {
+          const stillExists = finalSortedReports.some(r => r.id === currentReport.id);
+          if (!stillExists) {
+            // Se o relatório atual não está mais na lista, carregar o mais recente
+            await hydrateReport(finalSortedReports[0]);
+          }
+        } else {
+          // Se não há relatório atual, carregar o mais recente
+          await hydrateReport(finalSortedReports[0]);
+        }
       } else {
+        // Se não há relatórios filtrados, limpar o relatório atual apenas se estiver no modo específico
+        // No modo automático, manter o relatório atual se existir
+        if (filterMode === 'specific') {
+          setCurrentReport(null);
+          setSalesByPeriod([]);
+          setTopProducts([]);
+        } else if (!currentReport) {
+          // Se não há relatório atual e não há relatórios, limpar tudo
         setCurrentReport(null);
         setSalesByPeriod([]);
         setTopProducts([]);
+        }
       }
 
     } catch (error) {
@@ -104,11 +913,8 @@ export default function ReportsPage() {
     
     sales.forEach(sale => {
       const date = new Date(sale.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      if (salesMap.has(date)) {
-        salesMap.set(date, salesMap.get(date) + Number(sale.totalAmount));
-      } else {
-        salesMap.set(date, Number(sale.totalAmount));
-      }
+      const currentRevenue = salesMap.get(date) || 0;
+      salesMap.set(date, currentRevenue + Number(sale.totalAmount));
     });
 
     // Converter para array e ordenar por data
@@ -158,72 +964,6 @@ export default function ReportsPage() {
     return sortedProducts;
   };
 
-  const hydrateReport = async (report: any) => {
-    if (!report) return;
-
-    const processedReport = { ...report };
-
-    if (typeof processedReport.data === 'string') {
-      try {
-        processedReport.data = JSON.parse(processedReport.data);
-      } catch (e) {
-        console.error('Erro ao parsear dados do relatório:', e);
-        processedReport.data = {};
-      }
-    }
-
-    const calculatedSummary = calculateSummaryFromData(processedReport);
-    if (calculatedSummary) {
-      processedReport.data = processedReport.data || {};
-      processedReport.data.summary = {
-        ...(processedReport.data.summary || {}),
-        ...calculatedSummary,
-      };
-    }
-
-    setCurrentReport(processedReport);
-
-    const reportData = processedReport.data || {};
-    if (reportData.charts) {
-      if (reportData.charts.salesByPeriod && Array.isArray(reportData.charts.salesByPeriod)) {
-        setSalesByPeriod(reportData.charts.salesByPeriod);
-      }
-      if (reportData.charts.topProductsChart && Array.isArray(reportData.charts.topProductsChart)) {
-        setTopProducts(reportData.charts.topProductsChart);
-      }
-    } else {
-      const fallbackSales = reportData.sales
-        ? (Array.isArray(reportData.sales) ? reportData.sales : [])
-        : await fetchSalesFallback();
-      setSalesData(fallbackSales);
-      processSalesByPeriod(fallbackSales);
-      processTopProducts(fallbackSales);
-    }
-  };
-
-  const fetchSalesFallback = async () => {
-    try {
-      const sales = await adminAPI.getSales();
-      return Array.isArray(sales) ? sales : [];
-    } catch (error) {
-      console.error('Erro ao buscar vendas para fallback:', error);
-      return [];
-    }
-  };
-
-  const handleDownloadReport = () => {
-    if (!currentReport) return;
-    
-    const dataStr = JSON.stringify(currentReport.data, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `relatorio-completo-${currentReport.period || new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const calculateSummaryFromData = (report: any) => {
     if (!report) return null;
     
@@ -271,6 +1011,98 @@ export default function ReportsPage() {
     };
   };
 
+  const hydrateReport = async (report: any) => {
+    if (!report) return;
+
+    // Processar o relatório de forma síncrona primeiro
+    const processedReport = { ...report };
+
+    if (typeof processedReport.data === 'string') {
+      try {
+        processedReport.data = JSON.parse(processedReport.data);
+      } catch (e) {
+        console.error('Erro ao parsear dados do relatório:', e);
+        processedReport.data = {};
+      }
+    }
+
+    const calculatedSummary = calculateSummaryFromData(processedReport);
+    if (calculatedSummary) {
+      processedReport.data = processedReport.data || {};
+      processedReport.data.summary = {
+        ...(processedReport.data.summary || {}),
+        ...calculatedSummary,
+      };
+    }
+
+    const reportData = processedReport.data || {};
+    
+    // Processar gráficos ANTES de definir currentReport para que apareçam imediatamente
+    if (reportData.charts) {
+      if (reportData.charts.salesByPeriod && Array.isArray(reportData.charts.salesByPeriod) && reportData.charts.salesByPeriod.length > 0) {
+        setSalesByPeriod(reportData.charts.salesByPeriod);
+      } else {
+        setSalesByPeriod([]);
+      }
+      if (reportData.charts.topProductsChart && Array.isArray(reportData.charts.topProductsChart) && reportData.charts.topProductsChart.length > 0) {
+        setTopProducts(reportData.charts.topProductsChart);
+      } else if (reportData.topProducts && Array.isArray(reportData.topProducts) && reportData.topProducts.length > 0) {
+        // Se não há charts mas há topProducts, usar eles
+        setTopProducts(reportData.topProducts);
+      } else {
+        setTopProducts([]);
+      }
+    } else if (reportData.sales && Array.isArray(reportData.sales) && reportData.sales.length > 0) {
+      // Processar dados de vendas imediatamente se disponíveis
+      processSalesByPeriod(reportData.sales);
+      processTopProducts(reportData.sales);
+    } else {
+      // Inicializar vazios imediatamente
+      setSalesByPeriod([]);
+      setTopProducts([]);
+    }
+
+    // Definir currentReport DEPOIS de processar os gráficos para que tudo apareça junto
+    setCurrentReport(processedReport);
+
+    // Se não há dados de gráficos, tentar buscar de forma assíncrona (sem bloquear)
+    if (!reportData.charts && (!reportData.sales || !Array.isArray(reportData.sales) || reportData.sales.length === 0)) {
+      // Buscar dados de fallback de forma assíncrona sem bloquear a renderização
+      fetchSalesFallback().then((fallbackSales) => {
+        if (fallbackSales.length > 0) {
+          setSalesData(fallbackSales);
+          processSalesByPeriod(fallbackSales);
+          processTopProducts(fallbackSales);
+        }
+      }).catch((error) => {
+        console.error('Erro ao buscar vendas para fallback:', error);
+      });
+    }
+  };
+
+  const fetchSalesFallback = async () => {
+    try {
+      const sales = await adminAPI.getSales();
+      return Array.isArray(sales) ? sales : [];
+    } catch (error) {
+      console.error('Erro ao buscar vendas para fallback:', error);
+      return [];
+    }
+  };
+
+  const handleDownloadReport = () => {
+    if (!currentReport) return;
+    
+    const dataStr = JSON.stringify(currentReport.data, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `relatorio-completo-${currentReport.period || new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleGenerateDailyReport = async () => {
     try {
       setIsLoading(true);
@@ -290,12 +1122,11 @@ export default function ReportsPage() {
 
   const handleSelectReport = async (report: any) => {
     try {
-      setIsLoading(true);
+      // Não usar setIsLoading aqui para não bloquear a renderização
+      // Os dados aparecerão imediatamente quando currentReport for definido
       await hydrateReport(report);
     } catch (error) {
       console.error('Erro ao carregar relatório selecionado:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -359,7 +1190,7 @@ export default function ReportsPage() {
               >
                 {isLoading ? (
                   <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
                     Gerando...
                   </>
                 ) : (
@@ -376,7 +1207,7 @@ export default function ReportsPage() {
         {isLoading && !currentReport ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[#3e2626] mx-auto mb-4" />
+              <Loader size={32} className="text-[#3e2626] mx-auto mb-4" />
               <p className="text-gray-600 font-medium">Gerando relatório completo...</p>
               <p className="text-sm text-gray-500 mt-1">Aguarde enquanto os dados são processados</p>
             </div>
@@ -400,22 +1231,226 @@ export default function ReportsPage() {
           </Card>
         ) : (
           <div className="space-y-6">
-            {dailyReports.length > 0 && (
-              <Card className="border-0 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold text-gray-900">Relatórios Diários Recentes</CardTitle>
-                  <CardDescription className="text-sm text-gray-600">
-                    Acesse rapidamente os relatórios gerados nos últimos dias
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+            {/* Filtros */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filtros de Relatórios
+                </CardTitle>
+                <CardDescription className="text-sm text-gray-600">
+                  Escolha o tipo de visualização e período desejado
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="viewType">Tipo de Visualização</Label>
+                    <Select value={viewType} onValueChange={(value) => setViewType(value as ViewType)}>
+                      <SelectTrigger id="viewType">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Diário (últimos 7 dias)</SelectItem>
+                        <SelectItem value="weekly">Semanal (últimas 4 semanas)</SelectItem>
+                        <SelectItem value="monthly">Mensal (últimos 12 meses)</SelectItem>
+                        <SelectItem value="yearly">Anual (últimos 6 anos)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="filterMode">Modo de Filtro</Label>
+                    <Select value={filterMode} onValueChange={(value) => {
+                      setFilterMode(value as FilterMode);
+                      if (value === 'auto') {
+                        setSpecificDate('');
+                        setDateRangeStart('');
+                        setDateRangeEnd('');
+                      }
+                    }}>
+                      <SelectTrigger id="filterMode">
+                        <SelectValue placeholder="Selecione o modo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Automático</SelectItem>
+                        <SelectItem value="specific">Data/Período Específico</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {filterMode === 'specific' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="specificDate">Data Específica</Label>
+                        <Input
+                          id="specificDate"
+                          type="date"
+                          value={specificDate}
+                          onChange={(e) => {
+                            setSpecificDate(e.target.value);
+                            if (e.target.value) {
+                              setDateRangeStart('');
+                              setDateRangeEnd('');
+                            }
+                          }}
+                          placeholder="Selecione uma data"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Período (ou deixe a data acima vazia)</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label htmlFor="dateRangeStart" className="text-xs">De</Label>
+                            <Input
+                              id="dateRangeStart"
+                              type="date"
+                              value={dateRangeStart}
+                              onChange={(e) => {
+                                setDateRangeStart(e.target.value);
+                                if (e.target.value) {
+                                  setSpecificDate('');
+                                }
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="dateRangeEnd" className="text-xs">Até</Label>
+                            <Input
+                              id="dateRangeEnd"
+                              type="date"
+                              value={dateRangeEnd}
+                              onChange={(e) => {
+                                setDateRangeEnd(e.target.value);
+                                if (e.target.value) {
+                                  setSpecificDate('');
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base font-semibold text-gray-900">
+                  {filterMode === 'auto' 
+                    ? `Relatórios ${viewType === 'daily' ? 'Diários' : viewType === 'weekly' ? 'Semanais' : viewType === 'monthly' ? 'Mensais' : 'Anuais'} Recentes`
+                    : 'Relatórios Filtrados'
+                  }
+                </CardTitle>
+                <CardDescription className="text-sm text-gray-600">
+                  {filterMode === 'auto'
+                    ? `Acesse rapidamente os relatórios gerados nos últimos ${getMaxReports(viewType)} ${viewType === 'daily' ? 'dias' : viewType === 'weekly' ? 'semanas' : viewType === 'monthly' ? 'meses' : 'anos'}`
+                    : specificDate 
+                      ? `Relatórios da data: ${new Date(specificDate).toLocaleDateString('pt-BR')}`
+                      : dateRangeStart && dateRangeEnd
+                        ? `Relatórios do período: ${new Date(dateRangeStart).toLocaleDateString('pt-BR')} até ${new Date(dateRangeEnd).toLocaleDateString('pt-BR')}`
+                        : 'Acesse os relatórios filtrados'
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {dailyReports.length > 0 ? (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {dailyReports.map((report) => {
                       const summary = getReportSummary(report);
-                      const isActive = currentReport?.id === report.id;
+                      const reportDate = new Date(report.period || report.createdAt);
+                      const reportPeriodKey = getPeriodKey(reportDate, viewType);
+                      
+                      // Comparar por periodKey e id para garantir que o relatório correto está ativo
+                      const currentReportPeriodKey = currentReport 
+                        ? getPeriodKey(new Date(currentReport.period || currentReport.createdAt), viewType)
+                        : null;
+                      const isActive = currentReport && (
+                        currentReport.id === report.id || 
+                        (currentReportPeriodKey === reportPeriodKey && currentReport.period === report.period)
+                      );
+                      
+                      // Determinar o período para exibição baseado no tipo selecionado
+                      let periodLabel = '';
+                      let periodType = '';
+                      
+                      if (filterMode === 'auto') {
+                        // No modo automático, usar o viewType selecionado
+                        periodType = viewType === 'daily' ? 'diário' : viewType === 'weekly' ? 'semanal' : viewType === 'monthly' ? 'mensal' : 'anual';
+                        
+                      if (viewType === 'daily') {
+                        periodLabel = reportDate.toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        });
+                      } else if (viewType === 'weekly') {
+                        const weekStart = new Date(reportDate);
+                        const dayOfWeek = weekStart.getDay();
+                        const diff = weekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+                        weekStart.setDate(diff);
+                          weekStart.setHours(0, 0, 0, 0);
+                        const weekEnd = new Date(weekStart);
+                        weekEnd.setDate(weekEnd.getDate() + 6);
+                          weekEnd.setHours(23, 59, 59, 999);
+                        periodLabel = `${weekStart.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${weekEnd.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+                      } else if (viewType === 'monthly') {
+                          const monthStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+                          periodLabel = monthStart.toLocaleDateString('pt-BR', {
+                          month: 'long',
+                          year: 'numeric'
+                        });
+                      } else if (viewType === 'yearly') {
+                          periodLabel = reportDate.getFullYear().toString();
+                        }
+                      } else {
+                        // No modo específico, determinar o tipo baseado na data do relatório
+                        // Verificar se é diário, semanal, mensal ou anual
+                        const reportType = report.type || 'daily';
+                        periodType = reportType === 'daily' ? 'diário' : reportType === 'weekly' ? 'semanal' : reportType === 'monthly' ? 'mensal' : 'anual';
+                        
+                        if (reportType === 'daily') {
+                          periodLabel = reportDate.toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          });
+                        } else if (reportType === 'weekly') {
+                          const weekStart = new Date(reportDate);
+                          const dayOfWeek = weekStart.getDay();
+                          const diff = weekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+                          weekStart.setDate(diff);
+                          weekStart.setHours(0, 0, 0, 0);
+                          const weekEnd = new Date(weekStart);
+                          weekEnd.setDate(weekEnd.getDate() + 6);
+                          weekEnd.setHours(23, 59, 59, 999);
+                          periodLabel = `${weekStart.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${weekEnd.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+                        } else if (reportType === 'monthly') {
+                          const monthStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+                          periodLabel = monthStart.toLocaleDateString('pt-BR', {
+                            month: 'long',
+                            year: 'numeric'
+                          });
+                        } else if (reportType === 'yearly') {
+                        periodLabel = reportDate.getFullYear().toString();
+                      } else {
+                        periodLabel = reportDate.toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        });
+                        }
+                      }
+                      
+                      // Usar periodKey como key para garantir unicidade por período
+                      // Combinar periodKey com id para garantir unicidade absoluta
+                      const uniqueKey = `${reportPeriodKey}-${report.id}`;
                       return (
                         <div
-                          key={report.id}
+                          key={uniqueKey}
                           className={`p-4 rounded-xl border transition-all ${
                             isActive
                               ? 'border-[#3e2626] bg-[#3e2626]/5 shadow-md'
@@ -425,13 +1460,11 @@ export default function ReportsPage() {
                           <div className="flex items-start justify-between">
                             <div>
                               <p className="text-sm font-semibold text-gray-900">
-                                {new Date(report.period || report.createdAt).toLocaleDateString('pt-BR', {
-                                  day: '2-digit',
-                                  month: 'short',
-                                  year: 'numeric',
-                                })}
+                                {periodLabel}
                               </p>
-                              <p className="text-xs text-gray-500 capitalize">{report.type || 'daily'}</p>
+                              <p className="text-xs text-gray-500 capitalize">
+                                {periodType}
+                              </p>
                             </div>
                             <span className="text-xs text-gray-400">
                               {new Date(report.createdAt).toLocaleTimeString('pt-BR', {
@@ -461,12 +1494,40 @@ export default function ReportsPage() {
                       );
                     })}
                   </div>
+                ) : (
+                  <div className="py-12 text-center">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <Calendar className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Nenhum relatório encontrado
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-4 max-w-md mx-auto">
+                      {filterMode === 'specific' 
+                        ? (specificDate 
+                            ? `Não há relatórios para a data ${new Date(specificDate).toLocaleDateString('pt-BR')}. Tente selecionar outra data ou período.`
+                            : dateRangeStart && dateRangeEnd
+                              ? `Não há relatórios para o período de ${new Date(dateRangeStart).toLocaleDateString('pt-BR')} até ${new Date(dateRangeEnd).toLocaleDateString('pt-BR')}. Tente selecionar outro período.`
+                              : 'Selecione uma data específica ou um período para filtrar os relatórios.')
+                        : `Não há relatórios ${viewType === 'daily' ? 'diários' : viewType === 'weekly' ? 'semanais' : viewType === 'monthly' ? 'mensais' : 'anuais'} disponíveis nos últimos ${getMaxReports(viewType)} ${viewType === 'daily' ? 'dias' : viewType === 'weekly' ? 'semanas' : viewType === 'monthly' ? 'meses' : 'anos'}.`
+                      }
+                    </p>
+                    {filterMode === 'auto' && (
+                      <Button 
+                        onClick={handleGenerateDailyReport}
+                        className="bg-[#3e2626] hover:bg-[#2d1c1c] text-white gap-2"
+                      >
+                        <Calendar className="h-4 w-4" />
+                        Gerar Relatório Agora
+                      </Button>
+                    )}
+                  </div>
+                )}
                 </CardContent>
               </Card>
-            )}
 
             {/* Cards de Resumo Geral - Estilo Horizon */}
-            {(() => {
+            {currentReport && (() => {
               // Calcular summary se não existir ou estiver vazio
               const summary = currentReport.data?.summary || calculateSummaryFromData(currentReport) || {};
               
@@ -546,7 +1607,8 @@ export default function ReportsPage() {
             })()}
 
             {/* Gráficos Modernos */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {currentReport && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <Card className="bg-white border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold text-gray-900">Receita por Período</CardTitle>
@@ -662,12 +1724,15 @@ export default function ReportsPage() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
                       <RechartsBarChart 
-                        data={currentReport.data.stores.map((store: any) => ({
-                          name: store.storeName.length > 15 ? store.storeName.substring(0, 15) + '...' : store.storeName,
-                          receita: Number(store.totalRevenue),
-                          vendas: store.totalSales,
-                          ticketMedio: Number(store.averageTicket)
-                        }))}
+                        data={currentReport.data.stores.map((store: any) => {
+                          const storeName = store.name || store.storeName || 'Loja sem nome';
+                          return {
+                            name: storeName.length > 15 ? storeName.substring(0, 15) + '...' : storeName,
+                            receita: Number(store.totalRevenue || 0),
+                            vendas: store.totalSales || 0,
+                            ticketMedio: Number(store.averageTicket || 0)
+                          };
+                        })}
                         layout="vertical"
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -724,12 +1789,15 @@ export default function ReportsPage() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
                       <RechartsBarChart 
-                        data={currentReport.data.stores.map((store: any) => ({
-                          name: store.storeName.length > 15 ? store.storeName.substring(0, 15) + '...' : store.storeName,
-                          ticketMedio: Number(store.averageTicket),
-                          receita: Number(store.totalRevenue),
-                          vendas: store.totalSales
-                        }))}
+                        data={currentReport.data.stores.map((store: any) => {
+                          const storeName = store.name || store.storeName || 'Loja sem nome';
+                          return {
+                            name: storeName.length > 15 ? storeName.substring(0, 15) + '...' : storeName,
+                            ticketMedio: Number(store.averageTicket || 0),
+                            receita: Number(store.totalRevenue || 0),
+                            vendas: store.totalSales || 0
+                          };
+                        })}
                         layout="vertical"
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -775,10 +1843,11 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
               )}
-            </div>
+              </div>
+            )}
 
             {/* Métricas de Pagamento */}
-            {currentReport.data?.paymentMethods && currentReport.data.paymentMethods.length > 0 && (
+            {currentReport && currentReport.data?.paymentMethods && currentReport.data.paymentMethods.length > 0 && (
               <Card className="bg-white border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold text-gray-900">Métodos de Pagamento</CardTitle>
@@ -791,8 +1860,8 @@ export default function ReportsPage() {
                         key={pm.method} 
                         className="p-4 bg-white rounded-lg border border-gray-100"
                       >
-                        <p className="text-xs font-medium text-gray-600 mb-2 uppercase">
-                          {pm.method.replace('_', ' ')}
+                        <p className="text-xs font-medium text-gray-600 mb-2">
+                          {translatePaymentMethod(pm.method)}
                         </p>
                         <p className="text-xl font-semibold text-gray-900 mb-1">{pm.count}</p>
                         <p className="text-sm font-medium text-emerald-600">
@@ -828,7 +1897,7 @@ export default function ReportsPage() {
                         {currentReport.data.stores.map((store: any, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50/30">
                             <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="font-medium text-gray-900">{store.storeName}</div>
+                                    <div className="font-medium text-gray-900">{store.name || store.storeName || 'Loja sem nome'}</div>
                                   </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">{store.totalSales}</div>
@@ -884,8 +1953,8 @@ export default function ReportsPage() {
                             {idx > 2 && <span className="text-sm text-gray-500">{idx + 1}º</span>}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{emp.employeeName}</p>
-                            <p className="text-xs text-gray-500 truncate">{emp.storeName}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{emp.name || emp.employeeName || 'Vendedor sem nome'}</p>
+                            <p className="text-xs text-gray-500 truncate">{emp.storeName || ''}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-medium text-gray-900">
@@ -920,8 +1989,8 @@ export default function ReportsPage() {
                             {idx > 2 && <span className="text-sm text-gray-500">{idx + 1}º</span>}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{product.productName}</p>
-                            <p className="text-xs text-gray-500">Qtd: {product.quantity}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{product.name || product.productName || 'Produto sem nome'}</p>
+                            <p className="text-xs text-gray-500">Qtd: {product.quantity || 0}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-medium text-gray-900">

@@ -19,11 +19,10 @@ import {
   CreditCard,
   Clock,
   Trophy,
-  Activity,
-  Loader2
-} from 'lucide-react';
+  Activity} from 'lucide-react';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
 
+import { Loader } from '@/components/ui/ai/loader';
 const COLORS = ['#3e2626', '#6b4e3d', '#8b6f47', '#a67c52', '#c49a6a'];
 
 export default function ManagerReportsPage() {
@@ -256,7 +255,7 @@ export default function ManagerReportsPage() {
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[#3e2626] mx-auto mb-4" />
+              <Loader size={32} className="text-[#3e2626] mx-auto mb-4" />
               <p className="text-gray-600 font-medium">Carregando relatórios...</p>
               <p className="text-sm text-gray-500 mt-1">Aguarde enquanto os dados são processados</p>
             </div>

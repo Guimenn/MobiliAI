@@ -8,8 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import MedicalCertificateModal from '@/components/MedicalCertificateModal';
 import { useAppStore } from '@/lib/store';
-import { ArrowLeft, FileText, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, FileText, Plus } from 'lucide-react';
 
+import { Loader } from '@/components/ui/ai/loader';
 type Certificate = {
   id: string;
   employeeId: string;
@@ -185,7 +186,7 @@ export default function ManagerEmployeeMedicalCertificatesPage() {
         <CardContent className="p-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-gray-500">
-              <Loader2 className="h-8 w-8 mr-2 animate-spin text-[#3e2626]" />
+              <Loader size={32} className="mr-2 text-[#3e2626]" />
               <span className="text-lg">Carregando...</span>
             </div>
           ) : certificates.length === 0 ? (

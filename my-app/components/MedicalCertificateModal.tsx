@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Save, Loader2, FileText } from 'lucide-react';
+import { X, Save, FileText } from 'lucide-react';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface MedicalCertificate {
   id?: string;
   employeeId: string;
@@ -317,7 +318,7 @@ export default function MedicalCertificateModal({
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader size={16} className="mr-2" />
                   Salvando...
                 </>
               ) : (

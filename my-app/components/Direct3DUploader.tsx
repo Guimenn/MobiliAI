@@ -7,13 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { 
+
+import { Loader } from '@/components/ui/ai/loader';import { 
   Upload, 
   Box, 
   X, 
   CheckCircle, 
-  AlertCircle, 
-  Loader2,
+  AlertCircle,
   Eye,
   Download,
   Trash2,
@@ -336,7 +336,7 @@ export default function Direct3DUploader({ onUploaded, onClose }: Direct3DUpload
                 >
                   {isUploading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader size={16} className="mr-2" />
                       Fazendo Upload...
                     </>
                   ) : (

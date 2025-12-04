@@ -23,7 +23,6 @@ import {
   Receipt,
   AlertCircle,
   CheckCircle,
-  Loader2,
   Search,
   User,
   Package,
@@ -32,6 +31,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { showConfirm } from '@/lib/alerts';
 
+import { Loader } from '@/components/ui/ai/loader';
 enum PaymentMethod {
   PIX = 'pix',
   CREDIT_CARD = 'credit_card',
@@ -336,7 +336,7 @@ export default function CreateSalePage() {
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader size={32} className="text-blue-600" />
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -672,7 +672,7 @@ export default function CreateSalePage() {
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       Processando...
                     </>
                   ) : (

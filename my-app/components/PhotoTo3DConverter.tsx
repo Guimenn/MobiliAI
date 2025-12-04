@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { 
+
+import { Loader } from '@/components/ui/ai/loader';import { 
   Upload, 
   Camera, 
   Download, 
@@ -15,7 +16,6 @@ import {
   X, 
   CheckCircle,
   AlertCircle,
-  Loader2,
   Image as ImageIcon,
   Box as BoxIcon
 } from 'lucide-react';
@@ -369,7 +369,7 @@ export default function PhotoTo3DConverter({ onConverted, onClose }: PhotoTo3DCo
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader size={16} className="mr-2" />
                     Convertendo...
                   </>
                 ) : (

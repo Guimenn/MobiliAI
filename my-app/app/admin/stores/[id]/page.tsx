@@ -66,6 +66,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 import { X, Save } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 
 export default function StoreDetailsPage() {
   const router = useRouter();
@@ -619,7 +620,7 @@ export default function StoreDetailsPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
+          <Loader size={48} className="mx-auto mb-4" />
           <p className="text-gray-600">Carregando detalhes da loja...</p>
           
           {/* Botão de teste para o modal */}
@@ -658,7 +659,7 @@ export default function StoreDetailsPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
+          <Loader size={48} className="mx-auto mb-4" />
           <p className="text-gray-600">Carregando detalhes da loja...</p>
         </div>
       </div>
@@ -1186,7 +1187,7 @@ export default function StoreDetailsPage() {
             <div className="bg-white rounded-lg border">
               {isLoadingEmployees ? (
                 <div className="p-6 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
+                  <Loader size={32} className="mx-auto mb-4" />
                   <p className="text-gray-600">Carregando funcionários...</p>
                 </div>
               ) : employees.length === 0 ? (

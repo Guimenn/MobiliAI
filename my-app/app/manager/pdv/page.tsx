@@ -10,7 +10,6 @@ import { showAlert } from '@/lib/alerts';
 import { 
   User, 
   Search, 
-  Loader2, 
   UserCheck, 
   X, 
   ArrowRight, 
@@ -28,6 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Image from 'next/image';
 import PDVComponent from '@/components/PDVComponent';
 
+import { Loader } from '@/components/ui/ai/loader';
 export default function ManagerPDVPage() {
   const [customerSearchCpf, setCustomerSearchCpf] = useState('');
   const [searchingCustomer, setSearchingCustomer] = useState(false);
@@ -255,7 +255,7 @@ export default function ManagerPDVPage() {
                   >
                     {searchingCustomer ? (
                       <>
-                        <Loader2 className="h-6 w-6 mr-2 animate-spin" />
+                        <Loader size={24} className="mr-2" />
                         Buscando...
                       </>
                     ) : (

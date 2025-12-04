@@ -18,6 +18,7 @@ import {
   BarChart3,
   CheckCircle,
 } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 
 type DashboardOverview = {
   totalStores: number;
@@ -495,10 +496,10 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/40">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-b-primary" />
-          <p className="text-sm text-muted-foreground">Carregando informações do painel...</p>
+          <Loader size={40} className="mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Carregando informações do painel...</p>
         </div>
       </div>
     );
