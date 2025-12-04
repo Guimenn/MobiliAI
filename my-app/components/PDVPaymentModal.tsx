@@ -27,6 +27,8 @@ import {
 import { env } from '@/lib/env';
 import { mqttAPI } from '@/lib/mqtt-api';
 import { Loader } from '@/components/ui/ai/loader';
+import { loadStripe } from '@stripe/stripe-js';
+
 const stripePromise = loadStripe(env.STRIPE_PUBLISHABLE_KEY);
 
 interface PDVPaymentModalProps {
