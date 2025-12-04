@@ -16,6 +16,7 @@ import {
   Bell,
   Store,
 } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 import { useAppStore } from '@/lib/store';
 import { env } from '@/lib/env';
 
@@ -266,10 +267,10 @@ export default function SettingsPage() {
   // Mostrar loading apenas na primeira carga
   if (isInitialLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto"></div>
-          <p className="text-muted-foreground">Carregando configurações...</p>
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center">
+          <Loader size={48} className="mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Carregando configurações...</p>
         </div>
       </div>
     );

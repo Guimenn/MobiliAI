@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import Sidebar from '@/src/components/ui/Sidebar';
 import TransformModeIndicator from '@/src/components/ui/TransformModeIndicator';
 import ObjectInfo from '@/src/components/ui/ObjectInfo';
+import { Loader } from '@/components/ui/ai/loader';
 
 // Importação dinâmica para evitar problemas de SSR com Three.js
 const Scene = dynamic(() => import('@/src/components/canvas/Scene'), {
@@ -11,7 +12,7 @@ const Scene = dynamic(() => import('@/src/components/canvas/Scene'), {
   loading: () => (
     <div className="flex items-center justify-center h-full">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <Loader size={48} className="mx-auto mb-4" />
         <p className="text-muted-foreground">Carregando cena 3D...</p>
       </div>
     </div>

@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Save, Loader2, Clock } from 'lucide-react';
+import { X, Save, Clock } from 'lucide-react';
 import WorkingHoursConfig from '@/components/WorkingHoursConfig';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface Employee {
   id: string;
   name: string;
@@ -404,7 +405,7 @@ export default function EditEmployeeModal({
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader size={16} className="mr-2" />
                   Salvando...
                 </>
               ) : (

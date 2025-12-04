@@ -23,13 +23,13 @@ import {
   Camera,
   X,
   Image as ImageIcon,
-  Loader2,
   CheckCircle,
   CheckCircle2,
   Package,
   Wand2,
 } from 'lucide-react';
 import Image from 'next/image';
+import { Loader } from '@/components/ui/ai/loader';
 
 interface Product {
   id: string;
@@ -680,7 +680,7 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
                       {isProcessing && (
                         <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm z-30">
                           <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-[#3e2626]/20">
-                            <Loader2 className="h-12 w-12 animate-spin text-[#C07A45]" />
+                            <Loader size={48} className="text-[#C07A45]" />
                             <p className="text-lg font-semibold text-[#3e2626]">Processando com nossa IA...</p>
                             <p className="text-sm text-[#4f3a2f]/70">Aguarde alguns segundos</p>
                           </div>
@@ -816,7 +816,7 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    <Loader size={20} className="mr-2" />
                     Processando com IA...
                   </>
                 ) : (

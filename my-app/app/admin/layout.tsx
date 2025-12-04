@@ -25,6 +25,7 @@ import {
   ArrowRight,
   Ticket,
 } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 
 type UserNotification = {
   id: string;
@@ -432,7 +433,7 @@ export default function AdminLayout({
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-primary/30 border-b-primary" />
+          <Loader size={48} className="mx-auto mb-4" />
           <p className="text-sm text-muted-foreground">
             {isRedirecting ? 'Redirecionando...' : 'Carregando painel...'}
           </p>
@@ -613,7 +614,7 @@ export default function AdminLayout({
                     <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
                       {notificationsLoading ? (
                         <div className="flex items-center justify-center py-6">
-                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary/20 border-b-primary" />
+                          <Loader size={24} />
                         </div>
                       ) : notificationsError ? (
                         <p className="text-sm text-destructive">{notificationsError}</p>

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { User, Camera, X, Loader2 } from "lucide-react";
+import { User, Camera, X} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+import { Loader } from '@/components/ui/ai/loader';
 interface ProfileAvatarProps {
   avatarUrl?: string;
   username?: string;
@@ -217,7 +218,7 @@ export default function ProfileAvatar({
           >
             {isSaving ? (
               <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader size={16} />
                 Salvando...
               </span>
             ) : (

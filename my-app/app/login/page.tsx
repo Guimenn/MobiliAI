@@ -6,13 +6,14 @@ import { useAppStore } from '@/lib/store';
 import { authAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Loader2, Eye, EyeOff, Home, ArrowLeft } from 'lucide-react';
+import { Send, Eye, EyeOff, Home, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatCPF, formatCEP, formatPhone, formatState, formatCity, formatAddress, formatName, formatEmail } from '@/lib/input-utils';
 import { auth as firebaseAuth, googleProvider } from '@/lib/firebase';
 import { signInWithPopup } from 'firebase/auth';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface ChatMessage {
   id: string;
   type: 'assistant' | 'user';
@@ -981,7 +982,7 @@ export default function LoginPage() {
                 disabled={isLoading || !currentInput.trim()}
               >
                 {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader size={16} />
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
@@ -1003,7 +1004,7 @@ export default function LoginPage() {
                 >
                   {isGoogleLoading ? (
                     <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <Loader size={20} />
                       <span>Conectando...</span>
                     </>
                   ) : (

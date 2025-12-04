@@ -17,7 +17,6 @@ import {
   QrCode,
   Copy,
   CheckCircle,
-  Loader2,
   RefreshCw,
   Clock,
   AlertCircle,
@@ -29,6 +28,7 @@ import { Elements } from '@stripe/react-stripe-js';
 import StripeCardForm from '@/components/StripeCardForm';
 import { env } from '@/lib/env';
 
+import { Loader } from '@/components/ui/ai/loader';
 const stripePromise = loadStripe(env.STRIPE_PUBLISHABLE_KEY);
 
 interface PDVPaymentModalProps {
@@ -249,7 +249,7 @@ export default function PDVPaymentModal({
           <div className="space-y-6">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#3e2626] mb-4" />
+                <Loader size={32} className="text-[#3e2626] mb-4" />
                 <p className="text-gray-600">Gerando QR code PIX...</p>
               </div>
             ) : error ? (
@@ -335,7 +335,7 @@ export default function PDVPaymentModal({
                 {/* Status */}
                 {isCheckingPayment && (
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader size={16} />
                     <span>Verificando pagamento...</span>
                   </div>
                 )}
@@ -374,7 +374,7 @@ export default function PDVPaymentModal({
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader size={16} className="mr-2" />
                       Atualizando...
                     </>
                   ) : (
@@ -392,7 +392,7 @@ export default function PDVPaymentModal({
           <div className="space-y-6">
             {isCreatingIntent ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#3e2626] mb-4" />
+                <Loader size={32} className="text-[#3e2626] mb-4" />
                 <p className="text-gray-600">Preparando pagamento...</p>
               </div>
             ) : error ? (

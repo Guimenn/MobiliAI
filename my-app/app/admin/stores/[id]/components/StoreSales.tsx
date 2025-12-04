@@ -19,6 +19,7 @@ import {
   Download,
   BarChart3
 } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 import { adminAPI } from '@/lib/api';
 import SaleDetailsModal from '@/components/SaleDetailsModal';
 
@@ -206,7 +207,7 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
+          <Loader size={32} className="mx-auto mb-4" />
           <p className="text-gray-600">Carregando vendas...</p>
         </div>
       </div>

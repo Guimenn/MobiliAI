@@ -23,11 +23,12 @@ import {
   Clock,
   Trophy,
   Activity,
-  Loader2,
   Filter
 } from 'lucide-react';
+
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
+import { Loader } from '@/components/ui/ai/loader';
 const COLORS = ['#3e2626', '#6b4e3d', '#8b6f47', '#a67c52', '#c49a6a'];
 
 type ViewType = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -124,6 +125,40 @@ export default function ReportsPage() {
         end.setHours(23, 59, 59, 999);
         return end;
     }
+  };
+
+  const translatePaymentMethod = (method: string): string => {
+    const translations: Record<string, string> = {
+      'DEBIT_CARD': 'Cartão de Débito',
+      'DEBIT': 'Cartão de Débito',
+      'CREDIT_CARD': 'Cartão de Crédito',
+      'CREDIT': 'Cartão de Crédito',
+      'CASH': 'Dinheiro',
+      'PIX': 'PIX',
+      'BANK_TRANSFER': 'Transferência Bancária',
+      'TRANSFER': 'Transferência Bancária',
+      'OUTRO': 'Outro',
+      'OTHER': 'Outro'
+    };
+    
+    // Tentar tradução direta
+    if (translations[method]) {
+      return translations[method];
+    }
+    
+    // Se não encontrar, tentar com uppercase
+    const upperMethod = method.toUpperCase();
+    if (translations[upperMethod]) {
+      return translations[upperMethod];
+    }
+    
+    // Se ainda não encontrar, formatar o texto removendo underscores e capitalizando
+    return method
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const formatPeriodLabel = (type: ViewType, periodStart: Date, periodEnd: Date): string => {
@@ -287,6 +322,184 @@ export default function ReportsPage() {
         }
       });
 
+      // Processar TODOS os dados a partir das vendas ANTES de criar o relatório
+      const salesByPeriodData: any[] = [];
+      const topProductsData: any[] = [];
+      const storesData: any[] = [];
+      const topEmployeesData: any[] = [];
+      const paymentMethodsData: any[] = [];
+      
+      if (periodSales.length > 0) {
+        // Agrupar vendas por data para o gráfico de receita por período
+        const salesMap = new Map<string, number>();
+        periodSales.forEach((sale: any) => {
+          const date = new Date(sale.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+          const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+          const currentRevenue = salesMap.get(date) || 0;
+          salesMap.set(date, currentRevenue + Number(amount));
+        });
+
+        // Converter para array e ordenar
+        salesByPeriodData.push(...Array.from(salesMap.entries())
+          .map(([date, revenue]) => ({ date, revenue }))
+          .sort((a, b) => {
+            const dateA = a.date.split('/').reverse().join('-');
+            const dateB = b.date.split('/').reverse().join('-');
+            return new Date(dateA).getTime() - new Date(dateB).getTime();
+          })
+          .slice(-7)); // Últimos 7 dias
+
+        // Agrupar produtos para o gráfico de top produtos
+        const productsMap = new Map<string, { name: string; quantity: number; revenue: number }>();
+        periodSales.forEach((sale: any) => {
+          sale.items?.forEach((item: any) => {
+            const productName = item.product?.name || 'Produto sem nome';
+            const itemRevenue = Number(item.totalPrice || item.unitPrice * item.quantity || 0);
+            if (productsMap.has(productName)) {
+              const current = productsMap.get(productName);
+              if (current) {
+                productsMap.set(productName, {
+                  name: productName,
+                  quantity: current.quantity + (item.quantity || 0),
+                  revenue: current.revenue + itemRevenue
+                });
+              }
+            } else {
+              productsMap.set(productName, {
+                name: productName,
+                quantity: item.quantity || 0,
+                revenue: itemRevenue
+              });
+            }
+          });
+        });
+
+        // Converter para array, ordenar por receita e pegar top 5
+        topProductsData.push(...Array.from(productsMap.values())
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5));
+
+        // Agrupar vendas por LOJA
+        const storesMap = new Map<string, { 
+          id: string; 
+          name: string; 
+          totalRevenue: number; 
+          totalSales: number; 
+          totalProfit: number;
+        }>();
+        periodSales.forEach((sale: any) => {
+          const storeId = sale.storeId || sale.store?.id || 'unknown';
+          const storeName = sale.store?.name || 'Loja sem nome';
+          const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+          
+          // Calcular lucro da venda
+          let saleProfit = 0;
+          if (sale.items && Array.isArray(sale.items)) {
+            sale.items.forEach((item: any) => {
+              if (item.profit !== null && item.profit !== undefined) {
+                saleProfit += Number(item.profit);
+              } else if (item.costPrice !== null && item.costPrice !== undefined && item.unitPrice && item.quantity) {
+                const unitPrice = Number(item.unitPrice);
+                const costPrice = Number(item.costPrice);
+                const quantity = Number(item.quantity);
+                saleProfit += (unitPrice - costPrice) * quantity;
+              }
+            });
+          }
+          
+          if (storesMap.has(storeId)) {
+            const current = storesMap.get(storeId)!;
+            storesMap.set(storeId, {
+              id: storeId,
+              name: current.name,
+              totalRevenue: current.totalRevenue + Number(amount),
+              totalSales: current.totalSales + 1,
+              totalProfit: current.totalProfit + saleProfit
+            });
+          } else {
+            storesMap.set(storeId, {
+              id: storeId,
+              name: storeName,
+              totalRevenue: Number(amount),
+              totalSales: 1,
+              totalProfit: saleProfit
+            });
+          }
+        });
+
+        // Converter stores para array e calcular ticket médio
+        storesData.push(...Array.from(storesMap.values()).map(store => ({
+          ...store,
+          averageTicket: store.totalSales > 0 ? store.totalRevenue / store.totalSales : 0,
+          isActive: true
+        })).sort((a, b) => b.totalRevenue - a.totalRevenue));
+
+        // Agrupar vendas por VENDEDOR/EMPLOYEE
+        const employeesMap = new Map<string, { 
+          id: string; 
+          name: string; 
+          totalRevenue: number; 
+          totalSales: number; 
+        }>();
+        periodSales.forEach((sale: any) => {
+          const employeeId = sale.employeeId || sale.employee?.id || 'unknown';
+          const employeeName = sale.employee?.name || sale.employeeName || 'Vendedor sem nome';
+          const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+          
+          if (employeesMap.has(employeeId)) {
+            const current = employeesMap.get(employeeId)!;
+            employeesMap.set(employeeId, {
+              id: employeeId,
+              name: current.name,
+              totalRevenue: current.totalRevenue + Number(amount),
+              totalSales: current.totalSales + 1
+            });
+          } else {
+            employeesMap.set(employeeId, {
+              id: employeeId,
+              name: employeeName,
+              totalRevenue: Number(amount),
+              totalSales: 1
+            });
+          }
+        });
+
+        // Converter employees para array e ordenar por receita (top vendedores)
+        topEmployeesData.push(...Array.from(employeesMap.values())
+          .sort((a, b) => b.totalRevenue - a.totalRevenue)
+          .slice(0, 10)); // Top 10 vendedores
+
+        // Agrupar vendas por MÉTODO DE PAGAMENTO
+        const paymentMethodsMap = new Map<string, { 
+          method: string; 
+          count: number; 
+          total: number; 
+        }>();
+        periodSales.forEach((sale: any) => {
+          const method = sale.paymentMethod || sale.payment_method || 'OUTRO';
+          const amount = sale.totalAmount || sale.total || sale.amount || sale.value || 0;
+          
+          if (paymentMethodsMap.has(method)) {
+            const current = paymentMethodsMap.get(method)!;
+            paymentMethodsMap.set(method, {
+              method,
+              count: current.count + 1,
+              total: current.total + Number(amount)
+            });
+          } else {
+            paymentMethodsMap.set(method, {
+              method,
+              count: 1,
+              total: Number(amount)
+            });
+          }
+        });
+
+        // Converter paymentMethods para array
+        paymentMethodsData.push(...Array.from(paymentMethodsMap.values())
+          .sort((a, b) => b.total - a.total));
+      }
+
       // Criar relatório virtual
       // Usar a chave do período como data do período (já está no formato correto)
       // Para daily, a chave já é YYYY-MM-DD
@@ -298,8 +511,9 @@ export default function ReportsPage() {
         reportPeriod = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(reportDate.getDate()).padStart(2, '0')}`;
       }
       
+      // Usar periodKey como ID para garantir unicidade por período
       const virtualReport = {
-        id: `virtual-${periodKey}-${Date.now()}`,
+        id: `virtual-${periodKey}`,
         name: `Relatório ${type === 'daily' ? 'Diário' : type === 'weekly' ? 'Semanal' : type === 'monthly' ? 'Mensal' : 'Anual'} - ${periodKey}`,
         type: type,
         period: reportPeriod,
@@ -311,17 +525,18 @@ export default function ReportsPage() {
             totalSales,
             totalProfit,
             averageTicket,
-            totalStores: 0,
-            activeStores: 0
+            totalStores: storesData.length,
+            activeStores: storesData.filter(s => s.isActive).length
           },
-          stores: [],
-          topProducts: [],
-          topEmployees: [],
-          paymentMethods: [],
+          stores: storesData,
+          topProducts: topProductsData,
+          topEmployees: topEmployeesData,
+          paymentMethods: paymentMethodsData,
           charts: {
-            salesByPeriod: [],
-            topProductsChart: []
-          }
+            salesByPeriod: salesByPeriodData,
+            topProductsChart: topProductsData
+          },
+          sales: periodSales // Incluir vendas para processamento posterior se necessário
         }
       };
 
@@ -521,7 +736,7 @@ export default function ReportsPage() {
             if (isToday) {
               // Para o dia de hoje, sempre criar um relatório mesmo sem dados
               const emptyReport = {
-                id: `empty-${key}-${Date.now()}`,
+                id: `empty-${key}`,
                 name: `Relatório ${viewType === 'daily' ? 'Diário' : viewType === 'weekly' ? 'Semanal' : viewType === 'monthly' ? 'Mensal' : 'Anual'} - ${key}`,
                 type: viewType,
                 period: key,
@@ -553,18 +768,22 @@ export default function ReportsPage() {
         
         // Garantir que temos exatamente os períodos esperados na ordem correta
         const orderedReports: any[] = [];
+        const addedKeys = new Set<string>();
+        
         for (let i = 0; i < expectedPeriodRanges.length; i++) {
           const { key } = expectedPeriodRanges[i];
           const report = finalReportsMap.get(key);
-          if (report) {
+          if (report && !addedKeys.has(key)) {
             orderedReports.push(report);
+            addedKeys.add(key);
           }
         }
         
         // Se ainda faltam períodos, adicionar os que estão no map mas não na ordem esperada
         for (const [key, report] of finalReportsMap.entries()) {
-          if (!orderedReports.find(r => getPeriodKey(new Date(r.period || r.createdAt), viewType) === key)) {
+          if (!addedKeys.has(key)) {
             orderedReports.push(report);
+            addedKeys.add(key);
           }
         }
         
@@ -624,7 +843,34 @@ export default function ReportsPage() {
         return dateB.getTime() - dateA.getTime();
       });
 
-      setDailyReports(finalSortedReports);
+      // Deduplicação final baseada no periodKey para garantir unicidade
+      const uniqueReportsMap = new Map<string, any>();
+      finalSortedReports.forEach((report) => {
+        const reportDate = new Date(report.period || report.createdAt);
+        const periodKey = getPeriodKey(reportDate, viewType);
+        
+        // Se já existe um relatório para este período, manter o mais recente
+        if (!uniqueReportsMap.has(periodKey)) {
+          uniqueReportsMap.set(periodKey, report);
+        } else {
+          const existingReport = uniqueReportsMap.get(periodKey);
+          const existingDate = new Date(existingReport.period || existingReport.createdAt);
+          const currentDate = new Date(report.period || report.createdAt);
+          
+          if (currentDate > existingDate) {
+            uniqueReportsMap.set(periodKey, report);
+          }
+        }
+      });
+
+      // Converter de volta para array e manter a ordem
+      const uniqueReports = Array.from(uniqueReportsMap.values()).sort((a, b) => {
+        const dateA = new Date(a.period || a.createdAt);
+        const dateB = new Date(b.period || b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      setDailyReports(uniqueReports);
 
       // Atualizar o relatório atual
       if (finalSortedReports.length > 0) {
@@ -667,11 +913,8 @@ export default function ReportsPage() {
     
     sales.forEach(sale => {
       const date = new Date(sale.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      if (salesMap.has(date)) {
-        salesMap.set(date, salesMap.get(date) + Number(sale.totalAmount));
-      } else {
-        salesMap.set(date, Number(sale.totalAmount));
-      }
+      const currentRevenue = salesMap.get(date) || 0;
+      salesMap.set(date, currentRevenue + Number(sale.totalAmount));
     });
 
     // Converter para array e ordenar por data
@@ -771,6 +1014,7 @@ export default function ReportsPage() {
   const hydrateReport = async (report: any) => {
     if (!report) return;
 
+    // Processar o relatório de forma síncrona primeiro
     const processedReport = { ...report };
 
     if (typeof processedReport.data === 'string') {
@@ -791,23 +1035,48 @@ export default function ReportsPage() {
       };
     }
 
+    const reportData = processedReport.data || {};
+    
+    // Processar gráficos ANTES de definir currentReport para que apareçam imediatamente
+    if (reportData.charts) {
+      if (reportData.charts.salesByPeriod && Array.isArray(reportData.charts.salesByPeriod) && reportData.charts.salesByPeriod.length > 0) {
+        setSalesByPeriod(reportData.charts.salesByPeriod);
+      } else {
+        setSalesByPeriod([]);
+      }
+      if (reportData.charts.topProductsChart && Array.isArray(reportData.charts.topProductsChart) && reportData.charts.topProductsChart.length > 0) {
+        setTopProducts(reportData.charts.topProductsChart);
+      } else if (reportData.topProducts && Array.isArray(reportData.topProducts) && reportData.topProducts.length > 0) {
+        // Se não há charts mas há topProducts, usar eles
+        setTopProducts(reportData.topProducts);
+      } else {
+        setTopProducts([]);
+      }
+    } else if (reportData.sales && Array.isArray(reportData.sales) && reportData.sales.length > 0) {
+      // Processar dados de vendas imediatamente se disponíveis
+      processSalesByPeriod(reportData.sales);
+      processTopProducts(reportData.sales);
+    } else {
+      // Inicializar vazios imediatamente
+      setSalesByPeriod([]);
+      setTopProducts([]);
+    }
+
+    // Definir currentReport DEPOIS de processar os gráficos para que tudo apareça junto
     setCurrentReport(processedReport);
 
-    const reportData = processedReport.data || {};
-    if (reportData.charts) {
-      if (reportData.charts.salesByPeriod && Array.isArray(reportData.charts.salesByPeriod)) {
-        setSalesByPeriod(reportData.charts.salesByPeriod);
-      }
-      if (reportData.charts.topProductsChart && Array.isArray(reportData.charts.topProductsChart)) {
-        setTopProducts(reportData.charts.topProductsChart);
-      }
-    } else {
-      const fallbackSales = reportData.sales
-        ? (Array.isArray(reportData.sales) ? reportData.sales : [])
-        : await fetchSalesFallback();
-      setSalesData(fallbackSales);
-      processSalesByPeriod(fallbackSales);
-      processTopProducts(fallbackSales);
+    // Se não há dados de gráficos, tentar buscar de forma assíncrona (sem bloquear)
+    if (!reportData.charts && (!reportData.sales || !Array.isArray(reportData.sales) || reportData.sales.length === 0)) {
+      // Buscar dados de fallback de forma assíncrona sem bloquear a renderização
+      fetchSalesFallback().then((fallbackSales) => {
+        if (fallbackSales.length > 0) {
+          setSalesData(fallbackSales);
+          processSalesByPeriod(fallbackSales);
+          processTopProducts(fallbackSales);
+        }
+      }).catch((error) => {
+        console.error('Erro ao buscar vendas para fallback:', error);
+      });
     }
   };
 
@@ -853,12 +1122,11 @@ export default function ReportsPage() {
 
   const handleSelectReport = async (report: any) => {
     try {
-      setIsLoading(true);
+      // Não usar setIsLoading aqui para não bloquear a renderização
+      // Os dados aparecerão imediatamente quando currentReport for definido
       await hydrateReport(report);
     } catch (error) {
       console.error('Erro ao carregar relatório selecionado:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -922,7 +1190,7 @@ export default function ReportsPage() {
               >
                 {isLoading ? (
                   <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
                     Gerando...
                   </>
                 ) : (
@@ -939,7 +1207,7 @@ export default function ReportsPage() {
         {isLoading && !currentReport ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[#3e2626] mx-auto mb-4" />
+              <Loader size={32} className="text-[#3e2626] mx-auto mb-4" />
               <p className="text-gray-600 font-medium">Gerando relatório completo...</p>
               <p className="text-sm text-gray-500 mt-1">Aguarde enquanto os dados são processados</p>
             </div>
@@ -1093,8 +1361,17 @@ export default function ReportsPage() {
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {dailyReports.map((report) => {
                       const summary = getReportSummary(report);
-                      const isActive = currentReport?.id === report.id;
                       const reportDate = new Date(report.period || report.createdAt);
+                      const reportPeriodKey = getPeriodKey(reportDate, viewType);
+                      
+                      // Comparar por periodKey e id para garantir que o relatório correto está ativo
+                      const currentReportPeriodKey = currentReport 
+                        ? getPeriodKey(new Date(currentReport.period || currentReport.createdAt), viewType)
+                        : null;
+                      const isActive = currentReport && (
+                        currentReport.id === report.id || 
+                        (currentReportPeriodKey === reportPeriodKey && currentReport.period === report.period)
+                      );
                       
                       // Determinar o período para exibição baseado no tipo selecionado
                       let periodLabel = '';
@@ -1168,9 +1445,12 @@ export default function ReportsPage() {
                         }
                       }
                       
+                      // Usar periodKey como key para garantir unicidade por período
+                      // Combinar periodKey com id para garantir unicidade absoluta
+                      const uniqueKey = `${reportPeriodKey}-${report.id}`;
                       return (
                         <div
-                          key={report.id}
+                          key={uniqueKey}
                           className={`p-4 rounded-xl border transition-all ${
                             isActive
                               ? 'border-[#3e2626] bg-[#3e2626]/5 shadow-md'
@@ -1247,7 +1527,7 @@ export default function ReportsPage() {
               </Card>
 
             {/* Cards de Resumo Geral - Estilo Horizon */}
-            {(() => {
+            {currentReport && (() => {
               // Calcular summary se não existir ou estiver vazio
               const summary = currentReport.data?.summary || calculateSummaryFromData(currentReport) || {};
               
@@ -1327,7 +1607,8 @@ export default function ReportsPage() {
             })()}
 
             {/* Gráficos Modernos */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {currentReport && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <Card className="bg-white border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold text-gray-900">Receita por Período</CardTitle>
@@ -1443,12 +1724,15 @@ export default function ReportsPage() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
                       <RechartsBarChart 
-                        data={currentReport.data.stores.map((store: any) => ({
-                          name: store.storeName.length > 15 ? store.storeName.substring(0, 15) + '...' : store.storeName,
-                          receita: Number(store.totalRevenue),
-                          vendas: store.totalSales,
-                          ticketMedio: Number(store.averageTicket)
-                        }))}
+                        data={currentReport.data.stores.map((store: any) => {
+                          const storeName = store.name || store.storeName || 'Loja sem nome';
+                          return {
+                            name: storeName.length > 15 ? storeName.substring(0, 15) + '...' : storeName,
+                            receita: Number(store.totalRevenue || 0),
+                            vendas: store.totalSales || 0,
+                            ticketMedio: Number(store.averageTicket || 0)
+                          };
+                        })}
                         layout="vertical"
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -1505,12 +1789,15 @@ export default function ReportsPage() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
                       <RechartsBarChart 
-                        data={currentReport.data.stores.map((store: any) => ({
-                          name: store.storeName.length > 15 ? store.storeName.substring(0, 15) + '...' : store.storeName,
-                          ticketMedio: Number(store.averageTicket),
-                          receita: Number(store.totalRevenue),
-                          vendas: store.totalSales
-                        }))}
+                        data={currentReport.data.stores.map((store: any) => {
+                          const storeName = store.name || store.storeName || 'Loja sem nome';
+                          return {
+                            name: storeName.length > 15 ? storeName.substring(0, 15) + '...' : storeName,
+                            ticketMedio: Number(store.averageTicket || 0),
+                            receita: Number(store.totalRevenue || 0),
+                            vendas: store.totalSales || 0
+                          };
+                        })}
                         layout="vertical"
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -1556,10 +1843,11 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
               )}
-            </div>
+              </div>
+            )}
 
             {/* Métricas de Pagamento */}
-            {currentReport.data?.paymentMethods && currentReport.data.paymentMethods.length > 0 && (
+            {currentReport && currentReport.data?.paymentMethods && currentReport.data.paymentMethods.length > 0 && (
               <Card className="bg-white border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold text-gray-900">Métodos de Pagamento</CardTitle>
@@ -1572,8 +1860,8 @@ export default function ReportsPage() {
                         key={pm.method} 
                         className="p-4 bg-white rounded-lg border border-gray-100"
                       >
-                        <p className="text-xs font-medium text-gray-600 mb-2 uppercase">
-                          {pm.method.replace('_', ' ')}
+                        <p className="text-xs font-medium text-gray-600 mb-2">
+                          {translatePaymentMethod(pm.method)}
                         </p>
                         <p className="text-xl font-semibold text-gray-900 mb-1">{pm.count}</p>
                         <p className="text-sm font-medium text-emerald-600">
@@ -1609,7 +1897,7 @@ export default function ReportsPage() {
                         {currentReport.data.stores.map((store: any, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50/30">
                             <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="font-medium text-gray-900">{store.storeName}</div>
+                                    <div className="font-medium text-gray-900">{store.name || store.storeName || 'Loja sem nome'}</div>
                                   </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">{store.totalSales}</div>
@@ -1665,8 +1953,8 @@ export default function ReportsPage() {
                             {idx > 2 && <span className="text-sm text-gray-500">{idx + 1}º</span>}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{emp.employeeName}</p>
-                            <p className="text-xs text-gray-500 truncate">{emp.storeName}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{emp.name || emp.employeeName || 'Vendedor sem nome'}</p>
+                            <p className="text-xs text-gray-500 truncate">{emp.storeName || ''}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-medium text-gray-900">
@@ -1701,8 +1989,8 @@ export default function ReportsPage() {
                             {idx > 2 && <span className="text-sm text-gray-500">{idx + 1}º</span>}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{product.productName}</p>
-                            <p className="text-xs text-gray-500">Qtd: {product.quantity}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{product.name || product.productName || 'Produto sem nome'}</p>
+                            <p className="text-xs text-gray-500">Qtd: {product.quantity || 0}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-medium text-gray-900">

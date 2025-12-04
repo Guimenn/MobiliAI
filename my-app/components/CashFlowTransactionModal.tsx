@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Save, Loader2, ArrowUp, ArrowDown } from 'lucide-react';
+import { X, Save, ArrowUp, ArrowDown } from 'lucide-react';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface CashFlowTransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -308,7 +309,7 @@ export default function CashFlowTransactionModal({
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader size={16} className="mr-2" />
                   Salvando...
                 </>
               ) : (

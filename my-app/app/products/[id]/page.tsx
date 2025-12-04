@@ -50,10 +50,11 @@ import { env } from '@/lib/env';
 import { customerAPI, shippingAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import { showAlert } from '@/lib/alerts';
-import { Loader2 } from 'lucide-react';
+import {} from 'lucide-react';
 import ProductReviews from '@/components/ProductReviews';
 import ReviewForm from '@/components/ReviewForm';
 
+import { Loader } from '@/components/ui/ai/loader';
 // Mapeamento de categorias para ícones
 const categoryNames: Record<string, string> = {
   'SOFA': 'Sofás',
@@ -1213,7 +1214,7 @@ const experienceHighlights: Array<{
                         className="h-10 px-4 border-[#3e2626]/40 text-[#3e2626] hover:bg-[#3e2626]/10 disabled:opacity-50"
                       >
                         {(isLoadingShipping || isSearchingCep) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader size={16} />
                         ) : (
                           'Calcular'
                         )}

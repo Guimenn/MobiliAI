@@ -9,7 +9,6 @@ import { showAlert } from '@/lib/alerts';
 import {
   Package,
   CheckCircle,
-  Loader2,
   Clock,
   DollarSign,
   ShoppingBag,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface PDVPickupPageProps {
   pickupOrders: any[];
   onOrderPickedUp?: (orderId: string) => void;
@@ -285,7 +285,7 @@ export default function PDVPickupPage({ pickupOrders, onOrderPickedUp }: PDVPick
                     >
                       {markingAsPickedUp === order.id ? (
                         <>
-                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          <Loader size={20} className="mr-2" />
                           Processando...
                         </>
                       ) : (

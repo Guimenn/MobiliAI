@@ -3,7 +3,8 @@
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { Loader2Icon, SendIcon } from 'lucide-react';
+import { SendIcon } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 import type {
   ComponentProps,
   HTMLAttributes,
@@ -97,7 +98,7 @@ export const PromptInputSubmit = ({
   ...props
 }: PromptInputSubmitProps) => {
   const Icon = isLoading ? (
-    <Loader2Icon className="size-4 animate-spin" />
+    <Loader size={16} className="size-4" />
   ) : (
     <SendIcon className="size-4" />
   );

@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  compiler: {
+    styledComponents: true,
+  },
   images: {
     // Add both domains and remote patterns to cover all Next versions/configs
     domains: [

@@ -26,12 +26,12 @@ import {
   BookOpen,
   Lamp,
   X,
-  Loader2,
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react';
 import Image from 'next/image';
 
+import { Loader } from '@/components/ui/ai/loader';
 // Tipos e interfaces
 interface FurnitureItem {
   id: string;
@@ -1218,7 +1218,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                       {isProcessingAI && (
                         <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm">
                           <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-[#3e2626]/20">
-                            <Loader2 className="h-12 w-12 animate-spin text-[#C07A45]" />
+                            <Loader size={48} className="text-[#C07A45]" />
                             <p className="text-lg font-semibold text-[#3e2626]">Processando com nossa IA...</p>
                             <p className="text-sm text-[#4f3a2f]/70">Aguarde alguns segundos</p>
                            
@@ -1314,12 +1314,12 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                             >
                               {isProcessingAI ? (
                                 <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  <Loader size={16} className="mr-2" />
                                   Processando IA...
                                 </>
                               ) : isSelectingPosition && pendingFurniture?.id === product.id ? (
                                 <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  <Loader size={16} className="mr-2" />
                                   Selecionando posição...
                                 </>
                               ) : (

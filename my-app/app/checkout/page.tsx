@@ -32,7 +32,6 @@ import {
   Lock,
   Radio,
   Search,
-  Loader2,
   ChevronLeft,
   ChevronRight,
   X,
@@ -53,7 +52,8 @@ import {
 import { customerAPI, authAPI, storesAPI, shippingAPI } from '@/lib/api';
 import { env } from '@/lib/env';
 import { showAlert, showConfirm } from '@/lib/alerts';
-import {
+
+import { Loader } from '@/components/ui/ai/loader';import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -2903,7 +2903,7 @@ export default function CheckoutPage() {
 
                     {isLoadingUserData ? (
                       <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+                        <Loader size={24} className="text-[#3e2626]" />
                       </div>
                     ) : (
                       <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
@@ -2971,7 +2971,7 @@ export default function CheckoutPage() {
                     >
                       {isLoadingUserData ? (
                         <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <Loader size={16} className="mr-2" />
                           Carregando...
                         </>
                       ) : (
@@ -3088,7 +3088,7 @@ export default function CheckoutPage() {
 
                   {isLoadingRecommended ? (
                     <div className="flex items-center justify-center py-12">
-                      <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+                      <Loader size={24} className="text-[#3e2626]" />
                       <span className="ml-2 text-gray-600">Carregando produtos...</span>
                     </div>
                   ) : recommendedProducts.length === 0 ? (
@@ -3390,7 +3390,7 @@ export default function CheckoutPage() {
                                   </Label>
                                   {isLoadingStores ? (
                                     <div className="flex items-center gap-2 text-sm text-gray-500">
-                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <Loader size={16} />
                                       Carregando lojas...
                                     </div>
                                   ) : stores && stores.length > 0 ? (
@@ -3996,7 +3996,7 @@ export default function CheckoutPage() {
                       className="border-[#3e2626] text-[#3e2626] hover:bg-[#3e2626] hover:text-white"
                     >
                       {isSearchingCep ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader size={16} />
                       ) : (
                         <Search className="h-4 w-4" />
                       )}
@@ -4089,7 +4089,7 @@ export default function CheckoutPage() {
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader size={16} className="mr-2" />
                   Salvando...
                 </>
               ) : (
@@ -4208,7 +4208,7 @@ export default function CheckoutPage() {
                       {isProcessingAI && (
                         <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm z-30">
                           <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-[#3e2626]/20">
-                            <Loader2 className="h-12 w-12 animate-spin text-[#C07A45]" />
+                            <Loader size={48} className="text-[#C07A45]" />
                             <p className="text-lg font-semibold text-[#3e2626]">Processando com nossa IA...</p>
                             <p className="text-sm text-[#4f3a2f]/70">Aguarde alguns segundos</p>
                           </div>
@@ -4320,7 +4320,7 @@ export default function CheckoutPage() {
                               >
                                 {isProcessingAI && pendingProduct?.id === item.product.id ? (
                                   <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader size={16} className="mr-2" />
                                     Processando...
                                   </>
                                 ) : isPlaced ? (
@@ -4376,7 +4376,7 @@ export default function CheckoutPage() {
 
           {isLoadingQuickView ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+              <Loader size={24} className="text-[#3e2626]" />
             </div>
           ) : quickViewProduct ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -4508,7 +4508,7 @@ export default function CheckoutPage() {
             {/* Cupons atribuídos ao cliente */}
             {isLoadingCoupons ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+                <Loader size={24} className="text-[#3e2626]" />
                 <span className="ml-2 text-gray-600">Carregando cupons...</span>
               </div>
             ) : (

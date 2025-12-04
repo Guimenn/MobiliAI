@@ -18,6 +18,7 @@ import {
   XCircle,
   MapPin
 } from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
 import { adminAPI } from '@/lib/api';
 import { adminAPI as adminApiAuth } from '@/lib/api-admin';
 import { useAppStore } from '@/lib/store';
@@ -277,7 +278,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e2626] mx-auto mb-4"></div>
+          <Loader size={48} className="mx-auto mb-4" />
           <p className="text-gray-600">Carregando estoque...</p>
         </div>
       </div>

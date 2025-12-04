@@ -12,7 +12,6 @@ import {
   Plus,
   Minus,
   Package,
-  Loader2,
   AlertCircle,
   Barcode,
   ShoppingCart,
@@ -20,6 +19,7 @@ import {
 import Image from 'next/image';
 import { useAppStore } from '@/lib/store';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface Product {
   id: string;
   name: string;
@@ -148,7 +148,7 @@ export default function PDVProductsPage({
               className="pl-10 sm:pl-12 pr-10 sm:pr-12 h-12 sm:h-14 text-sm sm:text-lg border-2 border-[#3e2626]/20 focus:border-[#3e2626] focus:ring-2 focus:ring-[#3e2626]/20 rounded-lg font-medium"
             />
             {isSearching && (
-              <Loader2 className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 text-[#3e2626] animate-spin" />
+              <Loader size={20} className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 sm: sm: text-[#3e2626]" />
             )}
           </div>
         </CardContent>
@@ -174,7 +174,7 @@ export default function PDVProductsPage({
         <CardContent className={`p-3 sm:p-4 lg:p-6 flex-1 overflow-y-auto ${cart.length > 0 ? 'pb-20 lg:pb-6' : ''}`}>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-[#3e2626]" />
+              <Loader size={32} className="text-[#3e2626]" />
             </div>
           ) : products.length === 0 && searchTerm ? (
             <div className="text-center py-8 sm:py-16">

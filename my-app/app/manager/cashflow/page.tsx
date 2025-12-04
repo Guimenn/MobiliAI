@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import CashFlowTransactionModal from '@/components/CashFlowTransactionModal';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { 
+
+import { Loader } from '@/components/ui/ai/loader';import { 
   Wallet,
   ArrowUp,
   ArrowDown,
@@ -22,9 +23,7 @@ import {
   CreditCard,
   Receipt,
   DollarSign,
-  ShoppingCart,
-  Loader2
-} from 'lucide-react';
+  ShoppingCart} from 'lucide-react';
 
 interface CashFlow {
   id: string;
@@ -400,7 +399,7 @@ export default function ManagerCashFlowPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+              <Loader size={24} className="text-[#3e2626]" />
             ) : (
               <>
                 <div className={`text-2xl font-bold ${currentBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -421,7 +420,7 @@ export default function ManagerCashFlowPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+              <Loader size={24} className="text-[#3e2626]" />
             ) : (
               <>
                 <div className="text-2xl font-bold text-green-600">{formatCurrency(monthlyIncome)}</div>
@@ -440,7 +439,7 @@ export default function ManagerCashFlowPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+              <Loader size={24} className="text-[#3e2626]" />
             ) : (
               <>
                 <div className="text-2xl font-bold text-red-600">{formatCurrency(monthlyExpenses)}</div>
@@ -459,7 +458,7 @@ export default function ManagerCashFlowPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+              <Loader size={24} className="text-[#3e2626]" />
             ) : (
               <>
                 <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -485,7 +484,7 @@ export default function ManagerCashFlowPage() {
           <CardContent>
             {isLoading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+                <Loader size={24} className="text-[#3e2626]" />
               </div>
             ) : recentSales.length > 0 ? (
               <div className="space-y-4">
@@ -538,7 +537,7 @@ export default function ManagerCashFlowPage() {
           <CardContent>
             {isLoading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+                <Loader size={24} className="text-[#3e2626]" />
               </div>
             ) : recentExpenses.length > 0 ? (
               <div className="space-y-4">
@@ -594,7 +593,7 @@ export default function ManagerCashFlowPage() {
         <CardContent>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[#3e2626]" />
+              <Loader size={32} className="text-[#3e2626]" />
             </div>
           ) : chartData.length === 0 ? (
           <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">

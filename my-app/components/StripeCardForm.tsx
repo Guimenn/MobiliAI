@@ -7,9 +7,10 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface StripeCardFormProps {
   clientSecret: string;
   onSuccess: (paymentIntentId: string) => void;
@@ -85,7 +86,7 @@ export default function StripeCardForm({
   if (!isReady) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-[#3e2626]" />
+        <Loader size={24} className="text-[#3e2626]" />
         <span className="ml-2 text-gray-600">Carregando formulário de pagamento...</span>
       </div>
     );
@@ -123,7 +124,7 @@ export default function StripeCardForm({
         >
           {isProcessing ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader size={16} className="mr-2" />
               Processando...
             </>
           ) : (

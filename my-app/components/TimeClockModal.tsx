@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Clock, CheckCircle, AlertCircle, Loader2, Camera, MapPin, User } from 'lucide-react';
+import { X, Clock, CheckCircle, AlertCircle, Camera, MapPin, User } from 'lucide-react';
 
+import { Loader } from '@/components/ui/ai/loader';
 interface TimeClockEntry {
   id?: string;
   employeeId: string;
@@ -665,7 +666,7 @@ export default function TimeClockModal({
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader size={16} className="mr-2" />
                   Salvando...
                 </>
               ) : (
