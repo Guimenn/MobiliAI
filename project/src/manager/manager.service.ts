@@ -59,7 +59,7 @@ export class ManagerService {
       recentSales
     ] = await Promise.all([
       this.prisma.user.count({ where: { storeId } }),
-      this.prisma.sale.count({ where: { storeId } }),
+      this.getMonthlySalesCount(storeId),
       this.getMonthlyRevenue(storeId),
       this.getLowStockProducts(storeId),
       this.getRecentSales(storeId)
@@ -131,6 +131,19 @@ export class ManagerService {
       const saleTotal = sale.items.reduce((sum, item) => sum + (Number(item.unitPrice) * item.quantity), 0);
       return total + saleTotal;
     }, 0);
+  }
+
+  private async getMonthlySalesCount(storeId: string) {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    return this.prisma.sale.count({
+      where: {
+        storeId,
+        createdAt: { gte: startOfMonth }
+      }
+    });
   }
 
   private async getLowStockProducts(storeId: string) {
@@ -239,7 +252,11 @@ export class ManagerService {
     const storeId = manager.store.id;
     const skip = (page - 1) * limit;
     
-    const where: any = { storeId };
+    // Buscar apenas usuários da loja, excluindo o próprio gerente
+    const where: any = { 
+      storeId,
+      id: { not: managerId }
+    };
     
     if (search) {
       where.OR = [

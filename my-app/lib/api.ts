@@ -290,6 +290,65 @@ export const salesAPI = {
   },
 };
 
+// PDV API
+export const pdvAPI = {
+  // Controle de Caixa
+  openCash: async (data: { openingAmount: number; notes?: string }) => {
+    const response = await api.post('/pdv/cash/open', data);
+    return response.data;
+  },
+
+  getCurrentCash: async () => {
+    const response = await api.get('/pdv/cash/current');
+    return response.data;
+  },
+
+  closeCash: async (data: { closingAmount: number; notes?: string }) => {
+    const response = await api.post('/pdv/cash/close', data);
+    return response.data;
+  },
+
+  // Vendas do PDV
+  createSale: async (saleData: {
+    discount?: number;
+    tax?: number;
+    paymentMethod: string;
+    paymentReference?: string;
+    notes?: string;
+    customerId?: string;
+    items: Array<{
+      productId: string;
+      quantity: number;
+      notes?: string;
+    }>;
+  }) => {
+    try {
+      const response = await api.post('/pdv/sales', saleData);
+      return response.data;
+    } catch (error: any) {
+      console.error('[PDV API] Erro ao criar venda:', error);
+      console.error('[PDV API] Resposta do servidor:', error.response?.data);
+      console.error('[PDV API] Status:', error.response?.status);
+      throw error;
+    }
+  },
+
+  getSales: async (startDate?: string, endDate?: string) => {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get('/pdv/sales', { params });
+    return response.data;
+  },
+
+  getSalesReport: async (startDate: string, endDate: string) => {
+    const response = await api.get('/pdv/sales/report', {
+      params: { startDate, endDate }
+    });
+    return response.data;
+  },
+};
+
 // Stores API
 export const storesAPI = {
   getAll: async () => {
@@ -1349,6 +1408,50 @@ export const timeClockAPI = {
     if (endDate) params.endDate = endDate;
     const response = await api.get(`/time-clock/history/${employeeId}`, { params });
     return response.data;
+  },
+
+  getEmployeeTimeClock: async (employeeId: string, startDate?: string, endDate?: string) => {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get(`/time-clock/employee/${employeeId}`, { params });
+    return response.data;
+  },
+
+  checkTodayClockIn: async (employeeId: string) => {
+    // Verificar se o funcionário bateu o ponto hoje (entrada sem saída)
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      console.log('[TimeClock API] Verificando ponto para funcionário:', employeeId, 'Data:', today);
+      
+      // Usar o endpoint history que permite CASHIER/EMPLOYEE acessar
+      const response = await timeClockAPI.getHistory(employeeId, today, today);
+      console.log('[TimeClock API] Resposta do servidor:', response);
+      
+      // O endpoint retorna { records: [...], totalRecords: number, ... }
+      const timeClocks = response?.records || response || [];
+      console.log('[TimeClock API] Registros encontrados:', timeClocks);
+      
+      // Verificar se há uma entrada sem saída (clockOut null)
+      const openEntry = Array.isArray(timeClocks) 
+        ? timeClocks.find((entry: any) => !entry.clockOut)
+        : null;
+      
+      console.log('[TimeClock API] Entrada aberta encontrada:', !!openEntry);
+      
+      return {
+        hasClockIn: !!openEntry,
+        entry: openEntry || null
+      };
+    } catch (error: any) {
+      console.error('[TimeClock API] Erro ao verificar ponto:', error);
+      console.error('[TimeClock API] Detalhes do erro:', error.response?.data);
+      // Em caso de erro, retornar false para bloquear acesso
+      return {
+        hasClockIn: false,
+        entry: null
+      };
+    }
   },
 
   clockIn: async (data: {

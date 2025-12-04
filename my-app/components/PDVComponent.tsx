@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
-import { salesAPI } from '@/lib/api';
+import { salesAPI, pdvAPI } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,6 +77,8 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
   const [customerCpf, setCustomerCpf] = useState('');
   const [foundCustomer, setFoundCustomer] = useState<any>(initialCustomer || null);
   const [pendingPickupOrders, setPendingPickupOrders] = useState<any[]>(pickupOrders || []);
+  const [currentCash, setCurrentCash] = useState<any>(null);
+  const [isCheckingCash, setIsCheckingCash] = useState(true);
 
   useEffect(() => {
     // Se receber cliente inicial, preencher os campos
@@ -96,6 +98,54 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
       setActiveTab('pickup');
     }
   }, [pendingPickupOrders.length]);
+
+  // Verificar e abrir caixa automaticamente ao carregar o componente
+  useEffect(() => {
+    const checkAndOpenCash = async () => {
+      if (!user?.storeId) return;
+      
+      try {
+        setIsCheckingCash(true);
+        const cash = await pdvAPI.getCurrentCash();
+        
+        if (cash) {
+          setCurrentCash(cash);
+        } else {
+          // Se não há caixa aberto, abrir automaticamente com valor inicial 0
+          try {
+            const newCash = await pdvAPI.openCash({
+              openingAmount: 0,
+              notes: 'Caixa aberto automaticamente'
+            });
+            setCurrentCash(newCash);
+            showAlert('success', 'Caixa aberto automaticamente');
+          } catch (error: any) {
+            console.error('Erro ao abrir caixa:', error);
+            showAlert('error', 'Erro ao abrir caixa. Tente novamente.');
+          }
+        }
+      } catch (error: any) {
+        // Se der erro ao verificar, tentar abrir o caixa
+        if (error.response?.status === 404 || !error.response) {
+          try {
+            const newCash = await pdvAPI.openCash({
+              openingAmount: 0,
+              notes: 'Caixa aberto automaticamente'
+            });
+            setCurrentCash(newCash);
+            showAlert('success', 'Caixa aberto automaticamente');
+          } catch (openError: any) {
+            console.error('Erro ao abrir caixa:', openError);
+            showAlert('error', 'Erro ao abrir caixa. Tente novamente.');
+          }
+        }
+      } finally {
+        setIsCheckingCash(false);
+      }
+    };
+
+    checkAndOpenCash();
+  }, [user?.storeId]);
 
   const addToCart = (product: Product, quantity: number = 1) => {
     const existingItem = cart.find(item => item.productId === product.id);
@@ -219,24 +269,30 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
     try {
       setIsProcessingSale(true);
 
-      const saleData = {
-        storeId: user.storeId,
-        totalAmount: calculateTotal(),
-        discount: calculateDiscountAmount(),
+      const saleData: any = {
+        discount: calculateDiscountAmount() || 0,
         tax: 0,
-        paymentMethod: paymentMethod.toLowerCase() as string, // Método de pagamento selecionado
-        paymentReference: undefined,
-        notes: notes.trim() || undefined,
-        customerId: customerId.trim() || undefined,
+        paymentMethod: paymentMethod as 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD',
         items: cart.map(item => ({
           productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          notes: ''
+          quantity: Number(item.quantity),
+          notes: item.notes || ''
         }))
       };
 
-      const sale = await salesAPI.create(saleData);
+      // Adicionar campos opcionais apenas se tiverem valor
+      if (notes.trim()) {
+        saleData.notes = notes.trim();
+      }
+      if (customerId.trim()) {
+        saleData.customerId = customerId.trim();
+      }
+
+      console.log('[PDV] Dados da venda sendo enviados:', JSON.stringify(saleData, null, 2));
+      console.log('[PDV] Items detalhado:', saleData.items);
+      console.log('[PDV] Caixa atual:', currentCash);
+      
+      const sale = await pdvAPI.createSale(saleData);
       setCurrentSale(sale);
       
       // Abrir modal de pagamento
@@ -260,24 +316,56 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
     try {
       setIsProcessingSale(true);
 
-      const saleData = {
-        storeId: user.storeId,
-        totalAmount: calculateTotal(),
-        discount: calculateDiscountAmount(),
+      const saleData: any = {
+        discount: calculateDiscountAmount() || 0,
         tax: 0,
-        paymentMethod: 'cash',
-        paymentReference: undefined,
-        notes: notes.trim() || undefined,
-        customerId: customerId.trim() || undefined,
+        paymentMethod: 'CASH' as const,
         items: cart.map(item => ({
           productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          notes: ''
+          quantity: Number(item.quantity),
+          notes: item.notes || ''
         }))
       };
 
-      const sale = await salesAPI.create(saleData);
+      // Adicionar campos opcionais apenas se tiverem valor
+      if (notes.trim()) {
+        saleData.notes = notes.trim();
+      }
+      if (customerId.trim()) {
+        saleData.customerId = customerId.trim();
+      }
+
+      console.log('[PDV] Dados da venda sendo enviados:', JSON.stringify(saleData, null, 2));
+      console.log('[PDV] Items detalhado:', saleData.items);
+      // Verificar se há caixa aberto antes de criar a venda
+      if (!currentCash) {
+        try {
+          const cash = await pdvAPI.getCurrentCash();
+          if (!cash) {
+            // Tentar abrir o caixa automaticamente
+            const newCash = await pdvAPI.openCash({
+              openingAmount: 0,
+              notes: 'Caixa aberto automaticamente antes da venda'
+            });
+            setCurrentCash(newCash);
+          } else {
+            setCurrentCash(cash);
+          }
+        } catch (cashError: any) {
+          // Se não conseguir verificar/abrir caixa, tentar abrir
+          try {
+            const newCash = await pdvAPI.openCash({
+              openingAmount: 0,
+              notes: 'Caixa aberto automaticamente antes da venda'
+            });
+            setCurrentCash(newCash);
+          } catch (openError: any) {
+            throw new Error('Não foi possível abrir o caixa. Tente novamente.');
+          }
+        }
+      }
+
+      const sale = await pdvAPI.createSale(saleData);
       
     showAlert('success', `Venda #${sale.saleNumber} finalizada com sucesso!`);
     
@@ -287,7 +375,8 @@ export default function PDVComponent({ initialCustomer, pickupOrders = [], onRes
       
     } catch (error: any) {
       console.error('Erro ao finalizar venda:', error);
-      const errorMessage = error.response?.data?.message || 'Erro ao finalizar venda';
+      console.error('Detalhes do erro:', error.response?.data);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Erro ao finalizar venda';
       showAlert('error', errorMessage);
     } finally {
       setIsProcessingSale(false);

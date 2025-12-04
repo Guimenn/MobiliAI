@@ -1,0 +1,467 @@
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { salesAPI } from '@/lib/api';
+import { useAppStore } from '@/lib/store';
+import {
+  DollarSign,
+  TrendingUp,
+  BarChart3,
+  ShoppingCart,
+  Receipt,
+  Search,
+  Calendar,
+  User,
+  CreditCard,
+} from 'lucide-react';
+import { Loader } from '@/components/ui/ai/loader';
+
+export default function ManagerSalesPage() {
+  const router = useRouter();
+  const { user, isAuthenticated } = useAppStore();
+  const [sales, setSales] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    loadSalesData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user?.id]);
+
+  const loadSalesData = async () => {
+    if (!user) return;
+
+    try {
+      setIsLoading(true);
+      // Para o gerente (STORE_MANAGER), o backend já filtra por loja (storeId do usuário)
+      // Aqui trazemos todas as vendas da loja (PDV + online) para manter consistência com o dashboard/relatórios
+      const salesData = await salesAPI.getAll();
+      const allSales = Array.isArray(salesData) ? salesData : [];
+      setSales(allSales);
+    } catch (error) {
+      console.error('Erro ao carregar vendas da loja:', error);
+      setSales([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stats = useMemo(() => {
+    const totalRevenue = sales.reduce((sum: number, sale: any) => {
+      const amount =
+        typeof sale.totalAmount === 'string'
+          ? parseFloat(sale.totalAmount)
+          : sale.totalAmount || 0;
+      return sum + amount;
+    }, 0);
+
+    const averageOrderValue = sales.length > 0 ? totalRevenue / sales.length : 0;
+    const completedSales = sales.filter(
+      (sale: any) => sale.status === 'COMPLETED',
+    ).length;
+    const conversionRate =
+      sales.length > 0 ? (completedSales / sales.length) * 100 : 0;
+
+    return {
+      totalSales: sales.length,
+      totalRevenue,
+      averageOrderValue,
+      conversionRate,
+      completedSales,
+    };
+  }, [sales]);
+
+  const filteredSales = useMemo(() => {
+    return sales.filter((sale: any) => {
+      if (statusFilter !== 'all' && sale.status !== statusFilter) {
+        return false;
+      }
+
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const customerName = (
+          sale.customer?.name ||
+          sale.customerName ||
+          ''
+        ).toLowerCase();
+        const customerEmail = (
+          sale.customer?.email ||
+          sale.customerEmail ||
+          ''
+        ).toLowerCase();
+        const saleId = (sale.saleNumber || sale.id || '')
+          .toString()
+          .toLowerCase();
+
+        if (
+          !customerName.includes(term) &&
+          !customerEmail.includes(term) &&
+          !saleId.includes(term)
+        ) {
+          return false;
+        }
+      }
+
+      if (dateFilter !== 'all') {
+        const saleDate = sale.createdAt ? new Date(sale.createdAt) : null;
+        if (!saleDate) return false;
+
+        const now = new Date();
+        const today = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+        );
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const thisWeek = new Date(today);
+        thisWeek.setDate(thisWeek.getDate() - 7);
+        const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        if (dateFilter === 'today' && saleDate < today) return false;
+        if (
+          dateFilter === 'yesterday' &&
+          (saleDate < yesterday || saleDate >= today)
+        )
+          return false;
+        if (dateFilter === 'week' && saleDate < thisWeek) return false;
+        if (dateFilter === 'month' && saleDate < thisMonth) return false;
+      }
+
+      return true;
+    });
+  }, [sales, searchTerm, statusFilter, dateFilter]);
+
+  const handleViewSale = (saleId: string) => {
+    router.push(`/manager/sales/${saleId}`);
+  };
+
+  const getStatusBadge = (status: string | undefined) => {
+    const statusMap: Record<string, { label: string; className: string }> = {
+      COMPLETED: {
+        label: 'Concluída',
+        className: 'border-border bg-muted/50 text-foreground',
+      },
+      PENDING: {
+        label: 'Pendente',
+        className: 'border-border bg-muted/50 text-muted-foreground',
+      },
+      DELIVERED: {
+        label: 'Entregue',
+        className: 'border-border bg-muted/50 text-foreground',
+      },
+      CANCELLED: {
+        label: 'Cancelada',
+        className: 'border-border bg-muted/50 text-muted-foreground',
+      },
+      REFUNDED: {
+        label: 'Reembolsada',
+        className: 'border-border bg-muted/50 text-muted-foreground',
+      },
+    };
+    const config = statusMap[status || 'PENDING'] || statusMap.PENDING;
+    return (
+      <Badge variant="outline" className={config.className}>
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const formatPrice = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const formatDate = (date: Date | string | null | undefined) => {
+    if (!date) return 'Data não disponível';
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center">
+          <Loader size={40} className="mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">
+            Carregando vendas da loja...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <section className="rounded-3xl border border-border bg-[#3e2626] px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-6 sm:gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl space-y-4 w-full min-w-0">
+            <Badge
+              variant="outline"
+              className="border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+            >
+              Vendas da Loja
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-tight">
+                Vendas da Loja
+              </h1>
+              <p className="text-sm text-primary-foreground/80 lg:text-base">
+                Acompanhe todas as vendas desta loja — incluindo operações no PDV
+                e pedidos online — para monitorar o desempenho e identificar
+                oportunidades de melhoria.
+              </p>
+            </div>
+          </div>
+
+          <SalesStats stats={stats} />
+        </div>
+      </section>
+
+      {/* Filters */}
+      <Card className="border border-border shadow-sm">
+        <CardContent className="pt-4 sm:pt-6">
+          <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-end">
+            <div className="flex-1 w-full">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Buscar por cliente, email ou número da venda..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="w-full sm:w-48">
+              <Label
+                htmlFor="status-filter"
+                className="text-xs sm:text-sm mb-2 block"
+              >
+                Status
+              </Label>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="all">Todos os status</option>
+                <option value="COMPLETED">Concluída</option>
+                <option value="PENDING">Pendente</option>
+                <option value="DELIVERED">Entregue</option>
+                <option value="CANCELLED">Cancelada</option>
+                <option value="REFUNDED">Reembolsada</option>
+              </select>
+            </div>
+            <div className="w-full sm:w-48">
+              <Label
+                htmlFor="date-filter"
+                className="text-xs sm:text-sm mb-2 block"
+              >
+                Período
+              </Label>
+              <select
+                id="date-filter"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="all">Todos os períodos</option>
+                <option value="today">Hoje</option>
+                <option value="yesterday">Ontem</option>
+                <option value="week">Últimos 7 dias</option>
+                <option value="month">Este mês</option>
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sales List */}
+      {filteredSales.length === 0 ? (
+        <Card className="border border-border shadow-sm">
+          <CardContent className="py-12 text-center">
+            <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Nenhuma venda encontrada
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {searchTerm || statusFilter !== 'all' || dateFilter !== 'all'
+                ? 'Tente ajustar os filtros para encontrar vendas.'
+                : 'As vendas presenciais aparecerão aqui conforme forem registradas no PDV.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {filteredSales.map((sale: any) => (
+            <Card
+              key={sale.id}
+              className="border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => handleViewSale(sale.id)}
+            >
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                  <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                    <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg sm:rounded-xl bg-muted text-foreground flex-shrink-0">
+                      <Receipt className="h-5 w-5 sm:h-6 sm:w-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
+                          Venda #{sale.saleNumber || sale.id}
+                        </h3>
+                        {getStatusBadge(sale.status)}
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">
+                            {sale.customer?.name ||
+                              sale.customerName ||
+                              'Cliente da loja'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">
+                            {formatDate(sale.createdAt)}
+                          </span>
+                        </div>
+                        {sale.paymentMethod && (
+                          <div className="flex items-center gap-1.5">
+                            <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="capitalize truncate">
+                              {sale.paymentMethod}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">
+                            {sale.isOnlineOrder ? 'Origem: Online' : 'Origem: PDV'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-shrink-0">
+                    <div className="text-left sm:text-right">
+                      <p className="text-lg sm:text-xl font-semibold text-foreground">
+                        {formatPrice(
+                          typeof sale.totalAmount === 'string'
+                            ? parseFloat(sale.totalAmount)
+                            : sale.totalAmount || 0,
+                        )}
+                      </p>
+                      {sale.items && sale.items.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {sale.items.length}{' '}
+                          {sale.items.length === 1 ? 'item' : 'itens'}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewSale(sale.id);
+                      }}
+                      className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
+                    >
+                      <Receipt className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SalesStats({ stats }: any) {
+  const formatPrice = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  return (
+    <div className="grid w-full max-w-full sm:max-w-md grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:max-w-xl">
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+        </div>
+        <p className="text-xl sm:text-2xl font-semibold leading-tight">
+          {stats.totalSales}
+        </p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">
+          Vendas no PDV
+        </p>
+      </div>
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
+        </div>
+        <p className="text-lg sm:text-2xl font-semibold leading-tight truncate">
+          {formatPrice(stats.totalRevenue)}
+        </p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">
+          Receita total
+        </p>
+      </div>
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
+        </div>
+        <p className="text-lg sm:text-2xl font-semibold leading-tight truncate">
+          {formatPrice(stats.averageOrderValue)}
+        </p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">
+          Ticket médio
+        </p>
+      </div>
+      <div className="rounded-xl sm:rounded-2xl border border-primary-foreground/20 bg-primary-foreground/10 p-3 sm:p-4">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-primary-foreground/10 text-primary-foreground mb-2 sm:mb-3">
+          <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
+        </div>
+        <p className="text-xl sm:text-2xl font-semibold leading-tight">
+          {stats.conversionRate.toFixed(1)}%
+        </p>
+        <p className="text-[10px] sm:text-xs uppercase tracking-wide text-primary-foreground/70 mt-1">
+          Taxa de conversão
+        </p>
+      </div>
+    </div>
+  );
+}
+
+

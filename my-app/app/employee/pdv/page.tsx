@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { adminAPI } from '@/lib/api';
+import { adminAPI, timeClockAPI } from '@/lib/api';
 import { showAlert } from '@/lib/alerts';
+import { useAppStore } from '@/lib/store';
 import { 
   User, 
   Search, 
@@ -28,10 +30,76 @@ import PDVComponent from '@/components/PDVComponent';
 
 import { Loader } from '@/components/ui/ai/loader';
 export default function PDVPage() {
+  const { user } = useAppStore();
+  const router = useRouter();
   const [customerSearchCpf, setCustomerSearchCpf] = useState('');
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [foundCustomer, setFoundCustomer] = useState<any>(null);
   const [showPDV, setShowPDV] = useState(false);
+  const [hasClockIn, setHasClockIn] = useState<boolean | null>(null);
+  const [checkingClockIn, setCheckingClockIn] = useState(true);
+
+  // Log inicial para debug
+  useEffect(() => {
+    console.log('[PDV] Componente carregado');
+    console.log('[PDV] Usuário atual:', user);
+    console.log('[PDV] Role do usuário:', user?.role);
+  }, []);
+
+  // Verificar se o funcionário bateu o ponto (apenas para EMPLOYEE)
+  useEffect(() => {
+    const checkClockIn = async () => {
+      console.log('[PDV] Verificando ponto - Usuário:', user);
+      
+      // Verificar apenas se for funcionário (EMPLOYEE)
+      if (!user) {
+        console.log('[PDV] Usuário não encontrado');
+        setHasClockIn(true); // Permitir acesso se não houver usuário (pode estar carregando)
+        setCheckingClockIn(false);
+        return;
+      }
+
+      const userRole = user.role?.toUpperCase();
+      console.log('[PDV] Role do usuário:', userRole);
+      
+      // Verificar ponto para EMPLOYEE e CASHIER
+      if (userRole !== 'EMPLOYEE' && userRole !== 'CASHIER') {
+        console.log('[PDV] Não é funcionário/caixa, permitindo acesso');
+        setHasClockIn(true); // Permitir acesso para outros roles (ADMIN, MANAGER)
+        setCheckingClockIn(false);
+        return;
+      }
+
+      try {
+        setCheckingClockIn(true);
+        console.log('[PDV] Verificando ponto do funcionário:', user.id);
+        const result = await timeClockAPI.checkTodayClockIn(user.id);
+        console.log('[PDV] Resultado da verificação:', result);
+        console.log('[PDV] hasClockIn:', result.hasClockIn);
+        
+        // Definir o estado baseado no resultado
+        if (result.hasClockIn) {
+          console.log('[PDV] ✅ Ponto batido, permitindo acesso');
+          setHasClockIn(true);
+        } else {
+          console.log('[PDV] ❌ Ponto NÃO batido, bloqueando acesso');
+          setHasClockIn(false);
+        }
+      } catch (error: any) {
+        console.error('[PDV] Erro ao verificar ponto:', error);
+        console.error('[PDV] Detalhes do erro:', error.response?.data);
+        // Em caso de erro, bloquear acesso por segurança
+        console.log('[PDV] ⚠️ Erro na verificação, bloqueando acesso por segurança');
+        setHasClockIn(false);
+      } finally {
+        setCheckingClockIn(false);
+      }
+    };
+
+    if (user) {
+      checkClockIn();
+    }
+  }, [user]);
 
   // Desabilitar scroll na página
   useEffect(() => {
@@ -155,6 +223,56 @@ export default function PDVPage() {
   const formatCPF = (cpf: string) => {
     return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
+
+  // Verificar se está verificando o ponto
+  if (checkingClockIn) {
+    return (
+      <div className="fixed inset-0 bg-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader size={48} className="mx-auto mb-4" />
+          <p className="text-gray-600">Verificando ponto...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se o funcionário/caixa não bateu o ponto, mostrar mensagem
+  const userRole = user?.role?.toUpperCase();
+  if (hasClockIn === false && user && (userRole === 'EMPLOYEE' || userRole === 'CASHIER')) {
+    return (
+      <div className="fixed inset-0 bg-white flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200">
+          <CardHeader className="bg-red-50 text-center pb-4">
+            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle className="h-8 w-8 text-red-600" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-red-900">Ponto não registrado</CardTitle>
+            <p className="text-red-700 mt-2">Você precisa bater o ponto antes de acessar o PDV</p>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">
+                <strong>Importante:</strong> É necessário registrar sua entrada no sistema antes de realizar vendas.
+              </p>
+            </div>
+            <Button
+              onClick={() => router.push('/employee/timeclock')}
+              className="w-full bg-[#3e2626] hover:bg-[#5a3a3a] h-12 text-lg font-semibold"
+            >
+              Ir para Ponto Eletrônico
+            </Button>
+            <Button
+              onClick={() => router.push('/employee')}
+              variant="outline"
+              className="w-full h-10"
+            >
+              Voltar ao Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Se já abriu o PDV, mostrar o componente
   if (showPDV) {
