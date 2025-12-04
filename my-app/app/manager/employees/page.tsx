@@ -46,7 +46,11 @@ export default function ManagerEmployeesPage() {
       const storeEmployees = await managerAPI.getStoreUsers(1, 100, '');
       
       if (storeEmployees.users) {
-        setEmployees(storeEmployees.users);
+        // Garantir que o próprio gerente não apareça na lista
+        const filtered = storeEmployees.users.filter(
+          (employee: any) => employee.id !== user?.id
+        );
+        setEmployees(filtered);
       }
     } catch (err: any) {
       console.error('Erro ao buscar funcionários:', err);
@@ -322,7 +326,7 @@ function EmployeesSection({ employees, onEmployeesChange, onViewEmployee, onEdit
             {!filters.search && filters.role === 'all' && filters.status === 'all' && (
               <Button onClick={onNewEmployee} className="bg-[#3e2626] hover:bg-[#5a3a3a]">
                 <UserPlus className="h-4 w-4 mr-2" />
-                Criar Primeiro Funcionário
+                Adicionar Funcionário
               </Button>
             )}
           </CardContent>

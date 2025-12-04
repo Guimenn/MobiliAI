@@ -16,6 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { showAlert } from '@/lib/alerts';
 
 interface Employee {
   id: string;
@@ -397,14 +398,73 @@ export default function ManagerTimeClockPage() {
         
         setPhoto(null);
         setNotes('');
+        
+        const now = new Date();
+        const currentTime = now.toLocaleTimeString('pt-BR', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
+        const currentDate = now.toLocaleDateString('pt-BR', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long'
+        });
+
+        if (hasOpenEntry) {
+          // Saída registrada
+          const totalHours = result.timeClock?.totalHours || 0;
+          const hours = Math.floor(totalHours);
+          const minutes = Math.floor((totalHours - hours) * 60);
+          const hoursText = hours > 0 ? `${hours}h ` : '';
+          const minutesText = minutes > 0 ? `${minutes}min` : '';
+          
+          showAlert(
+            'success',
+            `Ponto de saída registrado para ${employee.name}`,
+            `Horário: ${currentTime} | ${currentDate}${hoursText || minutesText ? ` | Jornada: ${hoursText}${minutesText}` : ''}`,
+            5000
+          );
+        } else {
+          // Entrada registrada
+          const isLate = result.isLate || false;
+          const minutesLate = result.minutesLate || 0;
+          let description = `Colaborador: ${employee.name} | Horário: ${currentTime} | ${currentDate}`;
+          
+          if (isLate && minutesLate > 0) {
+            description += ` | Atraso: ${minutesLate} minuto${minutesLate > 1 ? 's' : ''}`;
+            showAlert(
+              'warning',
+              `Ponto de entrada registrado com atraso - ${employee.name}`,
+              description,
+              6000
+            );
+          } else {
+            showAlert(
+              'success',
+              `Ponto de entrada registrado para ${employee.name}`,
+              description,
+              5000
+            );
+          }
+        }
       } else {
         const errorData = await response.json();
         console.error('Erro ao registrar ponto:', errorData);
-        alert(`Erro: ${errorData.message || 'Erro desconhecido'}`);
+        showAlert(
+          'error',
+          'Não foi possível registrar o ponto',
+          errorData.message || 'Ocorreu um erro inesperado ao processar o registro. Tente novamente em instantes.',
+          5000
+        );
       }
     } catch (error) {
       console.error('Erro ao registrar ponto:', error);
-      alert('Erro de conexão');
+      showAlert(
+        'error',
+        'Falha de comunicação com o servidor',
+        'Não foi possível concluir o registro de ponto. Verifique sua conexão com a internet e tente novamente.',
+        5000
+      );
     } finally {
       setLoading(false);
     }

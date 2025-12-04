@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAppStore } from '@/lib/store';
+import { notificationsAPI } from '@/lib/api';
 import { 
   Package, 
   ShoppingCart,
@@ -21,6 +22,7 @@ import {
   Wallet,
   Monitor,
   ArrowRight,
+  Bell,
 } from 'lucide-react';
 
 export default function ManagerLayout({
@@ -35,12 +37,86 @@ export default function ManagerLayout({
   const [isMounted, setIsMounted] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
+  // Notificações (ícone no header, similar ao admin)
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const notificationsRef = useRef<HTMLDivElement | null>(null);
+
+  const loadNotifications = async (silent = false) => {
+    if (!isAuthenticated || !user) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    if (!silent) {
+      setNotificationsLoading(true);
+    }
+
+    try {
+      const [listResponse, unreadResponse] = await Promise.all([
+        notificationsAPI.getAll(1, 20),
+        notificationsAPI.getUnreadCount(),
+      ]);
+
+      const list = Array.isArray(listResponse?.notifications)
+        ? listResponse.notifications
+        : [];
+      setNotifications(list);
+
+      const unreadValue =
+        typeof unreadResponse === 'number'
+          ? unreadResponse
+          : (unreadResponse?.count as number | undefined) ?? 0;
+      setUnreadCount(unreadValue);
+    } catch (error) {
+      console.error('Erro ao carregar notificações do gerente:', error);
+    } finally {
+      if (!silent) {
+        setNotificationsLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsMounted(true);
     }, 100);
     return () => clearTimeout(timer);
   }, []);
+
+  // Carregar notificações periodicamente
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    void loadNotifications();
+
+    const interval = setInterval(() => {
+      void loadNotifications(true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user?.id]);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        notificationsRef.current &&
+        !notificationsRef.current.contains(event.target as Node)
+      ) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [notificationsOpen]);
 
   // Verificar autenticação e role
   useEffect(() => {
@@ -119,6 +195,12 @@ export default function ManagerLayout({
           current: pathname.startsWith('/manager/cashflow'),
         },
         {
+          name: 'Vendas da Loja',
+          href: '/manager/sales',
+          icon: Receipt,
+          current: pathname.startsWith('/manager/sales'),
+        },
+        {
           name: 'Relatórios',
           href: '/manager/reports',
           icon: BarChart3,
@@ -174,10 +256,13 @@ export default function ManagerLayout({
 
           <div className="border-b border-sidebar-border px-6 py-5">
             <button
-              onClick={() => router.push('/manager')}
+              onClick={() => router.push('/manager/profile')}
               className="flex w-full items-center gap-3 rounded-2xl bg-muted/40 p-3 transition-colors hover:bg-muted/60"
             >
               <Avatar className="h-10 w-10">
+                {user?.avatarUrl && (
+                  <AvatarImage src={user.avatarUrl} alt={user.name || 'Gerente'} />
+                )}
                 <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
                   {user?.name?.charAt(0)?.toUpperCase() || 'G'}
                 </AvatarFallback>
@@ -266,11 +351,93 @@ export default function ManagerLayout({
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Notificações - ícone ao lado do perfil */}
+              <div className="relative hidden sm:block" ref={notificationsRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative rounded-full"
+                  onClick={() => setNotificationsOpen(prev => !prev)}
+                  aria-label="Notificações"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute right-1 top-1 inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                  )}
+                </Button>
+
+                {notificationsOpen && (
+                  <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-border bg-popover p-3 shadow-2xl z-50">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          Notificações
+                        </p>
+                        {unreadCount > 0 ? (
+                          <p className="text-xs text-primary">
+                            {unreadCount} não lida{unreadCount > 1 ? 's' : ''}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Atualizadas automaticamente
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
+                      {notificationsLoading ? (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          Carregando notificações...
+                        </p>
+                      ) : notifications.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          Nenhuma notificação recente.
+                        </p>
+                      ) : (
+                        notifications.map((notification: any) => (
+                          <div
+                            key={notification.id}
+                            className="rounded-xl border border-border bg-background/80 p-3 text-xs text-foreground"
+                          >
+                            <p className="font-medium text-sm">
+                              {notification.title}
+                            </p>
+                            {notification.message && (
+                              <p className="mt-1 text-muted-foreground">
+                                {notification.message}
+                              </p>
+                            )}
+                            {notification.createdAt && (
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                {new Date(notification.createdAt).toLocaleString(
+                                  'pt-BR',
+                                  {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  }
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
-                onClick={() => router.push('/manager')}
+                onClick={() => router.push('/manager/profile')}
                 className="hidden items-center gap-3 rounded-2xl border border-border bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50 sm:flex"
               >
                 <Avatar className="h-8 w-8">
+                  {user?.avatarUrl && (
+                    <AvatarImage src={user.avatarUrl} alt={user.name || 'Gerente'} />
+                  )}
                   <AvatarFallback className="bg-[#3e2626] text-primary-foreground">
                     {user?.name?.charAt(0)?.toUpperCase() || 'G'}
                   </AvatarFallback>

@@ -202,27 +202,32 @@ export class ProductsService {
       // LÓGICA: Um produto pode estar em múltiplas lojas de duas formas:
       // 1. storeId direto = loja principal do produto (usa product.stock)
       // 2. StoreInventory = produto também disponível em outras lojas (usa StoreInventory.quantity)
+      // IMPORTANTE: Se o produto tem StoreInventory para a loja, SEMPRE priorizar StoreInventory.quantity
+      // mesmo que o produto também tenha storeId === targetStoreId
       
       // Verificar se o produto está disponível na loja solicitada via StoreInventory
-      const inventoryForStore = product.storeInventory?.find(inv => inv.storeId === targetStoreId);
+      // O storeInventory já está filtrado pela query quando targetStoreId existe
+      const inventoryForStore = product.storeInventory && product.storeInventory.length > 0
+        ? product.storeInventory.find(inv => inv.storeId === targetStoreId) || product.storeInventory[0]
+        : null;
       
-      // Se o produto tem storeId da loja solicitada, usar stock do produto
-      if (product.storeId === targetStoreId) {
-        return {
-          ...product,
-          stock: product.stock || 0,
-          storeId: product.store?.id || product.storeId,
-        };
-      }
-      
-      // Se o produto está disponível na loja via StoreInventory, usar quantity do StoreInventory
-      // Isso permite que um produto com storeId principal também esteja em outras lojas
+      // PRIORIDADE: Se o produto tem StoreInventory para esta loja, SEMPRE usar StoreInventory.quantity
+      // Isso garante consistência entre frontend e backend
       if (inventoryForStore) {
         return {
           ...product,
-          stock: inventoryForStore.quantity || 0,
+          stock: Number(inventoryForStore.quantity) || 0,
           store: inventoryForStore.store || product.store,
           storeId: inventoryForStore.store?.id || targetStoreId,
+        };
+      }
+      
+      // Se o produto tem storeId da loja solicitada (sem StoreInventory), usar stock do produto
+      if (product.storeId === targetStoreId) {
+        return {
+          ...product,
+          stock: Number(product.stock) || 0,
+          storeId: product.store?.id || product.storeId,
         };
       }
       

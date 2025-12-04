@@ -50,7 +50,7 @@ export class SalesService {
     };
     const prismaPaymentMethod = paymentMethodMap[String(createSaleDto.paymentMethod)] || 'CASH';
 
-    // Criar a venda com transação
+    // Criar a venda com transação (timeout aumentado para 15 segundos)
     return this.prisma.$transaction(async (tx) => {
       // Preparar dados da venda
       const saleData: any = {
@@ -252,6 +252,9 @@ export class SalesService {
       }
 
       return saleWithDetails;
+    }, {
+      timeout: 15000, // 15 segundos (aumentado de 5 segundos padrão)
+      maxWait: 10000, // 10 segundos para esperar iniciar a transação
     });
   }
 

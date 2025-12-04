@@ -248,3 +248,93 @@
 [data-radix-select-content] {
   z-index: 9999 !important;
 }
+
+/* ================================
+   Sonner (toast) – estilização customizada
+   Deixa os alerts com a mesma paleta e visual do site
+   ================================ */
+
+/* Container geral do toaster */
+.toaster {
+  pointer-events: none;
+}
+
+/* Cartão base do toast */
+.toaster [data-sonner-toast] {
+  pointer-events: auto;
+  border-radius: var(--radius-xl);
+  border: 1px solid oklch(from var(--border) l c h / 0.9);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.02);
+  padding-block: 0.85rem;
+  padding-inline: 0.95rem 1.1rem;
+  backdrop-filter: blur(12px);
+}
+
+/* Layout interno do toast (ícone + textos) */
+.toaster [data-sonner-toast] > div {
+  gap: 0.6rem;
+}
+
+/* Título e descrição – tipografia mais elegante, seguindo o site */
+.toaster [data-sonner-toast] [data-title] {
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.toaster [data-sonner-toast] [data-description] {
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+/* Ícone: bolinha com borda na cor primária da marca */
+.toaster [data-sonner-toast] svg {
+  width: 1rem;
+  height: 1rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid oklch(from var(--primary) l c h / 0.35);
+  background: oklch(from var(--primary) l c h / 0.06);
+  color: var(--primary);
+}
+
+/* SUCCESS – usa a paleta principal da loja (marrom) */
+.toaster [data-sonner-toast][data-type="success"] {
+  border-left: 4px solid #3e2626;
+}
+
+/* WARNING – tom âmbar suave */
+.toaster [data-sonner-toast][data-type="warning"] {
+  border-left: 4px solid oklch(0.828 0.189 84.429);
+}
+
+/* ERROR – vermelho da paleta */
+.toaster [data-sonner-toast][data-type="error"] {
+  border-left: 4px solid var(--destructive);
+}
+
+/* INFO – usa cor de accent */
+.toaster [data-sonner-toast][data-type="info"] {
+  border-left: 4px solid var(--accent-foreground);
+}
+
+/* Loading / neutral */
+.toaster [data-sonner-toast][data-type="default"],
+.toaster [data-sonner-toast]:not([data-type]) {
+  border-left: 4px solid var(--primary);
+}
+
+/* Botão de fechar sempre visível, mas discreto */
+.toaster [data-sonner-toast] [data-dismiss] {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.toaster [data-sonner-toast] [data-dismiss]:hover {
+  opacity: 1;
+}

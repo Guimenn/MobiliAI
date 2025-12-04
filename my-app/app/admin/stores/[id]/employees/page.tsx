@@ -29,18 +29,15 @@ export default function EmployeesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [store, setStore] = useState<any>(null);
 
-  // Função para organizar funcionários por hierarquia
+  // Função para organizar funcionários por hierarquia (usando roles reais do sistema)
   const getHierarchyOrder = (role: string) => {
-    const hierarchy = {
-      'GERENTE': 1,
-      'SUPERVISOR': 2,
-      'VENDEDOR': 3,
-      'CAIXA': 4,
-      'ESTOQUISTA': 5,
-      'ATENDENTE': 6,
-      'AUXILIAR': 7
+    const hierarchy: Record<string, number> = {
+      ADMIN: 0,
+      STORE_MANAGER: 1,
+      EMPLOYEE: 2,
+      CASHIER: 3,
     };
-    return hierarchy[role as keyof typeof hierarchy] || 99;
+    return hierarchy[role] ?? 99;
   };
 
   const sortedEmployees = employees.sort((a, b) => {
@@ -80,21 +77,19 @@ export default function EmployeesPage() {
 
   const getRoleBadgeStyle = (role: string) => {
     switch (role) {
-      case 'GERENTE':
+      case 'STORE_MANAGER':
         return 'bg-red-50 text-red-700 border-red-200';
-      case 'SUPERVISOR':
-        return 'bg-orange-50 text-orange-700 border-orange-200';
-      case 'VENDEDOR':
+      case 'EMPLOYEE':
+      case 'CASHIER':
         return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'CAIXA':
-        return 'bg-green-50 text-green-700 border-green-200';
-      case 'ESTOQUISTA':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'ATENDENTE':
-        return 'bg-yellow-50 text-yellow-700 border-yellow-200';
       default:
         return 'bg-gray-50 text-gray-700 border-gray-200';
     }
+  };
+
+  const getRoleLabel = (role: string) => {
+    if (role === 'STORE_MANAGER') return 'Gerente';
+    return 'Funcionário';
   };
 
   return (
@@ -186,7 +181,7 @@ export default function EmployeesPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={getRoleBadgeStyle(employee.role)}>
-                          {employee.role}
+                          {getRoleLabel(employee.role)}
                         </Badge>
                       </TableCell>
                       <TableCell>

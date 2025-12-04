@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { TimeClockService } from './time-clock.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -121,13 +121,19 @@ export class TimeClockController {
   // History endpoint for frontend integration (moved from AppController)
   @Get('history/:employeeId')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER, UserRole.CASHIER)
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER, UserRole.CASHIER, UserRole.EMPLOYEE)
   async getTimeClockHistory(
     @Param('employeeId') employeeId: string, 
     @Query('startDate') startDate?: string, 
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
+    @Request() req?: any
   ) {
     try {
+      // Se for EMPLOYEE, só pode ver seu próprio histórico
+      if (req?.user?.role === UserRole.EMPLOYEE && req?.user?.id !== employeeId) {
+        throw new ForbiddenException('Você só pode ver seu próprio histórico de ponto');
+      }
+      
       console.log('📊 [REAL DATA] Buscando histórico do funcionário:', employeeId);
       console.log('📅 [REAL DATA] Filtros - Início:', startDate, 'Fim:', endDate);
       

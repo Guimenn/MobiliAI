@@ -22,13 +22,13 @@ import {
   AlertCircle,
   X,
   CreditCard,
+  Radio,
 } from 'lucide-react';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
-import StripeCardForm from '@/components/StripeCardForm';
 import { env } from '@/lib/env';
-
+import { mqttAPI } from '@/lib/mqtt-api';
 import { Loader } from '@/components/ui/ai/loader';
+import { loadStripe } from '@stripe/stripe-js';
+
 const stripePromise = loadStripe(env.STRIPE_PUBLISHABLE_KEY);
 
 interface PDVPaymentModalProps {
@@ -62,27 +62,36 @@ export default function PDVPaymentModal({
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [error, setError] = useState<string>('');
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [isCreatingIntent, setIsCreatingIntent] = useState(false);
+  const [waitingForRFID, setWaitingForRFID] = useState(false);
+  const [rfidRead, setRfidRead] = useState(false);
+  const [rfidTag, setRfidTag] = useState<string | null>(null);
+  const [mqttConnected, setMqttConnected] = useState(false);
 
   useEffect(() => {
     if (open && saleId) {
       if (paymentMethod === 'PIX') {
         createPixPayment();
       } else if (paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') {
-        createStripePayment();
+        // Limpar tag RFID antes de começar a aguardar nova leitura
+        mqttAPI.clearLastRfid().catch(err => {
+          console.warn('Erro ao limpar tag RFID (não crítico):', err);
+        });
+        // Delay maior para garantir que a limpeza foi processada e não pegue tags antigas
+        setTimeout(() => {
+          handleCardPaymentWithRFID();
+        }, 500);
       }
     } else {
-      // Resetar estados ao fechar
       setPaymentData(null);
       setPaymentStatus('PENDING');
       setError('');
-      setClientSecret(null);
       setTimeLeft(0);
+      setWaitingForRFID(false);
+      setRfidRead(false);
+      setRfidTag(null);
     }
   }, [open, saleId, paymentMethod]);
 
-  // Verificar status do pagamento PIX periodicamente
   useEffect(() => {
     if (!open || paymentMethod !== 'PIX' || paymentStatus === 'PAID' || paymentStatus === 'EXPIRED') {
       return;
@@ -96,10 +105,9 @@ export default function PDVPaymentModal({
         setPaymentStatus(newStatus);
         
         if (newStatus === 'PAID') {
-          // Atualizar status da venda automaticamente
           try {
             await salesAPI.update(saleId, {
-              status: 'completed' as any, // Prisma usa COMPLETED, mas o DTO aceita do enum
+              status: 'completed' as any,
             });
           } catch (error) {
             console.error('Erro ao atualizar status da venda:', error);
@@ -121,7 +129,6 @@ export default function PDVPaymentModal({
     return () => clearInterval(checkInterval);
   }, [open, saleId, paymentMethod, paymentStatus, onPaymentSuccess, onClose]);
 
-  // Atualizar contador de tempo PIX
   useEffect(() => {
     if (timeLeft <= 0 || paymentMethod !== 'PIX') return;
 
@@ -161,19 +168,74 @@ export default function PDVPaymentModal({
     }
   };
 
-  const createStripePayment = async () => {
-    setIsCreatingIntent(true);
+  const handleCardPaymentWithRFID = async () => {
     setError('');
+    setWaitingForRFID(true);
+    setRfidRead(false);
+    setRfidTag(null);
+
     try {
-      const response = await customerAPI.createStripePaymentIntent(saleId, customerInfo);
-      setClientSecret(response.clientSecret);
+      console.log('Iniciando processo de pagamento com RFID...');
+      
+      // Verificar status da conexão MQTT
+      try {
+        const status = await mqttAPI.getStatus();
+        setMqttConnected(status.connected);
+        
+        if (!status.connected) {
+          throw new Error('Serviço MQTT não está conectado. Verifique se o backend está rodando e conectado ao broker.');
+        }
+      } catch (statusError: any) {
+        console.error('Erro ao verificar status MQTT:', statusError);
+        throw new Error('Não foi possível verificar a conexão com o leitor RFID.');
+      }
+
+      showAlert('info', 'Aproxime o cartão do leitor RFID...');
+      
+      // Aguardar leitura do RFID via API REST (timeout de 30 segundos no backend)
+      const result = await mqttAPI.waitForRfid();
+      console.log('RFID lido:', result.tag);
+      
+      setRfidTag(result.tag);
+      setRfidRead(true);
+      setWaitingForRFID(false);
+      
+      showAlert('success', 'Cartão identificado! Finalizando venda...');
+      
+      // Após ler o RFID, finalizar a venda diretamente (sem Stripe)
+      try {
+        // Atualizar status da venda para COMPLETED
+        await salesAPI.update(saleId, {
+          status: 'completed' as any,
+          paymentReference: result.tag, // Salvar a tag RFID como referência
+        });
+        
+        showAlert('success', 'Venda finalizada com sucesso!');
+        
+        // Limpar a tag RFID do backend para forçar nova leitura na próxima venda
+        try {
+          await mqttAPI.clearLastRfid();
+          console.log('Tag RFID limpa após finalizar venda');
+        } catch (clearError) {
+          console.warn('Erro ao limpar tag RFID (não crítico):', clearError);
+        }
+        
+        // Fechar modal e chamar callback de sucesso
+        setTimeout(() => {
+          onPaymentSuccess();
+          onClose();
+        }, 1500);
+      } catch (updateError: any) {
+        console.error('Erro ao finalizar venda:', updateError);
+        throw new Error('Erro ao finalizar venda. Tente novamente.');
+      }
+      
     } catch (err: any) {
-      console.error('Erro ao criar PaymentIntent:', err);
-      const errorMessage = err.response?.data?.message || 'Erro ao criar pagamento com cartão';
+      console.error('Erro ao aguardar RFID:', err);
+      setWaitingForRFID(false);
+      const errorMessage = err.response?.data?.message || err.message || 'Erro ao ler cartão RFID';
       setError(errorMessage);
       showAlert('error', errorMessage);
-    } finally {
-      setIsCreatingIntent(false);
     }
   };
 
@@ -195,18 +257,6 @@ export default function PDVPaymentModal({
 
   const handleRefreshPix = async () => {
     await createPixPayment();
-  };
-
-  const handlePaymentSuccess = async (paymentIntentId: string) => {
-    try {
-      await customerAPI.confirmStripePayment(paymentIntentId);
-      showAlert('success', 'Pagamento com cartão confirmado!');
-      onPaymentSuccess();
-      onClose();
-    } catch (err: any) {
-      console.error('Erro ao confirmar pagamento:', err);
-      showAlert('error', 'Erro ao confirmar pagamento');
-    }
   };
 
   const formatTime = (seconds: number) => {
@@ -269,7 +319,6 @@ export default function PDVPaymentModal({
               </div>
             ) : paymentData ? (
               <>
-                {/* Timer */}
                 {timeLeft > 0 && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="flex items-center justify-between">
@@ -288,7 +337,6 @@ export default function PDVPaymentModal({
                   </div>
                 )}
 
-                {/* QR Code */}
                 {paymentData.qrCode && (
                   <div className="flex flex-col items-center space-y-4">
                     <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
@@ -302,7 +350,6 @@ export default function PDVPaymentModal({
                   </div>
                 )}
 
-                {/* Código PIX */}
                 <div className="space-y-3">
                   <p className="text-sm font-medium text-gray-700">
                     Copie o código PIX:
@@ -332,7 +379,6 @@ export default function PDVPaymentModal({
                   </div>
                 </div>
 
-                {/* Status */}
                 {isCheckingPayment && (
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Loader size={16} />
@@ -388,57 +434,63 @@ export default function PDVPaymentModal({
             ) : null}
           </div>
         ) : (
-          // Pagamento com Cartão
           <div className="space-y-6">
-            {isCreatingIntent ? (
+            {waitingForRFID ? (
               <div className="flex flex-col items-center justify-center py-12">
-                <Loader size={32} className="text-[#3e2626] mb-4" />
-                <p className="text-gray-600">Preparando pagamento...</p>
+                <div className="mb-4">
+                  <Radio className="h-16 w-16 animate-pulse text-[#3e2626]" />
+                </div>
+                <p className="text-lg font-semibold text-gray-700 mb-2">
+                  {!mqttConnected ? 'Verificando conexão...' : 'Aguardando leitura do cartão...'}
+                </p>
+                <p className="text-sm text-gray-600 text-center mb-4">
+                  {!mqttConnected 
+                    ? 'Verificando conexão com o leitor RFID...'
+                    : 'Aproxime o cartão do leitor RFID'}
+                </p>
+                {!mqttConnected ? (
+                  <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 w-full">
+                    <div className="flex items-center space-x-2 text-yellow-800">
+                      <Loader className="h-4 w-4 animate-spin" />
+                      <span className="text-xs">Verificando conexão com o serviço MQTT...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3 w-full">
+                    <div className="flex items-center space-x-2 text-green-800">
+                      <CheckCircle className="h-4 w-4" />
+                      <span className="text-xs">Conectado! Aguardando leitura do cartão...</span>
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : error ? (
+            ) : rfidRead && rfidTag ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center space-x-2 text-green-800">
+                  <CheckCircle className="h-5 w-5" />
+                  <div>
+                    <span className="font-semibold">Cartão identificado!</span>
+                    <p className="text-xs text-green-700 mt-1">Tag: {rfidTag}</p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex items-center space-x-2 text-red-600">
                   <AlertCircle className="h-5 w-5" />
                   <span>{error}</span>
                 </div>
                 <Button
-                  onClick={createStripePayment}
+                  onClick={handleCardPaymentWithRFID}
                   className="mt-4 w-full"
                   variant="outline"
                 >
                   Tentar novamente
                 </Button>
               </div>
-            ) : clientSecret ? (
-              <Elements
-                stripe={stripePromise}
-                options={{
-                  clientSecret,
-                  appearance: {
-                    theme: 'stripe',
-                    variables: {
-                      colorPrimary: '#3e2626',
-                      colorBackground: '#ffffff',
-                      colorText: '#1f2937',
-                      colorDanger: '#ef4444',
-                      fontFamily: 'system-ui, sans-serif',
-                      spacingUnit: '4px',
-                      borderRadius: '8px',
-                    },
-                  },
-                }}
-              >
-                <StripeCardForm
-                  clientSecret={clientSecret}
-                  amount={amount}
-                  onSuccess={handlePaymentSuccess}
-                  onError={(errorMsg) => {
-                    setError(errorMsg);
-                    showAlert('error', errorMsg);
-                  }}
-                />
-              </Elements>
-            ) : null}
+            )}
           </div>
         )}
 

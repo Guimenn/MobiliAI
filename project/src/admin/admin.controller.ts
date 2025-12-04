@@ -83,6 +83,8 @@ export class AdminController {
     @Param('id') id: string,
     @Body() userData: UpdateUserDto
   ) {
+    console.log('📝 [AdminController] Atualizando usuário:', id);
+    console.log('💰 Dados recebidos (incluindo salary):', JSON.stringify(userData, null, 2));
     return this.adminService.updateUser(id, userData);
   }
 
@@ -276,6 +278,14 @@ export class AdminController {
     @Body() employeeData: UpdateEmployeeDto
   ) {
     return this.adminService.updateEmployee(id, employeeData);
+  }
+
+  @Post('employees/:id/promote')
+  async promoteEmployee(
+    @Param('id') id: string,
+    @Body() promotionData: { newPosition?: string; newSalary?: number; effectiveDate?: string }
+  ) {
+    return this.adminService.promoteEmployee(id, promotionData);
   }
 
   @Delete('employees/:id')

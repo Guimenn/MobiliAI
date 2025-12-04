@@ -137,7 +137,7 @@ export class PdvService {
       throw new BadRequestException('Alguns produtos não foram encontrados ou estão inativos');
     }
 
-    // Verificar estoque (usar StoreInventory.quantity se disponível, senão product.stock)
+    // Verificar estoque (priorizar StoreInventory.quantity se disponível, senão product.stock)
     for (const item of createSaleDto.items) {
       const product = products.find(p => p.id === item.productId);
       if (!product) {
@@ -145,20 +145,43 @@ export class PdvService {
       }
 
       // Determinar estoque disponível
+      // IMPORTANTE: O storeInventory já está filtrado pela query (where: { storeId: userStoreId })
+      // Então se existe, o primeiro item já é o da loja correta
+      const inventoryForStore = product.storeInventory && product.storeInventory.length > 0 
+        ? product.storeInventory[0] 
+        : null;
       const isProductInStore = product.storeId === userStoreId;
-      const isProductInStoreInventory = product.storeInventory && product.storeInventory.length > 0;
       
       let availableStock = 0;
-      if (isProductInStore) {
-        // Produto está diretamente na loja, usar product.stock
-        availableStock = product.stock || 0;
-      } else if (isProductInStoreInventory) {
-        // Produto está via StoreInventory, usar StoreInventory.quantity
-        availableStock = product.storeInventory[0].quantity || 0;
+      // PRIORIDADE: Se o produto tem StoreInventory para esta loja, SEMPRE usar StoreInventory.quantity
+      // Mesmo que o produto também tenha storeId === userStoreId, o StoreInventory tem prioridade
+      if (inventoryForStore) {
+        // Produto está via StoreInventory para esta loja, usar quantity do StoreInventory
+        availableStock = Number(inventoryForStore.quantity) || 0;
+      } else if (isProductInStore) {
+        // Produto está diretamente na loja (sem StoreInventory), usar product.stock
+        availableStock = Number(product.stock) || 0;
+      } else {
+        // Produto não está disponível nesta loja
+        availableStock = 0;
       }
 
+      // Debug: Log para identificar problemas de estoque
+      console.log(`[PDV] Verificação de estoque - Produto: ${product.name}, ` +
+        `storeId: ${product.storeId}, userStoreId: ${userStoreId}, ` +
+        `temStoreInventory: ${!!inventoryForStore}, ` +
+        `inventoryQuantity: ${inventoryForStore?.quantity}, ` +
+        `productStock: ${product.stock}, ` +
+        `availableStock: ${availableStock}, ` +
+        `solicitado: ${item.quantity}`);
+
       if (availableStock < item.quantity) {
-        throw new BadRequestException(`Estoque insuficiente para o produto ${product.name}. Disponível: ${availableStock}, Solicitado: ${item.quantity}`);
+        throw new BadRequestException(
+          `Estoque insuficiente para o produto ${product.name}. ` +
+          `Disponível: ${availableStock}, Solicitado: ${item.quantity}. ` +
+          `(storeId: ${product.storeId}, temStoreInventory: ${!!inventoryForStore}, ` +
+          `inventoryQty: ${inventoryForStore?.quantity || 'N/A'}, productStock: ${product.stock})`
+        );
       }
     }
 
@@ -466,12 +489,13 @@ export class PdvService {
     
     const lastSale = await this.prisma.sale.findFirst({
       where: {
-        storeId,
         saleNumber: {
           startsWith: dateStr,
         },
       },
-      orderBy: { createdAt: 'desc' },
+      // Usar o maior saleNumber global do dia, independente da loja,
+      // para evitar colisões na constraint única de saleNumber
+      orderBy: { saleNumber: 'desc' },
     });
 
     let sequence = 1;
