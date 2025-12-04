@@ -131,6 +131,7 @@ export default function ProductCard({
   // Calcular parcelamento
   const installmentValue = currentPrice / 12;
   const isOutOfStock = (product.stock || 0) === 0;
+  const hasReviews = (product.reviewCount || 0) > 0 && (product.rating || 0) > 0;
 
   // Verificar se está nos favoritos
   useEffect(() => {
@@ -429,27 +430,29 @@ export default function ProductCard({
           </div>
         )}
 
-        {/* Rating - Sempre mostra, mesmo quando for 0 */}
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-0.5">
-            {[...Array(5)].map((_, i) => (
-              <Star
-                key={i}
-                className={`h-3 w-3 ${
-                  product.rating && product.rating > 0 && i < Math.floor(product.rating)
-                    ? 'fill-yellow-400 text-yellow-400'
-                    : 'fill-gray-200 text-gray-200'
-                }`}
-              />
-            ))}
+        {/* Rating - mostrar apenas quando houver avaliações reais */}
+        {hasReviews && (
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-0.5">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className={`h-3 w-3 ${
+                    product.rating && product.rating > 0 && i < Math.floor(product.rating)
+                      ? 'fill-yellow-400 text-yellow-400'
+                      : 'fill-gray-200 text-gray-200'
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="text-xs font-medium text-gray-700">
+              {(product.rating || 0).toFixed(1)}
+            </span>
+            <span className="text-xs text-gray-500">
+              ({(product.reviewCount || 0) > 1000 ? `${((product.reviewCount || 0) / 1000).toFixed(1)}k` : (product.reviewCount || 0)})
+            </span>
           </div>
-          <span className="text-xs font-medium text-gray-700">
-            {(product.rating || 0).toFixed(1)}
-          </span>
-          <span className="text-xs text-gray-500">
-            ({(product.reviewCount || 0) > 1000 ? `${((product.reviewCount || 0) / 1000).toFixed(1)}k` : (product.reviewCount || 0)})
-          </span>
-        </div>
+        )}
 
         {/* Preço */}
         <div className="space-y-1">

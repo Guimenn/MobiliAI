@@ -20,6 +20,7 @@ import Image from 'next/image';
 import { useAppStore } from '@/lib/store';
 
 import { Loader } from '@/components/ui/ai/loader';
+
 interface Product {
   id: string;
   name: string;
@@ -28,6 +29,18 @@ interface Product {
   imageUrl?: string;
   barcode?: string;
   sku?: string;
+  // Campos de oferta normal (para aplicar preço promocional também no PDV)
+  isOnSale?: boolean;
+  salePrice?: number;
+  saleDiscountPercent?: number;
+  saleStartDate?: string;
+  saleEndDate?: string;
+  // Campos de oferta relâmpago
+  isFlashSale?: boolean;
+  flashSalePrice?: number;
+  flashSaleDiscountPercent?: number;
+  flashSaleStartDate?: string;
+  flashSaleEndDate?: string;
 }
 
 interface CartItem {
@@ -131,6 +144,54 @@ export default function PDVProductsPage({
     }).format(value);
   };
 
+  // Calcula o preço atual do produto considerando ofertas normais e relâmpago
+  const getCurrentPrice = (product: Product): number => {
+    const originalPrice = Number(product.price);
+    const now = new Date();
+
+    // Oferta relâmpago ativa
+    if (product.isFlashSale && product.flashSaleStartDate && product.flashSaleEndDate) {
+      try {
+        const flashStart = new Date(product.flashSaleStartDate);
+        const flashEnd = new Date(product.flashSaleEndDate);
+
+        if (now >= flashStart && now <= flashEnd) {
+          if (product.flashSalePrice !== undefined && product.flashSalePrice !== null) {
+            return Number(product.flashSalePrice);
+          }
+          if (product.flashSaleDiscountPercent !== undefined && product.flashSaleDiscountPercent !== null && originalPrice) {
+            const discount = (originalPrice * Number(product.flashSaleDiscountPercent)) / 100;
+            return originalPrice - discount;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar oferta relâmpago no PDV:', error);
+      }
+    }
+
+    // Oferta normal ativa
+    if (product.isOnSale && product.saleStartDate && product.saleEndDate) {
+      try {
+        const saleStart = new Date(product.saleStartDate);
+        const saleEnd = new Date(product.saleEndDate);
+
+        if (now >= saleStart && now <= saleEnd) {
+          if (product.salePrice !== undefined && product.salePrice !== null) {
+            return Number(product.salePrice);
+          }
+          if (product.saleDiscountPercent !== undefined && product.saleDiscountPercent !== null && originalPrice) {
+            const discount = (originalPrice * Number(product.saleDiscountPercent)) / 100;
+            return originalPrice - discount;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar oferta normal no PDV:', error);
+      }
+    }
+
+    return originalPrice;
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Busca de Produtos */}
@@ -197,7 +258,14 @@ export default function PDVProductsPage({
               {products.map((product) => {
                 const cartItem = cart.find(item => item.productId === product.id);
                 const currentQuantity = cartItem?.quantity || 0;
-                
+
+                const originalPrice = Number(product.price);
+                const currentPrice = getCurrentPrice(product);
+                const hasDiscount = currentPrice < originalPrice;
+                const discountPercent = hasDiscount
+                  ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
+                  : 0;
+
                 return (
                   <div
                     key={product.id}
@@ -225,9 +293,26 @@ export default function PDVProductsPage({
                         <h3 className="font-bold text-sm sm:text-base text-[#3e2626] line-clamp-2 mb-1 sm:mb-2 min-h-[2.5rem] sm:min-h-[3rem]">
                           {product.name}
                         </h3>
-                        <p className="text-lg sm:text-2xl font-bold text-[#3e2626] mb-2 sm:mb-3">
-                          {formatCurrency(product.price)}
-                        </p>
+
+                        <div className="mb-2 sm:mb-3">
+                          <div className="flex items-baseline gap-2">
+                            <p className="text-lg sm:text-2xl font-bold text-[#3e2626]">
+                              {formatCurrency(currentPrice)}
+                            </p>
+                            {hasDiscount && (
+                              <span className="text-xs sm:text-sm text-gray-400 line-through">
+                                {formatCurrency(originalPrice)}
+                              </span>
+                            )}
+                          </div>
+                          {hasDiscount && discountPercent > 0 && (
+                            <div className="mt-1">
+                              <Badge className="bg-[#3e2626] text-white text-[10px] sm:text-xs font-semibold px-2 py-0.5">
+                                -{discountPercent}%
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
                         
                         <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-1">
                           <Badge 
@@ -289,7 +374,8 @@ export default function PDVProductsPage({
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onAddToCart(product, 1);
+                                  // Garante que o carrinho use o preço atual (com oferta)
+                                  onAddToCart({ ...product, price: currentPrice }, 1);
                                 }}
                                 className="flex-1 bg-[#3e2626] hover:bg-[#5a3a3a] text-white h-8 sm:h-9 text-xs sm:text-sm"
                                 disabled={product.stock === 0 || cartItem.quantity >= product.stock}
@@ -302,7 +388,8 @@ export default function PDVProductsPage({
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onAddToCart(product, 1);
+                                // Garante que o carrinho use o preço atual (com oferta)
+                                onAddToCart({ ...product, price: currentPrice }, 1);
                               }}
                               className="flex-1 bg-[#3e2626] hover:bg-[#5a3a3a] text-white h-8 sm:h-9 text-xs sm:text-sm font-semibold"
                               disabled={product.stock === 0}
