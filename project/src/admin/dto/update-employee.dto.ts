@@ -1,4 +1,5 @@
-import { IsString, IsEmail, IsOptional, IsEnum, IsBoolean, IsObject } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsEnum, IsBoolean, IsObject, IsNumber, Min, IsDateString } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { UserRole } from '@prisma/client';
 
 export class UpdateEmployeeDto {
@@ -37,6 +38,20 @@ export class UpdateEmployeeDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  position?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => value ? parseFloat(value) : undefined)
+  salary?: number;
+
+  @IsOptional()
+  @IsDateString()
+  hireDate?: string;
 
   @IsOptional()
   @IsObject()

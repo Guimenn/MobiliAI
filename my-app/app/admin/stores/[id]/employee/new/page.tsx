@@ -54,7 +54,8 @@ export default function NewEmployeePage() {
   const filterAllowedFields = (data: any) => {
     const allowedFields = [
       'name', 'email', 'phone', 'address', 'city', 'state', 'zipCode', 
-      'role', 'isActive', 'cpf', 'workingHours', 'storeId', 'password'
+      'role', 'isActive', 'cpf', 'workingHours', 'storeId', 'password',
+      'salary', 'position', 'hireDate'
     ];
     
     const filtered: any = {};
@@ -64,7 +65,12 @@ export default function NewEmployeePage() {
         if (typeof data[field] === 'string' && data[field].trim() === '') {
           return; // Não incluir campos vazios
         }
-        filtered[field] = data[field];
+        // Converter salary para número se fornecido
+        if (field === 'salary' && data[field]) {
+          filtered[field] = parseFloat(data[field]);
+        } else {
+          filtered[field] = data[field];
+        }
       }
     });
     return filtered;

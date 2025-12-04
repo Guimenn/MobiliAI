@@ -27,6 +27,9 @@ model User {
   avatarUrl              String?
   passwordChangedAt      DateTime?            @default(now())
   gender                 String?
+  salary                 Decimal?             @db.Decimal(10, 2)
+  position               String?
+  hireDate               DateTime?
   cartItems              CartItem[]
   cashExpenses           CashExpense[]
   cashFlows              CashFlow[]

@@ -25,6 +25,7 @@ interface Employee {
   isActive: boolean;
   department?: string;
   position?: string;
+  salary?: number | string;
   hireDate?: string;
   emergencyContact?: string;
   emergencyPhone?: string;
@@ -61,6 +62,7 @@ export default function EditEmployeeModal({
     isActive: true,
     department: '',
     position: '',
+    salary: '',
     hireDate: '',
     emergencyContact: '',
     emergencyPhone: '',
@@ -85,6 +87,9 @@ export default function EditEmployeeModal({
         isActive: employee.isActive ?? true,
         department: employee.department || '',
         position: employee.position || '',
+        salary: employee.salary 
+          ? (typeof employee.salary === 'string' ? employee.salary : employee.salary.toString())
+          : '',
         hireDate: employee.hireDate || '',
         emergencyContact: employee.emergencyContact || '',
         emergencyPhone: employee.emergencyPhone || '',
@@ -138,10 +143,18 @@ export default function EditEmployeeModal({
     }
 
     try {
-      const employeeData = {
+      const employeeData: any = {
         ...formData,
         ...(workingHours && { workingHours })
       };
+      
+      // Converter salary para número se fornecido
+      if (employeeData.salary && employeeData.salary !== '') {
+        employeeData.salary = parseFloat(employeeData.salary);
+      } else {
+        delete employeeData.salary;
+      }
+      
       await onSubmit(employeeData);
       onClose();
     } catch (error) {
@@ -309,6 +322,18 @@ export default function EditEmployeeModal({
                   value={formData.position}
                   onChange={(e) => handleInputChange('position', e.target.value)}
                   placeholder="Ex: Vendedor Sênior"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="salary">Salário (R$)</Label>
+                <Input
+                  id="salary"
+                  type="number"
+                  step="0.01"
+                  value={formData.salary}
+                  onChange={(e) => handleInputChange('salary', e.target.value)}
+                  placeholder="0.00"
                 />
               </div>
 
