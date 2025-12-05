@@ -1488,7 +1488,10 @@ export default function HomePage() {
                 </p>
               </div>
               
-              <button className="group bg-[#3e2626] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold text-sm sm:text-base md:text-lg hover:bg-[#2a1f1f] transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2 sm:space-x-3">
+              <button 
+                onClick={() => router.push('/IA')}
+                className="group bg-[#3e2626] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold text-sm sm:text-base md:text-lg hover:bg-[#2a1f1f] transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2 sm:space-x-3"
+              >
                 <span>Experimentar IA</span>
                 <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform duration-300" />
               </button>

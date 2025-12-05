@@ -21,10 +21,12 @@ import {
   Download,
   Search,
   Sofa,
-  User,
+  Users,
   Table,
   BookOpen,
   Lamp,
+  Frame,
+  Package,
   X,
   AlertCircle,
   CheckCircle2,
@@ -64,31 +66,77 @@ interface HistoryState {
 }
 
 // Mock data do catálogo
-const CATEGORIES = ['Todos', 'Sofás', 'Cadeiras', 'Mesas', 'Estantes', 'Iluminação'];
+const CATEGORIES = ['Todos', 'Sofás', 'Cadeiras', 'Mesas', 'Estantes', 'Poltronas', 'Quadros', 'Luminárias', 'Mesa de centro'];
 
 // Mapear categorias da API para categorias do catálogo
 const mapCategory = (category: string): string => {
+  if (!category) return 'Outros';
+  
   const categoryMap: Record<string, string> = {
+    // Categorias principais (maiúsculas do banco - SOFA, MESA, etc.)
     'sofa': 'Sofás',
     'cadeira': 'Cadeiras',
     'mesa': 'Mesas',
     'estante': 'Estantes',
-    'iluminacao': 'Iluminação',
-    'mesa_centro': 'Mesas',
+    'poltrona': 'Poltronas',
+    'quadro': 'Quadros',
+    'luminaria': 'Luminárias',
+    'luminária': 'Luminárias',
+    'mesa_centro': 'Mesa de centro',
+    'mesacentro': 'Mesa de centro',
+    // Variações comuns
     'sofa_retratil': 'Sofás',
     'cadeira_escritorio': 'Cadeiras',
+    'mesa_jantar': 'Mesas',
+    'mesa_escritorio': 'Mesas',
   };
   
-  const normalized = category?.toLowerCase() || '';
-  return categoryMap[normalized] || 'Outros';
+  // Normalizar: remover espaços, converter para minúsculas, tratar underscores
+  let normalized = category.trim().toLowerCase();
+  
+  // Remover acentos para melhor matching
+  normalized = normalized
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  
+  // Tentar encontrar no mapa diretamente
+  if (categoryMap[normalized]) {
+    return categoryMap[normalized];
+  }
+  
+  // Tentar com underscores substituídos por espaços
+  const withUnderscores = normalized.replace(/\s+/g, '_');
+  if (categoryMap[withUnderscores]) {
+    return categoryMap[withUnderscores];
+  }
+  
+  // Tentar sem underscores
+  const withoutUnderscore = normalized.replace(/_/g, '');
+  if (categoryMap[withoutUnderscore]) {
+    return categoryMap[withoutUnderscore];
+  }
+  
+  // Tentar match parcial (ex: "SOFA" -> "sofa")
+  const partialMatch = Object.keys(categoryMap).find(key => 
+    normalized.includes(key) || key.includes(normalized)
+  );
+  if (partialMatch) {
+    return categoryMap[partialMatch];
+  }
+  
+  // Fallback: retornar categoria formatada
+  return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
 };
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Sofás: <Sofa className="h-5 w-5" />,
-  Cadeiras: <User className="h-5 w-5" />,
+  Cadeiras: <Users className="h-5 w-5" />,
   Mesas: <Table className="h-5 w-5" />,
   Estantes: <BookOpen className="h-5 w-5" />,
-  Iluminação: <Lamp className="h-5 w-5" />,
+  Poltronas: <Sofa className="h-5 w-5" />,
+  Quadros: <Frame className="h-5 w-5" />,
+  Luminárias: <Lamp className="h-5 w-5" />,
+  'Mesa de centro': <Package className="h-5 w-5" />,
 };
 
 const MAX_FREE_REQUESTS = 3;
@@ -932,25 +980,25 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
       {/* Navbar */}
       <Header />
       
-      <div className="flex flex-col bg-white" style={{ minHeight: '100vh', paddingTop: '180px' }}>
+      <div className="flex flex-col bg-white pt-[120px] sm:pt-[140px] md:pt-[160px] lg:pt-[180px]" style={{ minHeight: '100vh' }}>
         {/* Banner de limite atingido */}
         {hasReachedLimit && (
-          <div className="sticky top-[180px] z-40 bg-yellow-50 border-b-2 border-yellow-400 shadow-md">
-            <div className="container mx-auto px-4 py-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="h-6 w-6 text-yellow-600 shrink-0" />
-                  <div>
-                    <p className="font-semibold text-yellow-900">
+          <div className="sticky top-[120px] sm:top-[140px] md:top-[160px] lg:top-[180px] z-40 bg-yellow-50 border-b-2 border-yellow-400 shadow-md">
+            <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1">
+                  <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600 shrink-0 mt-0.5 sm:mt-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm sm:text-base text-yellow-900">
                       Limite de requisições gratuitas atingido
                     </p>
-                    <p className="text-sm text-yellow-700">
+                    <p className="text-xs sm:text-sm text-yellow-700 mt-1">
                       Você usou {MAX_FREE_REQUESTS} requisições gratuitas. Faça login para continuar usando o Visualizador de Móveis com IA.
                     </p>
                   </div>
                 </div>
                 <Button 
-                  className="bg-[#3e2626] hover:bg-[#4f3223] text-white shrink-0"
+                  className="bg-[#3e2626] hover:bg-[#4f3223] text-white shrink-0 w-full sm:w-auto text-sm sm:text-base"
                   asChild
                 >
                   <Link href="/login">Fazer Login</Link>
@@ -961,14 +1009,19 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
         )}
 
         {/* Header com ferramentas */}
-        <div className="sticky top-[180px] z-30 bg-white shadow-sm border-b border-[#3e2626]/10" style={{ top: hasReachedLimit ? '240px' : '180px' }}>
+        <div 
+          className=" z-30 bg-white shadow-sm border-b border-[#3e2626]/10 top-[120px] sm:top-[140px] md:top-[160px] lg:top-[180px]" 
+          style={hasReachedLimit ? { 
+            top: 'calc(120px + 60px)' 
+          } : {}}
+        >
           {/* Mensagem de seleção de posição */}
           {isSelectingPosition && pendingFurniture && (
-            <div className="bg-[#C07A45]/10 border-b border-[#C07A45]/30 px-4 py-2">
-              <div className="container mx-auto flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-[#C07A45] animate-pulse" />
-                  <p className="text-sm font-medium text-[#3e2626]">
+            <div className="bg-[#C07A45]/10 border-b border-[#C07A45]/30 px-3 sm:px-4 py-2">
+              <div className="container mx-auto flex items-center justify-between gap-2 sm:gap-4">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Sparkles className="h-4 w-4 text-[#C07A45] animate-pulse shrink-0" />
+                  <p className="text-xs sm:text-sm font-medium text-[#3e2626] truncate">
                     <span className="font-semibold">Clique na imagem</span> para escolher onde colocar: <span className="text-[#C07A45]">{pendingFurniture.name}</span>
                   </p>
                 </div>
@@ -976,52 +1029,52 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                   variant="ghost"
                   size="sm"
                   onClick={handleCancelPositionSelection}
-                  className="text-[#3e2626] hover:bg-[#C07A45]/20 h-7 px-2"
+                  className="text-[#3e2626] hover:bg-[#C07A45]/20 h-7 px-2 shrink-0"
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
-          <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-3">
-            <div className="flex items-center gap-4">
+          <div className="container mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 px-3 sm:px-4 py-2 sm:py-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-[#C07A45]" />
-                <h1 className="text-xl font-black text-[#3e2626]">Visualizador de Móveis com IA</h1>
+                <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-[#C07A45] shrink-0" />
+                <h1 className="text-base sm:text-lg lg:text-xl font-black text-[#3e2626]">Visualizador de Móveis com IA</h1>
                 {!isAuthenticated && (
-                  <div className="ml-4 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs font-medium text-blue-700">
-                    {MAX_FREE_REQUESTS - requestCount} requisições restantes
+                  <div className="ml-2 sm:ml-4 px-2 sm:px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-[10px] sm:text-xs font-medium text-blue-700 shrink-0">
+                    {MAX_FREE_REQUESTS - requestCount} restantes
                   </div>
                 )}
               </div>
               {uploadedImage && (
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={handleUndo} disabled={historyIndex === 0} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
-                    <Undo2 className="h-4 w-4" />
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={handleUndo} disabled={historyIndex === 0} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10 h-8 w-8 sm:h-9 sm:w-9 p-0">
+                    <Undo2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleRedo}
                     disabled={historyIndex === history.length - 1}
-                    className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10"
+                    className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10 h-8 w-8 sm:h-9 sm:w-9 p-0"
                   >
-                    <Redo2 className="h-4 w-4" />
+                    <Redo2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
-                  <div className="mx-2 h-6 w-px bg-[#3e2626]/20" />
+                  <div className="mx-1 sm:mx-2 h-5 sm:h-6 w-px bg-[#3e2626]/20" />
                   {selectedFurniture && (
                     <>
-                      <Button variant="outline" size="sm" onClick={() => handleRotate('left')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
-                        <RotateCw className="h-4 w-4 rotate-[-90]" />
+                      <Button variant="outline" size="sm" onClick={() => handleRotate('left')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10 h-8 w-8 sm:h-9 sm:w-9 p-0">
+                        <RotateCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 rotate-[-90]" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleRotate('right')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
-                        <RotateCw className="h-4 w-4" />
+                      <Button variant="outline" size="sm" onClick={() => handleRotate('right')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10 h-8 w-8 sm:h-9 sm:w-9 p-0">
+                        <RotateCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleScale('out')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
-                        <ZoomIn className="h-4 w-4 rotate-180" />
+                      <Button variant="outline" size="sm" onClick={() => handleScale('out')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10 h-8 w-8 sm:h-9 sm:w-9 p-0">
+                        <ZoomIn className="h-3.5 w-3.5 sm:h-4 sm:w-4 rotate-180" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleScale('in')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10">
-                        <ZoomIn className="h-4 w-4" />
+                      <Button variant="outline" size="sm" onClick={() => handleScale('in')} className="border-[#3e2626]/20 text-[#3e2626] hover:bg-[#3e2626]/10 h-8 w-8 sm:h-9 sm:w-9 p-0">
+                        <ZoomIn className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </Button>
                     </>
                   )}
@@ -1030,10 +1083,11 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
             </div>
 
             {uploadedImage && (
-              <div className="flex items-center gap-2">
-                <Button onClick={handleSaveImage} className="bg-[#3e2626] hover:bg-[#4f3223] text-white">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button onClick={handleSaveImage} className="bg-[#3e2626] hover:bg-[#4f3223] text-white text-sm sm:text-base w-full sm:w-auto">
                   <Download className="mr-2 h-4 w-4" />
-                  Salvar imagem
+                  <span className="hidden sm:inline">Salvar imagem</span>
+                  <span className="sm:hidden">Salvar</span>
                 </Button>
               </div>
             )}
@@ -1042,60 +1096,59 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
 
         {/* Mensagens de erro/sucesso */}
         {error && (
-          <div className="container mx-auto px-4">
-            <div className="mt-2 flex items-center gap-2 border-l-4 border-red-500 bg-red-50 px-4 py-3 rounded-r-lg">
-              <AlertCircle className="h-5 w-5 text-red-500" />
-              <p className="text-sm text-red-700">{error}</p>
-              <Button variant="ghost" size="icon" onClick={() => setError(null)} className="ml-auto h-6 w-6 hover:bg-red-100">
-                <X className="h-4 w-4" />
+          <div className="container mx-auto px-3 sm:px-4">
+            <div className="mt-2 flex items-start sm:items-center gap-2 border-l-4 border-red-500 bg-red-50 px-3 sm:px-4 py-2 sm:py-3 rounded-r-lg">
+              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 shrink-0 mt-0.5 sm:mt-0" />
+              <p className="text-xs sm:text-sm text-red-700 flex-1 break-words">{error}</p>
+              <Button variant="ghost" size="icon" onClick={() => setError(null)} className="ml-auto h-6 w-6 sm:h-7 sm:w-7 hover:bg-red-100 shrink-0">
+                <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
             </div>
           </div>
         )}
 
         {successMessage && (
-          <div className="container mx-auto px-4">
-            <div className="mt-2 flex items-center gap-2 border-l-4 border-[#C07A45] bg-[#F7C194]/20 px-4 py-3 text-sm text-[#3e2626] rounded-r-lg animate-in slide-in-from-top">
-              <CheckCircle2 className="h-5 w-5 text-[#C07A45]" />
-              <p>{successMessage}</p>
+          <div className="container mx-auto px-3 sm:px-4">
+            <div className="mt-2 flex items-start sm:items-center gap-2 border-l-4 border-[#C07A45] bg-[#F7C194]/20 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-[#3e2626] rounded-r-lg animate-in slide-in-from-top">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-[#C07A45] shrink-0 mt-0.5 sm:mt-0" />
+              <p className="flex-1 break-words">{successMessage}</p>
             </div>
           </div>
         )}
 
         {/* Conteúdo principal - 2 colunas */}
-        <div className="flex-1 pb-6">
+        <div className="flex-1 pb-4 sm:pb-6">
           <div
-            className="container mx-auto flex h-full overflow-hidden px-4"
-            style={{ height: 'calc(100vh - 220px)' }}
+            className="container mx-auto flex flex-col lg:flex-row lg:h-full lg:overflow-hidden px-2 sm:px-4"
           >
             {/* Coluna esquerda - Canvas */}
-            <div className="flex flex-1 flex-col overflow-hidden border-r border-[#3e2626]/10 bg-white">
+            <div className="flex flex-1 flex-col overflow-hidden border-b lg:border-b-0 lg:border-r border-[#3e2626]/10 bg-white min-h-[250px] sm:min-h-[300px] md:min-h-[400px] lg:min-h-0 lg:h-full">
               {!uploadedImage ? (
-                <div className="flex flex-1 items-center justify-center p-8 animate-in fade-in duration-500">
+                <div className="flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-8 animate-in fade-in duration-500 min-h-[250px] sm:min-h-[300px]">
                   <Card className="w-full max-w-2xl animate-in slide-in-from-bottom-4 duration-500 border-[#3e2626]/20 bg-white shadow-xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6 lg:p-8">
                       <div
                         {...getRootProps()}
-                        className={`cursor-pointer rounded-3xl border-2 border-dashed p-12 text-center transition-all ${
+                        className={`cursor-pointer rounded-2xl sm:rounded-3xl border-2 border-dashed p-6 sm:p-8 lg:p-12 text-center transition-all ${
                           isDragActive ? 'border-[#C07A45] bg-[#F7C194]/20 scale-105' : 'border-[#3e2626]/30 hover:border-[#C07A45] hover:bg-white'
                         }`}
                       >
                         <input {...getInputProps()} />
-                        <Upload className="mx-auto mb-4 h-16 w-16 text-[#C07A45]" />
-                        <p className="mb-2 text-lg font-semibold text-[#3e2626]">
+                        <Upload className="mx-auto mb-3 sm:mb-4 h-12 w-12 sm:h-16 sm:w-16 text-[#C07A45]" />
+                        <p className="mb-2 text-base sm:text-lg font-semibold text-[#3e2626]">
                           {isDragActive ? 'Solte a imagem aqui' : 'Arraste sua foto aqui ou clique para enviar'}
                         </p>
-                        <p className="mb-6 text-sm text-[#4f3a2f]/70">
+                        <p className="mb-4 sm:mb-6 text-xs sm:text-sm text-[#4f3a2f]/70">
                           Aceita qualquer tipo de arquivo - imagens serão processadas com nossa IA
                         </p>
-                        <div className="flex justify-center gap-4">
+                        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
                           <Button
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
                               open();
                             }}
-                            className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10"
+                            className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10 w-full sm:w-auto"
                           >
                             <Upload className="mr-2 h-4 w-4" />
                             Enviar foto
@@ -1106,7 +1159,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                               e.stopPropagation();
                               handleCameraClick();
                             }}
-                            className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10"
+                            className="border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10 w-full sm:w-auto"
                           >
                             <Camera className="mr-2 h-4 w-4" />
                             Abrir câmera
@@ -1120,7 +1173,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                 <div className="relative flex flex-1 overflow-auto bg-white animate-in fade-in duration-500">
                   <div
                     ref={canvasRef}
-                    className={`relative flex min-h-full items-center justify-center p-8 ${
+                    className={`relative flex min-h-full items-center justify-center p-2 sm:p-4 lg:p-8 ${
                       isSelectingPosition ? 'cursor-crosshair' : 'cursor-default'
                     }`}
                     onClick={handleCanvasClick}
@@ -1160,7 +1213,7 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                           width={1024}
                           height={768}
                           className="h-auto max-w-full rounded-lg shadow-2xl"
-                          style={{ maxHeight: 'calc(100vh - 200px)' }}
+                          style={{ maxHeight: 'calc(100vh - clamp(250px, 30vh, 350px))' }}
                           unoptimized
                         />
                       ) : uploadedImageFile ? (
@@ -1183,14 +1236,14 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                           style={{
                             left: `${hoverPosition.x}px`,
                             top: `${hoverPosition.y}px`,
-                            width: '150px',
-                            height: '150px',
+                            width: '120px',
+                            height: '120px',
                           }}
                         >
                           <div className="relative w-full h-full border-2 border-[#C07A45] border-dashed rounded-lg bg-[#C07A45]/5">
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45]/80 text-white px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
+                            <div className="absolute -top-7 sm:-top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45]/80 text-white px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold backdrop-blur-sm max-w-[200px] truncate">
                               {pendingFurniture?.name}
-                                </div>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1202,25 +1255,25 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                           style={{
                             left: `${selectedPosition.x}px`,
                             top: `${selectedPosition.y}px`,
-                            width: '150px',
-                            height: '150px',
-                                  }}
-                                >
-                          <div className="relative w-full h-full border-4 border-[#C07A45] border-dashed rounded-lg bg-[#C07A45]/10 animate-pulse">
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45] text-white px-3 py-1 rounded-full text-xs font-semibold">
+                            width: '120px',
+                            height: '120px',
+                          }}
+                        >
+                          <div className="relative w-full h-full border-2 sm:border-4 border-[#C07A45] border-dashed rounded-lg bg-[#C07A45]/10 animate-pulse">
+                            <div className="absolute -top-7 sm:-top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#C07A45] text-white px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold max-w-[200px] truncate">
                               {pendingFurniture?.name}
+                            </div>
                           </div>
-                        </div>
                         </div>
                       )}
 
                       {/* Overlay de IA processando */}
                       {isProcessingAI && (
-                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm">
-                          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl border border-[#3e2626]/20">
-                            <Loader size={48} className="text-[#C07A45]" />
-                            <p className="text-lg font-semibold text-[#3e2626]">Processando com nossa IA...</p>
-                            <p className="text-sm text-[#4f3a2f]/70">Aguarde alguns segundos</p>
+                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#3e2626]/80 backdrop-blur-sm z-50">
+                          <div className="flex flex-col items-center gap-3 sm:gap-4 rounded-xl sm:rounded-2xl bg-white p-4 sm:p-6 lg:p-8 shadow-2xl border border-[#3e2626]/20 mx-4">
+                            <Loader size={40} className="sm:w-12 sm:h-12 text-[#C07A45]" />
+                            <p className="text-base sm:text-lg font-semibold text-[#3e2626] text-center">Processando com nossa IA...</p>
+                            <p className="text-xs sm:text-sm text-[#4f3a2f]/70 text-center">Aguarde alguns segundos</p>
                            
                           </div>
                         </div>
@@ -1232,43 +1285,43 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
             </div>
 
             {/* Coluna direita - Catálogo */}
-            <div className="flex w-96 flex-col border-l border-[#3e2626]/10 bg-white animate-in slide-in-from-right duration-500">
-              <div className="border-b border-[#3e2626]/10 p-4 bg-white">
-                <div className="relative mb-4 animate-in fade-in slide-in-from-top duration-500 delay-100">
+            <div className="flex w-full lg:w-96 flex-col border-t lg:border-t-0 lg:border-l border-[#3e2626]/10 bg-white animate-in slide-in-from-right duration-500 flex-shrink-0 lg:flex-shrink">
+              <div className="border-b border-[#3e2626]/10 p-3 sm:p-4 bg-white sticky top-0 z-20 shrink-0">
+                <div className="relative mb-3 sm:mb-4 animate-in fade-in slide-in-from-top duration-500 delay-100">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-[#4f3a2f]/50" />
                   <Input
                     type="text"
                     placeholder="Buscar produtos..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 border-[#3e2626]/20 focus:border-[#C07A45] focus:ring-[#C07A45]/20 bg-white"
+                    className="pl-10 border-[#3e2626]/20 focus:border-[#C07A45] focus:ring-[#C07A45]/20 bg-white text-sm sm:text-base"
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top duration-500 delay-200">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2 animate-in fade-in slide-in-from-top duration-500 delay-200 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
                   {CATEGORIES.map((category) => (
                     <Button
                       key={category}
                       variant={selectedCategory === category ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setSelectedCategory(category)}
-                      className={`text-xs ${
+                      className={`text-[10px] sm:text-xs shrink-0 ${
                         selectedCategory === category
                           ? 'bg-[#3e2626] hover:bg-[#4f3223] text-white'
                           : 'border-[#3e2626]/30 text-[#3e2626] hover:bg-[#3e2626]/10'
                       }`}
                     >
-                      {category !== 'Todos' && CATEGORY_ICONS[category]}
-                      <span className={category !== 'Todos' ? 'ml-1' : ''}>{category}</span>
+                      {category !== 'Todos' && <span className="mr-1">{CATEGORY_ICONS[category]}</span>}
+                      <span>{category}</span>
                     </Button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              <div className="flex-1 space-y-3 sm:space-y-4 overflow-y-auto p-3 sm:p-4 min-h-[350px] sm:min-h-[450px] md:min-h-[550px] lg:min-h-0">
                 {filteredProducts.length === 0 ? (
-                  <div className="py-8 text-center text-[#4f3a2f]/60 animate-in fade-in duration-500">
-                    <p>Nenhum produto encontrado</p>
+                  <div className="py-6 sm:py-8 text-center text-[#4f3a2f]/60 animate-in fade-in duration-500">
+                    <p className="text-sm sm:text-base">Nenhum produto encontrado</p>
                   </div>
                 ) : (
                   filteredProducts.map((product, index) => (
@@ -1277,9 +1330,9 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                       className="transition-all animate-in fade-in slide-in-from-right duration-300 hover:shadow-lg border-[#3e2626]/10 hover:border-[#C07A45]/30"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <CardContent className="p-4">
-                        <div className="flex gap-4">
-                          <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white border border-[#3e2626]/10">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex gap-3 sm:gap-4">
+                          <div className="relative flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white border border-[#3e2626]/10">
                             {product.imageUrl ? (
                               <Image
                                 src={product.imageUrl}
@@ -1290,15 +1343,15 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                               />
                             ) : (
                               <div className="flex items-center justify-center">
-                                {CATEGORY_ICONS[product.category] || <Sofa className="h-8 w-8 text-[#4f3a2f]/40" />}
+                                {CATEGORY_ICONS[product.category] || <Package className="h-6 w-6 sm:h-8 sm:w-8 text-[#4f3a2f]/40" />}
                               </div>
                             )}
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <h3 className="mb-1 truncate text-sm font-semibold text-[#3e2626]">{product.name}</h3>
-                            <p className="mb-2 text-xs text-[#4f3a2f]/70">{product.category}</p>
-                            <p className="mb-3 text-lg font-bold text-[#C07A45]">
+                            <h3 className="mb-1 truncate text-xs sm:text-sm font-semibold text-[#3e2626]">{product.name}</h3>
+                            <p className="mb-1.5 sm:mb-2 text-[10px] sm:text-xs text-[#4f3a2f]/70">{product.category}</p>
+                            <p className="mb-2 sm:mb-3 text-base sm:text-lg font-bold text-[#C07A45]">
                               R${' '}
                               {product.price.toLocaleString('pt-BR', {
                                 minimumFractionDigits: 2,
@@ -1307,25 +1360,28 @@ Os móveis devem estar perfeitamente integrados ao ambiente, como se fossem part
                             </p>
                             <Button
                               size="sm"
-                              className="w-full bg-[#3e2626] hover:bg-[#4f3223] text-white"
+                              className="w-full bg-[#3e2626] hover:bg-[#4f3223] text-white text-xs sm:text-sm"
                               onClick={() => handleStartAddFurniture(product)}
                               disabled={!uploadedImage || isProcessingAI || isSelectingPosition || hasReachedLimit}
                               title={hasReachedLimit ? 'Faça login para continuar usando' : ''}
                             >
                               {isProcessingAI ? (
                                 <>
-                                  <Loader size={16} className="mr-2" />
-                                  Processando IA...
+                                  <Loader size={14} className="sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                                  <span className="hidden sm:inline">Processando IA...</span>
+                                  <span className="sm:hidden">Processando...</span>
                                 </>
                               ) : isSelectingPosition && pendingFurniture?.id === product.id ? (
                                 <>
-                                  <Loader size={16} className="mr-2" />
-                                  Selecionando posição...
+                                  <Loader size={14} className="sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                                  <span className="hidden sm:inline">Selecionando posição...</span>
+                                  <span className="sm:hidden">Selecionando...</span>
                                 </>
                               ) : (
                                 <>
-                                  <Sparkles className="mr-2 h-4 w-4" />
-                                  Adicionar ao ambiente
+                                  <Sparkles className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                  <span className="hidden sm:inline">Adicionar ao ambiente</span>
+                                  <span className="sm:hidden">Adicionar</span>
                                 </>
                               )}
                             </Button>
