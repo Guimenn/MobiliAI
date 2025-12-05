@@ -35,6 +35,7 @@ export default function PixPaymentPage() {
   const [paymentStatus, setPaymentStatus] = useState<'PENDING' | 'PAID' | 'EXPIRED'>('PENDING');
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [orderCreatedAt, setOrderCreatedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string>('');
   const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
   const [simulationMessage, setSimulationMessage] = useState<string>('');
@@ -100,6 +101,61 @@ export default function PixPaymentPage() {
     return buildStaticPixBrCode(Number(paymentData?.amount) || 0);
   }, [paymentData?.amount]);
 
+  // Estado para rastrear se o usuário interagiu com a página (necessário para beforeunload funcionar)
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+
+  // Registrar interação do usuário
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleUserInteraction = () => {
+      setHasUserInteracted(true);
+    };
+
+    // Registrar qualquer interação do usuário
+    window.addEventListener('click', handleUserInteraction, { once: true });
+    window.addEventListener('keydown', handleUserInteraction, { once: true });
+    window.addEventListener('touchstart', handleUserInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, []);
+
+  // Aviso ao sair da página de pagamento - sempre ativo quando há um saleId
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Sempre verificar saleId diretamente do sessionStorage (mais confiável)
+      const finalSaleId = sessionStorage.getItem('last-sale-id') || saleId;
+      
+      // Se houver um saleId, sempre mostrar aviso (exceto se pagamento foi concluído)
+      if (finalSaleId) {
+        // Verificar status atual do pagamento
+        const currentStatus = paymentStatus;
+        
+        // Só não mostrar se o pagamento foi realmente concluído
+        if (currentStatus !== 'PAID' && currentStatus !== 'EXPIRED') {
+          // Padrão moderno para beforeunload
+          e.preventDefault();
+          // Chrome e outros navegadores modernos requerem returnValue
+          e.returnValue = '';
+          return '';
+        }
+      }
+    };
+
+    // Adicionar listener - garantir que está sendo registrado
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [saleId, paymentStatus]);
+
   // Verificar se temos todas as dependências necessárias e buscar saleId do sessionStorage se necessário
   useEffect(() => {
     // Aguardar um pouco para garantir que o store tenha carregado
@@ -135,6 +191,33 @@ export default function PixPaymentPage() {
     return () => clearTimeout(checkDependencies);
   }, [saleIdFromUrl, saleId, user, token, router]);
 
+  // Carregar dados do pedido para obter createdAt (mesmo ao recarregar)
+  useEffect(() => {
+    if (isInitializing || !saleId) {
+      return;
+    }
+
+    const finalSaleId = saleId || (typeof window !== 'undefined' ? sessionStorage.getItem('last-sale-id') : null);
+    
+    if (!finalSaleId || !user || !token) {
+      return;
+    }
+
+    // Buscar informações do pedido para obter createdAt
+    const loadOrderData = async () => {
+      try {
+        const orderData = await customerAPI.getOrderById(finalSaleId);
+        if (orderData?.createdAt) {
+          setOrderCreatedAt(new Date(orderData.createdAt));
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar dados do pedido:', error);
+      }
+    };
+
+    loadOrderData();
+  }, [saleId, user, token, isInitializing]);
+
   // Carregar dados do pagamento
   useEffect(() => {
     if (isInitializing) {
@@ -166,6 +249,17 @@ export default function PixPaymentPage() {
       }, 30000);
       
       try {
+        // Primeiro, buscar informações do pedido para obter createdAt
+        let orderData = null;
+        try {
+          orderData = await customerAPI.getOrderById(finalSaleId);
+          if (orderData?.createdAt) {
+            setOrderCreatedAt(new Date(orderData.createdAt));
+          }
+        } catch (orderError) {
+          console.warn('Erro ao buscar dados do pedido:', orderError);
+        }
+
         const data = await customerAPI.createPixPayment(finalSaleId, {
           name: user.name,
           email: user.email,
@@ -179,8 +273,15 @@ export default function PixPaymentPage() {
         setPaymentData(data);
         setRetryCount(0); // Reset retry count on success
         
-        // Calcular tempo restante
-        if (data.expiresAt) {
+        // Calcular tempo restante baseado na data de criação do pedido (1 hora a partir de createdAt)
+        if (orderData?.createdAt) {
+          const orderDate = new Date(orderData.createdAt);
+          const expirationDate = new Date(orderDate.getTime() + 60 * 60 * 1000); // 1 hora
+          const now = new Date();
+          const remaining = Math.max(0, Math.floor((expirationDate.getTime() - now.getTime()) / 1000));
+          setTimeLeft(remaining);
+        } else if (data.expiresAt) {
+          // Fallback para expiresAt se não conseguir buscar o pedido
           const expiresAt = new Date(data.expiresAt).getTime();
           const now = Date.now();
           const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
@@ -249,22 +350,30 @@ export default function PixPaymentPage() {
     };
   }, [saleId, user, token, isInitializing]);
 
-  // Atualizar contador de tempo
+  // Atualizar contador de tempo baseado na data de criação do pedido
   useEffect(() => {
-    if (timeLeft <= 0) return;
+    if (!orderCreatedAt) return;
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          setPaymentStatus('EXPIRED');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const updateTimer = () => {
+      const orderDate = new Date(orderCreatedAt);
+      const expirationDate = new Date(orderDate.getTime() + 60 * 60 * 1000); // 1 hora
+      const now = new Date();
+      const remaining = Math.max(0, Math.floor((expirationDate.getTime() - now.getTime()) / 1000));
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        setPaymentStatus('EXPIRED');
+      }
+    };
+
+    // Atualizar imediatamente
+    updateTimer();
+
+    // Atualizar a cada segundo
+    const timer = setInterval(updateTimer, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [orderCreatedAt]);
 
   // Verificar status do pagamento periodicamente
   useEffect(() => {
@@ -325,11 +434,31 @@ export default function PixPaymentPage() {
       });
       setPaymentData(data);
       
-      if (data.expiresAt) {
-        const expiresAt = new Date(data.expiresAt).getTime();
-        const now = Date.now();
-        const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
-        setTimeLeft(remaining);
+      // Buscar informações do pedido novamente para garantir que temos createdAt
+      try {
+        const orderData = await customerAPI.getOrderById(saleId);
+        if (orderData?.createdAt) {
+          setOrderCreatedAt(new Date(orderData.createdAt));
+          const orderDate = new Date(orderData.createdAt);
+          const expirationDate = new Date(orderDate.getTime() + 60 * 60 * 1000); // 1 hora
+          const now = new Date();
+          const remaining = Math.max(0, Math.floor((expirationDate.getTime() - now.getTime()) / 1000));
+          setTimeLeft(remaining);
+        } else if (data.expiresAt) {
+          // Fallback para expiresAt
+          const expiresAt = new Date(data.expiresAt).getTime();
+          const now = Date.now();
+          const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+          setTimeLeft(remaining);
+        }
+      } catch (orderError) {
+        console.warn('Erro ao buscar dados do pedido no refresh:', orderError);
+        if (data.expiresAt) {
+          const expiresAt = new Date(data.expiresAt).getTime();
+          const now = Date.now();
+          const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+          setTimeLeft(remaining);
+        }
       }
       
       setPaymentStatus('PENDING');

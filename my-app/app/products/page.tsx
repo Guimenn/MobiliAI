@@ -91,7 +91,13 @@ export default function ProductsPage() {
   const [minPrice, setMinPrice] = useState<string>(searchParams.get('min') || '');
   const [maxPrice, setMaxPrice] = useState<string>(searchParams.get('max') || '');
   const [hasDiscount, setHasDiscount] = useState<boolean>(searchParams.get('discount') === 'true');
-  const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock'>((searchParams.get('sort') as any) || 'name');
+  const [inStock, setInStock] = useState<boolean>(searchParams.get('stock') === 'true');
+  const [isNew, setIsNew] = useState<boolean>(searchParams.get('new') === 'true');
+  const [isBestSeller, setIsBestSeller] = useState<boolean>(searchParams.get('bestseller') === 'true');
+  const [isFeatured, setIsFeatured] = useState<boolean>(searchParams.get('featured') === 'true');
+  const [selectedBrand, setSelectedBrand] = useState<string>(searchParams.get('brand') || '');
+  const [minRating, setMinRating] = useState<number>(Number(searchParams.get('rating')) || 0);
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'price-desc' | 'newest' | 'oldest' | 'rating' | 'bestseller' | 'name-desc'>((searchParams.get('sort') as any) || 'name');
   const [page, setPage] = useState<number>(Number(searchParams.get('page') || 1));
   const pageSize = 12;
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -141,6 +147,12 @@ export default function ProductsPage() {
     if (minPrice) params.set('min', minPrice);
     if (maxPrice) params.set('max', maxPrice);
     if (hasDiscount) params.set('discount', 'true');
+    if (inStock) params.set('stock', 'true');
+    if (isNew) params.set('new', 'true');
+    if (isBestSeller) params.set('bestseller', 'true');
+    if (isFeatured) params.set('featured', 'true');
+    if (selectedBrand) params.set('brand', selectedBrand);
+    if (minRating > 0) params.set('rating', String(minRating));
     if (sortBy && sortBy !== 'name') params.set('sort', sortBy);
     if (page && page > 1) params.set('page', String(page));
     const qs = params.toString();
@@ -163,6 +175,10 @@ export default function ProductsPage() {
 
   const colors = useMemo(() => {
     return Array.from(new Set(products.map(p => p.color).filter(Boolean))) as string[];
+  }, [products]);
+
+  const brands = useMemo(() => {
+    return Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort() as string[];
   }, [products]);
 
   // Função para verificar se uma oferta está ativa (dentro do período de datas)
@@ -372,22 +388,73 @@ export default function ProductsPage() {
         if (hasDiscount) {
           matchesDiscount = isSaleActive(product);
         }
-        return matchesSearch && matchesCategory && matchesColor && matchesMin && matchesMax && matchesDiscount;
+        // Filtro de estoque
+        const matchesStock = !inStock || (product.stock !== undefined && product.stock > 0);
+        // Filtro de produtos novos
+        const matchesNew = !isNew || product.isNew === true;
+        // Filtro de mais vendidos
+        const matchesBestSeller = !isBestSeller || product.isBestSeller === true;
+        // Filtro de produtos em destaque
+        const matchesFeatured = !isFeatured || product.isFeatured === true;
+        // Filtro por marca
+        const matchesBrand = !selectedBrand || product.brand?.toLowerCase() === selectedBrand.toLowerCase();
+        // Filtro por avaliação mínima
+        const matchesRating = !minRating || (product.rating !== undefined && product.rating >= minRating);
+        
+        return matchesSearch && matchesCategory && matchesColor && matchesMin && matchesMax && 
+               matchesDiscount && matchesStock && matchesNew && matchesBestSeller && 
+               matchesFeatured && matchesBrand && matchesRating;
       });
-  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount, isSaleActive, getCurrentPrice, normalizeText]);
+  }, [products, debouncedTerm, selectedCategory, selectedColor, minPrice, maxPrice, hasDiscount, 
+      inStock, isNew, isBestSeller, isFeatured, selectedBrand, minRating, isSaleActive, getCurrentPrice, normalizeText]);
 
   const sortedProducts = useMemo(() => {
     return [...filteredProducts].sort((a, b) => {
       switch (sortBy) {
         case 'price':
-          return Number(a.price) - Number(b.price);
-        case 'stock':
-          return (b.stock || 0) - (a.stock || 0);
+          // Menor preço primeiro
+          return getCurrentPrice(a) - getCurrentPrice(b);
+        case 'price-desc':
+          // Maior preço primeiro
+          return getCurrentPrice(b) - getCurrentPrice(a);
+        case 'newest':
+          // Mais recentes primeiro (produtos novos primeiro, depois por rating)
+          if (a.isNew && !b.isNew) return -1;
+          if (!a.isNew && b.isNew) return 1;
+          // Se ambos ou nenhum são novos, ordenar por rating
+          const ratingANew = a.rating || 0;
+          const ratingBNew = b.rating || 0;
+          return ratingBNew - ratingANew;
+        case 'oldest':
+          // Mais antigos primeiro (produtos não novos primeiro, depois por nome)
+          if (!a.isNew && b.isNew) return -1;
+          if (a.isNew && !b.isNew) return 1;
+          // Se ambos têm o mesmo status, ordenar por nome
+          return a.name.localeCompare(b.name);
+        case 'rating':
+          // Melhor avaliação primeiro
+          const ratingA = a.rating || 0;
+          const ratingB = b.rating || 0;
+          if (ratingB !== ratingA) return ratingB - ratingA;
+          // Em caso de empate, ordenar por número de avaliações
+          return (b.reviewCount || 0) - (a.reviewCount || 0);
+        case 'bestseller':
+          // Mais vendidos primeiro (isBestSeller + rating)
+          if (a.isBestSeller && !b.isBestSeller) return -1;
+          if (!a.isBestSeller && b.isBestSeller) return 1;
+          // Se ambos ou nenhum são bestseller, ordenar por rating
+          const ratingABest = a.rating || 0;
+          const ratingBBest = b.rating || 0;
+          return ratingBBest - ratingABest;
+        case 'name-desc':
+          // Z-A
+          return b.name.localeCompare(a.name);
         default:
+          // A-Z (Mais relevantes)
           return a.name.localeCompare(b.name);
       }
     });
-  }, [filteredProducts, sortBy]);
+  }, [filteredProducts, sortBy, getCurrentPrice]);
 
   const totalPages = Math.max(1, Math.ceil(sortedProducts.length / pageSize));
   const currentPage = Math.min(Math.max(1, page), totalPages);
@@ -410,6 +477,12 @@ export default function ProductsPage() {
     setTempMinPrice('');
     setTempMaxPrice('');
     setHasDiscount(false);
+    setInStock(false);
+    setIsNew(false);
+    setIsBestSeller(false);
+    setIsFeatured(false);
+    setSelectedBrand('');
+    setMinRating(0);
     setSortBy('name');
     setPage(1);
   };
@@ -1126,12 +1199,17 @@ export default function ProductsPage() {
             <div className="flex items-center justify-end mt-2 mb-4 pr-3">
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'name' | 'price' | 'stock')}
+                onChange={(e) => setSortBy(e.target.value as any)}
                 className="border-2 border-brand-200 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-brand-700 bg-white hover:border-brand-400 hover:bg-brand-50/50 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-colors flex-shrink-0"
               >
                 <option value="name">Ordenar por: Mais relevantes</option>
                 <option value="price">Menor preço</option>
-                <option value="stock">Maior estoque</option>
+                <option value="price-desc">Maior preço</option>
+                <option value="newest">Mais recentes</option>
+                <option value="oldest">Mais antigos</option>
+                <option value="rating">Melhor avaliação</option>
+                <option value="bestseller">Mais vendidos</option>
+                <option value="name-desc">Nome Z-A</option>
               </select>
             </div>
           </div>
@@ -1143,18 +1221,6 @@ export default function ProductsPage() {
             <div className="bg-white rounded-lg shadow-sm border-2 border-brand-100 sticky top-20 p-3 sm:p-4">
              
 
-              {/* Frete Grátis */}
-              <div className="mb-3 pb-3 border-b border-brand-100">
-                <h3 className="text-xs font-semibold text-brand-700 mb-1.5 border-b border-brand-100 pb-1">Envio</h3>
-                <label className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                  <input
-                    type="checkbox"
-                    className="w-3.5 h-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                  />
-                  <Truck className="h-3.5 w-3.5 text-brand-600" />
-                  <span className="text-xs text-gray-700">Frete grátis</span>
-                </label>
-              </div>
 
               {/* Categoria */}
               <div className="mb-3">
@@ -1300,6 +1366,27 @@ export default function ProductsPage() {
                   />
                   <span className="text-xs text-gray-700">Produtos com desconto</span>
                 </label>
+              </div>
+
+             
+
+              {/* Avaliação */}
+              <div className="mb-3 pb-3 border-b border-brand-100">
+                <h3 className="text-xs font-semibold text-brand-700 mb-1.5 border-b border-brand-100 pb-1">Avaliação</h3>
+                <select
+                  value={minRating}
+                  onChange={(e) => {
+                    setMinRating(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                >
+                  <option value="0">Todas as avaliações</option>
+                  <option value="4">4 estrelas ou mais</option>
+                  <option value="3">3 estrelas ou mais</option>
+                  <option value="2">2 estrelas ou mais</option>
+                  <option value="1">1 estrela ou mais</option>
+                </select>
               </div>
 
               {/* Limpar filtros */}

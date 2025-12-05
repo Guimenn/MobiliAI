@@ -83,17 +83,38 @@ export default function FavoriteProductCard({
   };
 
   // Renderizar estrelas de avaliação
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`w-4 h-4 ${
-          i < Math.floor(rating) 
-            ? 'text-yellow-400 fill-yellow-400' 
-            : 'text-gray-300'
-        }`}
-      />
-    ));
+  const renderStars = (rating: number | undefined) => {
+    const ratingValue = rating || 0;
+    const fullStars = Math.floor(ratingValue);
+    const hasHalfStar = ratingValue % 1 >= 0.5;
+    
+    return Array.from({ length: 5 }, (_, i) => {
+      const isFullStar = i < fullStars;
+      const isHalfStar = i === fullStars && hasHalfStar;
+      
+      if (isHalfStar) {
+        // Meia estrela: estrela cinza completa + estrela amarela cortada pela metade
+        return (
+          <div key={i} className="relative w-4 h-4 inline-block">
+            <Star className="w-4 h-4 fill-gray-300 text-gray-300" />
+            <div className="absolute inset-0 overflow-hidden" style={{ width: '50%' }}>
+              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <Star
+          key={i}
+          className={`w-4 h-4 ${
+            isFullStar
+              ? 'text-yellow-400 fill-yellow-400' 
+              : 'text-gray-300 fill-gray-300'
+          }`}
+        />
+      );
+    });
   };
 
   // Adicionar ao carrinho
@@ -214,7 +235,7 @@ export default function FavoriteProductCard({
                     {renderStars(favorite.product.rating)}
                   </div>
                   <span className="text-sm text-gray-500">
-                    ({favorite.product.reviewCount} avaliações)
+                    ({favorite.product.reviewCount || 0} avaliações)
                   </span>
                 </div>
               </div>
@@ -383,7 +404,7 @@ export default function FavoriteProductCard({
               {renderStars(favorite.product.rating)}
             </div>
             <span className="text-sm text-gray-500">
-              ({favorite.product.reviewCount})
+              ({favorite.product.reviewCount || 0})
             </span>
           </div>
 

@@ -132,6 +132,8 @@ export default function ProductCard({
   const installmentValue = currentPrice / 12;
   const isOutOfStock = (product.stock || 0) === 0;
   const hasReviews = (product.reviewCount || 0) > 0 && (product.rating || 0) > 0;
+  const rating = product.rating || 0;
+  const reviewCount = product.reviewCount || 0;
 
   // Verificar se está nos favoritos
   useEffect(() => {
@@ -340,7 +342,7 @@ export default function ProductCard({
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`group relative bg-white rounded-xl overflow-hidden border transition-all duration-300 cursor-pointer shadow-sm hover:shadow-lg ${
+      className={`group relative bg-white rounded-xl overflow-hidden border transition-all duration-300 cursor-pointer shadow-sm hover:shadow-lg flex flex-col h-full ${
         isFlashSaleActive 
           ? 'border-[#3e2626] hover:border-[#2a1f1f]' 
           : isNormalSaleActive
@@ -450,82 +452,102 @@ export default function ProductCard({
       </div>
 
       {/* Conteúdo do produto */}
-      <div className="p-4 space-y-3">
-        {/* Título e Marca */}
-        <div>
-          <h3 className="text-base font-bold text-[#3e2626] leading-tight line-clamp-2 min-h-[2.5rem] group-hover:text-[#2a1f1f] transition-colors">
-            {product.name}
-          </h3>
-          {product.brand && (
-            <p className="text-xs text-gray-500 mt-0.5">{product.brand}</p>
-          )}
-        </div>
-
-        {/* Categoria */}
-        {product.category && (
+      <div className="p-4 flex flex-col flex-1">
+        <div className="space-y-3 flex-1">
+          {/* Título e Marca */}
           <div>
-            <Badge variant="outline" className="text-[10px] px-2 py-0 border-gray-200 text-gray-600">
-              {formatCategory(product.category)}
-            </Badge>
+            <h3 className="text-base font-bold text-[#3e2626] leading-tight line-clamp-2 min-h-[2.5rem] group-hover:text-[#2a1f1f] transition-colors">
+              {product.name}
+            </h3>
+            {product.brand && (
+              <p className="text-xs text-gray-500 mt-0.5">{product.brand}</p>
+            )}
           </div>
-        )}
 
-        {/* Rating - mostrar apenas quando houver avaliações reais */}
-        {hasReviews && (
+          {/* Categoria */}
+          {product.category && (
+            <div>
+              <Badge variant="outline" className="text-[10px] px-2 py-0 border-gray-200 text-gray-600">
+                {formatCategory(product.category)}
+              </Badge>
+            </div>
+          )}
+
+          {/* Rating - sempre mostrar, mesmo sem avaliações */}
           <div className="flex items-center gap-1.5">
             <div className="flex items-center gap-0.5">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  className={`h-3 w-3 ${
-                    product.rating && product.rating > 0 && i < Math.floor(product.rating)
-                      ? 'fill-yellow-400 text-yellow-400'
-                      : 'fill-gray-200 text-gray-200'
-                  }`}
-                />
-              ))}
+              {[...Array(5)].map((_, i) => {
+                const fullStars = Math.floor(rating);
+                const hasHalfStar = rating % 1 >= 0.5;
+                const isFullStar = i < fullStars;
+                const isHalfStar = i === fullStars && hasHalfStar;
+                const isEmptyStar = i >= fullStars + (hasHalfStar ? 1 : 0);
+
+                if (isHalfStar) {
+                  // Meia estrela: estrela cinza completa + estrela amarela cortada pela metade
+                  return (
+                    <div key={i} className="relative h-3 w-3 inline-block">
+                      <Star className="h-3 w-3 fill-gray-300 text-gray-300" />
+                      <div className="absolute inset-0 overflow-hidden" style={{ width: '50%' }}>
+                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Star
+                    key={i}
+                    className={`h-3 w-3 ${
+                      isFullStar
+                        ? 'fill-yellow-400 text-yellow-400'
+                        : 'fill-gray-300 text-gray-300'
+                    }`}
+                  />
+                );
+              })}
             </div>
-            <span className="text-xs font-medium text-gray-700">
-              {(product.rating || 0).toFixed(1)}
+            <span className={`text-xs font-medium ${hasReviews ? 'text-gray-700' : 'text-gray-500'}`}>
+              {hasReviews ? rating.toFixed(1) : '0.0'}
             </span>
             <span className="text-xs text-gray-500">
-              ({(product.reviewCount || 0) > 1000 ? `${((product.reviewCount || 0) / 1000).toFixed(1)}k` : (product.reviewCount || 0)})
+              ({reviewCount > 1000 ? `${(reviewCount / 1000).toFixed(1)}k` : reviewCount})
             </span>
           </div>
-        )}
 
-        {/* Preço */}
-        <div className="space-y-1">
-          {hasActiveSale && originalPrice > currentPrice ? (
-            <div className="space-y-0.5">
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-black text-[#3e2626]">
-                  R$ {currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-                <span className="text-sm text-gray-500 line-through">
-                  R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
+          {/* Preço */}
+          <div className="space-y-1">
+            {hasActiveSale && originalPrice > currentPrice ? (
+              <div className="space-y-0.5">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-black text-[#3e2626]">
+                    R$ {currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-sm text-gray-500 line-through">
+                    R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
+            ) : (
+              <span className="text-xl font-black text-[#3e2626]">
+                R$ {currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            )}
+            
+            {/* Parcelamento */}
+            <div className="flex items-center gap-1.5 text-xs text-gray-600">
+              <CreditCard className="h-3.5 w-3.5 text-[#3e2626]" />
+              <span>ou 12x de R$ {installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} sem juros</span>
             </div>
-          ) : (
-            <span className="text-xl font-black text-[#3e2626]">
-              R$ {currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </span>
-          )}
-          
-          {/* Parcelamento */}
-          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-            <CreditCard className="h-3.5 w-3.5 text-[#3e2626]" />
-            <span>ou 12x de R$ {installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} sem juros</span>
           </div>
         </div>
 
-        {/* Botão de adicionar ao carrinho */}
+        {/* Botão de adicionar ao carrinho - sempre alinhado na parte inferior */}
         {showAddToCart && (
           <Button 
             onClick={handleAddToCart}
             disabled={isOutOfStock}
-            className={`w-full rounded-lg transition-all duration-300 font-semibold text-sm py-5 ${
+            className={`w-full rounded-lg transition-all duration-300 font-semibold text-sm py-5 mt-4 ${
               isOutOfStock
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-[#3e2626] hover:bg-[#2a1f1f] text-white shadow-md hover:shadow-lg'

@@ -1,8 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentService {
@@ -17,6 +18,8 @@ export class PaymentService {
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {
     this.apiKey = this.configService.get<string>('ABACATEPAY_API_KEY') || '';
     this.environment = this.configService.get<string>('ABACATEPAY_ENVIRONMENT') || 'sandbox';
@@ -430,15 +433,28 @@ export class PaymentService {
    * Verifica o status do pagamento de uma venda
    */
   async checkSalePaymentStatus(saleId: string) {
+    console.log(`[Payment Service] Verificando status do pagamento para venda ${saleId}...`);
+    
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
+      select: {
+        id: true,
+        status: true,
+        paymentReference: true,
+        customerId: true,
+        saleNumber: true,
+      },
     });
 
     if (!sale) {
+      console.error(`[Payment Service] Venda ${saleId} não encontrada.`);
       throw new BadRequestException('Venda não encontrada');
     }
 
+    console.log(`[Payment Service] Venda ${saleId} encontrada. Status atual: ${sale.status}, paymentReference: ${sale.paymentReference || 'N/A'}`);
+
     if (!sale.paymentReference) {
+      console.log(`[Payment Service] Venda ${saleId} não possui paymentReference. Retornando status PENDING.`);
       return {
         status: 'PENDING',
         saleStatus: sale.status,
@@ -446,18 +462,48 @@ export class PaymentService {
     }
 
     try {
+      console.log(`[Payment Service] Verificando status do pagamento PIX com reference ${sale.paymentReference}...`);
       const paymentStatus = await this.checkPixPaymentStatus(sale.paymentReference);
+      console.log(`[Payment Service] Status do pagamento PIX: ${paymentStatus.status} (venda status: ${sale.status})`);
+      
       let finalSaleStatus = sale.status;
 
-      // Se o pagamento foi confirmado, atualizar o status da venda
-      if (paymentStatus.status === 'PAID' && sale.status !== 'COMPLETED') {
-        await this.prisma.sale.update({
+      // Se o pagamento foi confirmado, atualizar o status da venda para PREPARING
+      // Verificar se o status do pagamento é 'PAID' (case-insensitive)
+      const paymentStatusUpper = String(paymentStatus.status || '').toUpperCase();
+      const saleStatusUpper = String(sale.status || '').toUpperCase();
+      
+      if (paymentStatusUpper === 'PAID' && saleStatusUpper === 'PENDING') {
+        console.log(`[Payment Service] ✅ Pagamento PIX confirmado para venda ${saleId}. Atualizando status de PENDING para PREPARING.`);
+        
+        const updatedSale = await this.prisma.sale.update({
           where: { id: saleId },
           data: {
-            status: 'COMPLETED' as any,
+            status: 'PREPARING' as any,
           },
         });
-        finalSaleStatus = 'COMPLETED';
+        finalSaleStatus = 'PREPARING';
+
+        console.log(`[Payment Service] ✅ Status da venda ${saleId} atualizado para PREPARING com sucesso. Novo status no banco: ${updatedSale.status}`);
+
+        // Enviar notificação ao cliente sobre o status PREPARING
+        if (sale.customerId) {
+          try {
+            await this.notificationsService.notifyOrderPreparing(
+              sale.customerId,
+              saleId,
+              sale.saleNumber,
+            );
+            console.log(`[Payment Service] ✅ Notificação de preparação enviada para cliente ${sale.customerId}.`);
+          } catch (notifError) {
+            console.error('[Payment Service] Erro ao enviar notificação de preparação:', notifError);
+          }
+        }
+      } else if (paymentStatusUpper === 'PAID' && saleStatusUpper !== 'PENDING') {
+        console.log(`[Payment Service] ⚠️ Pagamento PIX confirmado para venda ${saleId}, mas status já é ${sale.status}. Não atualizando.`);
+        finalSaleStatus = sale.status;
+      } else if (paymentStatusUpper !== 'PAID') {
+        console.log(`[Payment Service] Pagamento PIX ainda não foi confirmado. Status: ${paymentStatus.status}`);
       }
 
       return {
@@ -657,8 +703,8 @@ export class PaymentService {
         throw new BadRequestException(`Venda com ID ${saleId} não encontrada`);
       }
 
-      // Se a venda já está COMPLETED, retornar sucesso sem atualizar novamente
-      if (currentSale.status === 'COMPLETED') {
+      // Se a venda já está em PREPARING ou status posterior, retornar sucesso sem atualizar novamente
+      if (currentSale.status === 'PREPARING' || currentSale.status === 'SHIPPED' || currentSale.status === 'DELIVERED') {
         return {
           success: true,
           status: 'succeeded',
@@ -673,17 +719,41 @@ export class PaymentService {
         // Verificar se o pagamento realmente foi processado
         // Só atualizar se a venda ainda estiver em PENDING
         if (currentSale.status === 'PENDING') {
-          // Atualizar venda como paga (com retry)
+          console.log(`[Payment Service] Pagamento Stripe confirmado para venda ${saleId}. Atualizando status de PENDING para PREPARING.`);
+          
+          // Buscar informações da venda para notificação
+          const sale = await this.prisma.sale.findUnique({
+            where: { id: saleId },
+            select: { customerId: true, saleNumber: true },
+          });
+
+          // Atualizar venda para PREPARING após pagamento confirmado (com retry)
           await this.prisma.executeWithRetry(async () => {
             return await this.prisma.sale.update({
               where: { id: saleId },
               data: {
-                status: 'COMPLETED',
+                status: 'PREPARING',
                 paymentMethod: 'CREDIT_CARD',
                 paymentReference: paymentIntentId,
               },
             });
           });
+
+          console.log(`[Payment Service] Status da venda ${saleId} atualizado para PREPARING com sucesso.`);
+
+          // Enviar notificação ao cliente sobre o status PREPARING
+          if (sale?.customerId) {
+            try {
+              await this.notificationsService.notifyOrderPreparing(
+                sale.customerId,
+                saleId,
+                sale.saleNumber,
+              );
+              console.log(`[Payment Service] Notificação de preparação enviada para cliente ${sale.customerId}.`);
+            } catch (notifError) {
+              console.error('Erro ao enviar notificação de preparação:', notifError);
+            }
+          }
         } else {
           // Se a venda não está em PENDING, não atualizar o status
           console.warn(`Tentativa de confirmar pagamento para venda ${saleId} com status ${currentSale.status}`);
@@ -691,7 +761,7 @@ export class PaymentService {
             success: false,
             status: paymentIntent.status,
             saleId,
-            message: `Venda já possui status ${currentSale.status}, não foi possível atualizar para COMPLETED`,
+            message: `Venda já possui status ${currentSale.status}, não foi possível atualizar para PREPARING`,
           };
         }
 

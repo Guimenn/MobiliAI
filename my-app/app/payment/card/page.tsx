@@ -26,7 +26,9 @@ export default function CardPaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, token } = useAppStore();
-  const saleId = searchParams.get('saleId');
+  const saleIdFromUrl = searchParams.get('saleId');
+  const [saleId, setSaleId] = useState<string | null>(saleIdFromUrl);
+  const [isInitializing, setIsInitializing] = useState(true);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingIntent, setIsCreatingIntent] = useState(false);
@@ -34,31 +36,121 @@ export default function CardPaymentPage() {
   const [amount, setAmount] = useState<number>(0);
   const [saleNumber, setSaleNumber] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [paymentStatus, setPaymentStatus] = useState<string>('');
 
+  // Estado para rastrear se o usuário interagiu com a página (necessário para beforeunload funcionar)
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+
+  // Registrar interação do usuário
   useEffect(() => {
-    if (!saleId) {
+    if (typeof window === 'undefined') return;
+
+    const handleUserInteraction = () => {
+      setHasUserInteracted(true);
+    };
+
+    // Registrar qualquer interação do usuário
+    window.addEventListener('click', handleUserInteraction, { once: true });
+    window.addEventListener('keydown', handleUserInteraction, { once: true });
+    window.addEventListener('touchstart', handleUserInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, []);
+
+  // Aviso ao sair da página de pagamento - sempre ativo quando há um saleId
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Sempre verificar saleId diretamente do sessionStorage (mais confiável)
+      const finalSaleId = sessionStorage.getItem('last-sale-id') || saleId;
+      
+      // Se houver um saleId, sempre mostrar aviso (exceto se pagamento foi concluído)
+      if (finalSaleId) {
+        // Verificar status atual do pagamento
+        const currentStatus = paymentStatus;
+        
+        // Só não mostrar se o pagamento foi realmente concluído
+        if (currentStatus !== 'succeeded') {
+          // Padrão moderno para beforeunload
+          e.preventDefault();
+          // Chrome e outros navegadores modernos requerem returnValue
+          e.returnValue = '';
+          return '';
+        }
+      }
+    };
+
+    // Adicionar listener - garantir que está sendo registrado
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [saleId, paymentStatus]);
+
+  // Verificar se temos todas as dependências necessárias e buscar saleId do sessionStorage se necessário
+  useEffect(() => {
+    // Aguardar um pouco para garantir que o store tenha carregado
+    const checkDependencies = setTimeout(() => {
+      let finalSaleId = saleId;
+      
+      // Se não tiver saleId na URL, tentar buscar do sessionStorage
+      if (!finalSaleId && typeof window !== 'undefined') {
+        const storedSaleId = sessionStorage.getItem('last-sale-id');
+        if (storedSaleId) {
+          finalSaleId = storedSaleId;
+          setSaleId(storedSaleId);
+          // Atualizar a URL sem recarregar a página
+          router.replace(`/payment/card?saleId=${storedSaleId}`, { scroll: false });
+        }
+      }
+      
+      setIsInitializing(false);
+      
+      if (!finalSaleId) {
+        setError('ID da venda não encontrado');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!user || !token) {
+        router.push('/login?redirect=/payment/card&saleId=' + finalSaleId);
+        return;
+      }
+
+      // Criar PaymentIntent após confirmar que temos tudo
+      createPaymentIntent(finalSaleId);
+    }, 500);
+
+    return () => clearTimeout(checkDependencies);
+  }, [saleIdFromUrl, saleId, user, token, router]);
+
+  const createPaymentIntent = async (saleIdToUse?: string | null) => {
+    // Usar o saleId passado como parâmetro, ou do estado, ou do sessionStorage
+    const finalSaleId = saleIdToUse || saleId || (typeof window !== 'undefined' ? sessionStorage.getItem('last-sale-id') : null);
+    
+    if (!finalSaleId) {
       setError('ID da venda não encontrado');
       setIsLoading(false);
       return;
     }
 
     if (!user || !token) {
-      router.push('/login?redirect=/payment/card&saleId=' + saleId);
+      router.push('/login?redirect=/payment/card&saleId=' + finalSaleId);
       return;
     }
-
-    createPaymentIntent();
-  }, [saleId, user, token]);
-
-  const createPaymentIntent = async () => {
-    if (!saleId) return;
 
     setIsCreatingIntent(true);
     setError('');
 
     try {
       const response = await customerAPI.createStripePaymentIntent(
-        saleId,
+        finalSaleId,
         {
           name: user.name,
           email: user.email,
@@ -93,16 +185,20 @@ export default function CardPaymentPage() {
 
   const handlePaymentSuccess = async (paymentIntentId: string) => {
     try {
+      // Marcar status como succeeded para remover o aviso de saída
+      setPaymentStatus('succeeded');
+      
       // Confirmar pagamento no backend e obter o saleId
       const confirmationResult = await customerAPI.confirmStripePayment(paymentIntentId);
       
-      // Usar o saleId retornado ou o saleId da URL
-      const finalSaleId = confirmationResult?.saleId || saleId;
+      // Usar o saleId retornado, ou do estado, ou do sessionStorage
+      const finalSaleId = confirmationResult?.saleId || saleId || (typeof window !== 'undefined' ? sessionStorage.getItem('last-sale-id') : null);
       
       if (!finalSaleId) {
         console.error('SaleId não encontrado após confirmação do pagamento', {
           confirmationResult,
           saleId,
+          sessionStorageSaleId: typeof window !== 'undefined' ? sessionStorage.getItem('last-sale-id') : null,
         });
         setError('Erro ao obter ID do pedido. Entre em contato com o suporte.');
         return;
@@ -118,6 +214,7 @@ export default function CardPaymentPage() {
     } catch (err: any) {
       console.error('Erro ao confirmar pagamento:', err);
       setError('Erro ao confirmar pagamento. Entre em contato com o suporte.');
+      setPaymentStatus(''); // Resetar status em caso de erro
     }
   };
 
@@ -125,7 +222,7 @@ export default function CardPaymentPage() {
     setError(errorMessage);
   };
 
-  if (isLoading || isCreatingIntent) {
+  if (isInitializing || isLoading || isCreatingIntent) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white page-with-fixed-header">
         <Header />
@@ -168,7 +265,7 @@ export default function CardPaymentPage() {
                   Voltar ao Checkout
                 </Button>
                 <Button
-                  onClick={createPaymentIntent}
+                  onClick={() => createPaymentIntent()}
                   className="flex-1 bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white"
                 >
                   Tentar Novamente

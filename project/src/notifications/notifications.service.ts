@@ -288,6 +288,39 @@ export class NotificationsService {
     );
   }
 
+  async notifyPaymentPending(userId: string, saleId: string, saleNumber: string, totalAmount: number) {
+    return this.createNotification(
+      userId,
+      NotificationType.PAYMENT_PENDING,
+      'Pagamento Pendente',
+      `Seu pedido #${saleNumber} está aguardando pagamento. Valor: R$ ${totalAmount.toFixed(2)}. Você tem 1 hora para concluir o pagamento.`,
+      { saleId, saleNumber, totalAmount },
+      `/customer/orders/${saleId}`,
+    );
+  }
+
+  async notifyPaymentWarning(userId: string, saleId: string, saleNumber: string, minutesLeft: number) {
+    return this.createNotification(
+      userId,
+      NotificationType.PAYMENT_WARNING,
+      'Atenção: Pagamento Pendente',
+      `Seu pedido #${saleNumber} ainda está aguardando pagamento. Restam apenas ${minutesLeft} minutos para concluir o pagamento antes do cancelamento automático.`,
+      { saleId, saleNumber, minutesLeft },
+      `/customer/orders/${saleId}`,
+    );
+  }
+
+  async notifyPaymentExpired(userId: string, saleId: string, saleNumber: string) {
+    return this.createNotification(
+      userId,
+      NotificationType.PAYMENT_EXPIRED,
+      'Pedido Cancelado',
+      `Seu pedido #${saleNumber} foi cancelado automaticamente por falta de pagamento. O prazo de 1 hora expirou.`,
+      { saleId, saleNumber },
+      `/customer/orders/${saleId}`,
+    );
+  }
+
   // ==================== NOTIFICAÇÕES PARA ADMINS ====================
 
   /**

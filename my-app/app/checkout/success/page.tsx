@@ -89,7 +89,7 @@ function CheckoutSuccessContent() {
             <p className="text-xl text-gray-600 mb-2">
               Obrigado pela sua compra
             </p>
-            <p className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500">
               Número do pedido: <span className="font-semibold text-[#3e2626]">
                 {isLoadingSale ? (
                   <span className="inline-flex items-center">
@@ -100,7 +100,7 @@ function CheckoutSuccessContent() {
                   displayOrderId
                 )}
               </span>
-            </p>
+            </div>
           </div>
 
           {/* Card de Confirmação */}

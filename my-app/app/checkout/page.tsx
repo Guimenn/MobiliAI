@@ -2682,9 +2682,37 @@ export default function CheckoutPage() {
         return;
       }
       
+      // IMPORTANTE: Remover do carrinho do backend os produtos que NÃO foram selecionados
+      // Criar um Set com os IDs dos produtos selecionados para verificação rápida
+      const selectedProductIds = new Set(checkoutItems.map(item => item.product.id));
+      
+      // Remover produtos não selecionados do carrinho do backend
+      for (const backendItem of backendCart.items) {
+        const productId = backendItem.product?.id;
+        if (productId && !selectedProductIds.has(productId)) {
+          try {
+            // Remover produto não selecionado do carrinho do backend
+            await customerAPI.removeFromCart(backendItem.id);
+            console.log(`Produto ${productId} removido do carrinho do backend (não selecionado)`);
+          } catch (error: any) {
+            console.error(`Erro ao remover produto ${productId} do carrinho do backend:`, error.message);
+            // Continuar mesmo se houver erro ao remover um produto
+          }
+        }
+      }
+      
+      // Buscar carrinho atualizado após remover produtos não selecionados
+      const backendCartAfterCleanup = await customerAPI.getCart();
+      if (!backendCartAfterCleanup || !backendCartAfterCleanup.items || backendCartAfterCleanup.items.length === 0) {
+        showAlert('error', 'Não foi possível sincronizar seu carrinho com o servidor. Por favor, adicione os produtos novamente.');
+        setIsProcessing(false);
+        router.push('/cart');
+        return;
+      }
+      
       // Verificar duplicação de produtos no carrinho do backend
       const productIdCounts: { [key: string]: number } = {};
-      backendCart.items.forEach((item: any) => {
+      backendCartAfterCleanup.items.forEach((item: any) => {
         const productId = item.product?.id;
         if (productId) {
           productIdCounts[productId] = (productIdCounts[productId] || 0) + 1;
@@ -2708,7 +2736,7 @@ export default function CheckoutPage() {
         selectedShipping,
         selectedStore,
         itemsCount: checkoutItems.length,
-        backendCartItemsCount: backendCart.items?.length || 0,
+        backendCartItemsCount: backendCartAfterCleanup.items?.length || 0,
         shippingAddress,
         paymentMethod,
         shippingCost,

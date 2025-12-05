@@ -580,6 +580,21 @@ export class CustomerCartService {
       }
     }
 
+    // Enviar notificação de pagamento pendente se o pedido está PENDING
+    if (sale.status === 'PENDING') {
+      try {
+        await this.notificationsService.notifyPaymentPending(
+          customerId,
+          sale.id,
+          sale.saleNumber,
+          Number(sale.totalAmount),
+        );
+      } catch (error) {
+        console.error('Erro ao enviar notificação de pagamento pendente:', error);
+        // Não falhar o checkout se houver erro ao enviar notificação
+      }
+    }
+
     // Armazenar informações dos produtos para verificação posterior
     const productsToCheck: Array<{ id: string; name: string; stock: number; minStock: number; storeName?: string }> = [];
 

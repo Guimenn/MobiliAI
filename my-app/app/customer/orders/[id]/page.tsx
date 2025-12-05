@@ -24,7 +24,9 @@ import {
   User,
   AlertCircle,
   RefreshCw,
-  Star
+  Star,
+  CreditCard,
+  ArrowRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ProductReviewModal from '@/components/ProductReviewModal';
@@ -101,6 +103,7 @@ const getStatusTimeline = (status: string, createdAt: Date, shippedAt?: Date | n
     {
       step: 'PENDING',
       label: 'Pedido Realizado',
+      // Sempre concluído, pois o pedido foi criado
       completed: true,
       date: createdAt,
       icon: CheckCircle
@@ -108,21 +111,26 @@ const getStatusTimeline = (status: string, createdAt: Date, shippedAt?: Date | n
     {
       step: 'PREPARING',
       label: 'Preparando',
-      completed: ['PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(statusUpper),
+      // Só marca como completo se realmente estiver em PREPARING, SHIPPED ou DELIVERED
+      // COMPLETED significa apenas pagamento confirmado, não que está preparando
+      completed: ['PREPARING', 'SHIPPED', 'DELIVERED'].includes(statusUpper),
       date: createdAt,
       icon: Package
     },
     {
       step: 'SHIPPED',
       label: 'Enviado',
-      completed: ['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(statusUpper),
+      // Só marca como enviado se realmente estiver em SHIPPED ou DELIVERED
+      completed: ['SHIPPED', 'DELIVERED'].includes(statusUpper),
       date: shippedAt || null,
       icon: Truck
     },
     {
       step: 'DELIVERED',
       label: 'Entregue',
-      completed: ['DELIVERED', 'COMPLETED'].includes(statusUpper),
+      // Só marca como entregue se realmente estiver em DELIVERED
+      // COMPLETED não significa entregue, apenas pagamento confirmado
+      completed: statusUpper === 'DELIVERED',
       date: deliveredAt || null,
       icon: CheckCircle
     }
@@ -148,6 +156,7 @@ export default function OrderDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [existingReviews, setExistingReviews] = useState<any[]>([]);
 
@@ -164,11 +173,100 @@ export default function OrderDetailsPage() {
     }
   }, [isAuthenticated, user, token, orderId]);
 
-  const loadOrder = async () => {
+  // Verificar status do pedido periodicamente se estiver PENDING (para detectar quando pagamento é confirmado)
+  useEffect(() => {
+    if (!order || order.status !== 'PENDING' || !orderId || !token) {
+      return;
+    }
+
+    const checkOrderStatus = async () => {
+      try {
+        console.log(`[Order Status Check] Verificando status do pedido ${orderId}...`);
+        
+        // Primeiro, verificar o status do pagamento no backend (isso pode atualizar o status automaticamente)
+        // Isso funciona tanto para PIX quanto para cartão
+        try {
+          // Verificar status do pagamento PIX se houver paymentReference
+          if (order.paymentMethod === 'PIX' || !order.paymentMethod) {
+            console.log(`[Order Status Check] Verificando pagamento PIX para pedido ${orderId}...`);
+            const paymentStatus = await customerAPI.checkPixPaymentStatus(orderId);
+            console.log(`[Order Status Check] Status do pagamento PIX:`, paymentStatus);
+          }
+        } catch (paymentError: any) {
+          // Ignorar erros de verificação de pagamento (pode não ter paymentReference ainda)
+          console.warn('[Order Status Check] Erro ao verificar status do pagamento:', paymentError?.response?.data || paymentError?.message);
+        }
+
+        // Depois, buscar o pedido atualizado do backend
+        const updatedOrder = await customerAPI.getOrderById(orderId);
+        console.log(`[Order Status Check] Status atual do pedido: ${updatedOrder.status} (anterior: ${order.status})`);
+        
+        // Se o status mudou de PENDING para outro, atualizar o pedido
+        if (updatedOrder.status !== 'PENDING' && updatedOrder.status !== order.status) {
+          console.log(`[Order Status Check] ✅ Status do pedido atualizado: ${order.status} -> ${updatedOrder.status}`);
+          setOrder(updatedOrder);
+          
+          // Se mudou para PREPARING, mostrar mensagem de sucesso
+          if (updatedOrder.status === 'PREPARING') {
+            toast.success('Pagamento confirmado! Seu pedido está sendo preparado.');
+          }
+        } else if (updatedOrder.status === 'PENDING') {
+          console.log(`[Order Status Check] Pedido ainda está PENDING, aguardando pagamento...`);
+        }
+      } catch (error: any) {
+        console.error('[Order Status Check] Erro ao verificar status do pedido:', error?.response?.data || error?.message);
+      }
+    };
+
+    // Verificar imediatamente ao montar o componente
+    checkOrderStatus();
+
+    // Verificar a cada 3 segundos se o pedido ainda está PENDING
+    const statusInterval = setInterval(checkOrderStatus, 3000);
+
+    return () => clearInterval(statusInterval);
+  }, [order, orderId, token]);
+
+  // Atualizar contador de tempo restante para pedidos PENDING
+  useEffect(() => {
+    if (!order || order.status !== 'PENDING') {
+      setTimeLeft(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const orderDate = new Date(order.createdAt);
+      const expirationDate = new Date(orderDate.getTime() + 60 * 60 * 1000); // 1 hora
+      const now = new Date();
+      const remaining = Math.max(0, Math.floor((expirationDate.getTime() - now.getTime()) / 1000));
+      setTimeLeft(remaining);
+    };
+
+    // Atualizar imediatamente
+    updateTimer();
+
+    // Atualizar a cada segundo
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [order]);
+
+  const loadOrder = async (checkPaymentStatus = false) => {
     if (!token || !orderId) return;
     
     setIsLoading(true);
     try {
+      // Se o pedido está PENDING, verificar o status do pagamento primeiro
+      if (checkPaymentStatus && order?.status === 'PENDING') {
+        try {
+          if (order.paymentMethod === 'PIX' || !order.paymentMethod) {
+            await customerAPI.checkPixPaymentStatus(orderId);
+          }
+        } catch (paymentError) {
+          console.warn('Erro ao verificar status do pagamento:', paymentError);
+        }
+      }
+
       const orderData = await customerAPI.getOrderById(orderId);
       setOrder(orderData);
       
@@ -433,7 +531,7 @@ export default function OrderDetailsPage() {
             </Card>
 
             {/* Avaliação de Produtos - Mostrar apenas se pedido entregue */}
-            {(order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
+            {order.status === 'DELIVERED' && (
               <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
                 <CardHeader>
                   <div className="flex items-center gap-3">
@@ -545,7 +643,7 @@ export default function OrderDetailsPage() {
                                 </p>
                               )}
                             </div>
-                            {isReviewed && (order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
+                            {isReviewed && order.status === 'DELIVERED' && (
                               <Badge className="bg-green-100 text-green-800 border-green-300 flex items-center gap-1 flex-shrink-0">
                                 <Star className="h-3 w-3 fill-green-600 text-green-600" />
                                 Avaliado
@@ -578,7 +676,7 @@ export default function OrderDetailsPage() {
                             >
                               Ver Produto
                             </Button>
-                            {!isReviewed && (order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
+                            {!isReviewed && order.status === 'DELIVERED' && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -715,8 +813,119 @@ export default function OrderDetailsPage() {
               </Card>
             )}
 
+            {/* Retomar Pagamento - Mostrar apenas se pedido estiver PENDING */}
+            {order.status === 'PENDING' && (() => {
+              const hours = Math.floor(timeLeft / 3600);
+              const minutes = Math.floor((timeLeft % 3600) / 60);
+              const seconds = timeLeft % 60;
+              const isExpiringSoon = timeLeft < 30 * 60 && timeLeft > 0; // Menos de 30 minutos
+              
+              return (
+                <Card className={`border-2 ${isExpiringSoon ? 'border-red-300 bg-gradient-to-br from-red-50 to-orange-50' : 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50'}`}>
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 ${isExpiringSoon ? 'bg-red-500' : 'bg-yellow-500'} rounded-lg flex items-center justify-center`}>
+                        <Clock className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className={isExpiringSoon ? 'text-red-900' : 'text-yellow-900'}>
+                          Pagamento Pendente
+                        </CardTitle>
+                        <p className={`text-sm mt-1 ${isExpiringSoon ? 'text-red-700' : 'text-yellow-700'}`}>
+                          {timeLeft > 0 
+                            ? `Tempo restante: ${hours}h ${minutes}m ${seconds}s`
+                            : 'Tempo esgotado! O pedido será cancelado em breve.'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {isExpiringSoon && timeLeft > 0 && (
+                      <div className="bg-red-100 border border-red-300 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-red-800">
+                          <AlertCircle className="h-4 w-4" />
+                          <p className="text-sm font-semibold">
+                            Atenção! Restam menos de 30 minutos para concluir o pagamento.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="bg-white rounded-lg p-4 border border-yellow-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Valor a pagar:</span>
+                        <span className="text-xl font-bold text-[#3e2626]">
+                          {formatPrice(order.totalAmount)}
+                        </span>
+                      </div>
+                      {order.paymentMethod && (
+                        <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                          <CreditCard className="h-4 w-4" />
+                          <span>
+                            Método: {order.paymentMethod === 'PIX' ? 'PIX' : 
+                                     order.paymentMethod === 'CREDIT_CARD' ? 'Cartão de Crédito' :
+                                     order.paymentMethod === 'DEBIT_CARD' ? 'Cartão de Débito' :
+                                     order.paymentMethod}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Button
+                      onClick={() => {
+                        // Redirecionar para a página de pagamento baseado no método escolhido
+                        const paymentMethod = order.paymentMethod?.toLowerCase() || 'pix';
+                        if (paymentMethod === 'credit_card' || paymentMethod === 'creditcard') {
+                          router.push(`/payment/card?saleId=${order.id}`);
+                        } else {
+                          router.push(`/payment/pix?saleId=${order.id}`);
+                        }
+                      }}
+                      className="w-full bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white hover:from-[#2a1f1f] hover:to-[#3e2626] flex items-center justify-center gap-2"
+                    >
+                      <CreditCard className="h-5 w-5" />
+                      Retomar Pagamento
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                    
+                    <p className="text-xs text-yellow-700 text-center">
+                      {timeLeft > 0 
+                        ? 'Seu pedido será processado assim que o pagamento for confirmado'
+                        : 'O pedido será cancelado automaticamente por falta de pagamento'}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })()}
+
             {/* Ações */}
-            {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && order.status !== 'COMPLETED' && (
+            {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && order.status !== 'COMPLETED' && order.status !== 'PENDING' && (
+              <Card>
+                <CardContent className="p-6">
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelOrder}
+                    disabled={isCancelling}
+                    className="w-full border-red-300 text-red-600 hover:bg-red-50"
+                  >
+                    {isCancelling ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Cancelando...
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancelar Pedido
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Cancelar Pedido - Mostrar também quando PENDING (mas depois do botão de pagamento) */}
+            {order.status === 'PENDING' && (
               <Card>
                 <CardContent className="p-6">
                   <Button
