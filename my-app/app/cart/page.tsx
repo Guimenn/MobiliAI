@@ -424,6 +424,14 @@ export default function CartPage() {
           items: []
         };
       }
+
+      // Atualizar o produto com as informações de exibição da loja
+      if (item.product) {
+        item.product.displayStoreId = storeId;
+        item.product.displayStoreName = storeName;
+        item.product.displayStoreAddress = storeAddress;
+      }
+
       grouped[storeId].items.push(item);
     });
     

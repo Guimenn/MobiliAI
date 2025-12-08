@@ -1124,8 +1124,8 @@ export const customerAPI = {
     return response.data;
   },
 
-  addToCart: async (productId: string, quantity = 1) => {
-    const response = await api.post('/customer/cart/add', { productId, quantity });
+  addToCart: async (productId: string, quantity = 1, storeInfo?: { storeId: string; storeName: string; storeAddress?: string }) => {
+    const response = await api.post('/customer/cart/add', { productId, quantity, storeInfo });
     return response.data;
   },
 
@@ -1161,8 +1161,8 @@ export const customerAPI = {
     return response.data;
   },
 
-  cancelOrder: async (orderId: string, reason?: string) => {
-    const body = reason ? { reason } : {};
+  cancelOrder: async (orderId: string, options?: { reason?: string; comments?: string; returnToCart?: boolean }) => {
+    const body = options || {};
     const response = await api.put(`/customer/orders/${orderId}/cancel`, body);
     return response.data;
   },
@@ -1202,7 +1202,12 @@ export const customerAPI = {
     discount?: number;
     couponCode?: string;
     notes?: string;
+    frontendSubtotal?: number; // Subtotal calculado no frontend para garantir consistência
     productIds?: string[]; // Produtos selecionados
+    storeInfo?: { // Informações da loja como exibidas no carrinho
+      name?: string;
+      address?: string;
+    };
   }) => {
     const response = await api.post('/customer/cart/checkout', checkoutData);
     return response.data;

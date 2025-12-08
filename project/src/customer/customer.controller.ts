@@ -134,8 +134,15 @@ export class CustomerController {
   }
 
   @Post('cart/add')
-  async addToCart(@Request() req, @Body() data: { productId: string; quantity: number }) {
-    return this.customerCartService.addToCart(req.user.id, data.productId, data.quantity);
+  async addToCart(
+    @Request() req,
+    @Body() data: {
+      productId: string;
+      quantity: number;
+      storeInfo?: { storeId: string; storeName: string; storeAddress?: string }
+    }
+  ) {
+    return this.customerCartService.addToCart(req.user.id, data.productId, data.quantity, data.storeInfo);
   }
 
   @Put('cart/items/:id')
@@ -288,8 +295,8 @@ export class CustomerController {
   }
 
   @Put('orders/:id/cancel')
-  async cancelOrder(@Request() req, @Param('id') orderId: string, @Body() data: { reason?: string }) {
-    return this.customerOrdersService.cancelOrder(req.user.id, orderId, data.reason);
+  async cancelOrder(@Request() req, @Param('id') orderId: string, @Body() data: { reason?: string; comments?: string; returnToCart?: boolean }) {
+    return this.customerOrdersService.cancelOrder(req.user.id, orderId, data.reason, data.comments, data.returnToCart);
   }
 
   // ==================== AVALIAÇÕES ====================

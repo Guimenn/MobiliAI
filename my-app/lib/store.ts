@@ -106,6 +106,10 @@ export interface Product {
     city?: string;
     state?: string;
   };
+  // Campos para exibição consistente da loja no carrinho e checkout
+  displayStoreId?: string;
+  displayStoreName?: string;
+  displayStoreAddress?: string;
 }
 
 export interface CartItem {
@@ -219,10 +223,11 @@ interface AppState {
   addCoupon: (coupon: Coupon) => void;
   updateCouponStatus: (couponId: string, status: CouponStatus) => void;
   
-  addToCart: (product: Product, quantity?: number) => void;
+      addToCart: (product: Product, quantity?: number, storeInfo?: { storeId: string; storeName: string; storeAddress?: string }) => void;
   removeFromCart: (productId: string) => void;
   updateCartItemQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  loadCart: () => Promise<void>;
   
   setProducts: (products: Product[]) => void;
   setSelectedProduct: (product: Product | null) => void;
@@ -389,6 +394,10 @@ export const useAppStore = create<AppState>()(
                       storeId: item.product.storeId || item.product.store?.id || '',
                       storeName: item.product.store?.name,
                       storeAddress: item.product.store?.address,
+                      // Campos adicionais para garantir consistência com checkout
+                      displayStoreId: item.displayStoreId || item.product.storeId || item.product.store?.id || '',
+                      displayStoreName: item.displayStoreName || item.product.storeName || item.product.store?.name,
+                      displayStoreAddress: item.displayStoreAddress || item.product.storeAddress || item.product.store?.address,
                       store: item.product.store ? {
                         id: item.product.store.id,
                         name: item.product.store.name,
@@ -479,7 +488,7 @@ export const useAppStore = create<AppState>()(
       },
 
       // Cart actions
-      addToCart: async (product, quantity = 1) => {
+      addToCart: async (product, quantity = 1, storeInfo) => {
         const { cart, user, isAuthenticated } = get();
 
         // Verificar se o usuário tem permissão para usar carrinho de customer
@@ -565,7 +574,7 @@ export const useAppStore = create<AppState>()(
             const { customerAPI } = await import('./api');
 
             // Chama backend para adicionar
-            await customerAPI.addToCart(product.id, quantity);
+            await customerAPI.addToCart(product.id, quantity, storeInfo);
             console.log('✅ Item adicionado ao backend');
 
             // Pequeno delay para garantir que o backend processou
@@ -917,6 +926,90 @@ export const useAppStore = create<AppState>()(
         
         console.log('✅ Logout concluído - estado resetado (carrinho mantido no backend)');
       },
+
+      loadCart: async () => {
+        const { user, isAuthenticated } = get();
+
+        if (!isAuthenticated || !user) {
+          console.warn('⚠️ Usuário não autenticado, não é possível carregar carrinho');
+          return;
+        }
+
+        try {
+          console.log('📦 Carregando carrinho do backend...');
+          const { customerAPI } = await import('./api');
+          const cartData = await customerAPI.getCart();
+
+          console.log('📦 Dados do carrinho recebidos:', cartData);
+
+          if (cartData?.items && cartData.items.length > 0) {
+            // Obter carrinho atual para preservar dados locais dos produtos
+            const currentCart = get().cart;
+
+            // Converter os itens do backend para o formato do store
+            const cartItems: CartItem[] = cartData.items.map((item: any) => {
+              // Tentar encontrar produto correspondente no carrinho local para preservar dados
+              const localItem = currentCart.find(ci => ci.product.id === item.product.id);
+              const localProduct = localItem?.product;
+
+              // Mesclar dados do backend com dados locais, preservando campos de oferta relâmpago
+              const mergedProduct = {
+                id: item.product.id,
+                name: item.product.name,
+                description: item.product.description,
+                price: Number(item.product.price),
+                category: item.product.category?.toLowerCase() || 'mesa',
+                color: item.product.colorHex || item.product.color || '#8B4513',
+                imageUrl: item.product.imageUrls?.[0] || item.product.imageUrl || '',
+                imageUrls: item.product.imageUrls || (item.product.imageUrl ? [item.product.imageUrl] : []),
+                rating: item.product.rating || 4.5,
+                reviews: item.product.reviewCount || item.product.reviews || 0,
+                stock: item.product.stock || 0,
+                storeId: item.product.storeId || '',
+                storeName: item.product.store?.name || '',
+                brand: item.product.brand,
+                colorName: item.product.colorName,
+                colorHex: item.product.colorHex || item.product.color,
+
+                // Preservar dados locais se existirem
+                ...(localProduct && {
+                  isFlashSale: localProduct.isFlashSale,
+                  flashSalePrice: localProduct.flashSalePrice,
+                  flashSaleDiscountPercent: localProduct.flashSaleDiscountPercent,
+                  flashSaleStartDate: localProduct.flashSaleStartDate,
+                  flashSaleEndDate: localProduct.flashSaleEndDate,
+                  isOnSale: localProduct.isOnSale,
+                  salePrice: localProduct.salePrice,
+                  saleDiscountPercent: localProduct.saleDiscountPercent,
+                  saleStartDate: localProduct.saleStartDate,
+                  saleEndDate: localProduct.saleEndDate,
+                })
+              };
+
+              return {
+                id: item.id,
+                product: mergedProduct,
+                quantity: item.quantity
+              };
+            });
+
+            const cartTotal = cartItems.reduce(
+              (total, item) => total + (item.product.price * item.quantity),
+              0
+            );
+
+            set({ cart: cartItems, cartTotal });
+            console.log('✅ Carrinho carregado com sucesso:', cartItems.length, 'itens');
+          } else {
+            // Carrinho vazio
+            set({ cart: [], cartTotal: 0 });
+            console.log('📦 Carrinho vazio no backend');
+          }
+        } catch (error) {
+          console.error('❌ Erro ao carregar carrinho:', error);
+        }
+      },
+
     }),
     {
       name: 'mobili-ai-storage',

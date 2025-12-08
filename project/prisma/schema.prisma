@@ -182,10 +182,12 @@ model Sale {
   shippingCity     String?
   shippingPhone    String?
   shippingState    String?
-  shippingZipCode  String?
-  trackingCode     String?
-  reviews          ProductReview[]
-  items            SaleItem[]
+  shippingZipCode     String?
+  trackingCode        String?
+  storeDisplayName    String? // Nome da loja como exibido no carrinho
+  storeDisplayAddress String? // Endereço da loja como exibido no carrinho
+  reviews             ProductReview[]
+  items               SaleItem[]
   customer         User?           @relation("CustomerSales", fields: [customerId], references: [id])
   dailyCash        DailyCash?      @relation(fields: [dailyCashId], references: [id])
   employee         User            @relation("EmployeeSales", fields: [employeeId], references: [id])
@@ -460,14 +462,18 @@ model SystemLog {
 }
 
 model CartItem {
-  id         String   @id @default(cuid())
-  customerId String
-  productId  String
-  quantity   Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  customer   User     @relation(fields: [customerId], references: [id])
-  product    Product  @relation(fields: [productId], references: [id])
+  id                   String   @id @default(cuid())
+  customerId           String
+  productId            String
+  quantity             Int
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  // Informações da loja para exibição consistente no carrinho
+  displayStoreId       String?
+  displayStoreName     String?
+  displayStoreAddress  String?
+  customer             User     @relation(fields: [customerId], references: [id])
+  product              Product  @relation(fields: [productId], references: [id])
 
   @@map("cart_items")
 }

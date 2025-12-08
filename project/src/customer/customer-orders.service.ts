@@ -57,34 +57,34 @@ export class CustomerOrdersService {
       include: {
         items: {
           include: {
-            product: { 
-              select: { 
-                name: true, 
+            product: {
+              select: {
+                name: true,
                 description: true,
                 imageUrls: true,
                 category: true,
                 brand: true,
                 colorName: true,
                 colorHex: true
-              } 
+              }
             }
           }
         },
-        store: { 
-          select: { 
-            name: true, 
-            address: true, 
-            phone: true, 
-            email: true 
-          } 
+        store: {
+          select: {
+            name: true,
+            address: true,
+            phone: true,
+            email: true
+          }
         },
-        customer: { 
-          select: { 
-            name: true, 
-            email: true, 
-            phone: true, 
-            address: true 
-          } 
+        customer: {
+          select: {
+            name: true,
+            email: true,
+            phone: true,
+            address: true
+          }
         }
       }
     });
@@ -101,49 +101,124 @@ export class CustomerOrdersService {
     return order;
   }
 
-  async cancelOrder(customerId: string, orderId: string, reason?: string) {
+  async cancelOrder(customerId: string, orderId: string, reason?: string, comments?: string, returnToCart?: boolean) {
+    console.log(`[CancelOrder] Iniciando cancelamento do pedido ${orderId} para cliente ${customerId}`);
+    console.log(`[CancelOrder] Parâmetros: reason=${reason}, comments=${comments}, returnToCart=${returnToCart}`);
+
     const order = await this.prisma.sale.findUnique({
       where: { id: orderId },
       include: { items: true }
     });
 
     if (!order) {
+      console.log(`[CancelOrder] Pedido ${orderId} não encontrado`);
       throw new NotFoundException('Pedido não encontrado');
     }
 
+    console.log(`[CancelOrder] Pedido encontrado com status: ${order.status}`);
+
     // Verificar se o pedido pertence ao cliente
-    if (order.customerId !== customerId) {
+    if (!order.customerId || order.customerId !== customerId) {
+      console.log(`[CancelOrder] Pedido ${orderId} não pertence ao cliente ${customerId} (customerId do pedido: ${order.customerId})`);
       throw new ForbiddenException('Você só pode cancelar seus próprios pedidos');
     }
 
     // Verificar se o pedido pode ser cancelado
     if (order.status === 'CANCELLED') {
+      console.log(`[CancelOrder] Pedido ${orderId} já foi cancelado`);
       throw new BadRequestException('Pedido já foi cancelado');
     }
 
-    // Bloquear cancelamento para pedidos já em preparação ou além
-    const blockedStatuses = ['PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+    // Bloquear cancelamento para pedidos já enviados ou entregues
+    // Permitir cancelamento apenas quando PENDING ou PREPARING
+    const blockedStatuses = ['SHIPPED', 'DELIVERED', 'COMPLETED'];
     if (blockedStatuses.includes(order.status)) {
-      throw new BadRequestException('O pedido já está em preparação ou enviado e não pode ser cancelado');
+      console.log(`[CancelOrder] Pedido ${orderId} está em status bloqueado: ${order.status}`);
+      throw new BadRequestException('O pedido já foi enviado e não pode ser cancelado');
     }
+
+    // Verificar se está em um status que permite cancelamento
+    const allowedStatuses = ['PENDING', 'PREPARING'];
+    if (!allowedStatuses.includes(order.status)) {
+      console.log(`[CancelOrder] Status não permitido para cancelamento: ${order.status}`);
+      throw new BadRequestException('Este pedido não pode ser cancelado');
+    }
+
+    console.log(`[CancelOrder] Status válido para cancelamento: ${order.status}`);
+
+    // Preparar dados para salvar no pedido cancelado
+    const cancelNotes = [];
+    if (reason) cancelNotes.push(`Motivo: ${reason}`);
+    if (comments) cancelNotes.push(`Comentários: ${comments}`);
+    if (!reason && !comments) cancelNotes.push('Cancelado pelo cliente');
+
+    console.log(`[CancelOrder] Atualizando status do pedido para CANCELLED`);
 
     // Atualizar status do pedido
     const updatedOrder = await this.prisma.sale.update({
       where: { id: orderId },
-      data: { 
+      data: {
         status: 'CANCELLED',
-        notes: reason || 'Cancelado pelo cliente'
+        notes: cancelNotes.join(' | ')
       },
       include: {
         items: {
           include: {
-            product: { select: { name: true } }
+            product: { select: { name: true, price: true, imageUrls: true } }
           }
         }
       }
     });
 
+    console.log(`[CancelOrder] Pedido atualizado com sucesso`);
+
+    // Se o cliente optou por retornar os produtos ao carrinho, criar itens no carrinho
+    if (returnToCart) {
+      console.log(`[CancelOrder] Adicionando ${order.items.length} itens ao carrinho do cliente ${customerId}`);
+      try {
+        for (const item of order.items) {
+          console.log(`[CancelOrder] Processando item: productId=${item.productId}, quantity=${item.quantity}`);
+
+          // Verificar se já existe no carrinho
+          const existingCartItem = await this.prisma.cartItem.findFirst({
+            where: {
+              customerId,
+              productId: item.productId
+            }
+          });
+
+          if (existingCartItem) {
+            console.log(`[CancelOrder] Item já existe no carrinho (ID: ${existingCartItem.id}), incrementando quantidade de ${existingCartItem.quantity} para ${existingCartItem.quantity + item.quantity}`);
+            // Atualizar quantidade existente
+            await this.prisma.cartItem.update({
+              where: { id: existingCartItem.id },
+              data: { quantity: { increment: item.quantity } }
+            });
+            console.log(`[CancelOrder] Item atualizado com sucesso`);
+          } else {
+            console.log(`[CancelOrder] Criando novo item no carrinho para produto ${item.productId}`);
+            // Criar novo item no carrinho
+            const newCartItem = await this.prisma.cartItem.create({
+              data: {
+                customerId,
+                productId: item.productId,
+                quantity: item.quantity
+              }
+            });
+            console.log(`[CancelOrder] Novo item criado com ID: ${newCartItem.id}`);
+          }
+        }
+        console.log(`[CancelOrder] Itens adicionados ao carrinho com sucesso`);
+      } catch (cartError) {
+        console.error(`[CancelOrder] Erro ao adicionar itens ao carrinho:`, cartError);
+        // Não falhar o cancelamento por causa do carrinho
+      }
+    } else {
+      console.log(`[CancelOrder] Cliente optou por não retornar itens ao carrinho`);
+    }
+
     // Restaurar estoque dos produtos
+    console.log(`[CancelOrder] Restaurando estoque de ${order.items.length} produtos`);
     for (const item of order.items) {
       await this.prisma.product.update({
         where: { id: item.productId },
@@ -151,6 +226,7 @@ export class CustomerOrdersService {
       });
     }
 
+    console.log(`[CancelOrder] Cancelamento concluído com sucesso para pedido ${orderId}`);
     return updatedOrder;
   }
 
