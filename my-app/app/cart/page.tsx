@@ -291,135 +291,132 @@ export default function CartPage() {
     return originalPrice;
   };
 
-  // Agrupar produtos por loja
+  // Agrupar produtos por loja - apenas para usuários autenticados
   const productsByStore = useMemo(() => {
     const grouped: { [storeId: string]: { storeName: string; storeAddress?: string; items: typeof cart } } = {};
-    
+
+    // Para usuários NÃO AUTENTICADOS: não agrupar por loja, mostrar todos os produtos juntos
+    if (!isAuthenticated || !user) {
+      console.log('[Cart] Usuário não autenticado - não agrupando por loja');
+      const allItems = [...cart];
+
+      // Para usuários não autenticados, criar um grupo único sem loja específica
+      grouped['guest-cart'] = {
+        storeName: 'Produtos no Carrinho',
+        storeAddress: undefined,
+        items: allItems
+      };
+
+      return grouped;
+    }
+
+    // Para usuários AUTENTICADOS: usar lógica geográfica igual ao checkout
+    console.log('[Cart] Usuário autenticado - usando lógica geográfica');
+
+    // Obter endereço do usuário para cálculo de proximidade
+    const userAddress = {
+      city: user.city,
+      state: user.state,
+      zipCode: user.zipCode
+    };
+
     cart.forEach(item => {
-      // Determinar qual loja usar para este produto
-      // Nova prioridade:
-      // 1) Campos simples do produto (storeName/storeAddress) vindos do catálogo público
-      // 2) storeId direto com informações completas (`store`)
-      // 3) storeInventory com estoque
-      // 4) primeira loja do storeInventory
       let storeId: string = 'unknown';
       let storeName: string | undefined;
       let storeAddress: string | undefined;
 
-      // Prioridade 1: se o produto já traz `storeName`/`storeAddress` mapeados pelo frontend (uso público)
-      if (item.product.storeName) {
-        // Se não houver storeId definido, criar um id estável baseado na loja
-        storeId = item.product.storeId && item.product.storeId !== '' ? item.product.storeId : `public-${item.product.storeName}`;
-        storeName = item.product.storeName;
-        storeAddress = item.product.storeAddress;
+      // USAR A MESMA LÓGICA GEOGRÁFICA DO CHECKOUT
+      if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
+        // Buscar todas as lojas ativas com estoque
+        const storesWithStock = item.product.storeInventory
+          .filter((inv: any) => inv.store?.isActive && inv.quantity > 0 && inv.store?.name && inv.store?.zipCode)
+          .map(inv => ({
+            inventory: inv,
+            store: inv.store
+          }))
+          .filter(item => item.store); // Remover lojas não encontradas
+
+        if (storesWithStock.length > 0) {
+          // Função para calcular prioridade de proximidade (mesma do checkout)
+          const calculateProximityScore = (store: any) => {
+            if (!store) return 999;
+
+            let score = 0;
+
+            // Prioridade 1: Mesma cidade E mesmo estado
+            if (store.city?.toLowerCase() === userAddress.city?.toLowerCase() &&
+                store.state?.toUpperCase() === userAddress.state?.toUpperCase()) {
+              score = 1;
+            }
+            // Prioridade 2: Mesmo estado (diferente cidade)
+            else if (store.state?.toUpperCase() === userAddress.state?.toUpperCase()) {
+              score = 2;
+            }
+            // Prioridade 3: Estados diferentes
+            else {
+              score = 3;
+            }
+
+            return score;
+          };
+
+          // Filtrar e ordenar lojas por proximidade e estoque
+          const storesWithProximity = storesWithStock
+            .map(storeItem => ({
+              ...storeItem,
+              proximityScore: calculateProximityScore(storeItem.store)
+            }))
+            .sort((a, b) => {
+              // Ordenar por proximidade primeiro, depois por estoque
+              if (a.proximityScore !== b.proximityScore) {
+                return a.proximityScore - b.proximityScore;
+              }
+              return b.inventory.quantity - a.inventory.quantity;
+            });
+
+          // Usar a loja mais próxima (mesma lógica do checkout)
+          const selectedStore = storesWithProximity[0];
+          storeId = selectedStore.inventory.storeId;
+          storeName = selectedStore.store?.name;
+          storeAddress = selectedStore.store?.address;
+
+          console.log(`[Cart] Produto ${item.product.id}: loja selecionada por proximidade:`, {
+            storeId,
+            storeName,
+            proximityScore: selectedStore.proximityScore,
+            stock: selectedStore.inventory.quantity
+          });
+        } else {
+          // Fallback: usar storeInventory sem considerar localização
+          console.log(`[Cart] Produto ${item.product.id}: nenhuma loja com localização, usando fallback`);
+          const firstStore = item.product.storeInventory.find((inv: any) => inv.store?.isActive && inv.store?.name);
+          if (firstStore) {
+            storeId = firstStore.storeId;
+            storeName = firstStore.store?.name;
+            storeAddress = firstStore.store?.address;
+          }
+        }
       }
-      // Prioridade 2: tentar usar storeId direto se tiver informações completas
+      // Fallback para produtos sem storeInventory
       else if (item.product.storeId && item.product.store?.name) {
         storeId = item.product.storeId;
         storeName = item.product.store.name;
         storeAddress = item.product.store.address;
-      } 
-      // Se storeId direto não tiver informações completas, tentar storeInventory
-      else if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
-        // Buscar loja com estoque (ou maior estoque) que tenha informações completas
-        const availableStores = item.product.storeInventory
-          .filter((inv: any) => inv.store?.isActive && inv.quantity > 0 && inv.store?.name)
-          .sort((a: any, b: any) => b.quantity - a.quantity);
-
-        if (availableStores.length > 0) {
-          const selectedInventory = availableStores[0];
-          storeId = selectedInventory.storeId;
-          storeName = selectedInventory.store?.name;
-          storeAddress = selectedInventory.store?.address;
-        } else {
-          // Se nenhuma tem estoque, usar a primeira loja ativa com informações
-          const firstActive = item.product.storeInventory.find((inv: any) => inv.store?.isActive && inv.store?.name);
-          if (firstActive) {
-            storeId = firstActive.storeId;
-            storeName = firstActive.store?.name;
-            storeAddress = firstActive.store?.address;
-          } else {
-            // Último recurso: qualquer loja do storeInventory
-            const anyStore = item.product.storeInventory.find((inv: any) => inv.store?.name);
-            if (anyStore) {
-              storeId = anyStore.storeId;
-              storeName = anyStore.store?.name;
-              storeAddress = anyStore.store?.address;
-            }
-          }
-        }
-      }
-      // Se ainda não encontrou, tentar usar storeId direto mesmo sem informações completas
-      else if (item.product.storeId && item.product.storeId !== 'unknown' && item.product.storeId !== '') {
-        storeId = item.product.storeId;
-        storeName = item.product.store?.name;
-        storeAddress = item.product.store?.address;
-      }
-      // Último recurso: tentar buscar qualquer loja ativa do sistema
-      else {
-        // Se chegou aqui, não encontrou loja específica, mas vamos tentar buscar uma loja padrão
-        // Isso será tratado no fallback abaixo
       }
 
       // Fallback: usar cache ou buscar informações
       if (!storeName || storeId === 'unknown') {
-        // Tentar cache primeiro
         if (storeId !== 'unknown' && storeId !== '') {
           storeName = storeInfoCache[storeId]?.name;
         }
-        
-        // Se não tem no cache e tem storeId válido, tentar buscar
-        if (!storeName && storeId !== 'unknown' && storeId !== '') {
-          // Tentar buscar informações da loja de forma assíncrona
-          fetchStoreInfoFromProduct(item.product.id, storeId).catch(() => {
-            // Se falhar, usar nome genérico
-          });
-          // Enquanto busca, usar nome temporário
+        if (!storeName) {
           storeName = `Loja ${storeId.substring(0, 8)}`;
-        } else if (!storeName || storeId === 'unknown') {
-          // Se não tem storeId válido, tentar buscar primeira loja do storeInventory
-          if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
-            // Tentar encontrar loja com informações completas primeiro
-            const storeWithInfo = item.product.storeInventory.find((inv: any) => 
-              inv.storeId && inv.storeId !== 'unknown' && inv.storeId !== '' && inv.store?.name
-            );
-            
-            if (storeWithInfo && storeWithInfo.store) {
-              storeId = storeWithInfo.storeId;
-              storeName = storeWithInfo.store.name;
-              storeAddress = storeWithInfo.store.address;
-            } else {
-              // Se não encontrou com informações, pegar primeira loja válida e buscar
-              const firstInventory = item.product.storeInventory.find((inv: any) => 
-                inv.storeId && inv.storeId !== 'unknown' && inv.storeId !== ''
-              );
-              
-              if (firstInventory) {
-                storeId = firstInventory.storeId;
-                storeName = firstInventory.store?.name || storeInfoCache[firstInventory.storeId]?.name;
-                storeAddress = firstInventory.store?.address || storeInfoCache[firstInventory.storeId]?.address;
-                
-                if (!storeName) {
-                  // Buscar informações da loja de forma assíncrona
-                  fetchStoreInfoFromProduct(item.product.id, firstInventory.storeId).catch(() => {});
-                  storeName = `Loja ${firstInventory.storeId.substring(0, 8)}`;
-                }
-              } else {
-                storeName = 'Loja não identificada';
-              }
-            }
-          } else {
-            storeName = 'Loja não identificada';
-          }
         }
       }
-      if (!storeAddress && storeId !== 'unknown' && storeId !== '') {
-        storeAddress = storeInfoCache[storeId]?.address;
-      }
-      
+
       if (!grouped[storeId]) {
         grouped[storeId] = {
-          storeName,
+          storeName: storeName || `Loja ${storeId.substring(0, 8)}`,
           storeAddress,
           items: []
         };
@@ -434,9 +431,10 @@ export default function CartPage() {
 
       grouped[storeId].items.push(item);
     });
-    
+
+    console.log('[Cart] Agrupamento final:', Object.keys(grouped).length, 'grupos');
     return grouped;
-  }, [cart, storeInfoCache]);
+  }, [cart, storeInfoCache, isAuthenticated, user]);
 
   // Produtos selecionados
   const selectedCartItems = useMemo(() => {
