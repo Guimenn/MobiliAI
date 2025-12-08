@@ -257,6 +257,7 @@
 /* Container geral do toaster */
 .toaster {
   pointer-events: none;
+  z-index: 9999;
 }
 
 /* Cartão base do toast */
@@ -272,11 +273,14 @@
   padding-block: 0.85rem;
   padding-inline: 0.95rem 1.1rem;
   backdrop-filter: blur(12px);
+  min-width: 320px;
+  max-width: 420px;
 }
 
 /* Layout interno do toast (ícone + textos) */
 .toaster [data-sonner-toast] > div {
   gap: 0.6rem;
+  align-items: flex-start;
 }
 
 /* Título e descrição – tipografia mais elegante, seguindo o site */
@@ -285,11 +289,15 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-size: 0.78rem;
+  margin-bottom: 0.25rem;
+  color: var(--popover-foreground);
 }
 
 .toaster [data-sonner-toast] [data-description] {
   font-size: 0.82rem;
   opacity: 0.9;
+  line-height: 1.4;
+  color: var(--popover-foreground);
 }
 
 /* Ícone: bolinha com borda na cor primária da marca */
@@ -301,6 +309,8 @@
   border: 1px solid oklch(from var(--primary) l c h / 0.35);
   background: oklch(from var(--primary) l c h / 0.06);
   color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
 }
 
 /* SUCCESS – usa a paleta principal da loja (marrom) */
@@ -308,9 +318,21 @@
   border-left: 4px solid #3e2626;
 }
 
+.toaster [data-sonner-toast][data-type="success"] svg {
+  border-color: oklch(from #3e2626 l c h / 0.35);
+  background: oklch(from #3e2626 l c h / 0.06);
+  color: #3e2626;
+}
+
 /* WARNING – tom âmbar suave */
 .toaster [data-sonner-toast][data-type="warning"] {
   border-left: 4px solid oklch(0.828 0.189 84.429);
+}
+
+.toaster [data-sonner-toast][data-type="warning"] svg {
+  border-color: oklch(0.828 0.189 84.429 / 0.35);
+  background: oklch(0.828 0.189 84.429 / 0.06);
+  color: oklch(0.828 0.189 84.429);
 }
 
 /* ERROR – vermelho da paleta */
@@ -318,9 +340,21 @@
   border-left: 4px solid var(--destructive);
 }
 
+.toaster [data-sonner-toast][data-type="error"] svg {
+  border-color: oklch(from var(--destructive) l c h / 0.35);
+  background: oklch(from var(--destructive) l c h / 0.06);
+  color: var(--destructive);
+}
+
 /* INFO – usa cor de accent */
 .toaster [data-sonner-toast][data-type="info"] {
   border-left: 4px solid var(--accent-foreground);
+}
+
+.toaster [data-sonner-toast][data-type="info"] svg {
+  border-color: oklch(from var(--accent-foreground) l c h / 0.35);
+  background: oklch(from var(--accent-foreground) l c h / 0.06);
+  color: var(--accent-foreground);
 }
 
 /* Loading / neutral */
@@ -329,12 +363,61 @@
   border-left: 4px solid var(--primary);
 }
 
-/* Botão de fechar sempre visível, mas discreto */
-.toaster [data-sonner-toast] [data-dismiss] {
-  opacity: 0.6;
-  transition: opacity 0.15s ease;
+.toaster [data-sonner-toast][data-type="default"] svg,
+.toaster [data-sonner-toast]:not([data-type]) svg {
+  border-color: oklch(from var(--primary) l c h / 0.35);
+  background: oklch(from var(--primary) l c h / 0.06);
+  color: var(--primary);
 }
 
-.toaster [data-sonner-toast] [data-dismiss]:hover {
+/* Botão de fechar sempre visível, mas discreto */
+.toaster [data-sonner-toast] [data-close-button] {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+  color: var(--muted-foreground);
+}
+
+.toaster [data-sonner-toast] [data-close-button]:hover {
   opacity: 1;
+  color: var(--foreground);
+}
+
+/* Animações de entrada/saída */
+.toaster [data-sonner-toast][data-state="entering"] {
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+.toaster [data-sonner-toast][data-state="exiting"] {
+  animation: slideOutToRight 0.2s ease-in;
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Responsividade */
+@media (max-width: 640px) {
+  .toaster [data-sonner-toast] {
+    min-width: 280px;
+    max-width: 90vw;
+    margin: 0 1rem;
+  }
 }

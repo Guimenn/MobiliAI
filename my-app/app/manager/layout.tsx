@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAppStore } from '@/lib/store';
 import { notificationsAPI } from '@/lib/api';
-import { 
-  Package, 
+import {
+  Package,
   ShoppingCart,
-  Clock, 
-  LogOut, 
+  Clock,
+  LogOut,
   Menu,
   User,
   Home,
@@ -23,6 +23,7 @@ import {
   Monitor,
   ArrowRight,
   Bell,
+  Globe,
 } from 'lucide-react';
 
 export default function ManagerLayout({
@@ -182,6 +183,17 @@ export default function ManagerLayout({
           href: '/manager/products',
           icon: Package,
           current: pathname.startsWith('/manager/products'),
+        },
+      ],
+    },
+    {
+      title: 'Vendas Online',
+      items: [
+        {
+          name: 'Pedidos Online',
+          href: '/manager/orders-online',
+          icon: Globe,
+          current: pathname.startsWith('/manager/orders-online'),
         },
       ],
     },

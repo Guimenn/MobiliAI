@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { adminAPI } from '@/lib/api-admin';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'sonner';
+import { showAlert, showConfirm } from '@/lib/alerts';
+import TrackingCodeDialog from '@/components/TrackingCodeDialog';
 import {
   Package,
   Truck,
@@ -48,6 +50,8 @@ export default function OrdersOnlinePage() {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [trackingCode, setTrackingCode] = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [showTrackingDialog, setShowTrackingDialog] = useState(false);
+  const [pendingOrderUpdate, setPendingOrderUpdate] = useState<{ orderId: string; status: string } | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated || !user || !token) {
@@ -441,12 +445,18 @@ export default function OrdersOnlinePage() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <select
                         value={order.status}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const newStatus = e.target.value;
                           if (newStatus === 'SHIPPED' && !order.trackingCode) {
-                            const tracking = prompt('Digite o código de rastreamento:');
-                            if (tracking) {
-                              handleUpdateStatus(order.id, newStatus, tracking);
+                            const confirmed = await showConfirm(
+                              `Para marcar o pedido #${order.saleNumber} como enviado, é necessário informar o código de rastreamento. Isso permitirá que o cliente acompanhe o envio.`,
+                              'Código de Rastreamento Obrigatório',
+                              'Informar Código',
+                              'Cancelar'
+                            );
+                            if (confirmed) {
+                              setPendingOrderUpdate({ orderId: order.id, status: newStatus });
+                              setShowTrackingDialog(true);
                             }
                           } else {
                             handleUpdateStatus(order.id, newStatus);
@@ -529,6 +539,23 @@ export default function OrdersOnlinePage() {
           )}
         </>
       )}
+
+      <TrackingCodeDialog
+        isOpen={showTrackingDialog}
+        onClose={() => {
+          setShowTrackingDialog(false);
+          setPendingOrderUpdate(null);
+        }}
+        onConfirm={(trackingCode) => {
+          if (pendingOrderUpdate) {
+            handleUpdateStatus(pendingOrderUpdate.orderId, pendingOrderUpdate.status, trackingCode);
+            setShowTrackingDialog(false);
+            setPendingOrderUpdate(null);
+          }
+        }}
+        orderNumber={selectedOrder?.saleNumber || pendingOrderUpdate ? orders.find(o => o.id === pendingOrderUpdate.orderId)?.saleNumber || 'N/A' : 'N/A'}
+        isLoading={isUpdatingStatus}
+      />
     </div>
   );
 }
@@ -596,13 +623,18 @@ function OrderDetails({
               <select
                 id="status-select"
                 value={order.status}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const newStatus = e.target.value;
                   if (newStatus === 'SHIPPED' && !order.trackingCode && !trackingCode) {
-                    const tracking = prompt('Digite o código de rastreamento:');
-                    if (tracking) {
-                      setTrackingCode(tracking);
-                      onUpdateStatus(order.id, newStatus, tracking);
+                    const confirmed = await showConfirm(
+                      `Para marcar o pedido #${order.saleNumber} como enviado, é necessário informar o código de rastreamento. Isso permitirá que o cliente acompanhe o envio.`,
+                      'Código de Rastreamento Obrigatório',
+                      'Informar Código',
+                      'Cancelar'
+                    );
+                    if (confirmed) {
+                      setPendingOrderUpdate({ orderId: order.id, status: newStatus });
+                      setShowTrackingDialog(true);
                     }
                   } else {
                     onUpdateStatus(order.id, newStatus);
