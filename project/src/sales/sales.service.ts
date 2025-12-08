@@ -397,6 +397,14 @@ export class SalesService {
               updatedSale.id,
               updatedSale.saleNumber,
             );
+          } else if (newStatusString === 'SHIPPED') {
+            // Usar notificação específica para pedidos enviados que inclui código de rastreamento
+            await this.notificationsService.notifyOrderShipped(
+              updatedSale.customerId,
+              updatedSale.id,
+              updatedSale.saleNumber,
+              updatedSale.trackingCode,
+            );
           } else {
             await this.notificationsService.notifyOrderStatusChanged(
               updatedSale.customerId,

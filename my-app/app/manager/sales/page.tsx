@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { salesAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import {
@@ -19,17 +20,32 @@ import {
   Calendar,
   User,
   CreditCard,
+  Edit,
+  Check,
+  X,
 } from 'lucide-react';
 import { Loader } from '@/components/ui/ai/loader';
+import { useToast } from '@/hooks/useToast';
+
+const SALE_STATUSES = [
+  { value: 'PENDING', label: 'Pendente' },
+  { value: 'COMPLETED', label: 'Concluída' },
+  { value: 'DELIVERED', label: 'Entregue' },
+  { value: 'CANCELLED', label: 'Cancelada' },
+  { value: 'REFUNDED', label: 'Reembolsada' },
+];
 
 export default function ManagerSalesPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppStore();
+  const toast = useToast();
   const [sales, setSales] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -143,6 +159,32 @@ export default function ManagerSalesPage() {
 
   const handleViewSale = (saleId: string) => {
     router.push(`/manager/sales/${saleId}`);
+  };
+
+  const handleStatusUpdate = async (saleId: string, newStatus: string) => {
+    try {
+      setUpdatingStatus(saleId);
+      await salesAPI.update(saleId, { status: newStatus });
+
+      // Atualizar o status na lista local
+      setSales(prevSales =>
+        prevSales.map(sale =>
+          sale.id === saleId ? { ...sale, status: newStatus } : sale
+        )
+      );
+
+      setEditingSaleId(null);
+      toast.success('Status da venda atualizado com sucesso!', {
+        description: 'A alteração foi salva e o cliente foi notificado.'
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      toast.error('Erro ao atualizar status da venda', {
+        description: 'Verifique sua conexão e tente novamente.'
+      });
+    } finally {
+      setUpdatingStatus(null);
+    }
   };
 
   const getStatusBadge = (status: string | undefined) => {
@@ -384,17 +426,80 @@ export default function ManagerSalesPage() {
                         </p>
                       )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleViewSale(sale.id);
-                      }}
-                      className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
-                    >
-                      <Receipt className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {/* Status Edit Controls */}
+                      {editingSaleId === sale.id ? (
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={sale.status || 'PENDING'}
+                            onValueChange={(newStatus) => {
+                              if (newStatus !== sale.status) {
+                                handleStatusUpdate(sale.id, newStatus);
+                              } else {
+                                setEditingSaleId(null);
+                              }
+                            }}
+                            disabled={updatingStatus === sale.id}
+                          >
+                            <SelectTrigger className="w-32 h-8">
+                              {updatingStatus === sale.id ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="animate-spin rounded-full h-3 w-3 border border-gray-300 border-t-gray-600"></div>
+                                  <span>Atualizando...</span>
+                                </div>
+                              ) : (
+                                <SelectValue />
+                              )}
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SALE_STATUSES.map((status) => (
+                                <SelectItem key={status.value} value={status.value}>
+                                  {status.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingSaleId(null);
+                            }}
+                            className="h-8 w-8"
+                            disabled={updatingStatus === sale.id}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSaleId(sale.id);
+                          }}
+                          className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
+                          disabled={updatingStatus !== null}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+
+                      {/* View Details Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewSale(sale.id);
+                        }}
+                        className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
+                      >
+                        <Receipt className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
