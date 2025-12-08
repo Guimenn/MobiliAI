@@ -386,6 +386,8 @@ export class CustomerCartService {
       discount?: number;
       couponCode?: string;
       notes?: string;
+      frontendSubtotal?: number; // Subtotal calculado no frontend para garantir consistência
+      productIds?: string[]; // Produtos selecionados no checkout
     }
   ) {
     // Garantir conexão com o banco antes de processar checkout
@@ -413,6 +415,28 @@ export class CustomerCartService {
     if (validation.validItems.length === 0) {
       throw new BadRequestException('Carrinho está vazio. Adicione produtos ao carrinho antes de finalizar o pedido.');
     }
+
+    // Filtrar apenas os produtos selecionados (se fornecido)
+    let selectedItems = validation.validItems;
+    if (additionalCosts?.productIds && additionalCosts.productIds.length > 0) {
+      const selectedSet = new Set(additionalCosts.productIds);
+      selectedItems = validation.validItems.filter(item => selectedSet.has(item.productId));
+
+      if (selectedItems.length === 0) {
+        throw new BadRequestException('Nenhum produto selecionado encontrado no carrinho.');
+      }
+    }
+
+    // Guardar snapshot dos itens NÃO selecionados para garantir que permaneçam no carrinho
+    const nonSelectedItems = validation.validItems.filter(
+      item => !selectedItems.some(si => si.productId === item.productId)
+    );
+
+    // Subtotal original apenas dos produtos selecionados (para logs/validações)
+    const selectedSubtotalOriginal = selectedItems.reduce((sum, item) => {
+      const currentPrice = this.calculateCurrentPrice(item.product);
+      return sum + (currentPrice * item.quantity);
+    }, 0);
 
     // Validar se a loja existe
     let validStoreId = storeId;
@@ -444,26 +468,27 @@ export class CustomerCartService {
       }
     }
 
-    // Validar e aplicar cupom se fornecido
-    let couponDiscount = 0;
+    // Validar cupom se fornecido (apenas para validação, não para recalcular desconto)
     let couponId: string | undefined;
+    const frontendDiscount = additionalCosts?.discount || 0;
     
     if (additionalCosts?.couponCode) {
       try {
-        // Buscar informações dos produtos para validação do cupom
+        // Validar o cupom para garantir que é válido
+        // IMPORTANTE: Não vamos recalcular o desconto aqui, vamos usar o que o frontend passou
         const firstProduct = validation.validItems[0]?.product;
         const categoryId = firstProduct?.category;
         
         const couponValidation = await this.couponsService.validate({
           code: additionalCosts.couponCode,
-          totalAmount: validation.totalPrice,
-          productId: validation.validItems.length === 1 ? validation.validItems[0].productId : undefined,
+          totalAmount: selectedSubtotalOriginal,
+          productId: selectedItems.length === 1 ? selectedItems[0].productId : undefined,
           categoryId: categoryId,
           storeId: validStoreId,
         }, customerId);
         
-        couponDiscount = couponValidation.discount;
         couponId = couponValidation.coupon.id;
+        // Não usar couponValidation.discount - usar o desconto do frontend que já foi calculado corretamente
       } catch (error: any) {
         throw new BadRequestException(`Erro ao validar cupom: ${error.message}`);
       }
@@ -471,14 +496,33 @@ export class CustomerCartService {
     
     const shippingCost = additionalCosts?.shippingCost || 0;
     const insuranceCost = additionalCosts?.insuranceCost || 0;
-    const tax = additionalCosts?.tax || 0;
-    const manualDiscount = additionalCosts?.discount || 0;
-    const discount = couponDiscount + manualDiscount;
+    const tax = Math.round((additionalCosts?.tax || 0) * 100) / 100; // Arredondar tax para 2 casas decimais
+    
+    // IMPORTANTE: Se há cupom, o desconto já foi calculado e passado pelo frontend
+    // Não devemos recalcular ou somar novamente
+    // Se não há cupom mas há desconto manual, usar esse desconto
+    let discount = 0;
+    if (additionalCosts?.couponCode) {
+      // Se há cupom, usar o desconto do frontend (já calculado corretamente)
+      // O frontend já calculou o desconto baseado no subtotal correto
+      discount = frontendDiscount;
+      console.log('[Checkout] Usando desconto do frontend para cupom:', {
+        couponCode: additionalCosts.couponCode,
+        frontendDiscount,
+        discount,
+      });
+    } else if (additionalCosts?.discount) {
+      // Se não há cupom mas há desconto manual, usar esse desconto
+      discount = additionalCosts.discount;
+      console.log('[Checkout] Usando desconto manual:', discount);
+    } else {
+      console.log('[Checkout] Nenhum desconto aplicado');
+    }
     
     const isOnlineOrder = !!shippingInfo;
     
     // Buscar produtos atualizados do banco antes de criar a venda para garantir dados de oferta relâmpago atualizados
-    const itemsData = await Promise.all(validation.validItems.map(async (item) => {
+    const itemsData = await Promise.all(selectedItems.map(async (item) => {
       // Buscar produto novamente do banco para garantir dados atualizados (incluindo oferta relâmpago)
       const freshProduct = await this.prisma.product.findUnique({
         where: { id: item.productId },
@@ -520,7 +564,12 @@ export class CustomerCartService {
     }));
     
     // Recalcular subtotal usando os preços atualizados dos produtos buscados do banco
-    const subtotal = itemsData.reduce((sum, item) => sum + item.totalPrice, 0);
+    const subtotalRecalculado = itemsData.reduce((sum, item) => sum + item.totalPrice, 0);
+    
+    // IMPORTANTE: Se o frontend passou um subtotal, usar esse valor para garantir consistência
+    // Isso evita diferenças causadas por recálculo de preços (ofertas relâmpago, etc)
+    // O desconto foi calculado baseado no subtotal do frontend, então devemos usar esse subtotal
+    const subtotal = additionalCosts?.frontendSubtotal || subtotalRecalculado;
     
     // Preparar itens para criar na venda (sem propriedades extras)
     const itemsToCreate = itemsData.map(item => ({
@@ -533,7 +582,41 @@ export class CustomerCartService {
     }));
     
     // Calcular total incluindo custos adicionais
+    // IMPORTANTE: O desconto já foi calculado e passado pelo frontend
+    // Não devemos recalcular ou aplicar novamente aqui
     const totalAmount = subtotal + shippingCost + insuranceCost + tax - discount;
+    
+    // Calcular o total esperado do frontend para comparação
+    const totalEsperadoFrontend = (additionalCosts?.frontendSubtotal || subtotal) + shippingCost + insuranceCost + tax - frontendDiscount;
+    
+    // Log detalhado para depuração
+    console.log('[Checkout] Cálculo do total - DETALHADO:', {
+      'selectedSubtotalOriginal': selectedSubtotalOriginal,
+      'frontendSubtotal recebido': additionalCosts?.frontendSubtotal,
+      'subtotal recalculado': subtotalRecalculado,
+      'subtotal usado no cálculo': subtotal,
+      'diferença subtotal vs original': subtotal - selectedSubtotalOriginal,
+      shippingCost,
+      insuranceCost,
+      tax,
+      'discount aplicado': discount,
+      'frontendDiscount recebido': frontendDiscount,
+      'totalAmount calculado': totalAmount,
+      'totalAmount esperado (frontend)': totalEsperadoFrontend,
+      'diferença entre calculado e esperado': totalAmount - totalEsperadoFrontend,
+      couponCode: additionalCosts?.couponCode,
+      hasCoupon: !!additionalCosts?.couponCode,
+      'itens selecionados': selectedItems.length,
+    });
+    
+    // Verificar se há diferença significativa e alertar
+    if (Math.abs(totalAmount - totalEsperadoFrontend) > 0.01) {
+      console.error('[Checkout] ⚠️ ATENÇÃO: Diferença entre total calculado e esperado!', {
+        totalAmount,
+        totalEsperadoFrontend,
+        diferenca: totalAmount - totalEsperadoFrontend,
+      });
+    }
     
     // Criar venda com retry para garantir que seja criada mesmo se houver problemas de conexão
     const sale = await this.prisma.executeWithRetry(async () => {
@@ -543,9 +626,9 @@ export class CustomerCartService {
           customer: { connect: { id: customerId } },
           employee: { connect: { id: customerId } }, // Cliente é o próprio vendedor
           saleNumber: `SALE-${Date.now()}`,
-          totalAmount,
-          discount: discount,
-          tax: tax,
+          totalAmount: Number(totalAmount.toFixed(2)), // Garantir 2 casas decimais
+          discount: Number(discount.toFixed(2)), // Garantir 2 casas decimais
+          tax: Number(tax.toFixed(2)), // Garantir 2 casas decimais
           status: isOnlineOrder ? 'PENDING' : 'PENDING',
           paymentMethod: 'PIX',
           isOnlineOrder,
@@ -816,8 +899,66 @@ export class CustomerCartService {
       });
     }
 
-    // Limpar carrinho
-    await this.clearCart(customerId);
+    // Remover apenas os produtos que foram incluídos no pedido do carrinho
+    // Isso preserva os produtos não selecionados que ainda estão no carrinho
+    // validation.validItems contém apenas os produtos que foram processados no pedido
+    const productIdsInOrder = new Set(selectedItems.map(item => item.productId));
+    
+    // Buscar todos os itens do carrinho para verificar quais remover
+    const allCartItems = await this.prisma.cartItem.findMany({
+      where: { customerId },
+      include: { product: { select: { id: true } } }
+    });
+    
+    // Remover apenas os itens que foram incluídos no pedido
+    for (const cartItem of allCartItems) {
+      if (productIdsInOrder.has(cartItem.productId)) {
+        // Verificar se a quantidade do item no carrinho foi totalmente usada no pedido
+        const orderItem = selectedItems.find(item => item.productId === cartItem.productId);
+        if (orderItem) {
+          // Se a quantidade do pedido é maior ou igual à do carrinho, remover o item
+          // Se for menor, reduzir a quantidade
+          if (orderItem.quantity >= cartItem.quantity) {
+            await this.prisma.cartItem.delete({
+              where: { id: cartItem.id }
+            });
+          } else {
+            // Reduzir quantidade do item no carrinho
+            await this.prisma.cartItem.update({
+              where: { id: cartItem.id },
+              data: { quantity: cartItem.quantity - orderItem.quantity }
+            });
+          }
+        }
+      }
+    }
+
+    // Garantir que os itens não selecionados permaneçam (repor se necessário)
+    for (const item of nonSelectedItems) {
+      // Tentar encontrar novamente no carrinho (pode ter sido removido por engano)
+      const existing = await this.prisma.cartItem.findFirst({
+        where: { customerId, productId: item.productId }
+      });
+
+      if (existing) {
+        // Atualizar quantidade para a original se tiver sido alterada
+        if (existing.quantity !== item.quantity) {
+          await this.prisma.cartItem.update({
+            where: { id: existing.id },
+            data: { quantity: item.quantity }
+          });
+        }
+      } else {
+        // Recriar item não selecionado
+        await this.prisma.cartItem.create({
+          data: {
+            customerId,
+            productId: item.productId,
+            quantity: item.quantity
+          }
+        });
+      }
+    }
 
     // Criar notificação de pedido criado para o cliente
     try {

@@ -121,8 +121,10 @@ export class CustomerOrdersService {
       throw new BadRequestException('Pedido já foi cancelado');
     }
 
-    if (order.status === 'COMPLETED') {
-      throw new BadRequestException('Pedido já foi finalizado e não pode ser cancelado');
+    // Bloquear cancelamento para pedidos já em preparação ou além
+    const blockedStatuses = ['PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+    if (blockedStatuses.includes(order.status)) {
+      throw new BadRequestException('O pedido já está em preparação ou enviado e não pode ser cancelado');
     }
 
     // Atualizar status do pedido

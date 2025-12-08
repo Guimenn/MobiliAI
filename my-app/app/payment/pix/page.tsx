@@ -46,6 +46,95 @@ export default function PixPaymentPage() {
   const isProductionEnv =
     env.ABACATEPAY_ENVIRONMENT === 'production' || env.NODE_ENV === 'production';
 
+  // Garantir que o carrinho local preserve itens não selecionados mesmo se o backend estiver sem eles
+  useEffect(() => {
+    const mergeCartFromBackend = async () => {
+      try {
+        const store = useAppStore.getState();
+        const localCart = store.cart || [];
+
+        // Reidratar itens restantes salvos no checkout (fallback antecipado)
+        let persistedRemaining: any[] = [];
+        if (typeof window !== 'undefined') {
+          const stored = sessionStorage.getItem('checkout-remaining-items');
+          if (stored) {
+            try {
+              persistedRemaining = JSON.parse(stored);
+            } catch (e) {
+              console.warn('Erro ao parsear checkout-remaining-items', e);
+            }
+          }
+        }
+
+        // Se houver itens persistidos, aplica imediatamente no store e reenvia ao backend
+        if (persistedRemaining.length > 0) {
+          useAppStore.setState((state) => {
+            const merged = [...state.cart];
+            const existingIds = new Set(merged.map(ci => ci.product.id));
+            for (const pr of persistedRemaining) {
+              if (!existingIds.has(pr.product.id)) {
+                merged.push(pr);
+              }
+            }
+            const cartTotal = merged.reduce((sum, it) => sum + (it.subtotal || (Number(it.product.price) * it.quantity)), 0);
+            return { cart: merged, cartTotal };
+          });
+
+          for (const pr of persistedRemaining) {
+            try {
+              await customerAPI.addToCart(pr.product.id, pr.quantity || 1);
+            } catch (e) {
+              console.warn('Erro ao reenviar item restante ao backend', e);
+            }
+          }
+        }
+
+        // Buscar backend após reenvio
+        const cartData = await customerAPI.getCart();
+        const backendItems = cartData?.items || [];
+
+        const backendMap = new Map<string, any>();
+        backendItems.forEach((item: any) => backendMap.set(item.product.id, item));
+
+        const merged: any[] = [];
+        for (const localItem of localCart) {
+          const backendItem = backendMap.get(localItem.product.id);
+          if (backendItem) {
+            merged.push({
+              id: backendItem.id,
+              product: backendItem.product,
+              quantity: backendItem.quantity,
+              subtotal: Number(backendItem.product.price) * backendItem.quantity,
+            });
+            backendMap.delete(localItem.product.id);
+          } else {
+            merged.push(localItem);
+          }
+        }
+
+        for (const item of backendMap.values()) {
+          merged.push({
+            id: item.id,
+            product: item.product,
+            quantity: item.quantity,
+            subtotal: Number(item.product.price) * item.quantity,
+          });
+        }
+
+        const cartTotal = merged.reduce((sum, it) => sum + (it.subtotal || (Number(it.product.price) * it.quantity)), 0);
+        useAppStore.setState({ cart: merged, cartTotal });
+
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('checkout-remaining-items');
+        }
+      } catch (err) {
+        console.error('Erro ao mesclar carrinho no payment (pix):', err);
+      }
+    };
+
+    mergeCartFromBackend();
+  }, []);
+
   // ===== Utilitários para gerar BR Code PIX estático com valor dinâmico (fallback) =====
   type EmvFieldId = string;
 

@@ -1113,90 +1113,65 @@ export default function CartPage() {
                 </CardDescription>
               </CardHeader>
               
-              <CardContent className="p-6">
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {/* Mastercard */}
-                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <img 
-                      src="https://down-br.img.susercontent.com/file/95d849253f75d5e6e6b867af4f7c65aa" 
-                      alt="Mastercard" 
-                      className="h-6 w-auto object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-
-                  {/* Visa */}
-                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <img 
-                      src="https://down-br.img.susercontent.com/file/a65c5d1c5e556c6197f8fbd607482372" 
-                      alt="Visa" 
-                      className="h-6 w-auto object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-
-                  {/* American Express */}
-                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <img 
-                      src="https://down-br.img.susercontent.com/file/285e5ab6207eb562a9e893a42ff7ee46 " 
-                      alt="American Express" 
-                      className="h-6 w-auto object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-
-                  {/* Elo */}
-                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <img 
-                      src="https://down-br.img.susercontent.com/file/br-11134258-7r98o-lxsovyseln7jc5" 
-                      alt="Elo" 
-                      className="h-6 w-auto object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-
-                  {/* Boleto */}
-                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <img 
-                      src="https://down-br.img.susercontent.com/file/44734b7fc343eb46237c2d90c6c9ca60" 
-                      alt="Boleto" 
-                      className="h-6 w-auto object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-
-                  {/* Parcelamento */}
-                  <div className="flex items-center justify-center p-3 bg-[#2d5016] rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <span className="text-white font-semibold text-[9px]">PARCELAMENTO</span>
-                  </div>
-
-                  {/* Caixa */}
-                  <div className="flex items-center justify-center p-3 bg-[#0066cc] rounded-lg border border-gray-200 hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <span className="text-white font-bold text-xs">CAIXA</span>
-                  </div>
-
-                  {/* Apple Pay */}
-                  <div className="flex items-center justify-center p-3 bg-white rounded-lg border-2 border-black hover:border-[#3e2626] hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <span className="text-black font-semibold text-xs">Apple Pay</span>
-                  </div>
+              {/* Pagamento Section */}
+            <div className="flex flex-col">
+            
+              <div className="grid grid-cols-3 gap-2.5">
+                {/* VISA - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/a65c5d1c5e556c6197f8fbd607482372" 
+                    alt="Visa" 
+                    className="h-6 w-auto object-contain"
+                  />
                 </div>
                 
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 text-center">
-                    Seus dados estão protegidos e criptografados
-                  </p>
+                {/* Mastercard - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/95d849253f75d5e6e6b867af4f7c65aa" 
+                    alt="Mastercard" 
+                    className="h-6 w-auto object-contain"
+                  />
                 </div>
-              </CardContent>
+                
+                {/* Elo - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/br-11134258-7r98o-lxsovyseln7jc5" 
+                    alt="Elo" 
+                    className="h-6 w-auto object-contain"
+                  />
+                </div>
+                
+                {/* American Express - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/285e5ab6207eb562a9e893a42ff7ee46 " 
+                    alt="American Express" 
+                    className="h-6 w-auto object-contain"
+                  />
+                </div>
+                
+                {/* Boleto - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/44734b7fc343eb46237c2d90c6c9ca60" 
+                    alt="Boleto" 
+                    className="h-6 w-auto object-contain"
+                  />
+                </div>
+                
+                {/* PIX - Substitua a URL abaixo pela sua imagem */}
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center h-12 hover:scale-105 transition-transform">
+                  <img 
+                    src="https://down-br.img.susercontent.com/file/2a2cfeb34b00ef7b3be23ea516dcd1c5" 
+                    alt="PIX" 
+                    className="h-6 w-auto object-contain"
+                  />
+                </div>
+              </div>
+            </div>
             </Card>
           </div>
         </div>

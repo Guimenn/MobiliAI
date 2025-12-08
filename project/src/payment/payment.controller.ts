@@ -318,5 +318,39 @@ export class PaymentController {
 
     return paymentStatus;
   }
+
+  /**
+   * Simula o pagamento de um boleto do Stripe (apenas ambientes não produtivos)
+   */
+  @Post('stripe/simulate-boleto')
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.CASHIER, UserRole.STORE_MANAGER)
+  async simulateBoletoPayment(
+    @Request() req,
+    @Body() data: { saleId: string },
+  ) {
+    if (!data.saleId) {
+      throw new BadRequestException('ID da venda é obrigatório');
+    }
+
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: data.saleId },
+      select: { customerId: true },
+    });
+
+    if (!sale) {
+      throw new BadRequestException('Venda não encontrada');
+    }
+
+    const isEmployeeOrManager = req.user.role === UserRole.ADMIN || 
+                                 req.user.role === UserRole.EMPLOYEE || 
+                                 req.user.role === UserRole.CASHIER || 
+                                 req.user.role === UserRole.STORE_MANAGER;
+    
+    if (!isEmployeeOrManager && sale.customerId !== req.user.id) {
+      throw new ForbiddenException('Venda não pertence ao usuário');
+    }
+
+    return this.paymentService.simulateBoletoPayment(data.saleId);
+  }
 }
 

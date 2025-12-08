@@ -105,14 +105,8 @@ export default function PDVPaymentModal({
         setPaymentStatus(newStatus);
         
         if (newStatus === 'PAID') {
-          try {
-            await salesAPI.update(saleId, {
-              status: 'completed' as any,
-            });
-          } catch (error) {
-            console.error('Erro ao atualizar status da venda:', error);
-          }
-          
+          // Não atualizar manualmente o status - o backend já atualiza automaticamente para PREPARING
+          // A verificação do pagamento já atualiza o status corretamente
           showAlert('success', 'Pagamento PIX confirmado!');
           setTimeout(() => {
             onPaymentSuccess();

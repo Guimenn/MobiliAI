@@ -1161,8 +1161,9 @@ export const customerAPI = {
     return response.data;
   },
 
-  cancelOrder: async (orderId: string) => {
-    const response = await api.put(`/customer/orders/${orderId}/cancel`);
+  cancelOrder: async (orderId: string, reason?: string) => {
+    const body = reason ? { reason } : {};
+    const response = await api.put(`/customer/orders/${orderId}/cancel`, body);
     return response.data;
   },
 
@@ -1201,6 +1202,7 @@ export const customerAPI = {
     discount?: number;
     couponCode?: string;
     notes?: string;
+    productIds?: string[]; // Produtos selecionados
   }) => {
     const response = await api.post('/customer/cart/checkout', checkoutData);
     return response.data;
@@ -1280,6 +1282,11 @@ export const customerAPI = {
 
   checkStripePaymentStatus: async (paymentIntentId: string) => {
     const response = await api.get(`/payment/stripe/status/${paymentIntentId}`);
+    return response.data;
+  },
+
+  simulateBoletoPayment: async (saleId: string) => {
+    const response = await api.post('/payment/stripe/simulate-boleto', { saleId });
     return response.data;
   },
 
@@ -1649,6 +1656,11 @@ export const paymentAPI = {
 
   checkStripePaymentStatus: async (paymentIntentId: string) => {
     const response = await api.get(`/payment/stripe/status/${paymentIntentId}`);
+    return response.data;
+  },
+
+  simulateBoletoPayment: async (saleId: string) => {
+    const response = await api.post('/payment/stripe/simulate-boleto', { saleId });
     return response.data;
   },
 };

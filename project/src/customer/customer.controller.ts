@@ -178,6 +178,8 @@ export class CustomerController {
       discount?: number;
       couponCode?: string;
       notes?: string;
+      frontendSubtotal?: number; // Subtotal calculado no frontend
+      productIds?: string[]; // IDs dos produtos selecionados no checkout
     }
   ) {
     try {
@@ -200,6 +202,8 @@ export class CustomerController {
           discount: data.discount || 0,
           couponCode: data.couponCode,
           notes: data.notes,
+          frontendSubtotal: data.frontendSubtotal, // Passar subtotal do frontend
+          productIds: data.productIds, // Passar produtos selecionados
         }
       );
     } catch (error: any) {

@@ -23,17 +23,83 @@ function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   // Aceitar tanto orderId quanto saleId para compatibilidade
   const orderId = searchParams.get('orderId') || searchParams.get('saleId') || 'N/A';
-  const { clearCart } = useAppStore();
+  const { cart: currentCart } = useAppStore();
   const [saleNumber, setSaleNumber] = useState<string>('');
   const [isLoadingSale, setIsLoadingSale] = useState(false);
 
-  // Limpar carrinho ao chegar na página de sucesso
+  // Recarregar carrinho do backend ao chegar na página de sucesso
+  // Isso preserva produtos não selecionados que ainda estão no carrinho
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('checkout-selected-products');
-      clearCart();
+      
+      // Mesclar carrinho do backend com carrinho local
+      // Isso preserva produtos não selecionados que estão apenas no carrinho local
+      const reloadCart = async () => {
+        try {
+          const { useAppStore } = await import('@/lib/store');
+          const store = useAppStore.getState();
+          const localCart = store.cart || [];
+          
+          // Buscar carrinho do backend (pode estar vazio ou ter apenas produtos não selecionados)
+          const cartData = await customerAPI.getCart();
+          const backendItems = cartData?.items || [];
+          
+          // Criar um mapa dos produtos do backend
+          const backendProductMap = new Map();
+          backendItems.forEach((item: any) => {
+            backendProductMap.set(item.product.id, item);
+          });
+          
+          // Mesclar: usar produtos do backend quando disponíveis, senão usar do local
+          // Isso preserva produtos não selecionados que estão apenas no local
+          const mergedCartItems = localCart.map((localItem: any) => {
+            const backendItem = backendProductMap.get(localItem.product.id);
+            
+            if (backendItem) {
+              // Produto existe no backend, usar dados do backend
+              return {
+                id: backendItem.id,
+                product: {
+                  ...backendItem.product,
+                  // Preservar dados locais se disponíveis
+                  ...(localItem?.product || {})
+                },
+                quantity: backendItem.quantity,
+                subtotal: Number(backendItem.product.price) * backendItem.quantity
+              };
+            } else {
+              // Produto não está no backend (produto não selecionado), usar do local
+              return localItem;
+            }
+          });
+          
+          // Adicionar produtos do backend que não estão no local (caso raro)
+          backendItems.forEach((backendItem: any) => {
+            const existsInLocal = localCart.some((localItem: any) => 
+              localItem.product.id === backendItem.product.id
+            );
+            if (!existsInLocal) {
+              mergedCartItems.push({
+                id: backendItem.id,
+                product: backendItem.product,
+                quantity: backendItem.quantity,
+                subtotal: Number(backendItem.product.price) * backendItem.quantity
+              });
+            }
+          });
+          
+          const cartTotal = mergedCartItems.reduce((sum: number, item: any) => sum + item.subtotal, 0);
+          useAppStore.setState({ cart: mergedCartItems, cartTotal });
+        } catch (error) {
+          console.error('Erro ao recarregar carrinho:', error);
+          // Se falhar, apenas limpar o sessionStorage
+        }
+      };
+      
+      reloadCart();
     }
-  }, [clearCart]);
+  }, []);
 
   // Se não tiver orderId/saleId, tentar buscar do sessionStorage
   React.useEffect(() => {

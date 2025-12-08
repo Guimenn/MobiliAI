@@ -729,7 +729,7 @@ export default function CheckoutPage() {
   const insuranceCost = shippingInsurance && selectedShipping !== 'pickup' 
     ? Math.round((subtotal * 0.02) * 100) / 100 
     : 0;
-  const tax = subtotal * 0.1; // 10% de impostos estimados
+  const tax = Math.round((subtotal * 0.1) * 100) / 100; // 10% de impostos estimados (arredondado para 2 casas decimais)
   
   // Calcular desconto: se for cupom de frete, aplicar apenas ao frete
   const isShippingCoupon = appliedCoupon?.couponType === 'SHIPPING';
@@ -2647,11 +2647,15 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
+      // IMPORTANTE: Sincronizar TODOS os produtos do carrinho com o backend
+      // para que os não selecionados permaneçam lá e não sejam perdidos
+      // quando o backend remover apenas os itens do pedido
+      
       // Verificar carrinho do backend antes de sincronizar
       const backendCartBefore = await customerAPI.getCart();
       const backendProductIds = new Set((backendCartBefore?.items || []).map((item: any) => item.product?.id).filter(Boolean));
       
-      // Adicionar apenas produtos que ainda não estão no carrinho do backend ou atualizar quantidades
+      // 1) Sincronizar produtos SELECIONADOS com o backend
       for (const item of checkoutItems) {
         try {
           const existingBackendItem = (backendCartBefore?.items || []).find(
@@ -2673,6 +2677,21 @@ export default function CheckoutPage() {
         }
       }
 
+      // 2) Garantir que produtos NÃO selecionados também existam no backend
+      const selectedProductIds = new Set(checkoutItems.map(item => item.product.id));
+      for (const item of cart) {
+        // Se não está selecionado e não está no backend, adiciona
+        if (!selectedProductIds.has(item.product.id) && !backendProductIds.has(item.product.id)) {
+          try {
+            await customerAPI.addToCart(item.product.id, item.quantity);
+            console.log(`✅ Produto não selecionado ${item.product.id} sincronizado com o backend`);
+          } catch (error: any) {
+            console.error(`Erro ao sincronizar produto não selecionado ${item.product.id}:`, error.message);
+            // Continuar mesmo se houver erro
+          }
+        }
+      }
+
       // Verificar se o carrinho no backend tem itens após sincronização
       const backendCart = await customerAPI.getCart();
       if (!backendCart || !backendCart.items || backendCart.items.length === 0) {
@@ -2682,37 +2701,13 @@ export default function CheckoutPage() {
         return;
       }
       
-      // IMPORTANTE: Remover do carrinho do backend os produtos que NÃO foram selecionados
-      // Criar um Set com os IDs dos produtos selecionados para verificação rápida
-      const selectedProductIds = new Set(checkoutItems.map(item => item.product.id));
-      
-      // Remover produtos não selecionados do carrinho do backend
-      for (const backendItem of backendCart.items) {
-        const productId = backendItem.product?.id;
-        if (productId && !selectedProductIds.has(productId)) {
-          try {
-            // Remover produto não selecionado do carrinho do backend
-            await customerAPI.removeFromCart(backendItem.id);
-            console.log(`Produto ${productId} removido do carrinho do backend (não selecionado)`);
-          } catch (error: any) {
-            console.error(`Erro ao remover produto ${productId} do carrinho do backend:`, error.message);
-            // Continuar mesmo se houver erro ao remover um produto
-          }
-        }
-      }
-      
-      // Buscar carrinho atualizado após remover produtos não selecionados
-      const backendCartAfterCleanup = await customerAPI.getCart();
-      if (!backendCartAfterCleanup || !backendCartAfterCleanup.items || backendCartAfterCleanup.items.length === 0) {
-        showAlert('error', 'Não foi possível sincronizar seu carrinho com o servidor. Por favor, adicione os produtos novamente.');
-        setIsProcessing(false);
-        router.push('/cart');
-        return;
-      }
+      // IMPORTANTE: NÃO remover produtos não selecionados do carrinho antes do checkout
+      // O backend agora remove apenas os produtos incluídos no pedido após o checkout bem-sucedido
+      // Isso preserva os produtos não selecionados no carrinho caso o checkout falhe ou seja cancelado
       
       // Verificar duplicação de produtos no carrinho do backend
       const productIdCounts: { [key: string]: number } = {};
-      backendCartAfterCleanup.items.forEach((item: any) => {
+      backendCart.items.forEach((item: any) => {
         const productId = item.product?.id;
         if (productId) {
           productIdCounts[productId] = (productIdCounts[productId] || 0) + 1;
@@ -2723,6 +2718,9 @@ export default function CheckoutPage() {
       if (duplicatedProducts.length > 0) {
         showAlert('warning', 'Foram encontrados produtos duplicados no carrinho. Limpando duplicatas...');
       }
+      
+      // Usar backendCart diretamente (sem remover produtos não selecionados)
+      const backendCartAfterCleanup = backendCart;
 
       // Determinar loja (retirada na loja usa a loja selecionada, entrega usa a loja dos produtos)
       const firstProduct = checkoutItems[0]?.product;
@@ -2773,6 +2771,20 @@ export default function CheckoutPage() {
         notes += `Cupom aplicado: ${appliedCoupon.code}.`;
       }
       
+      // Log antes de enviar para o backend
+      console.log('[Checkout Frontend] Valores sendo enviados:', {
+        subtotal,
+        shippingCost,
+        finalShippingCost,
+        insuranceCost,
+        tax,
+        productDiscount,
+        shippingDiscount,
+        totalCalculado: total,
+        couponCode: appliedCoupon?.code,
+        isShippingCoupon,
+      });
+      
       // Criar a venda no backend (usuário já está autenticado neste ponto)
       const saleResponse = await customerAPI.checkout({
         storeId,
@@ -2795,6 +2807,30 @@ export default function CheckoutPage() {
         discount: productDiscount,
         couponCode: appliedCoupon?.code,
         notes: notes,
+        frontendSubtotal: subtotal, // Passar subtotal do frontend para garantir consistência
+        productIds: checkoutItems.map(item => item.product.id), // Produtos selecionados
+      });
+      
+      // Atualizar o store local para refletir o estado do backend (remover itens selecionados, manter não selecionados)
+      // e persistir os não selecionados em sessionStorage para reidratar na página de pagamento caso o backend retorne vazio
+      const selectedIdsSet = new Set(checkoutItems.map(item => item.product.id));
+      useAppStore.setState((state) => {
+        const remaining = state.cart.filter(ci => !selectedIdsSet.has(ci.product.id));
+        const cartTotal = remaining.reduce((sum, ci) => sum + ci.subtotal, 0);
+
+        // Persistir itens restantes para reidratar no pagamento
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('checkout-remaining-items', JSON.stringify(remaining));
+        }
+        return { cart: remaining, cartTotal };
+      });
+
+      // Log após receber resposta do backend
+      console.log('[Checkout Frontend] Resposta do backend:', {
+        saleId: saleResponse.id,
+        totalAmount: saleResponse.totalAmount,
+        totalEsperado: total,
+        diferenca: Number(saleResponse.totalAmount) - total,
       });
 
       // Salvar ID da venda no sessionStorage para a página de pagamento
@@ -2811,6 +2847,7 @@ export default function CheckoutPage() {
       
       // Usar window.location.replace para redirecionar imediatamente sem histórico
       // Isso impede que o usuário volte e veja o carrinho vazio
+      // Atualizar localmente removendo apenas os selecionados e navegando depois
       window.location.replace(paymentUrl);
     } catch (error: any) {
       console.error('Erro ao finalizar pedido:', error);

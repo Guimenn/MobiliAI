@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
-import { customerAPI } from '@/lib/api';
+import { customerAPI, paymentAPI } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -173,9 +173,10 @@ export default function OrderDetailsPage() {
     }
   }, [isAuthenticated, user, token, orderId]);
 
-  // Verificar status do pedido periodicamente se estiver PENDING (para detectar quando pagamento é confirmado)
+  // Verificar status do pedido periodicamente se estiver PENDING ou COMPLETED (para detectar quando pagamento é confirmado)
   useEffect(() => {
-    if (!order || order.status !== 'PENDING' || !orderId || !token) {
+    // Verificar se o pedido está PENDING (aguardando pagamento) ou COMPLETED (pode precisar atualizar para PREPARING)
+    if (!order || (order.status !== 'PENDING' && order.status !== 'COMPLETED') || !orderId || !token) {
       return;
     }
 
@@ -191,6 +192,21 @@ export default function OrderDetailsPage() {
             console.log(`[Order Status Check] Verificando pagamento PIX para pedido ${orderId}...`);
             const paymentStatus = await customerAPI.checkPixPaymentStatus(orderId);
             console.log(`[Order Status Check] Status do pagamento PIX:`, paymentStatus);
+          } else if (order.paymentMethod === 'CREDIT_CARD' && order.paymentReference) {
+            // Verificar status do pagamento Stripe se houver paymentReference
+            console.log(`[Order Status Check] Verificando pagamento Stripe para pedido ${orderId}...`);
+            try {
+              const stripeStatus = await paymentAPI.checkStripePaymentStatus(order.paymentReference);
+              console.log(`[Order Status Check] Status do pagamento Stripe:`, stripeStatus);
+              
+              // Se o pagamento foi confirmado, confirmar no backend para atualizar o status
+              if (stripeStatus.status === 'succeeded') {
+                console.log(`[Order Status Check] Pagamento Stripe confirmado, confirmando no backend...`);
+                await paymentAPI.confirmStripePayment(order.paymentReference);
+              }
+            } catch (stripeError: any) {
+              console.warn('[Order Status Check] Erro ao verificar status do pagamento Stripe:', stripeError?.response?.data || stripeError?.message);
+            }
           }
         } catch (paymentError: any) {
           // Ignorar erros de verificação de pagamento (pode não ter paymentReference ainda)
@@ -201,8 +217,8 @@ export default function OrderDetailsPage() {
         const updatedOrder = await customerAPI.getOrderById(orderId);
         console.log(`[Order Status Check] Status atual do pedido: ${updatedOrder.status} (anterior: ${order.status})`);
         
-        // Se o status mudou de PENDING para outro, atualizar o pedido
-        if (updatedOrder.status !== 'PENDING' && updatedOrder.status !== order.status) {
+        // Se o status mudou, atualizar o pedido
+        if (updatedOrder.status !== order.status) {
           console.log(`[Order Status Check] ✅ Status do pedido atualizado: ${order.status} -> ${updatedOrder.status}`);
           setOrder(updatedOrder);
           
@@ -212,6 +228,8 @@ export default function OrderDetailsPage() {
           }
         } else if (updatedOrder.status === 'PENDING') {
           console.log(`[Order Status Check] Pedido ainda está PENDING, aguardando pagamento...`);
+        } else if (updatedOrder.status === 'COMPLETED') {
+          console.log(`[Order Status Check] Pedido está COMPLETED, verificando se precisa atualizar para PREPARING...`);
         }
       } catch (error: any) {
         console.error('[Order Status Check] Erro ao verificar status do pedido:', error?.response?.data || error?.message);
@@ -256,11 +274,22 @@ export default function OrderDetailsPage() {
     
     setIsLoading(true);
     try {
-      // Se o pedido está PENDING, verificar o status do pagamento primeiro
-      if (checkPaymentStatus && order?.status === 'PENDING') {
+      // Se o pedido está PENDING ou COMPLETED, verificar o status do pagamento primeiro
+      if (checkPaymentStatus && (order?.status === 'PENDING' || order?.status === 'COMPLETED')) {
         try {
           if (order.paymentMethod === 'PIX' || !order.paymentMethod) {
             await customerAPI.checkPixPaymentStatus(orderId);
+          } else if (order.paymentMethod === 'CREDIT_CARD' && order.paymentReference) {
+            // Verificar status do pagamento Stripe se houver paymentReference
+            try {
+              const stripeStatus = await paymentAPI.checkStripePaymentStatus(order.paymentReference);
+              // Se o pagamento foi confirmado, confirmar no backend para atualizar o status
+              if (stripeStatus.status === 'succeeded') {
+                await paymentAPI.confirmStripePayment(order.paymentReference);
+              }
+            } catch (stripeError) {
+              console.warn('Erro ao verificar status do pagamento Stripe:', stripeError);
+            }
           }
         } catch (paymentError) {
           console.warn('Erro ao verificar status do pagamento:', paymentError);

@@ -733,6 +733,7 @@ enum PaymentMethod {
   DEBIT_CARD
   CASH
   PENDING
+  BOLETO
 }
 
 enum MessageRole {

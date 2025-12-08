@@ -441,6 +441,7 @@ export class PaymentService {
         id: true,
         status: true,
         paymentReference: true,
+        paymentMethod: true,
         customerId: true,
         saleNumber: true,
       },
@@ -451,7 +452,21 @@ export class PaymentService {
       throw new BadRequestException('Venda não encontrada');
     }
 
-    console.log(`[Payment Service] Venda ${saleId} encontrada. Status atual: ${sale.status}, paymentReference: ${sale.paymentReference || 'N/A'}`);
+    console.log(`[Payment Service] Venda ${saleId} encontrada. Status atual: ${sale.status}, paymentMethod: ${sale.paymentMethod || 'N/A'}, paymentReference: ${sale.paymentReference || 'N/A'}`);
+
+    // Buscar informações completas da venda para verificar se é pedido online
+    const fullSale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      select: { isOnlineOrder: true },
+    });
+
+    const isOnlineOrder = fullSale?.isOnlineOrder || false;
+    const saleStatusUpper = String(sale.status || '').toUpperCase();
+
+    // Se for pedido online e estiver COMPLETED, isso é um erro - deve ser corrigido para PREPARING
+    if (isOnlineOrder && saleStatusUpper === 'COMPLETED') {
+      console.log(`[Payment Service] ⚠️ Pedido online ${saleId} está com status COMPLETED (incorreto). Verificando pagamento para corrigir para PREPARING...`);
+    }
 
     if (!sale.paymentReference) {
       console.log(`[Payment Service] Venda ${saleId} não possui paymentReference. Retornando status PENDING.`);
@@ -462,48 +477,108 @@ export class PaymentService {
     }
 
     try {
-      console.log(`[Payment Service] Verificando status do pagamento PIX com reference ${sale.paymentReference}...`);
-      const paymentStatus = await this.checkPixPaymentStatus(sale.paymentReference);
-      console.log(`[Payment Service] Status do pagamento PIX: ${paymentStatus.status} (venda status: ${sale.status})`);
-      
+      let paymentStatus: any;
+      let paymentStatusUpper: string;
+
+      // Verificar o método de pagamento e chamar a função apropriada
+      if (sale.paymentMethod === 'CREDIT_CARD' || sale.paymentMethod === 'DEBIT_CARD') {
+        // Verificar pagamento Stripe
+        console.log(`[Payment Service] Verificando status do pagamento Stripe com reference ${sale.paymentReference}...`);
+        if (!this.stripe) {
+          console.warn(`[Payment Service] Stripe não configurado. Não é possível verificar pagamento Stripe.`);
+          return {
+            status: 'PENDING',
+            saleStatus: sale.status,
+          };
+        }
+
+        try {
+          const stripeStatus = await this.checkStripePaymentStatus(sale.paymentReference);
+          paymentStatus = {
+            status: stripeStatus.status === 'succeeded' ? 'PAID' : 'PENDING',
+            amount: stripeStatus.amount,
+          };
+          paymentStatusUpper = String(paymentStatus.status || '').toUpperCase();
+          console.log(`[Payment Service] Status do pagamento Stripe: ${paymentStatus.status} (venda status: ${sale.status})`);
+
+          // Se o pagamento foi confirmado, confirmar no backend para atualizar o status
+          if (stripeStatus.status === 'succeeded') {
+            await this.confirmStripePayment(sale.paymentReference);
+            // Após confirmar, buscar o status atualizado da venda
+            const updatedSale = await this.prisma.sale.findUnique({
+              where: { id: saleId },
+              select: { status: true },
+            });
+            return {
+              status: 'PAID',
+              saleStatus: updatedSale?.status || sale.status,
+              amount: paymentStatus.amount,
+            };
+          }
+        } catch (stripeError: any) {
+          console.error(`[Payment Service] Erro ao verificar pagamento Stripe:`, stripeError);
+          // Se for erro de pagamento não encontrado, retornar PENDING
+          return {
+            status: 'PENDING',
+            saleStatus: sale.status,
+          };
+        }
+      } else {
+        // Verificar pagamento PIX
+        console.log(`[Payment Service] Verificando status do pagamento PIX com reference ${sale.paymentReference}...`);
+        paymentStatus = await this.checkPixPaymentStatus(sale.paymentReference);
+        paymentStatusUpper = String(paymentStatus.status || '').toUpperCase();
+        console.log(`[Payment Service] Status do pagamento PIX: ${paymentStatus.status} (venda status: ${sale.status})`);
+      }
+
       let finalSaleStatus = sale.status;
 
+      // Status finais que não devem ser alterados mesmo com pagamento confirmado
+      const finalStatuses = ['DELIVERED', 'CANCELLED', 'REFUNDED'];
+      // Status que já indicam que o pedido está sendo processado ou foi processado
+      // Para pedidos online, COMPLETED não deve existir - sempre deve ser PREPARING após pagamento
+      const processingStatuses = ['PREPARING', 'SHIPPED', 'DELIVERED'];
+
       // Se o pagamento foi confirmado, atualizar o status da venda para PREPARING
-      // Verificar se o status do pagamento é 'PAID' (case-insensitive)
-      const paymentStatusUpper = String(paymentStatus.status || '').toUpperCase();
-      const saleStatusUpper = String(sale.status || '').toUpperCase();
-      
-      if (paymentStatusUpper === 'PAID' && saleStatusUpper === 'PENDING') {
-        console.log(`[Payment Service] ✅ Pagamento PIX confirmado para venda ${saleId}. Atualizando status de PENDING para PREPARING.`);
+      if (paymentStatusUpper === 'PAID') {
+        // Para pedidos online, COMPLETED não deve existir - sempre atualizar para PREPARING quando pagamento confirmado
+        // Se o pagamento foi confirmado e o pedido não está em status final ou já processado
+        // Se estiver COMPLETED (erro) ou PENDING, atualizar para PREPARING
+        const shouldUpdate = !finalStatuses.includes(saleStatusUpper) && 
+          (!processingStatuses.includes(saleStatusUpper) || saleStatusUpper === 'COMPLETED' || (isOnlineOrder && saleStatusUpper === 'PENDING'));
         
-        const updatedSale = await this.prisma.sale.update({
-          where: { id: saleId },
-          data: {
-            status: 'PREPARING' as any,
-          },
-        });
-        finalSaleStatus = 'PREPARING';
+        if (shouldUpdate) {
+          console.log(`[Payment Service] ✅ Pagamento confirmado para venda ${saleId}. Atualizando status de ${sale.status} para PREPARING.`);
+          
+          const updatedSale = await this.prisma.sale.update({
+            where: { id: saleId },
+            data: {
+              status: 'PREPARING' as any,
+            },
+          });
+          finalSaleStatus = 'PREPARING';
 
-        console.log(`[Payment Service] ✅ Status da venda ${saleId} atualizado para PREPARING com sucesso. Novo status no banco: ${updatedSale.status}`);
+          console.log(`[Payment Service] ✅ Status da venda ${saleId} atualizado para PREPARING com sucesso. Novo status no banco: ${updatedSale.status}`);
 
-        // Enviar notificação ao cliente sobre o status PREPARING
-        if (sale.customerId) {
-          try {
-            await this.notificationsService.notifyOrderPreparing(
-              sale.customerId,
-              saleId,
-              sale.saleNumber,
-            );
-            console.log(`[Payment Service] ✅ Notificação de preparação enviada para cliente ${sale.customerId}.`);
-          } catch (notifError) {
-            console.error('[Payment Service] Erro ao enviar notificação de preparação:', notifError);
+          // Enviar notificação ao cliente sobre o status PREPARING
+          if (sale.customerId) {
+            try {
+              await this.notificationsService.notifyOrderPreparing(
+                sale.customerId,
+                saleId,
+                sale.saleNumber,
+              );
+              console.log(`[Payment Service] ✅ Notificação de preparação enviada para cliente ${sale.customerId}.`);
+            } catch (notifError) {
+              console.error('[Payment Service] Erro ao enviar notificação de preparação:', notifError);
+            }
           }
+        } else {
+          console.log(`[Payment Service] ⚠️ Pagamento confirmado para venda ${saleId}, mas status já é ${sale.status} (final ou processado). Não atualizando.`);
+          finalSaleStatus = sale.status;
         }
-      } else if (paymentStatusUpper === 'PAID' && saleStatusUpper !== 'PENDING') {
-        console.log(`[Payment Service] ⚠️ Pagamento PIX confirmado para venda ${saleId}, mas status já é ${sale.status}. Não atualizando.`);
-        finalSaleStatus = sale.status;
       } else if (paymentStatusUpper !== 'PAID') {
-        console.log(`[Payment Service] Pagamento PIX ainda não foi confirmado. Status: ${paymentStatus.status}`);
+        console.log(`[Payment Service] Pagamento ainda não foi confirmado. Status: ${paymentStatus.status}`);
       }
 
       return {
@@ -545,6 +620,8 @@ export class PaymentService {
       select: {
         paymentReference: true,
         status: true,
+        customerId: true,
+        saleNumber: true,
       },
     });
 
@@ -568,6 +645,47 @@ export class PaymentService {
 
       const paymentData = response.data?.data || response.data;
       const paymentStatus = paymentData?.status?.toUpperCase?.() || 'PAID';
+
+      // Se o pagamento foi simulado com sucesso, atualizar o status do pedido para PREPARING
+      if (paymentStatus === 'PAID') {
+        // Status finais que não devem ser alterados mesmo com pagamento confirmado
+        const finalStatuses = ['DELIVERED', 'CANCELLED', 'REFUNDED'];
+        // Status que já indicam que o pedido está sendo processado ou foi processado
+        // COMPLETED não deve impedir a atualização - se o pagamento foi confirmado, deve ir para PREPARING
+        const processingStatuses = ['PREPARING', 'SHIPPED', 'DELIVERED'];
+        const currentStatusUpper = String(sale.status || '').toUpperCase();
+        
+        // Se o pedido não está em status final ou já processado, atualizar para PREPARING
+        // Se estiver COMPLETED mas o pagamento foi confirmado, atualizar para PREPARING
+        if (!finalStatuses.includes(currentStatusUpper) && (!processingStatuses.includes(currentStatusUpper) || currentStatusUpper === 'COMPLETED')) {
+          console.log(`[Payment Service] ✅ Pagamento PIX simulado confirmado para venda ${saleId}. Atualizando status de ${sale.status} para PREPARING.`);
+          
+          await this.prisma.sale.update({
+            where: { id: saleId },
+            data: {
+              status: 'PREPARING' as any,
+            },
+          });
+
+          console.log(`[Payment Service] ✅ Status da venda ${saleId} atualizado para PREPARING após simulação.`);
+
+          // Enviar notificação ao cliente sobre o status PREPARING
+          if (sale.customerId) {
+            try {
+              await this.notificationsService.notifyOrderPreparing(
+                sale.customerId,
+                saleId,
+                sale.saleNumber,
+              );
+              console.log(`[Payment Service] ✅ Notificação de preparação enviada para cliente ${sale.customerId}.`);
+            } catch (notifError) {
+              console.error('[Payment Service] Erro ao enviar notificação de preparação:', notifError);
+            }
+          }
+        } else {
+          console.log(`[Payment Service] ⚠️ Pagamento PIX simulado confirmado para venda ${saleId}, mas status já é ${sale.status} (final ou processado). Não atualizando.`);
+        }
+      }
 
       return {
         status: paymentStatus,
@@ -716,10 +834,17 @@ export class PaymentService {
 
       // Verificar status do pagamento
       if (paymentIntent.status === 'succeeded') {
-        // Verificar se o pagamento realmente foi processado
-        // Só atualizar se a venda ainda estiver em PENDING
-        if (currentSale.status === 'PENDING') {
-          console.log(`[Payment Service] Pagamento Stripe confirmado para venda ${saleId}. Atualizando status de PENDING para PREPARING.`);
+        // Status finais que não devem ser alterados mesmo com pagamento confirmado
+        const finalStatuses = ['DELIVERED', 'CANCELLED', 'REFUNDED'];
+        // Status que já indicam que o pedido está sendo processado ou foi processado
+        // COMPLETED não deve impedir a atualização - se o pagamento foi confirmado, deve ir para PREPARING
+        const processingStatuses = ['PREPARING', 'SHIPPED', 'DELIVERED'];
+        const currentStatusUpper = String(currentSale.status || '').toUpperCase();
+        
+        // Se o pagamento foi confirmado e o pedido não está em status final ou já processado
+        // Se estiver COMPLETED mas o pagamento foi confirmado, atualizar para PREPARING
+        if (!finalStatuses.includes(currentStatusUpper) && (!processingStatuses.includes(currentStatusUpper) || currentStatusUpper === 'COMPLETED')) {
+          console.log(`[Payment Service] Pagamento Stripe confirmado para venda ${saleId}. Atualizando status de ${currentSale.status} para PREPARING.`);
           
           // Buscar informações da venda para notificação
           const sale = await this.prisma.sale.findUnique({
@@ -755,13 +880,15 @@ export class PaymentService {
             }
           }
         } else {
-          // Se a venda não está em PENDING, não atualizar o status
-          console.warn(`Tentativa de confirmar pagamento para venda ${saleId} com status ${currentSale.status}`);
+          // Se a venda já está em status final ou processado, não atualizar
+          console.warn(`[Payment Service] Pagamento Stripe confirmado para venda ${saleId}, mas status já é ${currentSale.status} (final ou processado). Não atualizando.`);
+          // Retornar sucesso mesmo assim, pois o pagamento foi confirmado
           return {
-            success: false,
-            status: paymentIntent.status,
+            success: true,
+            status: 'succeeded',
             saleId,
-            message: `Venda já possui status ${currentSale.status}, não foi possível atualizar para PREPARING`,
+            amount: paymentIntent.amount / 100,
+            message: `Pagamento confirmado, mas venda já possui status ${currentSale.status}`,
           };
         }
 
@@ -820,6 +947,137 @@ export class PaymentService {
 
       throw new BadRequestException(
         error.message || 'Erro ao verificar status do pagamento'
+      );
+    }
+  }
+
+  /**
+   * Simula o pagamento de um boleto do Stripe (apenas ambientes não produtivos)
+   * Marca a venda como paga diretamente no banco de dados
+   */
+  async simulateBoletoPayment(saleId: string) {
+    if (this.environment === 'production') {
+      throw new BadRequestException('Simulação de pagamento não permitida em produção.');
+    }
+
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe não configurado.');
+    }
+
+    // Garantir conexão com o banco
+    await this.prisma.ensureConnection();
+
+    // Buscar a venda
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      select: {
+        paymentReference: true,
+        status: true,
+        customerId: true,
+        saleNumber: true,
+        totalAmount: true,
+      },
+    });
+
+    if (!sale) {
+      throw new BadRequestException('Venda não encontrada');
+    }
+
+    if (!sale.paymentReference) {
+      throw new BadRequestException('Venda não possui referência de pagamento Stripe ativa.');
+    }
+
+    try {
+      // Buscar o PaymentIntent
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(sale.paymentReference);
+
+      // Verificar se já está succeeded
+      if (paymentIntent.status === 'succeeded') {
+        return {
+          success: true,
+          status: 'succeeded',
+          saleId,
+          message: 'Pagamento já foi confirmado anteriormente',
+        };
+      }
+
+      // Verificar se é um pagamento de boleto verificando os métodos de pagamento disponíveis
+      // O Stripe permite boleto no PaymentIntent, então vamos assumir que é boleto se não for cartão
+      const isBoleto = paymentIntent.payment_method_types?.includes('boleto') || 
+                       !paymentIntent.payment_method_types?.includes('card');
+
+      if (!isBoleto) {
+        // Verificar se há um payment_method associado
+        if (paymentIntent.payment_method) {
+          try {
+            const pm = await this.stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
+            if (pm.type !== 'boleto') {
+              throw new BadRequestException('Este pagamento não é um boleto.');
+            }
+          } catch (err) {
+            // Se não conseguir recuperar, assumir que é boleto para permitir simulação
+            console.log('Não foi possível verificar tipo de pagamento, assumindo boleto para simulação');
+          }
+        }
+      }
+
+      // Status finais que não devem ser alterados
+      const finalStatuses = ['DELIVERED', 'CANCELLED', 'REFUNDED'];
+      const currentStatusUpper = String(sale.status || '').toUpperCase();
+      
+      if (finalStatuses.includes(currentStatusUpper)) {
+        throw new BadRequestException(`Venda já está em status final: ${sale.status}`);
+      }
+
+      // Buscar informações da venda para notificação
+      const saleForNotification = await this.prisma.sale.findUnique({
+        where: { id: saleId },
+        select: { customerId: true, saleNumber: true },
+      });
+
+      // Atualizar venda para PREPARING após pagamento simulado (com retry)
+      await this.prisma.executeWithRetry(async () => {
+        return await this.prisma.sale.update({
+          where: { id: saleId },
+          data: {
+            status: 'PREPARING',
+            paymentMethod: 'BOLETO',
+            paymentReference: sale.paymentReference,
+          },
+        });
+      });
+
+      console.log(`[Payment Service] Pagamento de boleto simulado para venda ${saleId}. Status atualizado para PREPARING.`);
+
+      // Enviar notificação ao cliente sobre o status PREPARING
+      if (saleForNotification?.customerId) {
+        try {
+          await this.notificationsService.notifyOrderPreparing(
+            saleForNotification.customerId,
+            saleId,
+            saleForNotification.saleNumber,
+          );
+          console.log(`[Payment Service] Notificação de preparação enviada para cliente ${saleForNotification.customerId}.`);
+        } catch (notifError) {
+          console.error('Erro ao enviar notificação de preparação:', notifError);
+        }
+      }
+
+      return {
+        success: true,
+        status: 'succeeded',
+        saleId,
+        message: 'Pagamento de boleto simulado com sucesso',
+      };
+    } catch (error: any) {
+      console.error('Erro ao simular pagamento de boleto:', {
+        message: error.message,
+        code: error.code,
+        saleId,
+      });
+
+      throw new BadRequestException(
+        error.response?.data?.message || error.message || 'Erro ao simular pagamento de boleto'
       );
     }
   }
