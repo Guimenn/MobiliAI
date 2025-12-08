@@ -205,6 +205,103 @@ export default function CheckoutPage() {
     return cart.filter(item => selectedProducts.has(item.product.id));
   }, [cart, selectedProducts]);
 
+  // Agrupar produtos por loja - USAR MESMA LÓGICA DO CARRINHO PARA CONSISTÊNCIA
+  const itemsByStore = useMemo(() => {
+    const grouped: { [storeId: string]: { storeName: string; storeAddress?: string; items: typeof checkoutItems } } = {};
+
+    console.log('[Checkout Debug] Agrupando', checkoutItems.length, 'produtos por loja');
+
+    checkoutItems.forEach(item => {
+      // DEBUG: Verificar dados do produto
+      console.log('[Checkout Debug] Produto analisado:', {
+        id: item.product.id,
+        name: item.product.name,
+        displayStoreId: item.product.displayStoreId,
+        displayStoreName: item.product.displayStoreName,
+        displayStoreAddress: item.product.displayStoreAddress,
+        storeId: item.product.storeId,
+        storeName: item.product.storeName,
+        storeAddress: item.product.storeAddress,
+        hasStoreInventory: !!item.product.storeInventory,
+        storeInventoryLength: item.product.storeInventory?.length
+      });
+
+      // PRIORIDADE: USAR AS INFORMAÇÕES DE DISPLAY DO CARRINHO PARA CONSISTÊNCIA
+      let storeId: string = 'unknown';
+      let storeName: string | undefined;
+      let storeAddress: string | undefined;
+
+      // Primeiro: tentar usar os campos de display definidos no carrinho
+      if (item.product.displayStoreId && item.product.displayStoreId !== 'unknown') {
+        storeId = item.product.displayStoreId;
+        storeName = item.product.displayStoreName;
+        storeAddress = item.product.displayStoreAddress;
+        console.log('[Checkout Debug] Usando loja de display do carrinho:', {
+          storeId,
+          storeName,
+          storeAddress
+        });
+      }
+      // Fallback: usar storeInventory apenas se não houver display definido
+      else if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
+        // Buscar loja com estoque (ou maior estoque) que tenha informações completas
+        const availableStores = item.product.storeInventory
+          .filter((inv: any) => inv.store?.isActive && inv.quantity > 0 && inv.store?.name)
+          .sort((a: any, b: any) => b.quantity - a.quantity);
+
+        if (availableStores.length > 0) {
+          const selectedInventory = availableStores[0];
+          storeId = selectedInventory.storeId;
+          storeName = selectedInventory.store?.name;
+          storeAddress = selectedInventory.store?.address;
+          console.log('[Checkout Debug] Loja selecionada do storeInventory (fallback):', {
+            storeId,
+            storeName,
+            storeAddress,
+            stock: selectedInventory.quantity
+          });
+        } else {
+          console.log('[Checkout Debug] ERRO: Nenhuma loja disponível no storeInventory');
+          // Fallback: usar a primeira loja qualquer
+          const anyStore = item.product.storeInventory.find((inv: any) => inv.store?.name);
+          if (anyStore) {
+            storeId = anyStore.storeId;
+            storeName = anyStore.store?.name;
+            storeAddress = anyStore.store?.address;
+            console.log('[Checkout Debug] Fallback: qualquer loja do storeInventory:', { storeId, storeName, storeAddress });
+          }
+        }
+      } else {
+        console.log('[Checkout Debug] ERRO: Produto não tem storeInventory e não tem display definido!');
+      }
+
+      if (!grouped[storeId]) {
+        grouped[storeId] = {
+          storeName: storeName || `Loja ${storeId.substring(0, 8)}`,
+          storeAddress,
+          items: []
+        };
+      }
+
+      grouped[storeId].items.push(item);
+    });
+
+    console.log('[Checkout Debug] Agrupamento final:', Object.entries(grouped).map(([storeId, data]) => ({
+      storeId,
+      storeName: data.storeName,
+      itemCount: data.items.length
+    })));
+
+    return grouped;
+  }, [checkoutItems]);
+
+  // Verificar se há produtos de diferentes lojas
+  const checkoutStores = useMemo(() => {
+    return Object.keys(itemsByStore);
+  }, [itemsByStore]);
+
+  const hasMultipleStores = checkoutStores.length > 1;
+
   const totalCheckoutQuantity = useMemo(() => {
     return checkoutItems.reduce((sum, it) => sum + (it.quantity || 1), 0);
   }, [checkoutItems]);
@@ -825,7 +922,7 @@ export default function CheckoutPage() {
     console.log(`🏪 Lojas distintas identificadas: ${Array.from(distinctStores).join(', ')}`);
 
     const mode: 'combined' | 'separate' | 'both' =
-      distinctStores.length > 1 ? 'both' : 'separate';
+      distinctStores.size > 1 ? 'both' : 'separate';
 
     const itemsPayload = checkoutItems.map((item) => ({
       productId: item.product.id,
@@ -977,9 +1074,9 @@ export default function CheckoutPage() {
 
         // Se ambos falharam, lançar erro
         if (!quoteStandard && !quoteExpress) {
-          const lastError = quoteStandardResult.status === 'rejected' 
-            ? quoteStandardResult.reason 
-            : quoteExpressResult.reason;
+          const lastError = quoteStandardResult.status === 'rejected'
+            ? quoteStandardResult.reason
+            : (quoteExpressResult.status === 'rejected' ? quoteExpressResult.reason : null);
           throw lastError || new Error('Não foi possível calcular frete para nenhum serviço');
         }
 
@@ -2785,38 +2882,76 @@ export default function CheckoutPage() {
         isShippingCoupon,
       });
       
-      // Criar a venda no backend (usuário já está autenticado neste ponto)
-      const saleResponse = await customerAPI.checkout({
-        storeId,
-        shippingAddress: selectedShipping === 'pickup' 
-          ? (stores.find((s: any) => s.id === selectedStore)?.address || 'Retirada na loja')
-          : `${shippingAddress.address}, ${shippingAddress.number}${shippingAddress.complement ? ` - ${shippingAddress.complement}` : ''}`,
-        shippingCity: selectedShipping === 'pickup'
-          ? (stores.find((s: any) => s.id === selectedStore)?.city || '')
-          : shippingAddress.city,
-        shippingState: selectedShipping === 'pickup'
-          ? (stores.find((s: any) => s.id === selectedStore)?.state || '')
-          : shippingAddress.state,
-        shippingZipCode: selectedShipping === 'pickup'
-          ? (stores.find((s: any) => s.id === selectedStore)?.zipCode || '')
-          : shippingAddress.zipCode,
-        shippingPhone: shippingAddress.phone,
-        shippingCost: shippingCost,
-        insuranceCost: insuranceCost,
-        tax: tax,
-        discount: productDiscount,
-        couponCode: appliedCoupon?.code,
-        notes: notes,
-        frontendSubtotal: subtotal, // Passar subtotal do frontend para garantir consistência
-        productIds: checkoutItems.map(item => item.product.id), // Produtos selecionados
-      });
+      // Criar pedidos separados por loja
+      const saleResponses = [];
+      const createdOrderIds = [];
+
+      for (const [storeId, storeData] of Object.entries(itemsByStore)) {
+        console.log(`[Checkout] Criando pedido para loja ${storeId} (${storeData.storeName}) com ${storeData.items.length} produtos`);
+
+        // Calcular valores específicos desta loja
+        const storeItems = storeData.items;
+        const storeSubtotal = storeItems.reduce((sum, item) => {
+          const currentPrice = getCurrentPrice(item.product);
+          return sum + (currentPrice * item.quantity);
+        }, 0);
+
+        // Para múltiplas lojas, dividir custos proporcionalmente
+        const storeProportion = hasMultipleStores ? (storeSubtotal / subtotal) : 1;
+        const storeShippingCost = hasMultipleStores ? Math.round(shippingCost * storeProportion * 100) / 100 : shippingCost;
+        const storeInsuranceCost = hasMultipleStores ? Math.round(insuranceCost * storeProportion * 100) / 100 : insuranceCost;
+        const storeTax = hasMultipleStores ? Math.round(tax * storeProportion * 100) / 100 : tax;
+        const storeDiscount = hasMultipleStores ? Math.round(productDiscount * storeProportion * 100) / 100 : productDiscount;
+
+
+        console.log('[Checkout Debug] Enviando storeInfo:', {
+          storeId,
+          name: storeData.storeName,
+          address: storeData.storeAddress,
+          itemCount: storeItems.length
+        });
+
+        const saleResponse = await customerAPI.checkout({
+          storeId,
+          shippingAddress: selectedShipping === 'pickup'
+            ? (stores.find((s: any) => s.id === selectedStore)?.address || 'Retirada na loja')
+            : `${shippingAddress.address}, ${shippingAddress.number}${shippingAddress.complement ? ` - ${shippingAddress.complement}` : ''}`,
+          shippingCity: selectedShipping === 'pickup'
+            ? (stores.find((s: any) => s.id === selectedStore)?.city || '')
+            : shippingAddress.city,
+          shippingState: selectedShipping === 'pickup'
+            ? (stores.find((s: any) => s.id === selectedStore)?.state || '')
+            : shippingAddress.state,
+          shippingZipCode: selectedShipping === 'pickup'
+            ? (stores.find((s: any) => s.id === selectedStore)?.zipCode || '')
+            : shippingAddress.zipCode,
+          shippingPhone: shippingAddress.phone,
+          shippingCost: storeShippingCost,
+          insuranceCost: storeInsuranceCost,
+          tax: storeTax,
+          discount: storeDiscount,
+          couponCode: hasMultipleStores ? undefined : appliedCoupon?.code, // Cupom apenas para pedido único
+          notes: hasMultipleStores ? `${notes || ''} (Pedido da loja: ${storeData.storeName})`.trim() : notes,
+          frontendSubtotal: storeSubtotal,
+          productIds: storeItems.map(item => item.product.id),
+          storeInfo: {
+            name: storeData.storeName,
+            address: storeData.storeAddress
+          }
+        });
+
+        saleResponses.push(saleResponse);
+        createdOrderIds.push(saleResponse.id);
+
+        console.log(`[Checkout] Pedido criado para loja ${storeId}: ${saleResponse.id}`);
+      }
       
       // Atualizar o store local para refletir o estado do backend (remover itens selecionados, manter não selecionados)
       // e persistir os não selecionados em sessionStorage para reidratar na página de pagamento caso o backend retorne vazio
       const selectedIdsSet = new Set(checkoutItems.map(item => item.product.id));
       useAppStore.setState((state) => {
         const remaining = state.cart.filter(ci => !selectedIdsSet.has(ci.product.id));
-        const cartTotal = remaining.reduce((sum, ci) => sum + ci.subtotal, 0);
+        const cartTotal = remaining.reduce((sum, ci) => sum + (Number(ci.product.price) * ci.quantity), 0);
 
         // Persistir itens restantes para reidratar no pagamento
         if (typeof window !== 'undefined') {
@@ -2825,30 +2960,43 @@ export default function CheckoutPage() {
         return { cart: remaining, cartTotal };
       });
 
-      // Log após receber resposta do backend
-      console.log('[Checkout Frontend] Resposta do backend:', {
-        saleId: saleResponse.id,
-        totalAmount: saleResponse.totalAmount,
-        totalEsperado: total,
-        diferenca: Number(saleResponse.totalAmount) - total,
-      });
+      // Log após receber respostas do backend
+      console.log('[Checkout Frontend] Pedidos criados:', saleResponses.map((response, index) => ({
+        pedido: index + 1,
+        saleId: response.id,
+        totalAmount: response.totalAmount,
+        loja: Object.keys(itemsByStore)[index]
+      })));
 
-      // Salvar ID da venda no sessionStorage para a página de pagamento
+      // Salvar IDs das vendas no sessionStorage para a página de pagamento
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('last-sale-id', saleResponse.id);
+        sessionStorage.setItem('last-sale-ids', JSON.stringify(createdOrderIds));
+        if (createdOrderIds.length === 1) {
+          // Para compatibilidade com páginas existentes
+          sessionStorage.setItem('last-sale-id', createdOrderIds[0]);
+        }
+      }
+
+      // Mostrar mensagem de sucesso
+      if (saleResponses.length === 1) {
+        showAlert('success', 'Pedido criado com sucesso! Redirecionando para pagamento...');
+      } else {
+        showAlert('success', `${saleResponses.length} pedidos criados com sucesso! Redirecionando para pagamento...`);
       }
 
       // Redirecionar IMEDIATAMENTE sem limpar o carrinho primeiro
       // O carrinho será limpo automaticamente após o checkout no backend
       // Isso evita mostrar a tela de carrinho vazio
-      const paymentUrl = selectedPaymentMethod === 'card' 
-        ? `/payment/card?saleId=${saleResponse.id}`
-        : `/payment/pix?saleId=${saleResponse.id}`;
-      
-      // Usar window.location.replace para redirecionar imediatamente sem histórico
-      // Isso impede que o usuário volte e veja o carrinho vazio
-      // Atualizar localmente removendo apenas os selecionados e navegando depois
-      window.location.replace(paymentUrl);
+      // Para múltiplos pedidos, redirecionar para o primeiro (os outros podem ser pagos separadamente)
+      const firstSaleId = saleResponses[0].id;
+      const paymentUrl = selectedPaymentMethod === 'card'
+        ? `/payment/card?saleId=${firstSaleId}`
+        : `/payment/pix?saleId=${firstSaleId}`;
+
+      // Pequeno delay para mostrar a mensagem de sucesso
+      setTimeout(() => {
+        window.location.replace(paymentUrl);
+      }, 1500);
     } catch (error: any) {
       console.error('Erro ao finalizar pedido:', error);
       console.error('Detalhes do erro:', {
@@ -3336,7 +3484,8 @@ export default function CheckoutPage() {
                                   const quote = shippingQuoteStandard;
                                   // Calcular estimativa se não houver cotação
                                   const estimatedWeight = checkoutItems.reduce((total, item) => {
-                                    return total + ((item.product.weight || 0.5) * item.quantity);
+                                    const weight = item.product.weight ? Number(item.product.weight) : 0.5;
+                                    return total + (weight * item.quantity);
                                   }, 0);
                                   const basePrice = selectedShipping === 'express' ? 20.00 : 10.00;
                                   const weightPrice = estimatedWeight * (selectedShipping === 'express' ? 5.00 : 2.50);
@@ -3744,6 +3893,30 @@ export default function CheckoutPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
+                {/* Aviso sobre múltiplas lojas */}
+                {hasMultipleStores && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-start gap-3">
+                      <Package className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-blue-900 text-sm">Pedidos Separados por Loja</p>
+                        <p className="text-blue-800 text-sm mt-1">
+                          Você selecionou produtos de {checkoutStores.length} lojas diferentes.
+                          Serão criados {checkoutStores.length} pedidos separados, um para cada loja, para garantir o melhor processamento e entrega.
+                        </p>
+                        <div className="mt-3 space-y-1">
+                          {Object.entries(itemsByStore).map(([storeId, storeData]) => (
+                            <div key={storeId} className="text-xs text-blue-700 flex items-center gap-2">
+                              <Store className="h-3 w-3" />
+                              <span>{storeData.storeName}: {storeData.items.length} produto{storeData.items.length !== 1 ? 's' : ''}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Itens */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">

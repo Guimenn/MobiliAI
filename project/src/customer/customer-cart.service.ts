@@ -14,7 +14,16 @@ export class CustomerCartService {
 
   // ==================== CARRINHO DE COMPRAS ====================
 
-  async addToCart(customerId: string, productId: string, quantity: number = 1) {
+  async addToCart(
+    customerId: string,
+    productId: string,
+    quantity: number = 1,
+    displayStoreInfo?: {
+      storeId?: string;
+      storeName?: string;
+      storeAddress?: string;
+    }
+  ) {
     // Verificar se o produto existe e está disponível
     const product = await this.prisma.product.findUnique({
       where: { id: productId }
@@ -43,7 +52,15 @@ export class CustomerCartService {
 
       cartItem = await this.prisma.cartItem.update({
         where: { id: existingCartItem.id },
-        data: { quantity: newQuantity },
+        data: {
+          quantity: newQuantity,
+          // Atualizar informações de display da loja se fornecidas
+          ...(displayStoreInfo && {
+            displayStoreId: displayStoreInfo.storeId,
+            displayStoreName: displayStoreInfo.storeName,
+            displayStoreAddress: displayStoreInfo.storeAddress,
+          })
+        },
         include: {
           product: {
             select: {
@@ -62,7 +79,13 @@ export class CustomerCartService {
         data: {
           customerId,
           productId,
-          quantity
+          quantity,
+          // Incluir informações de display da loja se fornecidas
+          ...(displayStoreInfo && {
+            displayStoreId: displayStoreInfo.storeId,
+            displayStoreName: displayStoreInfo.storeName,
+            displayStoreAddress: displayStoreInfo.storeAddress,
+          })
         },
         include: {
           product: {
@@ -98,7 +121,12 @@ export class CustomerCartService {
   async getCart(customerId: string) {
     const cartItems = await this.prisma.cartItem.findMany({
       where: { customerId },
-      include: {
+      select: {
+        id: true,
+        quantity: true,
+        displayStoreId: true,
+        displayStoreName: true,
+        displayStoreAddress: true,
         product: {
           select: {
             id: true,
@@ -160,9 +188,82 @@ export class CustomerCartService {
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const totalPrice = cartItems.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0);
 
+    // Para itens que não têm informações de display da loja, determinar automaticamente
+    const updatedCartItems = await Promise.all(
+      cartItems.map(async (cartItem) => {
+        // Se já tem informações de display válidas, retornar como está
+        if (cartItem.displayStoreId && cartItem.displayStoreName && cartItem.displayStoreId.trim() !== '' && cartItem.displayStoreName.trim() !== '') {
+          console.log(`🛒 [getCart] Item ${cartItem.product.id} já tem displayStore: ${cartItem.displayStoreName}`);
+          return cartItem;
+        }
+
+        console.log(`🛒 [getCart] Item ${cartItem.product.id} não tem displayStore válido, determinando automaticamente`);
+
+        console.log(`🛒 [getCart] Item ${cartItem.product.id} não tem displayStore, determinando automaticamente`);
+
+        // Determinar loja automaticamente baseada no storeInventory
+        let storeInfo = null;
+
+        if (cartItem.product.storeInventory && Array.isArray(cartItem.product.storeInventory) && cartItem.product.storeInventory.length > 0) {
+          // Filtrar lojas ativas com estoque suficiente
+          const availableStores = cartItem.product.storeInventory
+            .filter((inv: any) => inv.store?.isActive && inv.quantity >= cartItem.quantity && inv.store?.name)
+            .sort((a: any, b: any) => b.quantity - a.quantity); // Priorizar lojas com mais estoque
+
+          if (availableStores.length > 0) {
+            const selectedStore = availableStores[0];
+            storeInfo = {
+              storeId: selectedStore.storeId,
+              storeName: selectedStore.store?.name,
+              storeAddress: selectedStore.store?.address
+            };
+          } else {
+            // Fallback: primeira loja ativa disponível
+            const anyStore = cartItem.product.storeInventory.find((inv: any) => inv.store?.isActive && inv.store?.name);
+            if (anyStore) {
+              storeInfo = {
+                storeId: anyStore.storeId,
+                storeName: anyStore.store?.name,
+                storeAddress: anyStore.store?.address
+              };
+            }
+          }
+        }
+
+        // Se encontrou informações da loja, atualizar o item no banco
+        if (storeInfo) {
+          console.log(`🛒 [getCart] Atualizando item ${cartItem.id} com loja:`, storeInfo);
+
+          await this.prisma.cartItem.update({
+            where: { id: cartItem.id },
+            data: {
+              displayStoreId: storeInfo.storeId,
+              displayStoreName: storeInfo.storeName,
+              displayStoreAddress: storeInfo.storeAddress,
+            }
+          });
+
+          // Retornar item atualizado
+          return {
+            ...cartItem,
+            displayStoreId: storeInfo.storeId,
+            displayStoreName: storeInfo.storeName,
+            displayStoreAddress: storeInfo.storeAddress,
+          };
+        }
+
+        return cartItem;
+      })
+    );
+
+    // Recalcular totais com os itens atualizados
+    const finalCartItems = updatedCartItems;
+    const finalTotalItems = finalCartItems.reduce((sum, item) => sum + item.quantity, 0);
+    const finalTotalPrice = finalCartItems.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0);
+
     // Log para debug - verificar se storeInventory está sendo retornado
-    cartItems.forEach((item) => {
-      console.log(`🛒 Produto ${item.product.id}: storeId=${item.product.storeId}, storeInventory.length=${item.product.storeInventory?.length || 0}`);
+    finalCartItems.forEach((item) => {
+      console.log(`🛒 Produto ${item.product.id}: storeId=${item.product.storeId}, storeInventory.length=${item.product.storeInventory?.length || 0}, displayStoreId=${item.displayStoreId}`);
       if (item.product.storeInventory && item.product.storeInventory.length > 0) {
         item.product.storeInventory.forEach((inv: any) => {
           console.log(`  └─ Loja ${inv.storeId}: estoque=${inv.quantity}, ativa=${inv.store?.isActive}`);
@@ -171,11 +272,11 @@ export class CustomerCartService {
     });
 
     return {
-      items: cartItems,
+      items: finalCartItems,
       summary: {
-        totalItems,
-        totalPrice,
-        itemCount: cartItems.length
+        totalItems: finalTotalItems,
+        totalPrice: finalTotalPrice,
+        itemCount: finalCartItems.length
       }
     };
   }
@@ -370,7 +471,7 @@ export class CustomerCartService {
   // ==================== FINALIZAÇÃO DO CARRINHO ====================
 
   async checkout(
-    customerId: string, 
+    customerId: string,
     storeId: string,
     shippingInfo?: {
       address: string;
@@ -388,8 +489,19 @@ export class CustomerCartService {
       notes?: string;
       frontendSubtotal?: number; // Subtotal calculado no frontend para garantir consistência
       productIds?: string[]; // Produtos selecionados no checkout
+      storeInfo?: { // Informações da loja como exibidas no carrinho
+        name?: string;
+        address?: string;
+      };
     }
   ) {
+    console.log('[Checkout Debug] Iniciando checkout com dados:', {
+      customerId,
+      storeId,
+      storeInfo: additionalCosts?.storeInfo,
+      productIds: additionalCosts?.productIds
+    });
+
     // Garantir conexão com o banco antes de processar checkout
     await this.prisma.ensureConnection();
 
@@ -618,6 +730,7 @@ export class CustomerCartService {
       });
     }
     
+
     // Criar venda com retry para garantir que seja criada mesmo se houver problemas de conexão
     const sale = await this.prisma.executeWithRetry(async () => {
       return await this.prisma.sale.create({
@@ -638,6 +751,9 @@ export class CustomerCartService {
           shippingZipCode: shippingInfo?.zipCode,
           shippingPhone: shippingInfo?.phone,
           notes: additionalCosts?.notes,
+          // Salvar informações da loja como exibidas no carrinho para consistência
+          storeDisplayName: additionalCosts?.storeInfo?.name,
+          storeDisplayAddress: additionalCosts?.storeInfo?.address,
           items: {
             create: itemsToCreate
           }

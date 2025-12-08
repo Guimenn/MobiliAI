@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { adminAPI, salesAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import { 
-  DollarSign, 
+import {
+  DollarSign,
   ShoppingCart,
   Users,
   TrendingUp,
@@ -24,12 +24,17 @@ import {
   Clock,
   Trophy,
   Activity,
-  Filter
+  Filter,
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
 
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
 import { Loader } from '@/components/ui/ai/loader';
+import { jsPDF } from 'jspdf';
+import { autoTable } from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 const COLORS = ['#3e2626', '#6b4e3d', '#8b6f47', '#a67c52', '#c49a6a'];
 
 type ViewType = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -1514,9 +1519,197 @@ export default function ReportsPage() {
     }
   };
 
+  const handleExportPDF = () => {
+    if (!currentReport) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    let yPosition = 20;
+
+    // Título
+    doc.setFontSize(20);
+    doc.text('Relatório de Vendas', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 15;
+
+    // Período
+    doc.setFontSize(12);
+    doc.text(`Período: ${currentReport.period || 'N/A'}`, 20, yPosition);
+    yPosition += 10;
+
+    // Resumo
+    const summary = currentReport.data?.summary || {};
+    doc.setFontSize(14);
+    doc.text('Resumo', 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(10);
+    const summaryData = [
+      ['Receita Total', `R$ ${Number(summary.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Total de Vendas', summary.totalSales || 0],
+      ['Ticket Médio', `R$ ${Number(summary.averageTicket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Produtos Vendidos', summary.totalProducts || 0],
+      ['Clientes Atendidos', summary.totalCustomers || 0]
+    ];
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [['Métrica', 'Valor']],
+      body: summaryData,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [62, 38, 38] },
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 15;
+
+    // Receita por Loja
+    if (currentReport.data?.stores && currentReport.data.stores.length > 0) {
+      if (yPosition > pageHeight - 50) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.text('Receita por Loja', 20, yPosition);
+      yPosition += 10;
+
+      const storeData = currentReport.data.stores.map((store: any) => [
+        store.name || store.storeName || 'Loja sem nome',
+        store.totalSales || 0,
+        `R$ ${Number(store.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        `R$ ${Number(store.averageTicket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Loja', 'Vendas', 'Receita', 'Ticket Médio']],
+        body: storeData,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [62, 38, 38] },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 15;
+    }
+
+    // Top Produtos
+    if (currentReport.data?.topProducts && currentReport.data.topProducts.length > 0) {
+      if (yPosition > pageHeight - 50) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.text('Top Produtos', 20, yPosition);
+      yPosition += 10;
+
+      const productData = currentReport.data.topProducts.slice(0, 10).map((product: any, idx: number) => [
+        idx + 1,
+        product.name || 'Produto sem nome',
+        product.totalSold || 0,
+        `R$ ${Number(product.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Posição', 'Produto', 'Quantidade', 'Receita']],
+        body: productData,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [62, 38, 38] },
+      });
+    }
+
+    // Salvar PDF
+    const fileName = `relatorio-${currentReport.period || new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  };
+
+  const handleExportExcel = () => {
+    if (!currentReport) return;
+
+    const workbook = XLSX.utils.book_new();
+
+    // Resumo
+    const summary = currentReport.data?.summary || {};
+    const summaryData = [
+      ['Métrica', 'Valor'],
+      ['Receita Total', `R$ ${Number(summary.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Total de Vendas', summary.totalSales || 0],
+      ['Ticket Médio', `R$ ${Number(summary.averageTicket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Produtos Vendidos', summary.totalProducts || 0],
+      ['Clientes Atendidos', summary.totalCustomers || 0]
+    ];
+
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumo');
+
+    // Receita por Loja
+    if (currentReport.data?.stores && currentReport.data.stores.length > 0) {
+      const storeData = [
+        ['Loja', 'Vendas', 'Receita', 'Ticket Médio']
+      ];
+
+      currentReport.data.stores.forEach((store: any) => {
+        storeData.push([
+          store.name || store.storeName || 'Loja sem nome',
+          store.totalSales || 0,
+          `R$ ${Number(store.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          `R$ ${Number(store.averageTicket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        ]);
+      });
+
+      const storeSheet = XLSX.utils.aoa_to_sheet(storeData);
+      XLSX.utils.book_append_sheet(workbook, storeSheet, 'Lojas');
+    }
+
+    // Top Produtos
+    if (currentReport.data?.topProducts && currentReport.data.topProducts.length > 0) {
+      const productData = [
+        ['Posição', 'Produto', 'Quantidade', 'Receita']
+      ];
+
+      currentReport.data.topProducts.slice(0, 20).forEach((product: any, idx: number) => {
+        productData.push([
+          idx + 1,
+          product.name || 'Produto sem nome',
+          product.totalSold || 0,
+          `R$ ${Number(product.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        ]);
+      });
+
+      const productSheet = XLSX.utils.aoa_to_sheet(productData);
+      XLSX.utils.book_append_sheet(workbook, productSheet, 'Top Produtos');
+    }
+
+    // Top Vendedores
+    if (currentReport.data?.topEmployees && currentReport.data.topEmployees.length > 0) {
+      const employeeData = [
+        ['Posição', 'Vendedor', 'Vendas', 'Receita']
+      ];
+
+      currentReport.data.topEmployees.slice(0, 20).forEach((emp: any, idx: number) => {
+        employeeData.push([
+          idx + 1,
+          emp.name || emp.employeeName || 'Vendedor sem nome',
+          emp.totalSales || 0,
+          `R$ ${Number(emp.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        ]);
+      });
+
+      const employeeSheet = XLSX.utils.aoa_to_sheet(employeeData);
+      XLSX.utils.book_append_sheet(workbook, employeeSheet, 'Top Vendedores');
+    }
+
+    // Salvar Excel
+    const fileName = `relatorio-${currentReport.period || new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
   const handleDownloadReport = () => {
     if (!currentReport) return;
-    
+
     const dataStr = JSON.stringify(currentReport.data, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
@@ -1597,15 +1790,29 @@ export default function ReportsPage() {
             </div>
             <div className="flex items-center gap-3">
               {currentReport && (
-                <Button 
-                  onClick={handleDownloadReport}
-                  variant="outline"
-                  disabled={isLoading}
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Exportar
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleExportPDF}
+                    variant="outline"
+                    disabled={isLoading}
+                    className="gap-2"
+                    title="Exportar como PDF"
+                  >
+                    <FileText className="h-4 w-4" />
+                    PDF
+                  </Button>
+                  <Button
+                    onClick={handleExportExcel}
+                    variant="outline"
+                    disabled={isLoading}
+                    className="gap-2"
+                    title="Exportar como Excel"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Excel
+                  </Button>
+                
+                </div>
               )}
               <Button 
                 onClick={handleGenerateDailyReport}

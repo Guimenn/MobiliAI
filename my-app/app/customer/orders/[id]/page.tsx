@@ -26,10 +26,12 @@ import {
   RefreshCw,
   Star,
   CreditCard,
-  ArrowRight
+  ArrowRight,
+  Store
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ProductReviewModal from '@/components/ProductReviewModal';
+import OrderCancelModal from '@/components/OrderCancelModal';
 
 const getStatusConfig = (status: string) => {
   const statusUpper = String(status).toUpperCase();
@@ -156,6 +158,7 @@ export default function OrderDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [existingReviews, setExistingReviews] = useState<any[]>([]);
@@ -385,25 +388,19 @@ export default function OrderDetailsPage() {
     return order.items.filter((item: any) => !isProductReviewed(item.productId));
   };
 
-  const handleCancelOrder = async () => {
+  const handleCancelOrder = () => {
     if (!order) return;
-    
-    const confirmed = window.confirm(
-      'Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.'
-    );
-    
-    if (!confirmed) return;
+    setCancelModalOpen(true);
+  };
 
-    setIsCancelling(true);
+  const handleOrderCancelled = async () => {
+    loadOrder(); // Recarregar para atualizar o status
+
+    // Recarregar carrinho se produtos foram adicionados
     try {
-      await customerAPI.cancelOrder(order.id);
-      toast.success('Pedido cancelado com sucesso');
-      loadOrder(); // Recarregar para atualizar o status
-    } catch (error: any) {
-      console.error('Erro ao cancelar pedido:', error);
-      toast.error(error.response?.data?.message || 'Erro ao cancelar pedido. Tente novamente.');
-    } finally {
-      setIsCancelling(false);
+      await useAppStore.getState().loadCart();
+    } catch (error) {
+      console.error('Erro ao recarregar carrinho:', error);
     }
   };
 
@@ -622,9 +619,17 @@ export default function OrderDetailsPage() {
             )}
 
             {/* Itens do Pedido */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl font-bold text-[#3e2626]">Itens do Pedido</CardTitle>
+            <Card className="shadow-xl border-2 border-gray-100">
+              <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                    <Package className="h-5 w-5" />
+                  </div>
+                  Produtos do Pedido
+                </CardTitle>
+                <p className="text-white/80 text-sm mt-2">
+                  Todos os produtos são processados pela loja responsável ({order.store?.name})
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
@@ -748,31 +753,73 @@ export default function OrderDetailsPage() {
 
             {/* Informações da Loja */}
             {order.store && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Informações da Loja</CardTitle>
+              <Card className="border-2 border-[#3e2626]/20">
+                <CardHeader className="bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] text-white">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                      <Store className="h-5 w-5" />
+                    </div>
+                    Loja Responsável pelo Pedido
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <p className="font-semibold text-lg">{order.store.name}</p>
-                    {order.store.address && (
-                      <div className="flex items-start gap-2 text-gray-600">
-                        <MapPin className="h-4 w-4 mt-0.5" />
-                        <span>{order.store.address}</span>
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-r from-[#3e2626] to-[#5a3a3a] rounded-xl flex items-center justify-center shadow-lg">
+                        <Store className="h-6 w-6 text-white" />
                       </div>
-                    )}
-                    {order.store.phone && (
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Phone className="h-4 w-4" />
-                        <span>{order.store.phone}</span>
+                      <div>
+                        <p className="font-bold text-xl text-[#3e2626]">
+                          {order.storeDisplayName || order.store?.name || 'Loja não identificada'}
+                        </p>
+                        <p className="text-sm text-gray-600">Todos os produtos deste pedido vêm desta loja</p>
                       </div>
-                    )}
-                    {order.store.email && (
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Mail className="h-4 w-4" />
-                        <span>{order.store.email}</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                      {order.store.address && (
+                        <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <MapPin className="h-5 w-5 text-blue-600 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-blue-900 text-sm">Endereço</p>
+                            <p className="text-blue-800 text-sm">
+                              {order.storeDisplayAddress || order.store.address}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {order.store.phone && (
+                        <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                          <Phone className="h-5 w-5 text-green-600 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-green-900 text-sm">Telefone</p>
+                            <p className="text-green-800 text-sm">{order.store.phone}</p>
+                          </div>
+                        </div>
+                      )}
+                      {order.store.email && (
+                        <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200 md:col-span-2">
+                          <Mail className="h-5 w-5 text-purple-600 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-purple-900 text-sm">E-mail</p>
+                            <p className="text-purple-800 text-sm">{order.store.email}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                        <div>
+                          <p className="font-semibold text-amber-900 text-sm">Importante</p>
+                          <p className="text-amber-800 text-sm">
+                            Todos os produtos deste pedido são processados e enviados por esta loja.
+                            Em caso de dúvidas, entre em contato diretamente com a loja responsável.
+                          </p>
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -928,7 +975,7 @@ export default function OrderDetailsPage() {
             })()}
 
             {/* Ações */}
-            {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && order.status !== 'COMPLETED' && order.status !== 'PENDING' && (
+            {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && order.status !== 'COMPLETED' && order.status !== 'PENDING' && order.status !== 'SHIPPED' && (
               <Card>
                 <CardContent className="p-6">
                   <Button
@@ -984,6 +1031,14 @@ export default function OrderDetailsPage() {
 
       <Footer />
 
+      {/* Modal de Cancelamento */}
+      <OrderCancelModal
+        isOpen={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        order={order}
+        onOrderCancelled={handleOrderCancelled}
+      />
+
       {/* Modal de Avaliação */}
       {selectedProduct && (
         <ProductReviewModal
@@ -995,6 +1050,16 @@ export default function OrderDetailsPage() {
           product={selectedProduct}
           saleId={orderId}
           onReviewSubmitted={handleReviewSubmitted}
+        />
+      )}
+
+      {/* Modal de Cancelamento */}
+      {order && (
+        <OrderCancelModal
+          isOpen={cancelModalOpen}
+          onClose={() => setCancelModalOpen(false)}
+          order={order}
+          onOrderCancelled={handleOrderCancelled}
         />
       )}
     </div>

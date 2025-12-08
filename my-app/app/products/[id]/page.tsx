@@ -312,8 +312,27 @@ export default function ProductDetailPage() {
   const handleAddToCart = async () => {
     if (product) {
       try {
+        // Determinar qual loja usar para este produto
+        let storeInfo = undefined;
+
+        if (product.storeInventory && Array.isArray(product.storeInventory) && product.storeInventory.length > 0) {
+          // Filtrar lojas ativas com estoque
+          const availableStores = product.storeInventory
+            .filter((inv: any) => inv.store?.isActive && inv.quantity > 0 && inv.store?.name)
+            .sort((a: any, b: any) => b.quantity - a.quantity); // Priorizar lojas com mais estoque
+
+          if (availableStores.length > 0) {
+            const selectedStore = availableStores[0];
+            storeInfo = {
+              storeId: selectedStore.storeId,
+              storeName: selectedStore.store?.name,
+              storeAddress: selectedStore.store?.address
+            };
+          }
+        }
+
         // addToCart do store já gerencia backend automaticamente quando autenticado
-        await addToCart(product, quantity);
+        await addToCart(product, quantity, storeInfo);
         
         // Disparar evento para atualizar notificações imediatamente
         if (isAuthenticated && user?.role?.toUpperCase() === 'CUSTOMER') {
