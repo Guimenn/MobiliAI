@@ -356,7 +356,6 @@ export default function TestAIPage() {
         throw new Error(`Produto ${furniture.name} não possui imagem. Por favor, selecione um produto com imagem.`);
       }
 
-      console.log('🖼️ Carregando imagem do produto:', productImageUrl);
       
       try {
         // Tentar carregar a imagem do produto
@@ -381,7 +380,7 @@ export default function TestAIPage() {
         });
         
             productFiles.push(productFile);
-        console.log('✅ Imagem do produto carregada com sucesso:', productFile.name, productFile.size, 'bytes');
+     
         } catch (err) {
         console.error('❌ Erro ao carregar imagem do produto:', err);
         throw new Error(`Não foi possível carregar a imagem do produto ${furniture.name}. Verifique se a URL da imagem está acessível.`);
@@ -461,10 +460,7 @@ NÃO invente um produto diferente. Use APENAS a imagem do produto que foi enviad
         throw new Error('Erro: Imagem do produto não foi carregada. Por favor, tente novamente.');
       }
 
-      console.log('📤 Enviando para IA:');
-      console.log('  - Ambiente:', environmentFile.name, environmentFile.size, 'bytes');
-      console.log('  - Produto:', productFiles[0].name, productFiles[0].size, 'bytes');
-      console.log('  - Prompt:', prompt.substring(0, 100) + '...');
+ 
 
       // Chamar nossa IA - usar endpoint público para demo
       const apiBaseUrl = env.API_URL.endsWith('/api') ? env.API_URL : `${env.API_URL}/api`;
