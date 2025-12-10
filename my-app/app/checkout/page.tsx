@@ -174,7 +174,7 @@ const geocodeAddress = async (address: string, city: string, state: string, zipC
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { cart, user, isAuthenticated, token, clearCart } = useAppStore();
+  const { cart, user, isAuthenticated, token, clearCart, setUser } = useAppStore();
   
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
@@ -205,74 +205,149 @@ export default function CheckoutPage() {
     return cart.filter(item => selectedProducts.has(item.product.id));
   }, [cart, selectedProducts]);
 
-  // Agrupar produtos por loja - USAR MESMA LÓGICA DO CARRINHO PARA CONSISTÊNCIA
+  // Estado do formulário de endereço
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
+    name: '',
+    phone: '',
+    cpf: '',
+    address: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: '',
+    state: '',
+    zipCode: '',
+  });
+
+  // Agrupar produtos por loja - BASEADO NO ENDEREÇO DE ENTREGA
   const itemsByStore = useMemo(() => {
     const grouped: { [storeId: string]: { storeName: string; storeAddress?: string; items: typeof checkoutItems } } = {};
 
-    console.log('[Checkout Debug] Agrupando', checkoutItems.length, 'produtos por loja');
+    // Só agrupar por loja se tiver endereço de entrega válido E produtos selecionados
+    const hasValidAddress = shippingAddress.city && shippingAddress.state && shippingAddress.zipCode;
+    if (!hasValidAddress || checkoutItems.length === 0) {
+      console.log('[Checkout] Sem endereço válido ou produtos - não agrupando por loja');
+      return grouped;
+    }
+
+    console.log('[Checkout] Agrupando produtos por loja baseado no endereço de entrega');
 
     checkoutItems.forEach(item => {
-      // DEBUG: Verificar dados do produto
-      console.log('[Checkout Debug] Produto analisado:', {
-        id: item.product.id,
-        name: item.product.name,
-        displayStoreId: item.product.displayStoreId,
-        displayStoreName: item.product.displayStoreName,
-        displayStoreAddress: item.product.displayStoreAddress,
-        storeId: item.product.storeId,
-        storeName: item.product.storeName,
-        storeAddress: item.product.storeAddress,
-        hasStoreInventory: !!item.product.storeInventory,
-        storeInventoryLength: item.product.storeInventory?.length
-      });
-
-      // PRIORIDADE: USAR AS INFORMAÇÕES DE DISPLAY DO CARRINHO PARA CONSISTÊNCIA
+      // Usar MESMA LÓGICA GEOGRÁFICA do carrinho, mas baseada no endereço de entrega
       let storeId: string = 'unknown';
       let storeName: string | undefined;
       let storeAddress: string | undefined;
 
-      // Primeiro: tentar usar os campos de display definidos no carrinho
-      if (item.product.displayStoreId && item.product.displayStoreId !== 'unknown') {
-        storeId = item.product.displayStoreId;
-        storeName = item.product.displayStoreName;
-        storeAddress = item.product.displayStoreAddress;
-        console.log('[Checkout Debug] Usando loja de display do carrinho:', {
-          storeId,
-          storeName,
-          storeAddress
-        });
-      }
-      // Fallback: usar storeInventory apenas se não houver display definido
-      else if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
-        // Buscar loja com estoque (ou maior estoque) que tenha informações completas
-        const availableStores = item.product.storeInventory
-          .filter((inv: any) => inv.store?.isActive && inv.quantity > 0 && inv.store?.name)
-          .sort((a: any, b: any) => b.quantity - a.quantity);
+      // Obter endereço do usuário para cálculo de proximidade
+      const userAddress = {
+        city: shippingAddress.city,
+        state: shippingAddress.state,
+        zipCode: shippingAddress.zipCode
+      };
 
-        if (availableStores.length > 0) {
-          const selectedInventory = availableStores[0];
-          storeId = selectedInventory.storeId;
-          storeName = selectedInventory.store?.name;
-          storeAddress = selectedInventory.store?.address;
-          console.log('[Checkout Debug] Loja selecionada do storeInventory (fallback):', {
+      // Função para calcular prioridade de proximidade (mesma do carrinho)
+      const calculateProximityScore = (store: any) => {
+        if (!store) return 999;
+
+        let score = 0;
+
+        // Normalizar strings para comparação (remover acentos, espaços extras, converter para minúsculo)
+        const normalizeString = (str: string) => {
+          if (!str) return '';
+          return str
+            .toLowerCase()
+            .trim()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+            .replace(/\s+/g, ' ') // Normalizar espaços
+            .replace(/^(sao|sto|santa|sant)\s+/i, 'são ') // Corrigir abreviações comuns
+            .replace(/^(sao|sto|santa|sant)$/i, match => {
+              const corrections: { [key: string]: string } = {
+                'sao': 'são',
+                'sto': 'santo',
+                'santa': 'santa',
+                'sant': 'sant'
+              };
+              return corrections[match.toLowerCase()] || match;
+            });
+        };
+
+        const normalizedUserCity = normalizeString(userAddress.city || '');
+        const normalizedUserState = (userAddress.state || '').toUpperCase().trim();
+        const normalizedStoreCity = normalizeString(store.city || '');
+        const normalizedStoreState = (store.state || '').toUpperCase().trim();
+
+        // Prioridade 1: Mesma cidade E mesmo estado
+        if (normalizedStoreCity === normalizedUserCity &&
+            normalizedStoreState === normalizedUserState) {
+          score = 1;
+        }
+        // Prioridade 2: Mesmo estado (diferente cidade)
+        else if (normalizedStoreState === normalizedUserState) {
+          score = 2;
+        }
+        // Prioridade 3: Estados diferentes
+        else {
+          score = 3;
+        }
+
+        return score;
+      };
+
+      // Usar a mesma lógica do carrinho para seleção de loja
+      if (item.product.storeInventory && Array.isArray(item.product.storeInventory) && item.product.storeInventory.length > 0) {
+        // Buscar todas as lojas ativas com estoque
+        const storesWithStock = item.product.storeInventory
+          .filter((inv: any) => inv.store?.isActive && inv.quantity > 0 && inv.store?.name && inv.store?.zipCode)
+          .map(inv => ({
+            inventory: inv,
+            store: inv.store
+          }))
+          .filter(item => item.store); // Remover lojas não encontradas
+
+        if (storesWithStock.length > 0) {
+          // Filtrar e ordenar lojas por proximidade e estoque
+          const storesWithProximity = storesWithStock
+            .map(storeItem => ({
+              ...storeItem,
+              proximityScore: calculateProximityScore(storeItem.store)
+            }))
+            .sort((a, b) => {
+              // Ordenar por proximidade primeiro, depois por estoque
+              if (a.proximityScore !== b.proximityScore) {
+                return a.proximityScore - b.proximityScore;
+              }
+              return b.inventory.quantity - a.inventory.quantity;
+            });
+
+          // Usar a loja mais próxima
+          const selectedStore = storesWithProximity[0];
+          storeId = selectedStore.inventory.storeId;
+          storeName = selectedStore.store?.name;
+          storeAddress = selectedStore.store?.address;
+
+          console.log(`[Checkout] Produto ${item.product.id}: loja selecionada por proximidade:`, {
             storeId,
             storeName,
-            storeAddress,
-            stock: selectedInventory.quantity
+            proximityScore: selectedStore.proximityScore,
+            stock: selectedStore.inventory.quantity
           });
         } else {
-          console.log('[Checkout Debug] ERRO: Nenhuma loja disponível no storeInventory');
-          // Fallback: usar a primeira loja qualquer
-          const anyStore = item.product.storeInventory.find((inv: any) => inv.store?.name);
-          if (anyStore) {
-            storeId = anyStore.storeId;
-            storeName = anyStore.store?.name;
-            storeAddress = anyStore.store?.address;
-            console.log('[Checkout Debug] Fallback: qualquer loja do storeInventory:', { storeId, storeName, storeAddress });
+          // Fallback: se não houver lojas com localização, usar a com maior estoque
+          console.log(`[Checkout] Produto ${item.product.id}: nenhuma loja com localização, usando fallback`);
+          const firstStore = item.product.storeInventory.find((inv: any) => inv.store?.isActive && inv.store?.name);
+          if (firstStore) {
+            storeId = firstStore.storeId;
+            storeName = firstStore.store?.name;
+            storeAddress = firstStore.store?.address;
           }
         }
-      } else {
-        console.log('[Checkout Debug] ERRO: Produto não tem storeInventory e não tem display definido!');
+      }
+      // Fallback para produtos sem storeInventory
+      else if (item.product.storeId && item.product.store?.name) {
+        storeId = item.product.storeId;
+        storeName = item.product.store.name;
+        storeAddress = item.product.store.address;
       }
 
       if (!grouped[storeId]) {
@@ -293,7 +368,7 @@ export default function CheckoutPage() {
     })));
 
     return grouped;
-  }, [checkoutItems]);
+  }, [checkoutItems, shippingAddress]);
 
   // Verificar se há produtos de diferentes lojas
   const checkoutStores = useMemo(() => {
@@ -337,20 +412,6 @@ export default function CheckoutPage() {
   const [isLoadingUserData, setIsLoadingUserData] = useState(true);
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
-  // Estado do formulário de endereço
-  const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
-    name: '',
-    phone: '',
-    cpf: '',
-    address: '',
-    number: '',
-    complement: '',
-    neighborhood: '',
-    city: '',
-    state: '',
-    zipCode: '',
-  });
 
   // Estado temporário para edição no modal
   const [editAddress, setEditAddress] = useState<ShippingAddress>({
@@ -1768,21 +1829,46 @@ export default function CheckoutPage() {
 
       setIsSaving(true);
     try {
-      // Atualizar perfil do usuário
-      await customerAPI.updateProfile({
-        name: editAddress.name,
-        phone: editAddress.phone,
-        cpf: editAddress.cpf,
-        address: `${editAddress.address} ${editAddress.number}${editAddress.complement ? ` - ${editAddress.complement}` : ''}`.trim(),
-        city: editAddress.city,
-        state: editAddress.state,
-        zipCode: editAddress.zipCode,
-      });
+      // Preparar dados para atualização do perfil
+      // Só enviar informações que não existem no perfil atual
+      const profileUpdateData: any = {};
 
-      // Atualizar estado local
+      // Verificar e adicionar apenas informações que estão faltando no perfil
+      if (!user?.name || user.name.trim() === '' || user.name !== editAddress.name) {
+        profileUpdateData.name = editAddress.name;
+      }
+
+      if (!user?.phone || user.phone.trim() === '' || user.phone !== editAddress.phone) {
+        profileUpdateData.phone = editAddress.phone;
+      }
+
+      if (!user?.cpf || user.cpf?.trim() === '' || user.cpf !== editAddress.cpf) {
+        profileUpdateData.cpf = editAddress.cpf;
+      }
+
+      // Sempre atualizar endereço completo (já que pode ter mudado)
+      profileUpdateData.address = `${editAddress.address} ${editAddress.number}${editAddress.complement ? ` - ${editAddress.complement}` : ''}`.trim();
+      profileUpdateData.city = editAddress.city;
+      profileUpdateData.state = editAddress.state;
+      profileUpdateData.zipCode = editAddress.zipCode;
+
+      // Se há dados para atualizar no perfil
+      if (Object.keys(profileUpdateData).length > 0) {
+        console.log('[Checkout] Atualizando perfil com dados do endereço:', profileUpdateData);
+        const updatedUser = await customerAPI.updateProfile(profileUpdateData);
+
+        // Atualizar estado global do usuário se conseguiu atualizar
+        if (updatedUser) {
+          useAppStore.setState((state) => ({
+            user: { ...state.user, ...updatedUser }
+          }));
+        }
+      }
+
+      // Atualizar estado local do checkout
       setShippingAddress({ ...editAddress });
       setIsEditModalOpen(false);
-      showAlert('success', 'Endereço atualizado com sucesso!');
+      showAlert('success', 'Endereço salvo com sucesso!');
     } catch (error: any) {
       console.error('Erro ao salvar endereço:', error);
       showAlert('error', error.response?.data?.message || 'Erro ao salvar endereço');
@@ -3024,9 +3110,54 @@ export default function CheckoutPage() {
   };
 
   // Mudar etapa
-  const handleNextStep = () => {
+  const handleNextStep = async () => {
     if (currentStep === 'address') {
       if (validateAddress()) {
+        // Salvar automaticamente as informações no perfil se não estiverem salvas
+        try {
+          const profileUpdateData: any = {};
+
+          // Verificar e adicionar apenas informações que estão faltando no perfil
+          if (!user?.name || user.name.trim() === '' || user.name !== shippingAddress.name) {
+            profileUpdateData.name = shippingAddress.name;
+          }
+
+          if (!user?.phone || user.phone?.trim() === '' || user.phone !== shippingAddress.phone) {
+            profileUpdateData.phone = shippingAddress.phone;
+          }
+
+          if (!user?.cpf || user.cpf?.trim() === '' || user.cpf !== shippingAddress.cpf) {
+            profileUpdateData.cpf = shippingAddress.cpf;
+          }
+
+          // Sempre atualizar endereço se não existir no perfil
+          if (!user?.address || user.address.trim() === '' ||
+              !user?.city || user.city.trim() === '' ||
+              !user?.state || user.state.trim() === '' ||
+              !user?.zipCode || user.zipCode?.trim() === '') {
+            profileUpdateData.address = `${shippingAddress.address} ${shippingAddress.number}${shippingAddress.complement ? ` - ${shippingAddress.complement}` : ''}`.trim();
+            profileUpdateData.city = shippingAddress.city;
+            profileUpdateData.state = shippingAddress.state;
+            profileUpdateData.zipCode = shippingAddress.zipCode;
+          }
+
+          // Se há dados para atualizar no perfil
+          if (Object.keys(profileUpdateData).length > 0) {
+            console.log('[Checkout] Salvando informações no perfil automaticamente:', profileUpdateData);
+            const updatedUser = await customerAPI.updateProfile(profileUpdateData);
+
+            // Atualizar estado global do usuário
+            if (updatedUser) {
+              useAppStore.setState((state) => ({
+                user: { ...state.user, ...updatedUser }
+              }));
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao salvar informações no perfil:', error);
+          // Não bloquear o avanço, apenas logar o erro
+        }
+
         setCurrentStep('payment');
       }
     } else if (currentStep === 'payment') {

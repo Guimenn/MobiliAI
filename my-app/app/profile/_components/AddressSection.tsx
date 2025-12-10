@@ -38,6 +38,18 @@ interface Address {
   isFromUserProfile?: boolean; // Indica se vem do perfil do usuário
 }
 
+// Função auxiliar para parse do endereço
+const parseAddress = (fullAddress: string) => {
+  const address = fullAddress || '';
+  const parts = address.split(',').map(p => p.trim());
+
+  return {
+    address: parts[0] || '',
+    number: parts[1] || '',
+    complement: parts.slice(2).join(', ') || '',
+  };
+};
+
 export function AddressSection() {
   const { user } = useAppStore();
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -65,12 +77,12 @@ export function AddressSection() {
     loadAddresses();
   }, []);
 
-  // Recarregar endereços quando o usuário mudar
+  // Recarregar endereços quando o usuário mudar (incluindo endereço do perfil)
   useEffect(() => {
     if (user) {
       loadAddresses();
     }
-  }, [user?.address, user?.city, user?.state, user?.zipCode]);
+  }, [user]);
 
   const loadAddresses = async () => {
     try {
@@ -105,8 +117,27 @@ export function AddressSection() {
         console.error("Erro ao carregar endereços de entrega:", error);
       }
       
-      // NÃO exibir endereço do perfil como um endereço separado
-      // O endereço do perfil deve ser editado apenas através do perfil do usuário
+      // Exibir endereço do perfil como um endereço especial (se existir)
+      if (user?.address && user?.city && user?.state && user?.zipCode) {
+        // Parse do endereço do usuário
+        const parsedAddress = parseAddress(user.address);
+        allAddresses.push({
+          id: 'profile-address', // ID especial para identificar
+          name: 'Endereço do Perfil',
+          recipientName: user.name || '',
+          phone: user.phone || '',
+          cpf: user.cpf || undefined,
+          address: parsedAddress.address,
+          number: parsedAddress.number,
+          complement: parsedAddress.complement,
+          neighborhood: '', // Não temos bairro no perfil
+          city: user.city,
+          state: user.state,
+          zipCode: user.zipCode,
+          isDefault: true, // Sempre é o padrão
+          isFromUserProfile: true, // Indica que vem do perfil
+        });
+      }
 
       setAddresses(allAddresses);
     } catch (error) {
@@ -267,59 +298,50 @@ export function AddressSection() {
 
   const handleEdit = (address: Address) => {
     setEditingAddress(address);
-    
+
     // Preencher o formulário com os dados do endereço
-    setFormData({
-      name: address.name || "Endereço Principal",
-      recipientName: address.recipientName || user?.name || "",
-      phone: address.phone || user?.phone || "",
-      cpf: address.cpf || user?.cpf || "",
-      address: address.address,
-      number: address.number,
-      complement: address.complement || "",
-      neighborhood: address.neighborhood || "",
-      city: address.city,
-      state: address.state,
-      zipCode: address.zipCode,
-      isDefault: address.isDefault || false,
-    });
+    if (address.isFromUserProfile) {
+      // Para endereço do perfil, usar dados atuais do usuário
+      setFormData({
+        name: "Endereço do Perfil",
+        recipientName: user?.name || "",
+        phone: user?.phone || "",
+        cpf: user?.cpf || "",
+        address: address.address,
+        number: address.number,
+        complement: address.complement || "",
+        neighborhood: "", // Perfil não tem bairro
+        city: address.city,
+        state: address.state,
+        zipCode: address.zipCode,
+        isDefault: true, // Sempre é padrão
+      });
+    } else {
+      // Para endereços de entrega normais
+      setFormData({
+        name: address.name || "Endereço Principal",
+        recipientName: address.recipientName || user?.name || "",
+        phone: address.phone || user?.phone || "",
+        cpf: address.cpf || user?.cpf || "",
+        address: address.address,
+        number: address.number,
+        complement: address.complement || "",
+        neighborhood: address.neighborhood || "",
+        city: address.city,
+        state: address.state,
+        zipCode: address.zipCode,
+        isDefault: address.isDefault || false,
+      });
+    }
     setIsDialogOpen(true);
   };
 
   const handleDelete = async (id: string, isFromUserProfile?: boolean) => {
-    // Endereços do perfil não podem ser excluídos, apenas limpos
+    // Endereços do perfil não podem ser excluídos, apenas editados
     if (isFromUserProfile) {
-      const confirmed = await showConfirm("Deseja remover o endereço do seu perfil?");
-      if (confirmed) {
-        try {
-          const { user } = useAppStore.getState();
-          if (!user) return;
-
-          await customerAPI.updateProfile({
-            address: null,
-            city: null,
-            state: null,
-            zipCode: null,
-          });
-
-          useAppStore.getState().setUser({
-            ...user,
-            address: undefined,
-            city: undefined,
-            state: undefined,
-            zipCode: undefined,
-          });
-
-          await loadAddresses();
-          toast.success("Endereço removido com sucesso!");
-        } catch (error: any) {
-          console.error("Erro ao remover endereço:", error);
-          const errorMessage = error?.response?.data?.message || error?.message || "Erro desconhecido";
-          toast.error("Erro ao remover endereço", {
-            description: errorMessage,
-          });
-        }
-      }
+      toast.info("Endereço do perfil", {
+        description: "Para remover o endereço do perfil, edite-o através da página principal do perfil.",
+      });
       return;
     }
 
@@ -722,6 +744,11 @@ export function AddressSection() {
                           Padrão
                         </Badge>
                       )}
+                      {address.isFromUserProfile && (
+                        <Badge className="bg-blue-600 text-white hover:bg-blue-700">
+                          Perfil
+                        </Badge>
+                      )}
                     </div>
                     
                     {/* Botões de ação */}
@@ -731,19 +758,21 @@ export function AddressSection() {
                         size="sm"
                         onClick={() => handleEdit(address)}
                         className="h-8 w-8 p-0 text-[#3e2626] hover:text-white hover:bg-[#3e2626]"
-                        title="Editar endereço"
+                        title={address.isFromUserProfile ? "Editar endereço do perfil" : "Editar endereço"}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(address.id, address.isFromUserProfile)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-white hover:bg-red-600"
-                        title="Remover endereço"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!address.isFromUserProfile && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(address.id, address.isFromUserProfile)}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-white hover:bg-red-600"
+                          title="Remover endereço"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
