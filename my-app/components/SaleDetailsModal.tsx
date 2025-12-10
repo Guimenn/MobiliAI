@@ -102,12 +102,19 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
 
   const getPaymentMethodLabel = (method: string) => {
     const methodConfig = {
+      PIX: 'PIX',
+      CREDIT_CARD: 'Cartão de Crédito',
+      DEBIT_CARD: 'Cartão de Débito',
+      CASH: 'Dinheiro',
+      PENDING: 'Pendente',
+      BOLETO: 'Boleto',
+      // Fallback para valores minúsculos
       pix: 'PIX',
       credit_card: 'Cartão de Crédito',
       debit_card: 'Cartão de Débito',
       cash: 'Dinheiro',
     };
-    
+
     return methodConfig[method as keyof typeof methodConfig] || method;
   };
 

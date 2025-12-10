@@ -97,32 +97,25 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
   const loadSalesStats = async () => {
     try {
       const stats = await adminAPI.getStoreSalesStats(storeId);
-      // Calcular lucro total a partir das vendas
-      const totalProfit = sales.reduce((sum, sale) => {
-        const saleProfit = sale.items?.reduce((itemSum: number, item: any) => {
-          return itemSum + (item.profit ? Number(item.profit) : 0);
-        }, 0) || 0;
-        return sum + saleProfit;
-      }, 0);
-      
+
       // Garantir que os valores numéricos sejam válidos
       setSalesStats({
         totalRevenue: Number(stats?.totalRevenue) || 0,
-        totalProfit: totalProfit,
+        totalProfit: Number(stats?.totalProfit) || 0,
         totalSales: Number(stats?.totalSales) || 0,
         averageTicket: Number(stats?.averageTicket) || 0,
         growthRate: Number(stats?.growthRate) || 0
       });
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
-      // Calcular lucro mesmo em caso de erro
-      const totalProfit = sales.reduce((sum, sale) => {
-        const saleProfit = sale.items?.reduce((itemSum: number, item: any) => {
-          return itemSum + (item.profit ? Number(item.profit) : 0);
-        }, 0) || 0;
-        return sum + saleProfit;
-      }, 0);
-      setSalesStats(prev => ({ ...prev, totalProfit }));
+      // Valores padrão em caso de erro
+      setSalesStats({
+        totalRevenue: 0,
+        totalProfit: 0,
+        totalSales: 0,
+        averageTicket: 0,
+        growthRate: 0
+      });
     }
   };
 
@@ -193,13 +186,20 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
 
   const getPaymentMethodBadge = (method: string) => {
     const methodConfig = {
+      CASH: { label: 'Dinheiro', className: 'bg-green-100 text-green-800' },
+      CREDIT_CARD: { label: 'Cartão de Crédito', className: 'bg-blue-100 text-blue-800' },
+      DEBIT_CARD: { label: 'Cartão de Débito', className: 'bg-purple-100 text-purple-800' },
+      PIX: { label: 'PIX', className: 'bg-yellow-100 text-yellow-800' },
+      PENDING: { label: 'Pendente', className: 'bg-gray-100 text-gray-800' },
+      BOLETO: { label: 'Boleto', className: 'bg-orange-100 text-orange-800' },
+      // Fallback para valores minúsculos (caso ainda existam)
       cash: { label: 'Dinheiro', className: 'bg-green-100 text-green-800' },
       credit_card: { label: 'Cartão de Crédito', className: 'bg-blue-100 text-blue-800' },
       debit_card: { label: 'Cartão de Débito', className: 'bg-purple-100 text-purple-800' },
       pix: { label: 'PIX', className: 'bg-yellow-100 text-yellow-800' }
     };
-    
-    const config = methodConfig[method as keyof typeof methodConfig] || methodConfig.cash;
+
+    const config = methodConfig[method as keyof typeof methodConfig] || methodConfig.CASH;
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
@@ -379,7 +379,6 @@ export default function StoreSales({ storeId }: StoreSalesProps) {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {getStatusBadge(sale.status)}
                       {getPaymentMethodBadge(sale.paymentMethod)}
                     </div>
                   </div>

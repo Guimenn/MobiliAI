@@ -75,26 +75,12 @@ export default function NewUserPage() {
         console.log('✅ Lojas carregadas do banco:', data);
         setStores(data);
       } else {
-        console.log('❌ Erro ao carregar lojas do banco, usando dados mock');
-        // Mock data para demonstração - usando IDs reais das lojas do banco
-        setStores([
-          { id: '4244aee0-c924-4dfd-adc4-2f43cec505d', name: 'Loja Central' },
-          { id: '4244aee0-c924-4dfd-adc4-2f43cec505e', name: 'Dulux - Salvador' },
-          { id: '4244aee0-c924-4dfd-adc4-2f43cec505f', name: 'Tintas Iquine - Fortaleza' },
-          { id: '4244aee0-c924-4dfd-adc4-2f43cec5060', name: 'Suvinil - Vila Madalena' },
-          { id: '4244aee0-c924-4dfd-adc4-2f43cec5061', name: 'Sherwin Williams - Rio de Janeiro' }
-        ]);
+        console.log('❌ Erro ao carregar lojas do banco');
+        setStores([]);
       }
     } catch (error) {
       console.error('❌ Erro ao carregar lojas:', error);
-      // Em caso de erro, também usar dados mock
-      setStores([
-        { id: '4244aee0-c924-4dfd-adc4-2f43cec505d', name: 'Loja Central' },
-        { id: '4244aee0-c924-4dfd-adc4-2f43cec505e', name: 'Dulux - Salvador' },
-        { id: '4244aee0-c924-4dfd-adc4-2f43cec505f', name: 'Tintas Iquine - Fortaleza' },
-        { id: '4244aee0-c924-4dfd-adc4-2f43cec5060', name: 'Suvinil - Vila Madalena' },
-        { id: '4244aee0-c924-4dfd-adc4-2f43cec5061', name: 'Sherwin Williams - Rio de Janeiro' }
-      ]);
+      setStores([]);
     }
   };
 

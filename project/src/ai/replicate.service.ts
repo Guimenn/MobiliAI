@@ -9,7 +9,7 @@ export class ReplicateService {
   private replicate: Replicate;
 
   constructor(private configService: ConfigService) {
-    const token = this.configService.get<string>('REPLICATE_API_TOKEN') || 'r8_WwmiM2PiqGiJsyW0oVQ5LJDDHZqLQid1AzXRU';
+    const token = this.configService.get<string>('REPLICATE_API_TOKEN') || 'r8_LHfDqunHkdjTjuoznPTruRU33B8tLSI2hJ6YJ';
     
     if (!token) {
       console.warn('⚠️ REPLICATE_API_TOKEN não configurado. Usando token padrão.');

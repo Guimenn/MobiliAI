@@ -2,7 +2,7 @@ const WIFI_SSID = "Renan";
 const WIFI_PASS = "renan2005";
 const WIFI_HOSTNAME = "ESP32_do_Palmieri";
 
-const MQTT_BROKER = "10.70.124.30";
+const MQTT_BROKER = "10.144.231.30";
 
 const MQTT_CLIENT = "ESP32_do_Palmieri";
 

@@ -257,53 +257,17 @@ export default function StoreDetailsPage() {
       });
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
-      
-      // Fallback para dados simulados em caso de erro
-      const salesData = [
-        { name: 'Jan', vendas: Math.floor(Math.random() * 30000) + 10000, clientes: Math.floor(Math.random() * 50) + 20 },
-        { name: 'Fev', vendas: Math.floor(Math.random() * 30000) + 10000, clientes: Math.floor(Math.random() * 50) + 20 },
-        { name: 'Mar', vendas: Math.floor(Math.random() * 30000) + 10000, clientes: Math.floor(Math.random() * 50) + 20 },
-        { name: 'Abr', vendas: Math.floor(Math.random() * 30000) + 10000, clientes: Math.floor(Math.random() * 50) + 20 },
-        { name: 'Mai', vendas: Math.floor(Math.random() * 30000) + 10000, clientes: Math.floor(Math.random() * 50) + 20 },
-        { name: 'Jun', vendas: Math.floor(Math.random() * 30000) + 10000, clientes: Math.floor(Math.random() * 50) + 20 }
-      ];
 
-      const attendanceData = [
-        { name: 'Seg', presenca: Math.floor(Math.random() * 20) + 10, atrasos: Math.floor(Math.random() * 5) },
-        { name: 'Ter', presenca: Math.floor(Math.random() * 20) + 10, atrasos: Math.floor(Math.random() * 5) },
-        { name: 'Qua', presenca: Math.floor(Math.random() * 20) + 10, atrasos: Math.floor(Math.random() * 5) },
-        { name: 'Qui', presenca: Math.floor(Math.random() * 20) + 10, atrasos: Math.floor(Math.random() * 5) },
-        { name: 'Sex', presenca: Math.floor(Math.random() * 20) + 10, atrasos: Math.floor(Math.random() * 5) }
-      ];
-
-      const employeePerformance = employees.map((emp: any) => ({
-        name: emp.name,
-        vendas: Math.floor(Math.random() * 10000) + 2000,
-        pontos: Math.floor(Math.random() * 50) + 20,
-        atrasos: Math.floor(Math.random() * 10)
-      }));
-
-      const recentActivity = [
-        { id: 1, action: 'Funcionário bateu ponto', employee: 'João Silva', time: '2 horas atrás', type: 'success' },
-        { id: 2, action: 'Venda realizada', employee: 'Maria Santos', time: '4 horas atrás', type: 'success' },
-        { id: 3, action: 'Atraso registrado', employee: 'Pedro Costa', time: '6 horas atrás', type: 'warning' },
-        { id: 4, action: 'Novo funcionário adicionado', employee: 'Ana Lima', time: '1 dia atrás', type: 'info' }
-      ];
-
-      const totalSales = salesData.reduce((sum, month) => sum + month.vendas, 0);
-      const totalEmployees = employees.length;
-      const attendanceRate = Math.floor(Math.random() * 20) + 80;
-      const averageHours = Math.floor(Math.random() * 4) + 6;
-
+      // Dados vazios em caso de erro - sem dados mockados
       setDashboardData({
-        salesData,
-        attendanceData,
-        employeePerformance,
-        recentActivity,
-        totalSales,
-        totalEmployees,
-        attendanceRate,
-        averageHours
+        salesData: [],
+        attendanceData: [],
+        employeePerformance: [],
+        recentActivity: [],
+        totalSales: 0,
+        totalEmployees: 0,
+        attendanceRate: 0,
+        averageHours: 0
       });
     }
   };

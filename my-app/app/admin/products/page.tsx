@@ -22,9 +22,6 @@ import {
   CheckCircle,
   Zap, 
   RefreshCw,
-  Box,
-  Upload,
-  Camera,
   Tag,
   ChevronLeft,
   ChevronRight,
@@ -35,10 +32,6 @@ import {
 } from 'lucide-react';
 import { Loader } from '@/components/ui/ai/loader';
 import AdminProductModal from '@/components/AdminProductModal';
-import ProductViewer3D from '@/components/ProductViewer3D';
-import ProductViewer3DAdvanced from '@/components/ProductViewer3DAdvanced';
-import PhotoTo3DConverter from '@/components/PhotoTo3DConverter';
-import Direct3DUploader from '@/components/Direct3DUploader';
 import FlashSalePanel from '@/components/FlashSalePanel';
 import DeleteProductConfirmDialog from '@/components/DeleteProductConfirmDialog';
 
@@ -57,12 +50,6 @@ export default function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('view');
   
-  const [is3DViewerOpen, setIs3DViewerOpen] = useState(false);
-  const [productFor3D, setProductFor3D] = useState<any | null>(null);
-  const [viewerMode, setViewerMode] = useState<'basic' | 'advanced'>('advanced');
-  
-  const [isPhotoTo3DOpen, setIsPhotoTo3DOpen] = useState(false);
-  const [isDirect3DUploadOpen, setIsDirect3DUploadOpen] = useState(false);
   
   const [productToDelete, setProductToDelete] = useState<any>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -220,7 +207,7 @@ export default function ProductsPage() {
                     Gerenciar Produtos
                   </h1>
                   <p className="text-sm text-primary-foreground/80 lg:text-base">
-                    Gerencie o catálogo de produtos da empresa. Controle estoque, preços, ofertas e modelos 3D.
+                    Gerencie o catálogo de produtos da empresa. Controle estoque, preços e ofertas.
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
@@ -339,49 +326,6 @@ export default function ProductsPage() {
         onProductDeleted={handleProductDeleted}
       />
 
-      {productFor3D && (
-        <>
-          {viewerMode === 'basic' ? (
-            <ProductViewer3D
-              product={productFor3D}
-              isOpen={is3DViewerOpen}
-              onClose={() => {
-                setIs3DViewerOpen(false);
-                setProductFor3D(null);
-              }}
-            />
-          ) : (
-            <ProductViewer3DAdvanced
-              product={productFor3D}
-              isOpen={is3DViewerOpen}
-              onClose={() => {
-                setIs3DViewerOpen(false);
-                setProductFor3D(null);
-              }}
-            />
-          )}
-        </>
-      )}
-
-      {isPhotoTo3DOpen && (
-        <PhotoTo3DConverter
-          onConverted={(model3D) => {
-            onProductsChange();
-            setIsPhotoTo3DOpen(false);
-          }}
-          onClose={() => setIsPhotoTo3DOpen(false)}
-        />
-      )}
-
-      {isDirect3DUploadOpen && (
-        <Direct3DUploader
-          onUploaded={(model3D) => {
-            onProductsChange();
-            setIsDirect3DUploadOpen(false);
-          }}
-          onClose={() => setIsDirect3DUploadOpen(false)}
-        />
-      )}
     </div>
   );
 }
@@ -558,61 +502,7 @@ function ProductsSection({
     return { label: 'Em Estoque', color: 'border-border bg-muted/50 text-foreground' };
   };
 
-  const [is3DViewerOpen, setIs3DViewerOpen] = useState(false);
-  const [productFor3D, setProductFor3D] = useState<any | null>(null);
-  const [viewerMode, setViewerMode] = useState<'basic' | 'advanced'>('advanced');
 
-  const handleView3D = (product: any) => {
-    setProductFor3D(product);
-    setIs3DViewerOpen(true);
-  };
-
-  const handleGenerate3D = async (product: any) => {
-    if (!product.imageUrls || product.imageUrls.length === 0) {
-      toast.error('Produto sem imagem', {
-        description: 'Produto precisa ter pelo menos uma imagem para gerar modelo 3D.',
-      });
-      return;
-    }
-
-    try {
-      toast.info('Gerando modelo 3D...', {
-        description: 'Isso pode levar alguns minutos.',
-      });
-
-      const response = await fetch(product.imageUrls[0]);
-      const blob = await response.blob();
-      const file = new File([blob], 'product-image.jpg', { type: blob.type });
-      
-      const formData = new FormData();
-      formData.append('images', file);
-
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-      
-      const backendResponse = await fetch(`${API_BASE_URL}/admin/products/${product.id}/generate-3d`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData
-      });
-      
-      if (!backendResponse.ok) {
-        const errorData = await backendResponse.json().catch(() => ({ message: 'Erro desconhecido' }));
-        throw new Error(errorData.message || 'Erro ao gerar modelo 3D');
-      }
-
-      toast.success('Modelo 3D gerado!', {
-        description: 'Produto atualizado com sucesso.',
-      });
-
-      onProductsChange();
-    } catch (error: any) {
-      toast.error('Erro ao gerar modelo 3D', {
-        description: error.message || 'Tente novamente mais tarde.',
-      });
-    }
-  };
 
   return (
     <>
@@ -792,27 +682,7 @@ function ProductsSection({
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          {product.model3DUrl ? (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-9 w-9 sm:h-8 sm:w-8 p-0 flex-shrink-0"
-                              onClick={() => handleView3D(product)}
-                              title="Visualizar 3D"
-                            >
-                              <Box className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-9 w-9 sm:h-8 sm:w-8 p-0 flex-shrink-0"
-                              onClick={() => handleGenerate3D(product)}
-                              title="Gerar Modelo 3D"
-                            >
-                              <Box className="h-4 w-4" />
-                            </Button>
-                          )}
+                          
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -908,29 +778,7 @@ function ProductsSection({
         </>
       )}
 
-      {productFor3D && (
-        <>
-          {viewerMode === 'basic' ? (
-            <ProductViewer3D
-              product={productFor3D}
-              isOpen={is3DViewerOpen}
-              onClose={() => {
-                setIs3DViewerOpen(false);
-                setProductFor3D(null);
-              }}
-            />
-          ) : (
-            <ProductViewer3DAdvanced
-              product={productFor3D}
-              isOpen={is3DViewerOpen}
-              onClose={() => {
-                setIs3DViewerOpen(false);
-                setProductFor3D(null);
-              }}
-            />
-          )}
-        </>
-      )}
+      
     </>
   );
 }

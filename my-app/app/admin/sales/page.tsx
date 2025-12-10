@@ -33,6 +33,24 @@ export default function SalesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
 
+  const getPaymentMethodLabel = (method: string) => {
+    const methodConfig = {
+      PIX: 'PIX',
+      CREDIT_CARD: 'Cartão de Crédito',
+      DEBIT_CARD: 'Cartão de Débito',
+      CASH: 'Dinheiro',
+      PENDING: 'Pendente',
+      BOLETO: 'Boleto',
+      // Fallback para valores minúsculos
+      pix: 'PIX',
+      credit_card: 'Cartão de Crédito',
+      debit_card: 'Cartão de Débito',
+      cash: 'Dinheiro',
+    };
+
+    return methodConfig[method as keyof typeof methodConfig] || method;
+  };
+
   useEffect(() => {
     loadSalesData();
   }, []);
@@ -50,46 +68,7 @@ export default function SalesPage() {
         console.log('Vendas definidas no state:', Array.isArray(salesData) ? salesData.length : 0);
       } catch (apiError) {
         console.error('Erro ao carregar vendas da API:', apiError);
-        console.log('API de vendas não disponível, usando dados mock');
-        const mockSales = [
-          {
-            id: '1',
-            customerName: 'João Silva',
-            customerEmail: 'joao@email.com',
-            totalAmount: 1250.00,
-            status: 'COMPLETED',
-            paymentMethod: 'pix',
-            createdAt: new Date('2024-01-15'),
-            items: [
-              { productName: 'Sofá 3 Lugares', quantity: 1, price: 1250.00 }
-            ]
-          },
-          {
-            id: '2',
-            customerName: 'Maria Santos',
-            customerEmail: 'maria@email.com',
-            totalAmount: 850.00,
-            status: 'PENDING',
-            paymentMethod: 'CARTÃO',
-            createdAt: new Date('2024-01-14'),
-            items: [
-              { productName: 'Mesa de Jantar', quantity: 1, price: 850.00 }
-            ]
-          },
-          {
-            id: '3',
-            customerName: 'Pedro Costa',
-            customerEmail: 'pedro@email.com',
-            totalAmount: 2100.00,
-            status: 'COMPLETED',
-            paymentMethod: 'pix',
-            createdAt: new Date('2024-01-13'),
-            items: [
-              { productName: 'Conjunto Sala Completo', quantity: 1, price: 2100.00 }
-            ]
-          }
-        ];
-        setSales(mockSales);
+        setSales([]);
       }
     } catch (error) {
       console.error('Erro ao carregar dados do banco:', error);
@@ -311,7 +290,7 @@ export default function SalesPage() {
                         <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
                           Venda #{sale.saleNumber || sale.id}
                         </h3>
-                        {getStatusBadge(sale.status)}
+                        {getStatusBadge(sale.status)} 
                       </div>
                       <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1.5 min-w-0">
@@ -325,7 +304,7 @@ export default function SalesPage() {
                         {sale.paymentMethod && (
                           <div className="flex items-center gap-1.5">
                             <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                            <span className="capitalize truncate">{sale.paymentMethod}</span>
+                            <span className="truncate">{getPaymentMethodLabel(sale.paymentMethod)}</span>
                           </div>
                         )}
                       </div>

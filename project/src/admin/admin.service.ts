@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole, ProductCategory, ProductStyle, MaterialType, MedicalCertificateType, MedicalCertificateStatus } from '@prisma/client';
+import { UserRole, ProductCategory, ProductStyle, MaterialType, MedicalCertificateType, MedicalCertificateStatus, SaleStatus } from '@prisma/client';
 import { UploadService } from '../upload/upload.service';
 import { TrellisService } from '../trellis/trellis.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -2158,17 +2158,43 @@ export class AdminService {
   }
 
   async getStoreSalesStats(storeId: string) {
-    const [totalRevenue, totalSales, averageTicket] = await Promise.all([
+    const [totalRevenue, totalSales, averageTicket, totalProfit] = await Promise.all([
       this.prisma.sale.aggregate({
-        where: { storeId },
+        where: {
+          storeId,
+          status: {
+            in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED, SaleStatus.PENDING, SaleStatus.PREPARING, SaleStatus.SHIPPED]
+          }
+        },
         _sum: { totalAmount: true }
       }),
       this.prisma.sale.count({
-        where: { storeId }
+        where: {
+          storeId,
+          status: {
+            in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED, SaleStatus.PENDING, SaleStatus.PREPARING, SaleStatus.SHIPPED]
+          }
+        }
       }),
       this.prisma.sale.aggregate({
-        where: { storeId },
+        where: {
+          storeId,
+          status: {
+            in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED, SaleStatus.PENDING, SaleStatus.PREPARING, SaleStatus.SHIPPED]
+          }
+        },
         _avg: { totalAmount: true }
+      }),
+      this.prisma.saleItem.aggregate({
+        where: {
+          sale: {
+            storeId,
+            status: {
+              in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED, SaleStatus.PENDING, SaleStatus.PREPARING, SaleStatus.SHIPPED]
+            }
+          }
+        },
+        _sum: { profit: true }
       })
     ]);
 
@@ -2176,6 +2202,7 @@ export class AdminService {
       totalRevenue: totalRevenue._sum.totalAmount || 0,
       totalSales,
       averageTicket: averageTicket._avg.totalAmount || 0,
+      totalProfit: totalProfit._sum.profit || 0,
       growthRate: 0 // Implementar cálculo de crescimento
     };
   }

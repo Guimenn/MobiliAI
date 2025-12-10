@@ -19,7 +19,7 @@ export class DashboardService {
         where: {
           storeId,
           status: {
-            in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED]
+            in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED, SaleStatus.PENDING, SaleStatus.PREPARING, SaleStatus.SHIPPED]
           }
         },
         _sum: {
@@ -86,7 +86,7 @@ export class DashboardService {
           gte: sixMonthsAgo
         },
         status: {
-          in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED]
+          in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED, SaleStatus.PENDING, SaleStatus.PREPARING, SaleStatus.SHIPPED]
         }
       },
       select: {
@@ -193,7 +193,7 @@ export class DashboardService {
           gte: oneMonthAgo
         },
         status: {
-          in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED]
+          in: [SaleStatus.COMPLETED, SaleStatus.DELIVERED, SaleStatus.PENDING, SaleStatus.PREPARING, SaleStatus.SHIPPED]
         }
       },
       select: {
