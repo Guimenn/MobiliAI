@@ -291,16 +291,23 @@ export default function CartPage() {
     return originalPrice;
   };
 
-  // Agrupar produtos por loja - apenas para usuários autenticados
+  // Agrupar produtos por loja - apenas para usuários autenticados COM endereço completo
   const productsByStore = useMemo(() => {
     const grouped: { [storeId: string]: { storeName: string; storeAddress?: string; items: typeof cart } } = {};
 
-    // Para usuários NÃO AUTENTICADOS: não agrupar por loja, mostrar todos os produtos juntos
-    if (!isAuthenticated || !user) {
-      console.log('[Cart] Usuário não autenticado - não agrupando por loja');
+    // Verificar se usuário tem endereço completo (cidade, estado e CEP)
+    const hasCompleteAddress = user?.city && user?.state && user?.zipCode;
+
+    // Para usuários NÃO AUTENTICADOS ou SEM ENDEREÇO COMPLETO: não agrupar por loja, mostrar todos os produtos juntos
+    if (!isAuthenticated || !user || !hasCompleteAddress) {
+      const reason = !isAuthenticated ? 'não autenticado' :
+                    !user ? 'dados do usuário não carregados' :
+                    'sem endereço completo';
+      console.log(`[Cart] Usuário ${reason} - não agrupando por loja`);
+
       const allItems = [...cart];
 
-      // Para usuários não autenticados, criar um grupo único sem loja específica
+      // Para usuários sem endereço, criar um grupo único sem loja específica
       grouped['guest-cart'] = {
         storeName: 'Produtos no Carrinho',
         storeAddress: undefined,
@@ -310,8 +317,8 @@ export default function CartPage() {
       return grouped;
     }
 
-    // Para usuários AUTENTICADOS: usar lógica geográfica igual ao checkout
-    console.log('[Cart] Usuário autenticado - usando lógica geográfica');
+    // Para usuários AUTENTICADOS COM ENDEREÇO COMPLETO: usar lógica geográfica igual ao checkout
+    console.log('[Cart] Usuário autenticado com endereço completo - usando lógica geográfica');
 
     // Obter endereço do usuário para cálculo de proximidade
     const userAddress = {
@@ -343,13 +350,45 @@ export default function CartPage() {
 
             let score = 0;
 
+            // Normalizar strings para comparação (remover acentos, espaços extras, converter para minúsculo)
+            const normalizeString = (str: string) => {
+              if (!str) return '';
+              return str
+                .toLowerCase()
+                .trim()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+                .replace(/\s+/g, ' ') // Normalizar espaços
+                .replace(/^(sao|sto|santa|sant)\s+/i, 'são ') // Corrigir abreviações comuns
+                .replace(/^(sao|sto|santa|sant)$/i, match => {
+                  const corrections: { [key: string]: string } = {
+                    'sao': 'são',
+                    'sto': 'santo',
+                    'santa': 'santa',
+                    'sant': 'sant'
+                  };
+                  return corrections[match.toLowerCase()] || match;
+                });
+            };
+
+            const normalizedUserCity = normalizeString(userAddress.city || '');
+            const normalizedUserState = (userAddress.state || '').toUpperCase().trim();
+            const normalizedStoreCity = normalizeString(store.city || '');
+            const normalizedStoreState = (store.state || '').toUpperCase().trim();
+
+            // Debug: mostrar comparações se necessário
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[Proximity] Comparando: "${userAddress.city}/${userAddress.state}" vs "${store.city}/${store.state}"`);
+              console.log(`[Proximity] Normalizado: "${normalizedUserCity}/${normalizedUserState}" vs "${normalizedStoreCity}/${normalizedStoreState}"`);
+            }
+
             // Prioridade 1: Mesma cidade E mesmo estado
-            if (store.city?.toLowerCase() === userAddress.city?.toLowerCase() &&
-                store.state?.toUpperCase() === userAddress.state?.toUpperCase()) {
+            if (normalizedStoreCity === normalizedUserCity &&
+                normalizedStoreState === normalizedUserState) {
               score = 1;
             }
             // Prioridade 2: Mesmo estado (diferente cidade)
-            else if (store.state?.toUpperCase() === userAddress.state?.toUpperCase()) {
+            else if (normalizedStoreState === normalizedUserState) {
               score = 2;
             }
             // Prioridade 3: Estados diferentes
@@ -801,6 +840,24 @@ export default function CartPage() {
                 </label>
               </div>
             </Card>
+
+            {/* Mensagem para usuários sem endereço completo */}
+            {isAuthenticated && user && !(user?.city && user?.state && user?.zipCode) && (
+              <Card className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 shadow-xl">
+                <div className="flex items-start space-x-3">
+                  <MapPin className="h-6 w-6 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="font-bold text-blue-800 text-lg mb-2">
+                      Endereço para entrega otimizada
+                    </h3>
+                    <p className="text-blue-700 text-sm leading-relaxed">
+                      Para garantir que você receba seus produtos da loja mais próxima, informe seu endereço completo durante o checkout.
+                      Isso nos ajuda a otimizar o frete e a entrega dos seus móveis!
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             {/* Agrupar por loja */}
             {Object.entries(productsByStore).map(([storeId, storeData]) => (
