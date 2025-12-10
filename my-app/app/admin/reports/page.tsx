@@ -1604,12 +1604,25 @@ export default function ReportsPage() {
       doc.text('Top Produtos', 20, yPosition);
       yPosition += 10;
 
-      const productData = currentReport.data.topProducts.slice(0, 10).map((product: any, idx: number) => [
-        idx + 1,
-        product.name || 'Produto sem nome',
-        product.totalSold || 0,
-        `R$ ${Number(product.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-      ]);
+      const productData = currentReport.data.topProducts.slice(0, 10).map((product: any, idx: number) => {
+        const quantity =
+          product.totalSold ??
+          product.quantity ??
+          product.totalQuantity ??
+          0;
+        const revenue =
+          product.totalRevenue ??
+          product.revenue ??
+          product.totalPrice ??
+          0;
+
+        return [
+          idx + 1,
+          product.name || product.productName || 'Produto sem nome',
+          quantity,
+          `R$ ${Number(revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        ];
+      });
 
       autoTable(doc, {
         startY: yPosition,
@@ -1671,11 +1684,22 @@ export default function ReportsPage() {
       ];
 
       currentReport.data.topProducts.slice(0, 20).forEach((product: any, idx: number) => {
+        const quantity =
+          product.totalSold ??
+          product.quantity ??
+          product.totalQuantity ??
+          0;
+        const revenue =
+          product.totalRevenue ??
+          product.revenue ??
+          product.totalPrice ??
+          0;
+
         productData.push([
           idx + 1,
-          product.name || 'Produto sem nome',
-          product.totalSold || 0,
-          `R$ ${Number(product.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+          product.name || product.productName || 'Produto sem nome',
+          quantity,
+          `R$ ${Number(revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
         ]);
       });
 
