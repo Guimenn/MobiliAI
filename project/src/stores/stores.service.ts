@@ -102,28 +102,29 @@ export class StoresService {
     return this.findOne(id, currentUser);
   }
 
-  async remove(id: string, currentUser: User): Promise<void> {
-    // Apenas admins podem deletar lojas
-    if (currentUser.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Acesso negado');
-    }
+  // Método removido - exclusão de lojas agora é feita pelo admin.service.ts
+  // async remove(id: string, currentUser: User): Promise<void> {
+  //   // Apenas admins podem deletar lojas
+  //   if (currentUser.role !== UserRole.ADMIN) {
+  //     throw new ForbiddenException('Acesso negado');
+  //   }
 
-    const store = await this.prisma.store.findUnique({ where: { id } });
-    if (!store) {
-      throw new NotFoundException('Loja não encontrada');
-    }
+  //   const store = await this.prisma.store.findUnique({ where: { id } });
+  //   if (!store) {
+  //     throw new NotFoundException('Loja não encontrada');
+  //   }
 
-    // Verificar se há funcionários na loja
-    const employees = await this.prisma.user.count({ where: { storeId: id } });
-    if (employees > 0) {
-      throw new ForbiddenException('Não é possível deletar uma loja que possui funcionários');
-    }
+  //   // Verificar se há funcionários na loja
+  //   const employees = await this.prisma.user.count({ where: { storeId: id } });
+  //   if (employees > 0) {
+  //     throw new ForbiddenException('Não é possível deletar uma loja que possui funcionários');
+  //   }
 
-    await this.prisma.store.update({
-      where: { id },
-      data: { isActive: false },
-    });
-  }
+  //   await this.prisma.store.update({
+  //     where: { id },
+  //     data: { isActive: false },
+  //   });
+  // }
 
   async getStoreStats(id: string, currentUser: User): Promise<any> {
     const store = await this.findOne(id, currentUser);

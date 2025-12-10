@@ -42,9 +42,14 @@ export default function SalesPage() {
       setIsLoading(true);
       
       try {
+        console.log('Carregando vendas da API...');
         const salesData = await salesAPI.getAll();
+        console.log('Dados recebidos da API:', salesData);
+        console.log('Número de vendas:', Array.isArray(salesData) ? salesData.length : 'não é array');
         setSales(Array.isArray(salesData) ? salesData : []);
+        console.log('Vendas definidas no state:', Array.isArray(salesData) ? salesData.length : 0);
       } catch (apiError) {
+        console.error('Erro ao carregar vendas da API:', apiError);
         console.log('API de vendas não disponível, usando dados mock');
         const mockSales = [
           {

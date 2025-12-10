@@ -33,8 +33,8 @@ export class StoresController {
     return this.storesService.update(id, updateStoreDto, req.user);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string, @Request() req) {
-    return this.storesService.remove(id, req.user);
-  }
+  // @Delete(':id')
+  // remove(@Param('id') id: string, @Request() req) {
+  //   return this.storesService.remove(id, req.user);
+  // }
 }

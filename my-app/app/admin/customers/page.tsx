@@ -10,10 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { adminAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import { 
-  DollarSign, 
+import {
+  DollarSign,
   CheckCircle,
-  Search, 
+  Search,
   User,
   Users,
   UserPlus,
@@ -23,8 +23,11 @@ import {
   Phone,
   Calendar,
   ShoppingCart,
+  Trash2,
 } from 'lucide-react';
 import { Loader } from '@/components/ui/ai/loader';
+import DeleteUserConfirmDialog from '@/components/DeleteUserConfirmDialog';
+import { toast } from 'sonner';
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -33,6 +36,9 @@ export default function CustomersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [customerToDelete, setCustomerToDelete] = useState<any>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadCustomersData();
@@ -67,6 +73,54 @@ export default function CustomersPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDeleteCustomer = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    setCustomerToDelete(customer);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!customerToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`http://localhost:3001/api/admin/users/${customerToDelete.id}?force=true`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token || ''}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        toast.success('Cliente excluído com sucesso!', {
+          description: `${customerToDelete.name} foi removido do sistema.`,
+        });
+        setIsDeleteDialogOpen(false);
+        setCustomerToDelete(null);
+        setTimeout(() => {
+          loadCustomersData();
+        }, 100);
+      } else {
+        const errorData = await response.json();
+        toast.error('Erro ao excluir cliente', {
+          description: errorData.message || `Erro ${response.status}: ${response.statusText}`,
+        });
+      }
+    } catch (error) {
+      toast.error('Erro ao excluir cliente', {
+        description: 'Tente novamente mais tarde.',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteDialogOpen(false);
+    setCustomerToDelete(null);
   };
 
   const [totalOrders, setTotalOrders] = useState(0);
@@ -257,8 +311,8 @@ export default function CustomersPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       size="icon"
                       onClick={() => router.push(`/admin/customers/${customer.id}`)}
                       className="h-10 w-10"
@@ -266,14 +320,23 @@ export default function CustomersPage() {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="icon"
                       onClick={() => router.push(`/admin/customers/${customer.id}/edit`)}
                       className="h-10 w-10"
                       title="Editar cliente"
                     >
                       <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteCustomer(customer.id)}
+                      title="Excluir cliente"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -282,6 +345,15 @@ export default function CustomersPage() {
           ))}
         </div>
       )}
+
+      <DeleteUserConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        userName={customerToDelete?.name || ''}
+        userRole="CLIENTE"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

@@ -456,7 +456,7 @@ export class AdminService {
     };
   }
 
-  async deleteUser(id: string) {
+  async deleteUser(id: string, forceDelete: boolean = false) {
     const user = await this.prisma.user.findUnique({
       where: { id }
     });
@@ -465,17 +465,41 @@ export class AdminService {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    // Verificar se usuário tem vendas associadas
-    const userSales = await this.prisma.sale.count({
-      where: { customerId: id }
-    });
+    // Se forceDelete for true, permitir exclusão de qualquer usuário
+    if (!forceDelete) {
+      // Verificar se o usuário é funcionário e tem vendas associadas como funcionário
+      if (user.role === 'ADMIN' || user.role === 'STORE_MANAGER' || user.role === 'CASHIER' || user.role === 'EMPLOYEE') {
+        const employeeSales = await this.prisma.sale.count({
+          where: { employeeId: id }
+        });
 
-    if (userSales > 0) {
-      throw new BadRequestException('Não é possível deletar usuário com vendas associadas');
+        if (employeeSales > 0) {
+          throw new BadRequestException('Não é possível deletar funcionário com vendas registradas');
+        }
+      }
     }
 
-    await this.prisma.user.delete({
-      where: { id }
+    // Limpar dados relacionados antes da exclusão
+    await this.prisma.$transaction(async (tx) => {
+      // Limpar dados relacionados ao cliente
+      await tx.cartItem.deleteMany({ where: { customerId: id } });
+      await tx.favorite.deleteMany({ where: { customerId: id } });
+      await tx.comparison.deleteMany({ where: { customerId: id } });
+
+      // Para funcionários, limpar dados relacionados
+      if (user.role !== 'CUSTOMER') {
+        await tx.timeClock.deleteMany({ where: { employeeId: id } });
+        await tx.medicalCertificate.deleteMany({ where: { employeeId: id } });
+        await tx.sale.deleteMany({ where: { employeeId: id } });
+      }
+
+      // Limpar vendas onde o usuário é cliente (sempre fazer isso)
+      await tx.sale.deleteMany({ where: { customerId: id } });
+
+      // Finalmente, excluir o usuário
+      await tx.user.delete({
+        where: { id }
+      });
     });
 
     return { message: 'Usuário deletado com sucesso' };
@@ -745,28 +769,78 @@ export class AdminService {
   }
 
   async deleteStore(id: string) {
-    const store = await this.prisma.store.findUnique({
-      where: { id }
-    });
+    try {
+      console.log('=== INICIANDO EXCLUSÃO DA LOJA ===');
+      console.log('ID da loja:', id);
+      console.log('Timestamp:', new Date().toISOString());
 
-    if (!store) {
-      throw new NotFoundException('Loja não encontrada');
+      const store = await this.prisma.store.findUnique({
+        where: { id }
+      });
+
+      if (!store) {
+        console.log('Loja não encontrada com ID:', id);
+        throw new NotFoundException('Loja não encontrada');
+      }
+
+      console.log('Loja encontrada:', store.name);
+
+      // Verificar usuários associados (apenas para log)
+      const associatedUsers = await this.prisma.user.count({
+        where: { storeId: id }
+      });
+      console.log('Usuários associados à loja:', associatedUsers);
+
+      if (associatedUsers > 0) {
+        console.log('ATENÇÃO: Há usuários associados, mas prosseguindo com exclusão...');
+      }
+
+      console.log('=== EXECUTANDO EXCLUSÃO SIMPLES DA LOJA ===');
+
+      // Primeiro, desvincular usuários
+      console.log('Desvinculando usuários...');
+      const updatedUsers = await this.prisma.user.updateMany({
+        where: {
+          storeId: id,
+          role: {
+            in: ['STORE_MANAGER', 'CASHIER', 'EMPLOYEE']
+          }
+        },
+        data: {
+          storeId: null
+        }
+      });
+      console.log('Usuários desvinculados:', updatedUsers.count);
+
+      // PRESERVAR vendas históricas - não excluir, manter no histórico
+      console.log('Passo 2: Verificando vendas (serão preservadas)...');
+      const salesCount = await this.prisma.sale.count({
+        where: { storeId: id }
+      });
+      console.log('✅ Vendas preservadas no histórico:', salesCount);
+
+      // Excluir dados relacionados
+      const deletedInventory = await this.prisma.storeInventory.deleteMany({ where: { storeId: id } });
+      const deletedCash = await this.prisma.dailyCash.deleteMany({ where: { storeId: id } });
+      const deletedCashFlows = await this.prisma.cashFlow.deleteMany({ where: { storeId: id } });
+      const deletedReports = await this.prisma.report.deleteMany({ where: { storeId: id } });
+      const deletedCoupons = await this.prisma.coupon.deleteMany({ where: { storeId: id } });
+
+      console.log('Dados relacionados removidos');
+
+      // Finalmente, excluir a loja
+      console.log('Tentando excluir a loja...');
+      const deletedStore = await this.prisma.store.delete({
+        where: { id }
+      });
+
+      console.log('Loja excluída com sucesso:', deletedStore);
+
+      return { message: 'Loja deletada com sucesso. Usuários foram desvinculados e vendas históricas foram preservadas.' };
+    } catch (error) {
+      console.error('Erro detalhado ao excluir loja:', error);
+      throw error;
     }
-
-    // Verificar se loja tem usuários associados
-    const storeUsers = await this.prisma.user.count({
-      where: { storeId: id }
-    });
-
-    if (storeUsers > 0) {
-      throw new BadRequestException('Não é possível deletar loja com usuários associados');
-    }
-
-    await this.prisma.store.delete({
-      where: { id }
-    });
-
-    return { message: 'Loja deletada com sucesso' };
   }
 
   // ==================== GESTÃO DE PRODUTOS ====================
@@ -1748,8 +1822,8 @@ export class AdminService {
   // ==================== VENDAS POR LOJA ====================
 
   async getAllSales(adminId: string) {
-    // Retornar apenas vendas presenciais (não online)
-    return this.prisma.sale.findMany({
+    // Primeiro buscar as vendas
+    const sales = await this.prisma.sale.findMany({
       where: {
         isOnlineOrder: false
       },
@@ -1769,12 +1843,6 @@ export class AdminService {
             email: true
           }
         },
-        store: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
         items: {
           include: {
             product: {
@@ -1792,6 +1860,35 @@ export class AdminService {
         createdAt: 'desc'
       }
     });
+
+    // Para cada venda, tentar buscar informações da loja (se ela ainda existir)
+    const salesWithStoreInfo = await Promise.all(
+      sales.map(async (sale) => {
+        let storeInfo = null;
+        try {
+          if (sale.storeId) {
+            const store = await this.prisma.store.findUnique({
+              where: { id: sale.storeId },
+              select: {
+                id: true,
+                name: true
+              }
+            });
+            storeInfo = store;
+          }
+        } catch (error) {
+          // Loja foi excluída, manter storeInfo como null
+          console.log(`Loja ${sale.storeId} não encontrada para venda ${sale.id}`);
+        }
+
+        return {
+          ...sale,
+          store: storeInfo
+        };
+      })
+    );
+
+    return salesWithStoreInfo;
   }
 
   // ==================== PEDIDOS ONLINE ====================

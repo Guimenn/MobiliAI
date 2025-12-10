@@ -24,14 +24,20 @@ import {
 } from 'lucide-react';
 import { Loader } from '@/components/ui/ai/loader';
 import { adminAPI } from '@/lib/api';
+import { useAppStore } from '@/lib/store';
 import { toast } from 'sonner';
+import DeleteUserConfirmDialog from '@/components/DeleteUserConfirmDialog';
 
 export default function StoresPage() {
   const router = useRouter();
+  const { token } = useAppStore();
   const [stores, setStores] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [storeToDelete, setStoreToDelete] = useState<any>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadStores();
@@ -96,6 +102,79 @@ export default function StoresPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDeleteStore = (storeId: string) => {
+    const store = stores.find(s => s.id === storeId);
+    setStoreToDelete(store);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!storeToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      console.log('Tentando excluir loja:', storeToDelete.id, storeToDelete.name);
+      console.log('Token disponível:', !!token);
+
+      const response = await fetch(`http://localhost:3001/api/admin/stores/${storeToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token || ''}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Resposta recebida:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
+      if (response.ok) {
+        toast.success('Loja excluída com sucesso!', {
+          description: `A loja "${storeToDelete.name}" foi removida. Funcionários foram desvinculados.`,
+        });
+        setIsDeleteDialogOpen(false);
+        setStoreToDelete(null);
+        setTimeout(() => {
+          loadStores();
+        }, 100);
+      } else {
+        let errorData = {};
+        try {
+          const responseText = await response.text();
+          console.error('Resposta bruta da API:', responseText);
+          console.error('Status da resposta:', response.status, response.statusText);
+
+          // Tentar parsear como JSON
+          if (responseText && responseText.trim()) {
+            errorData = JSON.parse(responseText);
+          }
+        } catch (parseError) {
+          console.error('Erro ao fazer parse da resposta:', parseError);
+          errorData = { message: `Erro ${response.status}: ${response.statusText}` };
+        }
+
+        console.error('Dados de erro processados:', errorData);
+        toast.error('Erro ao excluir loja', {
+          description: errorData.message || errorData.error || `Erro ${response.status}: ${response.statusText}`,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao excluir loja:', error);
+      toast.error('Erro ao excluir loja', {
+        description: 'Tente novamente mais tarde.',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteDialogOpen(false);
+    setStoreToDelete(null);
   };
 
   const filteredStores = useMemo(() => {
@@ -316,18 +395,113 @@ export default function StoresPage() {
                     </div>
                   </div>
 
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => router.push(`/admin/stores/${store.id}`)}
-                  >
-                    Gerenciar Loja
-                    <ArrowUpRight className="h-4 w-4 ml-2" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => router.push(`/admin/stores/${store.id}`)}
+                    >
+                      Gerenciar Loja
+                      <ArrowUpRight className="h-4 w-4 ml-2" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDeleteStore(store.id)}
+                      title="Excluir loja"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Modal de confirmação personalizado para exclusão de loja */}
+      {isDeleteDialogOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-background/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-lg">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                    <Trash2 className="w-6 h-6 text-red-600" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Excluir Loja
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Esta ação não pode ser desfeita.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4 border">
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                      <Store className="w-5 h-5 text-gray-600" />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {storeToDelete?.name}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-700">
+                  Tem certeza que deseja excluir a loja <strong>{storeToDelete?.name}</strong>?
+                </p>
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-800 font-medium mb-1">ℹ️ O que acontecerá:</p>
+                  <ul className="text-xs text-blue-700 space-y-1">
+                    <li>• A loja será completamente removida do sistema</li>
+                    <li>• <strong>Funcionários NÃO serão excluídos</strong></li>
+                    <li>• Eles ficarão sem atribuição de loja</li>
+                    <li>• Manterão seus papéis originais (Gerente, Caixa, Funcionário)</li>
+                    <li>• <strong>Vendas históricas serão preservadas</strong></li>
+                    <li>• Poderão ser reatribuídos a outras lojas depois</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 mt-6">
+              <button
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+                className="flex-1 sm:flex-none px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex-1 sm:flex-none px-4 py-2 bg-red-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Excluindo...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Trash2 className="w-4 h-4" />
+                    <span>Excluir Loja</span>
+                  </div>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

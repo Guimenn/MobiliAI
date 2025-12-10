@@ -89,8 +89,8 @@ export class AdminController {
   }
 
   @Delete('users/:id')
-  async deleteUser(@Param('id') id: string) {
-    return this.adminService.deleteUser(id);
+  async deleteUser(@Param('id') id: string, @Query('force') force?: string) {
+    return this.adminService.deleteUser(id, force === 'true');
   }
 
   @Put('users/:id/password')
@@ -191,7 +191,18 @@ export class AdminController {
 
   @Delete('stores/:id')
   async deleteStore(@Param('id') id: string) {
-    return this.adminService.deleteStore(id);
+    console.log('=== ADMIN CONTROLLER: deleteStore chamado ===');
+    console.log('ID da loja para deletar:', id);
+    console.log('Timestamp:', new Date().toISOString());
+
+    try {
+      const result = await this.adminService.deleteStore(id);
+      console.log('Resultado da exclusão:', result);
+      return result;
+    } catch (error) {
+      console.error('Erro no controller:', error);
+      throw error;
+    }
   }
 
   // ==================== PONTO ELETRÔNICO ====================
@@ -422,7 +433,12 @@ export class AdminController {
 
   @Get('sales')
   async getAllSales(@Request() req) {
-    return this.adminService.getAllSales(req.user.id);
+    console.log('=== ADMIN CONTROLLER: getAllSales chamado ===');
+    console.log('Usuário:', req.user?.id);
+    const result = await this.adminService.getAllSales(req.user.id);
+    console.log('Vendas retornadas:', Array.isArray(result) ? result.length : 'não é array');
+    console.log('Primeira venda (se existir):', result && result.length > 0 ? result[0] : 'nenhuma venda');
+    return result;
   }
 
   // ==================== PEDIDOS ONLINE ====================

@@ -685,8 +685,28 @@ export const adminAPI = {
 
   // Users
   getUsers: async () => {
-    const response = await api.get('/admin/users');
-    return response.data;
+    const allUsers = [];
+    let page = 1;
+    const limit = 50; // Buscar em lotes de 50 para evitar timeouts
+
+    while (true) {
+      const response = await api.get('/admin/users', {
+        params: { page, limit }
+      });
+
+      const data = response.data;
+      const users = data.users || [];
+      allUsers.push(...users);
+
+      // Se não há mais páginas ou se o número de usuários retornados é menor que o limite, paramos
+      if (!data.pagination || users.length < limit || page >= data.pagination.pages) {
+        break;
+      }
+
+      page++;
+    }
+
+    return { users: allUsers };
   },
 
   getAllUsers: async (page = 1, limit = 10, search = '') => {

@@ -51,21 +51,21 @@ export default function UsersPage() {
   const loadUsersData = async () => {
     try {
       setIsLoading(true);
-      
+
       const [usersData, storesData] = await Promise.all([
         adminAPI.getUsers(),
         adminAPI.getStores()
       ]);
 
       const usersArray = Array.isArray(usersData) ? usersData : (usersData?.users || []);
-      
-      const filteredUsers = usersArray.filter((user: any) => 
-        user.role === 'ADMIN' || 
-        user.role === 'STORE_MANAGER' || 
+
+      const filteredUsers = usersArray.filter((user: any) =>
+        user.role === 'ADMIN' ||
+        user.role === 'STORE_MANAGER' ||
         user.role === 'CASHIER' ||
         user.role === 'EMPLOYEE'
       );
-      
+
       setUsers(filteredUsers);
       
       const storesArray = Array.isArray(storesData) ? storesData : (storesData?.stores || []);
