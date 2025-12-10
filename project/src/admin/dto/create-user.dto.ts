@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsEnum, IsOptional, IsUUID, MinLength, MaxLength, IsBoolean, IsObject, IsNumberString, ValidateIf } from 'class-validator';
+import { IsString, IsEmail, IsEnum, IsOptional, IsUUID, MinLength, MaxLength, IsBoolean, IsObject, IsNumberString, ValidateIf, IsNotEmpty } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole } from '@prisma/client';
 import { IsStringOrNumber } from '../decorators/string-or-number.decorator';
@@ -20,13 +20,16 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   role: UserRole;
 
-  @IsOptional()
-  @IsStringOrNumber()
   @Transform(({ value }) => {
-    if (value === undefined || value === null) return undefined;
-    return String(value);
+    // Converter string vazia para undefined para que @IsOptional() funcione corretamente
+    if (value === '' || value === null) {
+      return undefined;
+    }
+    return value;
   })
-  storeId?: string;
+  @IsOptional()
+  @IsUUID()
+  storeId?: string | null;
 
   @IsOptional()
   @IsString()

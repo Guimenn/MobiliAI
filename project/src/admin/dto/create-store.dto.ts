@@ -1,4 +1,5 @@
 import { IsString, IsEmail, IsOptional, IsUUID, MinLength, MaxLength, IsArray } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateStoreDto {
   @IsString()
@@ -20,6 +21,13 @@ export class CreateStoreDto {
   email: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    // Converter string vazia para undefined para que @IsOptional() funcione corretamente
+    if (value === '' || value === null) {
+      return undefined;
+    }
+    return value;
+  })
   @IsUUID()
   managerId?: string;
 

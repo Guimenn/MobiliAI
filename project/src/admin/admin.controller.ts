@@ -79,6 +79,7 @@ export class AdminController {
   }
 
   @Put('users/:id')
+  @UseInterceptors(TransformUserDataInterceptor)
   async updateUser(
     @Param('id') id: string,
     @Body() userData: UpdateUserDto
@@ -721,6 +722,12 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
   async getStoreInventory(@Param('id') storeId: string) {
     return this.adminService.getStoreInventory(storeId);
+  }
+
+  @Get('stores/:id/catalog')
+  @Roles(UserRole.ADMIN, UserRole.STORE_MANAGER)
+  async getStoreCatalog(@Param('id') storeId: string) {
+    return this.adminService.getStoreCatalog(storeId);
   }
 
   @Get('stores/:id/inventory/available-products')

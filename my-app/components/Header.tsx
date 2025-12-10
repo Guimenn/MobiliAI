@@ -997,9 +997,26 @@ export default function Header() {
                         <div className="px-4 py-3 bg-gray-50 rounded-t-2xl">
                           <div className="flex items-center space-x-3">
                             <div className="relative">
-                              <div className="w-10 h-10 bg-gradient-to-br from-[#3e2626] to-[#5a3a3a] rounded-full flex items-center justify-center shadow-lg">
-                                <User className="h-5 w-5 text-white" />
-                              </div>
+                              {user?.avatarUrl ? (
+                                <img
+                                  src={user.avatarUrl}
+                                  alt={user.name || 'Foto do perfil'}
+                                  className="w-10 h-10 rounded-full object-cover shadow-lg border border-gray-100"
+                                  onError={(e) => {
+                                    e.currentTarget.onerror = null;
+                                    e.currentTarget.src = '';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-gradient-to-br from-[#3e2626] to-[#5a3a3a] rounded-full flex items-center justify-center shadow-lg text-white font-semibold">
+                                  {(user?.name || 'U')
+                                    .split(' ')
+                                    .map((n) => n[0])
+                                    .join('')
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </div>
+                              )}
                             </div>
                             <div className="flex-1">
                               <p className="text-sm font-bold text-gray-900">{user?.name || 'Usuário'}</p>

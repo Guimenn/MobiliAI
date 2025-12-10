@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsEnum, IsUUID, IsDateString, IsBoolean, IsNumber, Min } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsEnum, IsUUID, IsDateString, IsBoolean, IsNumber, Min, ValidateIf, IsNotEmpty } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserRole } from '@prisma/client';
 
@@ -39,8 +39,16 @@ export class CreateEmployeeDto {
   @IsEnum(UserRole)
   role: UserRole;
 
+  @IsOptional()
+  @Transform(({ value }) => {
+    // Converter string vazia para undefined para que @IsOptional() funcione corretamente
+    if (value === '' || value === null) {
+      return undefined;
+    }
+    return value;
+  })
   @IsUUID()
-  storeId: string;
+  storeId?: string | null;
 
   @IsOptional()
   @IsString()

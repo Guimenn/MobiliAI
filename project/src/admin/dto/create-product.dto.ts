@@ -167,6 +167,13 @@ export class CreateProductDto {
   storeId: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    // Converter string vazia para undefined para que @IsOptional() funcione corretamente
+    if (value === '' || value === null) {
+      return undefined;
+    }
+    return value;
+  })
   @IsUUID()
   supplierId?: string;
 }

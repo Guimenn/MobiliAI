@@ -550,58 +550,43 @@ export class AdminService {
         return [];
       }
 
-      // Buscar contagens de estoque em uma única query agregada (mais eficiente)
-      try {
-        const inventoryCounts = await this.prisma.storeInventory.groupBy({
-          by: ['storeId'],
-          _count: {
-            id: true
-          },
-          where: {
-            storeId: {
-              in: stores.map(s => s.id)
-            }
-          }
-        });
+      // Calcular contagem REAL de catálogo por loja (IDs únicos):
+      // - Produtos com storeId direto
+      // - Produtos via StoreInventory (sem duplicar se estiver em ambos)
+      const storeIds = stores.map(s => s.id);
 
-        // Criar um mapa de storeId -> count para acesso rápido
-        const inventoryCountMap = new Map(
-          inventoryCounts.map(item => [item.storeId, item._count.id])
-        );
+      const [directProducts, inventoryProducts] = await Promise.all([
+        this.prisma.product.findMany({
+          where: { storeId: { in: storeIds }, isActive: true },
+          select: { id: true, storeId: true }
+        }),
+        this.prisma.storeInventory.findMany({
+          where: { storeId: { in: storeIds } },
+          select: { storeId: true, productId: true }
+        })
+      ]);
 
-        // Combinar dados das lojas com contagens de estoque
-        return stores.map((store) => ({
+      const catalogMap = new Map<string, Set<string>>();
+      storeIds.forEach(id => catalogMap.set(id, new Set<string>()));
+
+      directProducts.forEach(p => catalogMap.get(p.storeId)?.add(p.id));
+      inventoryProducts.forEach(inv => catalogMap.get(inv.storeId)?.add(inv.productId));
+
+      return stores.map(store => {
+        const uniqueCount = catalogMap.get(store.id)?.size || 0;
+        const directCount = directProducts.filter(p => p.storeId === store.id).length;
+        const inventoryCount = uniqueCount - directCount >= 0 ? uniqueCount - directCount : 0;
+
+        return {
           ...store,
           _count: {
-            // Manter products como a contagem de produtos do catálogo da loja,
-            // e expor inventoryProducts como a contagem de itens no inventário.
-            ...store._count,
-            products: store._count?.products || 0,
-            inventoryProducts: inventoryCountMap.get(store.id) || 0
+            products: uniqueCount,
+            sales: store._count?.sales || 0,
+            directProducts: directCount,
+            inventoryProducts: inventoryCount
           }
-        }));
-      } catch (inventoryError: any) {
-        // Se houver erro ao contar estoque, retornar lojas com contagem padrão
-        console.error('Erro ao contar estoque das lojas:', inventoryError);
-        
-        // Verificar se é um erro de conexão
-        if (
-          inventoryError.message?.includes('shutdown') ||
-          inventoryError.message?.includes('db_termination') ||
-          inventoryError.message?.includes('not connected')
-        ) {
-          console.warn('Conexão com banco perdida, retornando lojas sem contagem de estoque');
-        }
-
-        return stores.map((store) => ({
-          ...store,
-          _count: {
-            ...store._count,
-            products: store._count.products || 0,
-            inventoryProducts: 0
-          }
-        }));
-      }
+        };
+      });
     } catch (error: any) {
       console.error('Erro ao buscar lojas:', error);
       
@@ -672,7 +657,35 @@ export class AdminService {
       throw new NotFoundException('Loja não encontrada');
     }
 
-    return store;
+    // Contar produtos no StoreInventory para esta loja
+    const [directProducts, inventoryProducts] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { storeId: id, isActive: true },
+        select: { id: true }
+      }),
+      this.prisma.storeInventory.findMany({
+        where: { storeId: id },
+        select: { productId: true }
+      })
+    ]);
+
+    const uniqueIds = new Set<string>();
+    directProducts.forEach(p => uniqueIds.add(p.id));
+    inventoryProducts.forEach(inv => uniqueIds.add(inv.productId));
+
+    const directProductsCount = directProducts.length;
+    const uniqueCount = uniqueIds.size;
+    const inventoryCount = uniqueCount - directProductsCount >= 0 ? uniqueCount - directProductsCount : 0;
+
+    return {
+      ...store,
+      _count: {
+        products: uniqueCount,
+        sales: store._count?.sales || 0,
+        directProducts: directProductsCount,
+        inventoryProducts: inventoryCount
+      }
+    };
   }
 
   async createStore(storeData: {
@@ -1660,7 +1673,7 @@ export class AdminService {
     state?: string;
     zipCode?: string;
     role: any;
-    storeId: string;
+    storeId?: string;
     department?: string;
     position?: string;
     salary?: number;
@@ -2766,6 +2779,112 @@ export class AdminService {
 
   // ==================== ESTOQUE POR LOJA ====================
 
+  async getStoreCatalog(storeId: string) {
+    // Verificar se a loja existe
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId }
+    });
+
+    if (!store) {
+      throw new NotFoundException('Loja não encontrada');
+    }
+
+    // Buscar produtos do catálogo da loja:
+    // 1. Produtos com storeId direto nesta loja
+    // 2. Produtos disponíveis via StoreInventory (mesmo com quantidade 0)
+    const [directProducts, inventoryProducts] = await Promise.all([
+      // Produtos com storeId direto
+      this.prisma.product.findMany({
+        where: {
+          storeId,
+          isActive: true
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          category: true,
+          price: true,
+          costPrice: true,
+          sku: true,
+          barcode: true,
+          imageUrl: true,
+          imageUrls: true,
+          brand: true,
+          colorName: true,
+          colorHex: true,
+          isActive: true,
+          isAvailable: true,
+          stock: true,
+          storeId: true
+        }
+      }),
+      // Produtos via StoreInventory
+      this.prisma.storeInventory.findMany({
+        where: { storeId },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              category: true,
+              price: true,
+              costPrice: true,
+              sku: true,
+              barcode: true,
+              imageUrl: true,
+              imageUrls: true,
+              brand: true,
+              colorName: true,
+              colorHex: true,
+              isActive: true,
+              isAvailable: true,
+              stock: true,
+              storeId: true
+            }
+          }
+        }
+      })
+    ]);
+
+    // Combinar produtos, removendo duplicatas (priorizar StoreInventory se existir ambos)
+    const productMap = new Map();
+
+    // Adicionar produtos diretos
+    directProducts.forEach(product => {
+      productMap.set(product.id, {
+        id: product.id,
+        quantity: 0, // Produtos diretos não têm quantidade específica no StoreInventory
+        minStock: 0,
+        maxStock: null,
+        location: null,
+        notes: null,
+        product
+      });
+    });
+
+    // Adicionar/sobrescrever com produtos do StoreInventory
+    inventoryProducts.forEach(inventory => {
+      productMap.set(inventory.productId, {
+        id: inventory.id,
+        quantity: inventory.quantity,
+        minStock: inventory.minStock,
+        maxStock: inventory.maxStock,
+        location: inventory.location,
+        notes: inventory.notes,
+        product: inventory.product
+      });
+    });
+
+    // Converter para array
+    const catalogItems = Array.from(productMap.values());
+
+    console.log(`[getStoreCatalog] Loja ${storeId}: retornando ${catalogItems.length} produtos no catálogo`);
+
+    return catalogItems;
+  }
+
   async getStoreInventory(storeId: string) {
     // Verificar se a loja existe
     const store = await this.prisma.store.findUnique({
@@ -2949,13 +3068,27 @@ export class AdminService {
     }
 
     // Buscar produtos que já estão no catálogo desta loja
-    const catalogProducts = await this.prisma.product.findMany({
+    // 1. Produtos com storeId direto nesta loja
+    const directCatalogProducts = await this.prisma.product.findMany({
       where: { storeId },
       select: { id: true }
     });
-    const catalogProductIds = catalogProducts.map(p => p.id);
 
-    console.log(`[getGlobalProductsForCatalog] Loja ${storeId}: ${catalogProductIds.length} produtos já no catálogo`);
+    // 2. Produtos disponíveis nesta loja via StoreInventory
+    const inventoryProducts = await this.prisma.storeInventory.findMany({
+      where: { storeId },
+      select: { productId: true }
+    });
+
+    // Combinar IDs únicos de produtos no catálogo
+    const catalogProductIds = [
+      ...new Set([
+        ...directCatalogProducts.map(p => p.id),
+        ...inventoryProducts.map(p => p.productId)
+      ])
+    ];
+
+    console.log(`[getGlobalProductsForCatalog] Loja ${storeId}: ${catalogProductIds.length} produtos já no catálogo (${directCatalogProducts.length} direto + ${inventoryProducts.length} via StoreInventory)`);
 
     const whereClause: any = {
       isActive: true,
@@ -3033,23 +3166,42 @@ export class AdminService {
       throw new NotFoundException('Produto não encontrado');
     }
 
-    // Verificar se o produto já está no catálogo desta loja
-    if (product.storeId === storeId) {
+    // Verificar se o produto já está no catálogo desta loja (via StoreInventory)
+    const existingInventory = await this.prisma.storeInventory.findUnique({
+      where: {
+        storeId_productId: {
+          storeId,
+          productId
+        }
+      }
+    });
+
+    if (existingInventory) {
       throw new BadRequestException('Produto já está no catálogo desta loja');
     }
 
-    // Atualizar o storeId do produto para adicioná-lo ao catálogo da loja
-    const updatedProduct = await this.prisma.product.update({
-      where: { id: productId },
-      data: { storeId },
+    // Criar registro no StoreInventory com quantidade 0 para adicionar ao catálogo
+    // Isso permite que o produto apareça no catálogo da loja sem alterar sua loja principal
+    const storeInventory = await this.prisma.storeInventory.create({
+      data: {
+        storeId,
+        productId,
+        quantity: 0, // Quantidade inicial 0 - apenas no catálogo, não no estoque
+        minStock: 0
+      },
       include: {
+        product: {
+          include: {
+            store: { select: { id: true, name: true } }
+          }
+        },
         store: { select: { id: true, name: true } }
       }
     });
 
-    console.log(`[addProductToStoreCatalog] Produto ${productId} adicionado ao catálogo da loja ${storeId}`);
+    console.log(`[addProductToStoreCatalog] Produto ${productId} adicionado ao catálogo da loja ${storeId} via StoreInventory`);
 
-    return updatedProduct;
+    return storeInventory;
   }
 
   async updateStoreInventory(storeId: string, productId: string, inventoryData: {

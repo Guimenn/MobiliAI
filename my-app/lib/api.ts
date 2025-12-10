@@ -836,6 +836,11 @@ export const adminAPI = {
     return response.data;
   },
 
+  getStoreCatalog: async (storeId: string) => {
+    const response = await api.get(`/admin/stores/${storeId}/catalog`);
+    return response.data;
+  },
+
   updateStoreInventory: async (storeId: string, productId: string, inventoryData: {
     quantity?: number;
     minStock?: number;

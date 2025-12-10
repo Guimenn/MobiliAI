@@ -125,7 +125,7 @@ export default function NewUserPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validar campos obrigatórios
     if (!formData.name || !formData.email || !formData.password) {
       alert('Por favor, preencha todos os campos obrigatórios (Nome, E-mail e Senha).');
@@ -139,17 +139,20 @@ export default function NewUserPage() {
       return;
     }
 
+    // Validar que STORE_MANAGER pode ter uma loja (opcional)
+    // Usuários podem ser criados sem loja para upload de avatar
+
     setLoading(true);
 
-    // Preparar dados para envio - remover campos vazios
+    // Preparar dados para envio - campos vazios viram null
     const userData: any = {
-      name: formData.name,
-      email: formData.email,
+      name: formData.name.trim(),
+      email: formData.email.trim(),
       password: formData.password,
       role: formData.role,
-      ...(formData.phone && { phone: formData.phone }),
-      ...(formData.address && { address: formData.address }),
-      ...(formData.storeId && { storeId: formData.storeId }),
+      phone: formData.phone && formData.phone.trim() ? formData.phone.trim() : null,
+      address: formData.address && formData.address.trim() ? formData.address.trim() : null,
+      storeId: formData.storeId && formData.storeId.trim() ? formData.storeId.trim() : null,
       ...(workingHours && { workingHours })
     };
 
@@ -334,16 +337,15 @@ export default function NewUserPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="storeId">Loja *</Label>
+                    <Label htmlFor="storeId">Loja (opcional)</Label>
                     <select
                       id="storeId"
                       name="storeId"
                       value={formData.storeId}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
                     >
-                      <option value="">Selecione uma loja</option>
+                      <option value="">Nenhuma loja</option>
                       {stores.map((store) => (
                         <option key={store.id} value={store.id}>
                           {store.name}

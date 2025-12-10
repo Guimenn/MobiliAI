@@ -129,10 +129,10 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
   const loadInventory = async () => {
     try {
       setIsLoading(true);
-      const data = await adminAPI.getStoreInventory(storeId);
+      const data = await adminAPI.getStoreCatalog(storeId);
       setInventory(data);
     } catch (error) {
-      console.error('Erro ao carregar estoque:', error);
+      console.error('Erro ao carregar catálogo:', error);
     } finally {
       setIsLoading(false);
     }
@@ -290,10 +290,10 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Estoque da Loja</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Catálogo da Loja</h3>
           <p className="text-sm text-gray-600">
-            O total de produtos abaixo refere-se ao catálogo vinculado a esta loja. 
-            Para vender, distribua produtos ao estoque da loja.
+            Lista completa de produtos disponíveis nesta loja. Produtos no catálogo podem ter ou não estoque físico.
+            Para definir quantidade física, use "Adicionar ao Estoque".
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -345,7 +345,7 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">No Estoque (SKUs)</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">No Catálogo</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold text-gray-900">{inventory.length}</div>
@@ -396,18 +396,18 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
       {/* Inventory Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Produtos no Estoque</CardTitle>
-          <CardDescription>Lista completa de produtos com seus estoques nesta loja</CardDescription>
+          <CardTitle>Produtos no Catálogo</CardTitle>
+          <CardDescription>Lista completa de produtos disponíveis nesta loja</CardDescription>
         </CardHeader>
         <CardContent>
           {filteredInventory.length === 0 ? (
             <div className="text-center py-12">
               <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {searchTerm ? 'Nenhum produto encontrado' : 'Nenhum produto no estoque'}
+                {searchTerm ? 'Nenhum produto encontrado' : 'Nenhum produto no catálogo'}
               </h3>
               <p className="text-gray-500">
-                {searchTerm ? 'Tente buscar por outro termo' : 'Adicione produtos ao estoque desta loja'}
+                {searchTerm ? 'Tente buscar por outro termo' : 'Adicione produtos ao catálogo desta loja'}
               </p>
             </div>
           ) : (
@@ -816,11 +816,40 @@ export default function StoreInventory({ storeId }: StoreInventoryProps) {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Buscar Produto (global)</Label>
-              <Input
-                placeholder="Digite o nome, SKU ou código de barras..."
-                value={searchGlobal}
-                onChange={(e) => setSearchGlobal(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Digite o nome, SKU ou código de barras..."
+                  value={searchGlobal}
+                  onChange={(e) => setSearchGlobal(e.target.value)}
+                  className="flex-1"
+                />
+                {globalProducts.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const allSelected = globalProducts.every(p => selectedProducts.has(p.id));
+                      if (allSelected) {
+                        // Desselecionar todos os produtos visíveis
+                        const newSelected = new Set(selectedProducts);
+                        globalProducts.forEach(p => newSelected.delete(p.id));
+                        setSelectedProducts(newSelected);
+                      } else {
+                        // Selecionar todos os produtos visíveis
+                        const newSelected = new Set(selectedProducts);
+                        globalProducts.forEach(p => newSelected.add(p.id));
+                        setSelectedProducts(newSelected);
+                      }
+                    }}
+                    className="whitespace-nowrap"
+                  >
+                    {globalProducts.every(p => selectedProducts.has(p.id))
+                      ? 'Desselecionar Todos'
+                      : 'Selecionar Todos'}
+                  </Button>
+                )}
+              </div>
             </div>
             {selectedProducts.size > 0 && (
               <div className="bg-[#3e2626]/10 border border-[#3e2626]/20 rounded-lg p-3 flex items-center justify-between">

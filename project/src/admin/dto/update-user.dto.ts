@@ -17,6 +17,13 @@ export class UpdateUserDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
+  @Transform(({ value }) => {
+    // Converter string vazia para undefined para que @IsOptional() funcione corretamente
+    if (value === '' || value === null) {
+      return undefined;
+    }
+    return value;
+  })
   @IsOptional()
   @IsUUID()
   storeId?: string;

@@ -123,10 +123,30 @@ export default function EditUserModal({ isOpen, onClose, user, onSave }: EditUse
         }
       }
 
-      const userData = {
-        ...formData,
-        ...(workingHours && { workingHours })
+      // Preparar dados para envio, removendo campos vazios
+      const userData: any = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        isActive: formData.isActive,
       };
+
+      // Adicionar campos opcionais apenas se tiverem valor
+      if (formData.phone && formData.phone.trim() !== '') {
+        userData.phone = formData.phone;
+      }
+      if (formData.address && formData.address.trim() !== '') {
+        userData.address = formData.address;
+      }
+      if (formData.storeId && formData.storeId.trim() !== '') {
+        userData.storeId = formData.storeId;
+      }
+      if (formData.avatarUrl && formData.avatarUrl.trim() !== '') {
+        userData.avatarUrl = formData.avatarUrl;
+      }
+      if (workingHours) {
+        userData.workingHours = workingHours;
+      }
 
       await onSave(user.id, userData);
       onClose();

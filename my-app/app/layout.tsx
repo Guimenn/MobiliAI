@@ -19,7 +19,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "MobiliAI",
-  description: "Sistema de Gestão",
+  description: "Sistema de Gestão para Lojas de Tintas com Visualização de móveis via IA",
+  icons: {
+    icon: "/favicon/favicon.ico",
+  },
 };
 
 export default function RootLayout({

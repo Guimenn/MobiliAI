@@ -640,7 +640,15 @@ export class ManagerService {
       where: { id: productId },
       include: {
         store: { select: { id: true, name: true } },
-        supplier: { select: { id: true, name: true } }
+        supplier: { select: { id: true, name: true } },
+        storeInventory: {
+          where: { storeId: manager.store.id },
+          select: {
+            storeId: true,
+            quantity: true,
+            minStock: true
+          }
+        }
       }
     });
 
@@ -648,9 +656,25 @@ export class ManagerService {
       throw new NotFoundException('Produto não encontrado');
     }
 
-    // Verificar se o produto pertence à loja do gerente
-    if (product.storeId !== manager.store.id) {
-      throw new ForbiddenException('Você só pode visualizar produtos da sua própria loja');
+    // Verificar se o produto pertence à loja do gerente:
+    // - diretamente pelo storeId
+    // - ou via StoreInventory (produto compartilhado)
+    const isDirectFromStore = product.storeId === manager.store.id;
+    const isInStoreInventory = product.storeInventory && product.storeInventory.length > 0;
+
+    if (!isDirectFromStore && !isInStoreInventory) {
+      throw new ForbiddenException('Você só pode visualizar produtos do catálogo da sua loja');
+    }
+
+    // Se estiver via StoreInventory, priorizar estoque do StoreInventory para exibição
+    if (isInStoreInventory && !isDirectFromStore) {
+      const inv = product.storeInventory[0];
+      return {
+        ...product,
+        stock: inv.quantity ?? 0,
+        minStock: inv.minStock ?? product.minStock ?? 0,
+        storeId: manager.store.id
+      } as any;
     }
 
     return product;
