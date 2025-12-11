@@ -10,7 +10,7 @@
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "position": [
         1040,
-        780
+        784
       ],
       "webhookId": "f406671e-c954-4691-b39a-66c90aa2f103",
       "typeVersion": 1
@@ -21,12 +21,12 @@
         "sessionKey": "={{ $json.sessionId }}",
         "contextWindowLength": 20
       },
-      "id": "f6ef3bee-31e4-4fda-817c-67377a446fb7",
+      "id": "28e52cd9-43ce-4616-91cb-744f261617d5",
       "name": "Window Buffer Memory",
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "position": [
-        2272,
-        1024
+        2064,
+        656
       ],
       "typeVersion": 1.2
     },
@@ -37,12 +37,12 @@
           "temperature": 0.7
         }
       },
-      "id": "f9b47535-b15a-4495-9c90-75fdc30fee3d",
+      "id": "cfc2fff0-b749-4e7c-89af-c6bf027288a2",
       "name": "OpenAI Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "position": [
-        2144,
-        1024
+        1936,
+        656
       ],
       "typeVersion": 1,
       "credentials": {
@@ -60,12 +60,12 @@
           "systemMessage": "Você é um assistente virtual inteligente e amigável da MobiliAI, uma loja especializada em móveis e decoração. Seu objetivo é ajudar os clientes APENAS com dúvidas relacionadas à MobiliAI, produtos, compras, entregas e serviços da loja.\n\n**REGRA CRÍTICA - ESCOPO DE ATENDIMENTO:**\nVocê DEVE responder APENAS perguntas relacionadas a:\n- Produtos da MobiliAI (móveis, decoração, categorias, estilos, materiais)\n- Processo de compra na loja\n- Entregas, frete e prazos\n- Pedidos e rastreamento\n- Políticas da loja (troca, devolução, garantia)\n- Funcionamento do site e funcionalidades\n- Localização e horários das lojas físicas\n- Pagamentos e formas de pagamento\n- Conta do cliente e perfil\n\n**VOCÊ NÃO DEVE RESPONDER perguntas sobre:**\n- História, política, geografia, ciências gerais\n- Eventos históricos (guerras, batalhas, etc.)\n- Assuntos gerais não relacionados à MobiliAI\n- Outros negócios ou empresas\n- Tópicos educacionais gerais\n- Notícias ou atualidades não relacionadas à loja\n- Qualquer assunto que não seja sobre móveis, decoração ou serviços da MobiliAI\n\n**COMO RECUSAR PERGUNTAS FORA DO ESCOPO:**\nQuando receber uma pergunta que NÃO seja sobre a MobiliAI, produtos, compras ou serviços da loja, você DEVE responder educadamente:\n\n\"Desculpe, mas sou especializado em ajudar com questões relacionadas à MobiliAI - nossos produtos, compras, entregas e serviços. 😊\n\nPosso te ajudar com:\n• Informações sobre nossos móveis e produtos\n• Processo de compra e entrega\n• Dúvidas sobre pedidos\n• Políticas da loja\n• Qualquer outra questão relacionada à MobiliAI\n\nComo posso te ajudar hoje?\"\n\n**SOBRE A MOBILIAI:**\n- Loja de móveis e decoração com múltiplas filiais\n- Sistema de compra online com carrinho de compras\n- Entrega para todo o Brasil\n- Visualização de móveis em ambientes usando IA\n- Sistema de favoritos e comparação de produtos\n\n**SUAS RESPONSABILIDADES:**\n1. **Dúvidas sobre Entrega:**\n   - Prazos de entrega: Entrega Padrão (5-10 dias úteis, R$ 29,90), Entrega Expressa (2-5 dias úteis, R$ 49,90), Retirada na Loja (grátis)\n   - Frete grátis para compras acima de R$ 299,90\n   - Áreas de cobertura: Grande São Paulo, Região Metropolitana do Rio de Janeiro, Grande Belo Horizonte, Região Metropolitana de Curitiba, Grande Porto Alegre, Região Metropolitana de Brasília e outras regiões do Brasil\n   - Rastreamento de pedidos via código enviado por email e SMS\n   - Status: Pedido Confirmado → Em Trânsito → Entregue\n\n2. **Como Usar a Loja:**\n   - Navegar pelo catálogo de produtos\n   - Buscar produtos por nome, categoria, marca, estilo\n   - Filtrar por preço, categoria, estilo\n   - Adicionar produtos ao carrinho\n   - Visualizar detalhes do produto\n   - Adicionar produtos aos favoritos\n   - Comparar produtos\n   - Finalizar compra no checkout\n   - Pagamento via PIX (AbacatePay)\n\n3. **Produtos e Móveis:**\n   - Catálogo com diversas categorias: Sofá, Mesa, Cadeira, Armário, Cama, etc.\n   - Diferentes estilos: Moderno, Clássico, Contemporâneo, etc.\n   - Materiais: Madeira, Metal, Vidro, Tecido, etc.\n   - Produtos em destaque: Featured, Novos, Best Sellers\n   - Visualização 3D de produtos\n   - Visualização de móveis em ambientes usando IA\n\n4. **Processo de Compra:**\n   - Criar conta ou fazer login\n   - Navegar e adicionar produtos ao carrinho\n   - Revisar carrinho e ajustar quantidades\n   - Preencher dados de entrega\n   - Escolher forma de pagamento (PIX)\n   - Confirmar pedido\n   - Acompanhar pedido pelo código de rastreamento\n\n5. **Outras Dúvidas:**\n   - Horários de funcionamento das lojas físicas\n   - Localização das lojas\n   - Política de troca e devolução\n   - Garantia dos produtos\n   - Formas de pagamento\n   - Programa de fidelidade (se houver)\n\n**DIRETRIZES DE COMUNICAÇÃO:**\n- Seja sempre educado, prestativo e profissional\n- Use linguagem clara e acessível\n- Responda de forma completa, mas concisa\n- Se não souber algo sobre a MobiliAI, seja honesto e ofereça conectar o cliente com um atendente humano\n- Use emojis moderadamente para tornar a conversa mais amigável\n- Sempre confirme se a dúvida foi esclarecida\n- Se o cliente precisar de ajuda mais complexa, ofereça conectar com um humano\n- NUNCA responda perguntas fora do escopo da MobiliAI - sempre recuse educadamente\n\n**QUANDO ENVIAR PARA ATENDENTE HUMANO:**\n- Cliente explicitamente pede para falar com uma pessoa\n- Dúvida muito complexa sobre a MobiliAI que você não consegue resolver\n- Problema técnico ou reclamação\n- Solicitação especial ou personalizada\n- Antes de enviar, sempre colete: nome completo, email e descrição detalhada da dúvida\n\n**EXEMPLOS DE RESPOSTAS:**\n\nCliente: \"Qual o prazo de entrega?\"\nVocê: \"Temos três opções de entrega:\n• Entrega Padrão: 5 a 10 dias úteis - R$ 29,90\n• Entrega Expressa: 2 a 5 dias úteis - R$ 49,90\n• Retirada na Loja: Grátis e imediata\n\nE tem mais: compras acima de R$ 299,90 têm frete grátis! 🎉\n\nQual opção você prefere?\"\n\nCliente: \"Como faço para comprar?\"\nVocê: \"É super simples! 😊\n\n1️⃣ Navegue pelo nosso catálogo e encontre os móveis que você gosta\n2️⃣ Clique em 'Adicionar ao Carrinho' nos produtos desejados\n3️⃣ Vá até o carrinho e revise seus itens\n4️⃣ Clique em 'Finalizar Compra'\n5️⃣ Preencha seus dados de entrega\n6️⃣ Escolha a forma de pagamento (aceitamos PIX)\n7️⃣ Confirme seu pedido!\n\nApós a confirmação, você receberá um código de rastreamento por email. Precisa de ajuda com algum passo específico?\"\n\nCliente: \"Vocês entregam em [cidade]?\"\nVocê: \"Sim! Entregamos para todo o Brasil! 🚚\n\nPara as principais regiões metropolitanas (São Paulo, Rio, Belo Horizonte, Curitiba, Porto Alegre e Brasília), temos entrega mais rápida.\n\nPara outras cidades, o prazo e valor do frete são calculados no checkout baseado no seu endereço.\n\nQual é sua cidade? Posso te dar uma estimativa mais precisa!\"\n\nCliente: \"O que foi a Segunda Guerra Mundial?\"\nVocê: \"Desculpe, mas sou especializado em ajudar com questões relacionadas à MobiliAI - nossos produtos, compras, entregas e serviços. 😊\n\nPosso te ajudar com:\n• Informações sobre nossos móveis e produtos\n• Processo de compra e entrega\n• Dúvidas sobre pedidos\n• Políticas da loja\n• Qualquer outra questão relacionada à MobiliAI\n\nComo posso te ajudar hoje?\"\n\n**IMPORTANTE:**\n- Sempre responda em português brasileiro\n- Seja empático e entenda as necessidades do cliente\n- NÃO responda perguntas fora do escopo da MobiliAI - sempre recuse educadamente\n- Não invente informações que você não tem certeza\n- Se não souber algo sobre a MobiliAI, seja honesto e ofereça ajuda alternativa"
         }
       },
-      "id": "552da966-72e1-4f9b-a2d2-27dc03ee1f1b",
+      "id": "1ed8a751-23eb-4498-b533-9809a53b7a26",
       "name": "AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "position": [
-        2192,
-        800
+        2000,
+        432
       ],
       "typeVersion": 1.6
     },
@@ -94,12 +94,12 @@
         },
         "options": {}
       },
-      "id": "547c72e7-0f7b-4c4e-99b7-52ea68c1d873",
+      "id": "21ec3952-595b-409d-91bb-bfd6e3da5a03",
       "name": "If",
       "type": "n8n-nodes-base.if",
       "position": [
-        1472,
-        1152
+        1264,
+        784
       ],
       "typeVersion": 2.2
     },
@@ -109,12 +109,12 @@
         "responseBody": "{\n  \"output\": \"Olá! Sou o assistente virtual da MobiliAI. Como posso te ajudar hoje? Posso ajudar com informações sobre produtos, entrega, pedidos e muito mais! 😊\"\n}",
         "options": {}
       },
-      "id": "e59cbf4e-d527-4029-a0e3-b1da2ccdfb23",
+      "id": "60a4af33-c2a1-4559-9faf-585c4354a99c",
       "name": "Respond With Initial Message",
       "type": "n8n-nodes-base.respondToWebhook",
       "position": [
-        1696,
-        1248
+        1488,
+        880
       ],
       "typeVersion": 1.1
     },
@@ -144,16 +144,14 @@
               "name": "subject"
             }
           ]
-        },
-        "specifyInputSchema": true,
-        "jsonSchemaExample": "{\n  \"name\": \"nome completo do cliente\",\n  \"email\": \"email do cliente\",\n  \"message\": \"descrição detalhada da dúvida ou problema do cliente\",\n  \"subject\": \"assunto da mensagem\"\n}"
+        }
       },
-      "id": "ee3dd5d3-8a94-4959-8097-bc1045ca9bd3",
+      "id": "b52e87d9-b44b-4cea-970c-af6e7030afda",
       "name": "Send Message",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "position": [
-        2400,
-        1024
+        2192,
+        656
       ],
       "typeVersion": 1.2
     },
@@ -165,22 +163,22 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        2608,
-        912
+        2400,
+        544
       ],
-      "id": "e330a6f4-820c-4dc7-a7e2-584532c10a14",
+      "id": "79138fe1-9d35-400d-983d-fde302472428",
       "name": "Respond to Webhook"
     },
     {
       "parameters": {
         "jsCode": "// Palavras-chave relacionadas ao negócio da MobiliAI\nconst relevantKeywords = [\n  'mobiliai', 'mobili', 'móvel', 'móveis', 'moveis',\n  'sofa', 'sofá', 'mesa', 'cadeira', 'armário', 'armario', 'cama',\n  'decoração', 'decoracao', 'produto', 'produtos',\n  'compra', 'comprar', 'carrinho', 'checkout', 'pedido', 'pedidos',\n  'entrega', 'frete', 'prazo', 'rastreamento', 'rastrear',\n  'loja', 'lojas', 'filial', 'filiais',\n  'preço', 'preco', 'valor', 'pagamento', 'pix', 'abacatepay',\n  'garantia', 'troca', 'devolução', 'devolucao',\n  'categoria', 'categorias', 'estilo', 'estilos', 'material', 'materiais',\n  'favorito', 'favoritos', 'comparar', 'comparação', 'comparacao',\n  'visualização', 'visualizacao', 'visualizar', 'ambiente', 'ambientes',\n  'funcionamento', 'horário', 'horario', 'localização', 'localizacao',\n  'conta', 'perfil', 'login', 'cadastro', 'registro',\n  'site', 'aplicativo', 'app', 'plataforma'\n];\n\n// Palavras-chave que indicam perguntas fora do escopo\nconst offTopicKeywords = [\n  'guerra', 'batalha', 'história', 'historia', 'histórico', 'historico',\n  'política', 'politica', 'político', 'politico',\n  'geografia', 'ciência', 'ciencia', 'científico', 'cientifico',\n  'matemática', 'matematica', 'física', 'fisica', 'química', 'quimica',\n  'biologia', 'literatura', 'arte', 'música', 'musica',\n  'esporte', 'futebol', 'notícia', 'noticia', 'atualidade',\n  'educação', 'educacao', 'escola', 'universidade', 'curso',\n  'receita', 'culinária', 'culinaria', 'comida',\n  'filme', 'cinema', 'série', 'serie', 'livro',\n  'celebridade', 'famoso', 'fama'\n];\n\nconst chatInput = $input.item.json.chatInput || '';\nconst inputLower = chatInput.toLowerCase();\n\n// Verifica se contém palavras-chave relevantes\nconst hasRelevantKeyword = relevantKeywords.some(keyword => \n  inputLower.includes(keyword)\n);\n\n// Verifica se contém palavras-chave fora do escopo\nconst hasOffTopicKeyword = offTopicKeywords.some(keyword => \n  inputLower.includes(keyword)\n);\n\n// Se tem palavra fora do escopo E não tem palavra relevante, bloqueia\nif (hasOffTopicKeyword && !hasRelevantKeyword) {\n  return {\n    json: {\n      ...$input.item.json,\n      output: 'Desculpe, mas sou especializado em ajudar com questões relacionadas à MobiliAI - nossos produtos, compras, entregas e serviços. 😊\\n\\nPosso te ajudar com:\\n• Informações sobre nossos móveis e produtos\\n• Processo de compra e entrega\\n• Dúvidas sobre pedidos\\n• Políticas da loja\\n• Qualquer outra questão relacionada à MobiliAI\\n\\nComo posso te ajudar hoje?',\n      isOutOfScope: true\n    }\n  };\n}\n\n// Passa para o AI Agent processar\nreturn {\n  json: {\n    ...$input.item.json,\n    isOutOfScope: false\n  }\n};"
       },
-      "id": "82b0d435-d957-4a9c-9d62-abaf0c7c3475",
+      "id": "74e8b1b3-4aa4-4076-9b2e-4eb82ae8212f",
       "name": "Validate Question Scope1",
       "type": "n8n-nodes-base.code",
       "position": [
-        1696,
-        1056
+        1488,
+        688
       ],
       "typeVersion": 2
     },
@@ -190,12 +188,12 @@
         "responseBody": "={{ JSON.stringify({ output: $json.output }) }}",
         "options": {}
       },
-      "id": "948fd138-64f7-4b00-b69a-125b9d4b38d2",
+      "id": "390317ab-a4b0-4a62-84fe-51e3c25a7daf",
       "name": "Respond Out of Scope1",
       "type": "n8n-nodes-base.respondToWebhook",
       "position": [
-        2256,
-        1200
+        2064,
+        832
       ],
       "typeVersion": 1.1
     },
@@ -223,12 +221,12 @@
         },
         "options": {}
       },
-      "id": "a20f5440-b939-4ae4-9958-7bedcc863f5a",
+      "id": "4e136dea-361b-4712-99f9-d3cddb63d6da",
       "name": "Check If Out of Scope1",
       "type": "n8n-nodes-base.if",
       "position": [
-        1920,
-        1056
+        1712,
+        688
       ],
       "typeVersion": 2.2
     }
