@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { managerAPI, salesAPI } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'sonner';
-import { 
-  DollarSign, 
+import {
+  DollarSign,
   ShoppingCart,
   Users,
   TrendingUp,
@@ -19,10 +19,16 @@ import {
   CreditCard,
   Clock,
   Trophy,
-  Activity} from 'lucide-react';
+  Activity,
+  FileText,
+  FileSpreadsheet} from 'lucide-react';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
 
 import { Loader } from '@/components/ui/ai/loader';
+import { jsPDF } from 'jspdf';
+import { autoTable } from 'jspdf-autotable';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 const COLORS = ['#3e2626', '#6b4e3d', '#8b6f47', '#a67c52', '#c49a6a'];
 
 export default function ManagerReportsPage() {
@@ -175,7 +181,7 @@ export default function ManagerReportsPage() {
       topProducts,
       sales: salesData
     };
-    
+
     const dataStr = JSON.stringify(reportData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
@@ -185,6 +191,168 @@ export default function ManagerReportsPage() {
     link.click();
     URL.revokeObjectURL(url);
     toast.success('Relatório exportado com sucesso!');
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    let yPosition = 20;
+
+    // Título
+    doc.setFontSize(20);
+    doc.text('Relatório da Loja', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 15;
+
+    // Período
+    doc.setFontSize(12);
+    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 20, yPosition);
+    yPosition += 10;
+
+    // Resumo
+    if (summary) {
+      doc.setFontSize(14);
+      doc.text('Resumo Geral', 20, yPosition);
+      yPosition += 10;
+
+      doc.setFontSize(10);
+      const summaryData = [
+        ['Total de Vendas', summary.totalSales || 0],
+        ['Receita Total', `R$ ${Number(summary.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+        ['Lucro Total', `R$ ${Number(summary.totalProfit || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+        ['Ticket Médio', `R$ ${Number(summary.averageTicket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`]
+      ];
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Métrica', 'Valor']],
+        body: summaryData,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [62, 38, 38] },
+      });
+
+      yPosition = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // Vendas por período
+    if (salesByPeriod.length > 0) {
+      if (yPosition > pageHeight - 50) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.text('Vendas por Período', 20, yPosition);
+      yPosition += 10;
+
+      const periodData = salesByPeriod.map(item => [
+        item.period || '-',
+        item.sales || 0,
+        `R$ ${Number(item.revenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Período', 'Vendas', 'Receita']],
+        body: periodData,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [62, 38, 38] },
+      });
+
+      yPosition = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // Top Produtos
+    if (topProducts.length > 0) {
+      if (yPosition > pageHeight - 50) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.text('Top Produtos', 20, yPosition);
+      yPosition += 10;
+
+      const productData = topProducts.slice(0, 10).map((product, idx) => [
+        idx + 1,
+        product.name || 'Produto sem nome',
+        product.quantity || 0,
+        `R$ ${Number(product.revenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Posição', 'Produto', 'Quantidade', 'Receita']],
+        body: productData,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [62, 38, 38] },
+      });
+    }
+
+    // Salvar PDF
+    const fileName = `relatorio-loja-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    toast.success('PDF exportado com sucesso!');
+  };
+
+  const handleExportExcel = () => {
+    const workbook = XLSX.utils.book_new();
+
+    // Resumo
+    if (summary) {
+      const summaryData = [
+        ['Resumo Geral'],
+        [''],
+        ['Métrica', 'Valor'],
+        ['Total de Vendas', summary.totalSales],
+        ['Receita Total', `R$ ${summary.totalRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+        ['Lucro Total', `R$ ${summary.totalProfit?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+        ['Ticket Médio', `R$ ${summary.averageTicket?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ];
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumo');
+    }
+
+    // Vendas por período
+    if (salesByPeriod.length > 0) {
+      const periodData = [
+        ['Vendas por Período'],
+        [''],
+        ['Período', 'Vendas', 'Receita']
+      ].concat(
+        salesByPeriod.map(item => [
+          item.period || '-',
+          item.sales || 0,
+          (item.revenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+        ])
+      );
+      const periodSheet = XLSX.utils.aoa_to_sheet(periodData);
+      XLSX.utils.book_append_sheet(workbook, periodSheet, 'Vendas por Período');
+    }
+
+    // Top Produtos
+    if (topProducts.length > 0) {
+      const productsData = [
+        ['Top Produtos'],
+        [''],
+        ['Produto', 'Quantidade', 'Receita']
+      ].concat(
+        topProducts.map(product => [
+          product.name || 'Produto sem nome',
+          product.quantity || 0,
+          (product.revenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+        ])
+      );
+      const productsSheet = XLSX.utils.aoa_to_sheet(productsData);
+      XLSX.utils.book_append_sheet(workbook, productsSheet, 'Top Produtos');
+    }
+
+    // Salvar Excel
+    XLSX.writeFile(workbook, `relatorio-loja-${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Excel exportado com sucesso!');
   };
 
   const formatCurrency = (value: number) => {
@@ -222,15 +390,29 @@ export default function ManagerReportsPage() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Button 
-                onClick={handleDownloadReport}
-                variant="outline"
-                disabled={isLoading || !summary}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Exportar
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleExportPDF}
+                  variant="outline"
+                  disabled={isLoading || !summary}
+                  className="gap-2"
+                  title="Exportar como PDF"
+                >
+                  <FileText className="h-4 w-4" />
+                  PDF
+                </Button>
+                <Button
+                  onClick={handleExportExcel}
+                  variant="outline"
+                  disabled={isLoading || !summary}
+                  className="gap-2"
+                  title="Exportar como Excel"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Excel
+                </Button>
+                
+              </div>
               <Button 
                 onClick={loadReportsData}
                 disabled={isLoading}
